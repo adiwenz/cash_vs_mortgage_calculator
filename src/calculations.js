@@ -114,9 +114,14 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     // Cash buyer savings additions (only during the mortgage term)
     const annualSavingsAdd = y <= mortgageTerm ? annualPI : 0;
 
-    // Compound stock portfolios
-    cashBuyerStock = cashBuyerStock * (1 + cashBuyerStockRate) + annualSavingsAdd;
-    mortgageBuyerStock = mortgageBuyerStock * (1 + mortgageBuyerStockRate);
+    // Calculate annual property tax and insurance costs based on current home value
+    const propertyTax = homeValue * propertyTaxRate;
+    const insurance = homeValue * insuranceRate;
+    const annualExpenses = propertyTax + insurance;
+
+    // Compound stock portfolios and subtract annual expenses
+    cashBuyerStock = cashBuyerStock * (1 + cashBuyerStockRate) + annualSavingsAdd - annualExpenses;
+    mortgageBuyerStock = mortgageBuyerStock * (1 + mortgageBuyerStockRate) - annualExpenses;
 
     // Net Worth Calculations
     data.push({
