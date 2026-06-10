@@ -7,6 +7,7 @@
  * Formula: P * r * (1+r)^n / ((1+r)^n - 1)
  */
 export function calculateMonthlyPayment(principal, annualRate, termYears) {
+  if (termYears <= 0) return 0;
   if (annualRate === 0) return principal / (termYears * 12);
   const r = annualRate / 12;
   const n = termYears * 12;
@@ -18,6 +19,7 @@ export function calculateMonthlyPayment(principal, annualRate, termYears) {
  * Formula: PMT * (1 - (1+r)^-remaining_months) / r
  */
 export function calculateRemainingBalance(principal, annualRate, termYears, elapsedYears) {
+  if (termYears <= 0) return 0;
   if (elapsedYears >= termYears) return 0;
   const r = annualRate / 12;
   const n = termYears * 12;
