@@ -62,9 +62,7 @@ export default function AssumptionsPanel({ inputs, onChange }) {
         <div className="assumptions-group" style={{ marginTop: '1.5rem' }}>
           <div className="assumptions-group-title">Investments & Savings</div>
           {renderInput('stockReturn', 'Stock Market Return', 'number', 0.0, 0.20, 0.001, true)}
-          {renderInput('savingsRate', 'Savings Account Rate', 'number', 0.0, 0.10, 0.001, true)}
           {renderInput('mortgageBuyerInitialStock', 'Mortgage Initial Stock', 'number', 50000, 1000000, 10000, false, true)}
-          {renderInput('investmentRate503020', '50/30/20 Invest Rate', 'number', 0.0, 0.20, 0.001, true)}
         </div>
 
         <div className="assumptions-group" style={{ marginTop: '1.5rem' }}>

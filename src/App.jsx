@@ -19,20 +19,13 @@ const DEFAULT_INPUTS = {
   mortgageBuyerInitialStock: 240000,
   cashPurchaseDiscount: 50000,
   capitalGainsRate: 0.20,
-  taxablePortion: 1.0,
-  savingsRate: 0.04,
-  investmentRate503020: 0.08
+  taxablePortion: 1.0
 };
 
 // Scenario Metadata
 const SCENARIO_INFO = {
   cashBuyer: { label: 'Cash Buyer', dataKey: 'cashBuyerNW', color: '#6366f1' },
-  cashBuyerHomeOnly: { label: 'Cash Buyer Home-Only', dataKey: 'cashBuyerHomeOnlyNW', color: '#f43f5e' },
-  mortgageBuyer: { label: 'Mortgage Buyer', dataKey: 'mortgageBuyerNW', color: '#10b981' },
-  keptAsCash: { label: 'Mortgage - Kept as Cash', dataKey: 'keptAsCashNW', color: '#f59e0b' },
-  savingsAccount: { label: 'Mortgage - Savings Account', dataKey: 'savingsAccountNW', color: '#8b5cf6' },
-  completelySpent: { label: 'Mortgage - Completely Spent', dataKey: 'completelySpentNW', color: '#64748b' },
-  budgeted503020: { label: 'Mortgage - 50/30/20 Budget', dataKey: 'budgeted503020NW', color: '#ec4899' }
+  mortgageBuyer: { label: 'Mortgage Buyer', dataKey: 'mortgageBuyerNW', color: '#10b981' }
 };
 
 export default function App() {
@@ -43,12 +36,7 @@ export default function App() {
   // Visibility state for each scenario
   const [visibleScenarios, setVisibleScenarios] = useState({
     cashBuyer: true,
-    cashBuyerHomeOnly: true,
-    mortgageBuyer: true,
-    keptAsCash: true,
-    savingsAccount: true,
-    completelySpent: true,
-    budgeted503020: true
+    mortgageBuyer: true
   });
 
   // Theme synchronization

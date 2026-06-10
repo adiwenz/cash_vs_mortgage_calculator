@@ -41,7 +41,7 @@ export function calculateTaxPaid(netCashNeeded, capitalGainsRate, taxablePortion
 }
 
 /**
- * Computes the year-by-year comparison data for the 7 scenarios
+ * Computes the year-by-year comparison data for the 2 scenarios
  */
 export function calculateScenarios(inputs) {
   const {
@@ -57,9 +57,7 @@ export function calculateScenarios(inputs) {
     mortgageBuyerInitialStock,
     cashPurchaseDiscount,
     capitalGainsRate,
-    taxablePortion,
-    savingsRate,
-    investmentRate503020
+    taxablePortion
   } = inputs;
 
   const yearsToCompute = Math.max(30, mortgageTerm); // compute at least 30 years to show long term growth
@@ -94,12 +92,7 @@ export function calculateScenarios(inputs) {
     
     // Net Worths
     cashBuyerNW: homePrice + cashBuyerStock - cashBuyerTax,
-    cashBuyerHomeOnlyNW: homePrice - cashBuyerTax,
-    mortgageBuyerNW: homePrice + mortgageBuyerStock - mortgagePrincipal,
-    keptAsCashNW: homePrice - mortgagePrincipal + initialUninvestedAmount,
-    savingsAccountNW: homePrice - mortgagePrincipal + initialUninvestedAmount,
-    completelySpentNW: homePrice - mortgagePrincipal,
-    budgeted503020NW: homePrice - mortgagePrincipal + (initialUninvestedAmount * 0.2)
+    mortgageBuyerNW: homePrice + mortgageBuyerStock - mortgagePrincipal
   });
 
   // Calculate year by year
@@ -114,12 +107,6 @@ export function calculateScenarios(inputs) {
     cashBuyerStock = cashBuyerStock * (1 + stockReturn) + annualSavingsAdd;
     mortgageBuyerStock = mortgageBuyerStock * (1 + stockReturn);
 
-    // Alternative mortgage paths
-    const keptAsCashStock = initialUninvestedAmount;
-    const savingsAccountStock = initialUninvestedAmount * Math.pow(1 + savingsRate, y);
-    const completelySpentStock = 0;
-    const budgeted503020Stock = (initialUninvestedAmount * 0.2) * Math.pow(1 + investmentRate503020, y);
-
     // Net Worth Calculations
     data.push({
       year: y,
@@ -129,19 +116,10 @@ export function calculateScenarios(inputs) {
       // Stock Portfolio values for reference
       cashBuyerStock,
       mortgageBuyerStock,
-      keptAsCashStock,
-      savingsAccountStock,
-      completelySpentStock,
-      budgeted503020Stock,
 
       // Net Worths
       cashBuyerNW: homeValue + cashBuyerStock - cashBuyerTax,
-      cashBuyerHomeOnlyNW: homeValue - cashBuyerTax,
-      mortgageBuyerNW: homeValue + mortgageBuyerStock - mortgageBalance,
-      keptAsCashNW: homeValue - mortgageBalance + keptAsCashStock,
-      savingsAccountNW: homeValue - mortgageBalance + savingsAccountStock,
-      completelySpentNW: homeValue - mortgageBalance,
-      budgeted503020NW: homeValue - mortgageBalance + budgeted503020Stock
+      mortgageBuyerNW: homeValue + mortgageBuyerStock - mortgageBalance
     });
   }
 
