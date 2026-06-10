@@ -41,8 +41,18 @@ export default function AssumptionsPanel({ inputs, onChange }) {
 
   const handleChange = (key, valueString) => {
     // Strip leading zeros unless followed by decimal point
-    const sanitized = valueString.replace(/^0+(?=\d)/, '');
+    let sanitized = valueString.replace(/^0+(?=\d)/, '');
     
+    const isPercent = PERCENT_FIELDS.includes(key);
+    
+    // Clamp percentage inputs to a maximum of 100%
+    if (sanitized !== '' && sanitized !== '.') {
+      const parsedVal = parseFloat(sanitized);
+      if (!isNaN(parsedVal) && isPercent && parsedVal > 100) {
+        sanitized = '100';
+      }
+    }
+
     // Update local string state immediately to let user type freely
     setLocalValues((prev) => ({
       ...prev,
@@ -50,7 +60,6 @@ export default function AssumptionsPanel({ inputs, onChange }) {
     }));
 
     // Propagate parsed numeric value to parent for instant calculations
-    const isPercent = PERCENT_FIELDS.includes(key);
     if (sanitized === '' || sanitized === '.') {
       onChange(key, 0);
     } else {
