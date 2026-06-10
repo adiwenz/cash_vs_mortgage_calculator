@@ -19,7 +19,8 @@ const DEFAULT_INPUTS = {
   mortgageBuyerInitialStock: 240000,
   cashPurchaseDiscount: 50000,
   capitalGainsRate: 0.20,
-  taxablePortion: 1.0
+  taxablePortion: 1.0,
+  savingsRate: 0.04
 };
 
 // Scenario Metadata
@@ -32,6 +33,10 @@ export default function App() {
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+
+  // Radio Decisions state
+  const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
+  const [cashSavingsDest, setCashSavingsDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
 
   // Visibility state for each scenario
   const [visibleScenarios, setVisibleScenarios] = useState({
@@ -63,8 +68,8 @@ export default function App() {
 
   // Run financial calculations dynamically
   const calcResults = useMemo(() => {
-    return calculateScenarios(inputs);
-  }, [inputs]);
+    return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
+  }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
   // Toggle scenario visibility
   const handleToggleScenario = (key) => {
@@ -143,6 +148,100 @@ export default function App() {
 
         {/* Right Column: Results & Interactive Views */}
         <div className="results-display">
+          {/* Interactive Decisions Selector */}
+          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+              Interactive Buying Decisions
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {/* Mortgage Buyer Choice */}
+              <div>
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                  Mortgage leftover cash goes to:
+                </span>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {[
+                    { val: 'invest', label: '📈 Invest (Stock)' },
+                    { val: 'savings', label: '🏦 Savings Account' },
+                    { val: 'cash', label: '💵 Hold as Cash' }
+                  ].map((item) => (
+                    <label
+                      key={item.val}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-color)',
+                        background: mortgageLeftoverDest === item.val ? 'var(--primary-light)' : 'transparent',
+                        borderColor: mortgageLeftoverDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                        color: mortgageLeftoverDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        transition: 'all var(--transition-fast)'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="mortgageLeftoverDest"
+                        value={item.val}
+                        checked={mortgageLeftoverDest === item.val}
+                        onChange={() => setMortgageLeftoverDest(item.val)}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cash Buyer Choice */}
+              <div>
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                  Cash Buyer monthly savings go to:
+                </span>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {[
+                    { val: 'invest', label: '📈 Invest (Stock)' },
+                    { val: 'savings', label: '🏦 Savings Account' },
+                    { val: 'cash', label: '💵 Hold as Cash' }
+                  ].map((item) => (
+                    <label
+                      key={item.val}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-color)',
+                        background: cashSavingsDest === item.val ? 'var(--primary-light)' : 'transparent',
+                        borderColor: cashSavingsDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                        color: cashSavingsDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        transition: 'all var(--transition-fast)'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="cashSavingsDest"
+                        value={item.val}
+                        checked={cashSavingsDest === item.val}
+                        onChange={() => setCashSavingsDest(item.val)}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Tab Navigation */}
           <nav className="tab-nav">
             <button

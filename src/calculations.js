@@ -41,9 +41,9 @@ export function calculateTaxPaid(netCashNeeded, capitalGainsRate, taxablePortion
 }
 
 /**
- * Computes the year-by-year comparison data for the 2 scenarios
+ * Computes the year-by-year comparison data for the 2 scenarios based on active decisions
  */
-export function calculateScenarios(inputs) {
+export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest) {
   const {
     homePrice,
     downPaymentPercent,
@@ -57,14 +57,14 @@ export function calculateScenarios(inputs) {
     mortgageBuyerInitialStock,
     cashPurchaseDiscount,
     capitalGainsRate,
-    taxablePortion
+    taxablePortion,
+    savingsRate
   } = inputs;
 
   const yearsToCompute = Math.max(30, mortgageTerm); // compute at least 30 years to show long term growth
   const data = [];
 
   // Day 1 (Year 0) Calculations
-  // Merged Cash Buyer purchases home at (Home Price - Cash Purchase Discount)
   const cashBuyerPrice = homePrice - cashPurchaseDiscount;
   const cashBuyerTax = calculateTaxPaid(cashBuyerPrice, capitalGainsRate, taxablePortion);
   
@@ -76,8 +76,17 @@ export function calculateScenarios(inputs) {
   const monthlyPmt = calculateMonthlyPayment(mortgagePrincipal, mortgageRate, mortgageTerm);
   const annualPI = monthlyPmt * 12;
 
+  // Determine Growth Rates based on Radio Decisions ('invest', 'savings', 'cash')
+  const getGrowthRate = (dest) => {
+    if (dest === 'invest') return stockReturn;
+    if (dest === 'savings') return savingsRate;
+    return 0; // 'cash'
+  };
+
+  const cashBuyerStockRate = getGrowthRate(cashSavingsDest);
+  const mortgageBuyerStockRate = getGrowthRate(mortgageLeftoverDest);
+
   // Set up Year 0 values
-  // Cash buyer starts with stock equal to the cash purchase discount (if any)
   let cashBuyerStock = cashPurchaseDiscount;
   let mortgageBuyerStock = initialUninvestedAmount;
 
@@ -100,12 +109,12 @@ export function calculateScenarios(inputs) {
     const homeValue = homePrice * Math.pow(1 + homeAppreciation, y);
     const mortgageBalance = calculateRemainingBalance(mortgagePrincipal, mortgageRate, mortgageTerm, y);
     
-    // Cash buyer savings additions (only during the mortgage term, i.e. when they are "saving" the mortgage payment)
+    // Cash buyer savings additions (only during the mortgage term)
     const annualSavingsAdd = y <= mortgageTerm ? annualPI : 0;
 
-    // Stock returns
-    cashBuyerStock = cashBuyerStock * (1 + stockReturn) + annualSavingsAdd;
-    mortgageBuyerStock = mortgageBuyerStock * (1 + stockReturn);
+    // Compound stock portfolios
+    cashBuyerStock = cashBuyerStock * (1 + cashBuyerStockRate) + annualSavingsAdd;
+    mortgageBuyerStock = mortgageBuyerStock * (1 + mortgageBuyerStockRate);
 
     // Net Worth Calculations
     data.push({
