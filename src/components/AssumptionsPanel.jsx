@@ -132,7 +132,35 @@ export default function AssumptionsPanel({ inputs, onChange }) {
         <div className="assumptions-group" style={{ marginTop: '1.5rem' }}>
           <div className="assumptions-group-title">Mortgage Assumptions</div>
           {renderInput('downPaymentPercent', 'Down Payment %', 'number', 0.0, 1.0, 0.01, true)}
-          {renderInput('mortgageTerm', 'Mortgage Term (Years)', 'number', 5, 40, 1)}
+          
+          {/* Custom Mortgage Term Toggle Selector */}
+          <div className="input-wrapper" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.5rem' }}>
+            <div className="input-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="input-name" style={{ fontSize: '0.9rem' }}>Mortgage Term</span>
+              <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--bg-tertiary)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                {[15, 30].map((term) => (
+                  <button
+                    key={term}
+                    onClick={() => onChange('mortgageTerm', term)}
+                    style={{
+                      background: inputs.mortgageTerm === term ? 'var(--primary)' : 'transparent',
+                      color: inputs.mortgageTerm === term ? '#ffffff' : 'var(--text-secondary)',
+                      border: 'none',
+                      padding: '0.3rem 0.6rem',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all var(--transition-fast)'
+                    }}
+                  >
+                    {term} Years
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {renderInput('mortgageRate', 'Mortgage Rate', 'number', 0.0, 0.15, 0.001, true)}
         </div>
 
