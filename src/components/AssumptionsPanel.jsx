@@ -28,7 +28,22 @@ export default function AssumptionsPanel({ inputs, onChange }) {
               step={isPercent ? step * 100 : step}
               onChange={(e) => {
                 const val = e.target.value;
-                handleChange(key, isPercent ? parseFloat(val) / 100 : parseFloat(val));
+                // Strip leading zeros unless it's just '0' or followed by a decimal point
+                const sanitized = val.replace(/^0+(?=\d)/, '');
+                e.target.value = sanitized;
+                
+                if (sanitized === '') {
+                  handleChange(key, 0);
+                } else {
+                  const parsed = parseFloat(sanitized);
+                  handleChange(key, isPercent ? parsed / 100 : parsed);
+                }
+              }}
+              onBlur={(e) => {
+                // If blurred and empty, restore the display value
+                if (e.target.value === '') {
+                  e.target.value = displayVal.toString();
+                }
               }}
             />
             {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '500' }}>%</span>}

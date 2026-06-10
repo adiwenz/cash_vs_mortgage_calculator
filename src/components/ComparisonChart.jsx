@@ -28,7 +28,7 @@ const formatYAxis = (val) => {
   return `$${val}`;
 };
 
-export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax }) {
+export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange }) {
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -54,9 +54,33 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
 
   return (
     <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div className="card-header">
-        <h2 className="card-title">Net Worth Comparison Over Time</h2>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Click legend items to hide/show</span>
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 className="card-title">Net Worth Comparison Over Time</h2>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Adjust assumptions on the left to see changes instantly</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
+          {[5, 10, 15, 30].map((years) => (
+            <button
+              key={years}
+              onClick={() => onZoomChange(years)}
+              style={{
+                background: zoomRange === years ? 'var(--primary)' : 'transparent',
+                color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '0.35rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              {years === 30 ? 'All (30y)' : `${years}y`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Scenario Checkbox Toggles */}

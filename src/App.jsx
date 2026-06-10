@@ -38,6 +38,9 @@ export default function App() {
   const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
   const [cashSavingsDest, setCashSavingsDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
 
+  // Chart Zoom Range state
+  const [zoomRange, setZoomRange] = useState(30); // 5 | 10 | 15 | 30
+
   // Visibility state for each scenario
   const [visibleScenarios, setVisibleScenarios] = useState({
     cashBuyer: true,
@@ -71,19 +74,20 @@ export default function App() {
     return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
-  // Calculate invested baseline for Y-axis scale
+  // Calculate invested baseline for Y-axis scale based on zoom range
   const investResults = useMemo(() => {
     return calculateScenarios(inputs, 'invest', 'invest');
   }, [inputs]);
 
   const maxInvestNW = useMemo(() => {
     let maxVal = 0;
-    investResults.data.forEach((row) => {
+    const zoomedBaseline = investResults.data.slice(0, zoomRange + 1);
+    zoomedBaseline.forEach((row) => {
       if (row.cashBuyerNW > maxVal) maxVal = row.cashBuyerNW;
       if (row.mortgageBuyerNW > maxVal) maxVal = row.mortgageBuyerNW;
     });
     return Math.ceil(maxVal * 1.05); // Add 5% padding
-  }, [investResults]);
+  }, [investResults, zoomRange]);
 
   // Toggle scenario visibility
   const handleToggleScenario = (key) => {
@@ -281,11 +285,13 @@ export default function App() {
           {/* Active View Container */}
           {activeTab === 'chart' && (
             <ComparisonChart
-              data={calcResults.data}
+              data={calcResults.data.slice(0, zoomRange + 1)}
               visibleScenarios={visibleScenarios}
               onToggleScenario={handleToggleScenario}
               scenarioInfo={SCENARIO_INFO}
               yAxisMax={maxInvestNW}
+              zoomRange={zoomRange}
+              onZoomChange={setZoomRange}
             />
           )}
 
