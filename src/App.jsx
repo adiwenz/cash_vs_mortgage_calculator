@@ -60,10 +60,19 @@ export default function App() {
 
   // Handle inputs change
   const handleInputChange = (key, value) => {
-    setInputs((prev) => ({
-      ...prev,
-      [key]: value
-    }));
+    setInputs((prev) => {
+      const nextInputs = {
+        ...prev,
+        [key]: value
+      };
+      
+      // Scale mortgage buyer's initial stock to 80% of home price when home price changes
+      if (key === 'homePrice') {
+        nextInputs.mortgageBuyerInitialStock = value * 0.80;
+      }
+      
+      return nextInputs;
+    });
   };
 
   // Run financial calculations dynamically
