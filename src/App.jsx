@@ -71,6 +71,20 @@ export default function App() {
     return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
+  // Calculate invested baseline for Y-axis scale
+  const investResults = useMemo(() => {
+    return calculateScenarios(inputs, 'invest', 'invest');
+  }, [inputs]);
+
+  const maxInvestNW = useMemo(() => {
+    let maxVal = 0;
+    investResults.data.forEach((row) => {
+      if (row.cashBuyerNW > maxVal) maxVal = row.cashBuyerNW;
+      if (row.mortgageBuyerNW > maxVal) maxVal = row.mortgageBuyerNW;
+    });
+    return Math.ceil(maxVal * 1.05); // Add 5% padding
+  }, [investResults]);
+
   // Toggle scenario visibility
   const handleToggleScenario = (key) => {
     setVisibleScenarios((prev) => ({
@@ -271,6 +285,7 @@ export default function App() {
               visibleScenarios={visibleScenarios}
               onToggleScenario={handleToggleScenario}
               scenarioInfo={SCENARIO_INFO}
+              yAxisMax={maxInvestNW}
             />
           )}
 

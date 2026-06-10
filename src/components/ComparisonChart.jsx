@@ -28,7 +28,7 @@ const formatYAxis = (val) => {
   return `$${val}`;
 };
 
-export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo }) {
+export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax }) {
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -101,6 +101,7 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
               fontSize={11}
               tickFormatter={formatYAxis}
               dx={-10}
+              domain={[0, yAxisMax]}
             />
             <Tooltip content={<CustomTooltip />} />
             
