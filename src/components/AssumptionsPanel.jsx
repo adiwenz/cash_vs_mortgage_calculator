@@ -1,18 +1,83 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const PERCENT_FIELDS = [
+  'homeAppreciation',
+  'downPaymentPercent',
+  'mortgageRate',
+  'stockReturn',
+  'savingsRate',
+  'capitalGainsRate',
+  'taxablePortion',
+  'propertyTaxRate',
+  'insuranceRate'
+];
 
 export default function AssumptionsPanel({ inputs, onChange }) {
-  const handleChange = (key, value) => {
-    // Clamp values to valid numeric ranges if they are entered via number inputs
-    let numericValue = parseFloat(value);
-    if (isNaN(numericValue)) {
-      numericValue = 0;
+  // Local state to hold the string representation of inputs during editing
+  const [localValues, setLocalValues] = useState({});
+  const activeFieldRef = useRef(null);
+
+  // Sync parent changes to local state, but only for fields that are NOT currently focused
+  useEffect(() => {
+    const nextLocals = { ...localValues };
+    let changed = false;
+
+    Object.keys(inputs).forEach((key) => {
+      if (activeFieldRef.current !== key) {
+        const rawVal = inputs[key];
+        const isPercent = PERCENT_FIELDS.includes(key);
+        // Format to string, preserving a standard decimal place for percents
+        const displayVal = isPercent ? (rawVal * 100).toString() : rawVal.toString();
+        
+        if (nextLocals[key] !== displayVal) {
+          nextLocals[key] = displayVal;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      setLocalValues(nextLocals);
     }
-    onChange(key, numericValue);
+  }, [inputs]);
+
+  const handleChange = (key, valueString) => {
+    // Strip leading zeros unless followed by decimal point
+    const sanitized = valueString.replace(/^0+(?=\d)/, '');
+    
+    // Update local string state immediately to let user type freely
+    setLocalValues((prev) => ({
+      ...prev,
+      [key]: sanitized
+    }));
+
+    // Propagate parsed numeric value to parent for instant calculations
+    const isPercent = PERCENT_FIELDS.includes(key);
+    if (sanitized === '' || sanitized === '.') {
+      onChange(key, 0);
+    } else {
+      const parsed = parseFloat(sanitized);
+      if (!isNaN(parsed)) {
+        onChange(key, isPercent ? parsed / 100 : parsed);
+      }
+    }
+  };
+
+  const handleBlur = (key) => {
+    activeFieldRef.current = null;
+    const rawVal = inputs[key];
+    const isPercent = PERCENT_FIELDS.includes(key);
+    // Format to a clean standardized decimal string on blur
+    const displayVal = isPercent ? (rawVal * 100).toFixed(1) : rawVal.toString();
+    
+    setLocalValues((prev) => ({
+      ...prev,
+      [key]: displayVal
+    }));
   };
 
   const renderInput = (key, label, type, min, max, step, isPercent = false, isCurrency = false) => {
-    const rawVal = inputs[key];
-    const displayVal = isPercent ? (rawVal * 100).toFixed(1) : rawVal;
+    const valString = localValues[key] ?? '';
 
     return (
       <div className="input-wrapper" key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.5rem' }}>
@@ -24,26 +89,16 @@ export default function AssumptionsPanel({ inputs, onChange }) {
               type="number"
               className="input-number-box"
               style={{ width: '120px', fontSize: '0.9rem' }}
-              value={displayVal}
+              value={valString}
               step={isPercent ? step * 100 : step}
-              onChange={(e) => {
-                const val = e.target.value;
-                // Strip leading zeros unless it's just '0' or followed by a decimal point
-                const sanitized = val.replace(/^0+(?=\d)/, '');
-                e.target.value = sanitized;
-                
-                if (sanitized === '') {
-                  handleChange(key, 0);
-                } else {
-                  const parsed = parseFloat(sanitized);
-                  handleChange(key, isPercent ? parsed / 100 : parsed);
-                }
+              onFocus={() => {
+                activeFieldRef.current = key;
               }}
-              onBlur={(e) => {
-                // If blurred and empty, restore the display value
-                if (e.target.value === '') {
-                  e.target.value = displayVal.toString();
-                }
+              onChange={(e) => {
+                handleChange(key, e.target.value);
+              }}
+              onBlur={() => {
+                handleBlur(key);
               }}
             />
             {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '500' }}>%</span>}
