@@ -41,7 +41,7 @@ export function calculateTaxPaid(netCashNeeded, capitalGainsRate, taxablePortion
 }
 
 /**
- * Computes the year-by-year comparison data for all 8 scenarios
+ * Computes the year-by-year comparison data for the 7 scenarios
  */
 export function calculateScenarios(inputs) {
   const {
@@ -66,9 +66,9 @@ export function calculateScenarios(inputs) {
   const data = [];
 
   // Day 1 (Year 0) Calculations
-  const cashBuyerTax = calculateTaxPaid(homePrice, capitalGainsRate, taxablePortion);
-  const discountedPrice = homePrice - cashPurchaseDiscount;
-  const discountedTax = calculateTaxPaid(discountedPrice, capitalGainsRate, taxablePortion);
+  // Merged Cash Buyer purchases home at (Home Price - Cash Purchase Discount)
+  const cashBuyerPrice = homePrice - cashPurchaseDiscount;
+  const cashBuyerTax = calculateTaxPaid(cashBuyerPrice, capitalGainsRate, taxablePortion);
   
   const downPaymentAmount = homePrice * downPaymentPercent;
   const mortgageBuyerTax = calculateTaxPaid(downPaymentAmount, capitalGainsRate, taxablePortion);
@@ -79,8 +79,8 @@ export function calculateScenarios(inputs) {
   const annualPI = monthlyPmt * 12;
 
   // Set up Year 0 values
-  let cashBuyerStock = cashBuyerInitialStock;
-  let discountedStock = cashPurchaseDiscount;
+  // Cash buyer starts with stock equal to the cash purchase discount (if any)
+  let cashBuyerStock = cashPurchaseDiscount;
   let mortgageBuyerStock = initialUninvestedAmount;
 
   data.push({
@@ -90,13 +90,11 @@ export function calculateScenarios(inputs) {
     
     // Stocks
     cashBuyerStock,
-    discountedStock,
     mortgageBuyerStock,
     
     // Net Worths
     cashBuyerNW: homePrice + cashBuyerStock - cashBuyerTax,
     cashBuyerHomeOnlyNW: homePrice - cashBuyerTax,
-    discountedCashBuyerNW: homePrice + discountedStock - discountedTax,
     mortgageBuyerNW: homePrice + mortgageBuyerStock - mortgagePrincipal,
     keptAsCashNW: homePrice - mortgagePrincipal + initialUninvestedAmount,
     savingsAccountNW: homePrice - mortgagePrincipal + initialUninvestedAmount,
@@ -114,7 +112,6 @@ export function calculateScenarios(inputs) {
 
     // Stock returns
     cashBuyerStock = cashBuyerStock * (1 + stockReturn) + annualSavingsAdd;
-    discountedStock = discountedStock * (1 + stockReturn) + annualSavingsAdd;
     mortgageBuyerStock = mortgageBuyerStock * (1 + stockReturn);
 
     // Alternative mortgage paths
@@ -131,7 +128,6 @@ export function calculateScenarios(inputs) {
       
       // Stock Portfolio values for reference
       cashBuyerStock,
-      discountedStock,
       mortgageBuyerStock,
       keptAsCashStock,
       savingsAccountStock,
@@ -141,7 +137,6 @@ export function calculateScenarios(inputs) {
       // Net Worths
       cashBuyerNW: homeValue + cashBuyerStock - cashBuyerTax,
       cashBuyerHomeOnlyNW: homeValue - cashBuyerTax,
-      discountedCashBuyerNW: homeValue + discountedStock - discountedTax,
       mortgageBuyerNW: homeValue + mortgageBuyerStock - mortgageBalance,
       keptAsCashNW: homeValue - mortgageBalance + keptAsCashStock,
       savingsAccountNW: homeValue - mortgageBalance + savingsAccountStock,

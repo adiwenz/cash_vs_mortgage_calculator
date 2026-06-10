@@ -15,14 +15,15 @@ export default function AssumptionsPanel({ inputs, onChange }) {
     const displayVal = isPercent ? (rawVal * 100).toFixed(1) : rawVal;
 
     return (
-      <div className="input-wrapper" key={key}>
-        <div className="input-label-row">
-          <span className="input-name">{label}</span>
+      <div className="input-wrapper" key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.5rem' }}>
+        <div className="input-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="input-name" style={{ fontSize: '0.9rem' }}>{label}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>$</span>}
+            {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '500' }}>$</span>}
             <input
               type="number"
               className="input-number-box"
+              style={{ width: '120px', fontSize: '0.9rem' }}
               value={displayVal}
               step={isPercent ? step * 100 : step}
               onChange={(e) => {
@@ -30,20 +31,9 @@ export default function AssumptionsPanel({ inputs, onChange }) {
                 handleChange(key, isPercent ? parseFloat(val) / 100 : parseFloat(val));
               }}
             />
-            {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>%</span>}
+            {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '500' }}>%</span>}
           </div>
         </div>
-        <input
-          type="range"
-          className="custom-range"
-          min={isPercent ? min * 100 : min}
-          max={isPercent ? max * 100 : max}
-          step={isPercent ? step * 100 : step}
-          value={isPercent ? (rawVal * 100).toFixed(2) : rawVal}
-          onChange={(e) => {
-            handleChange(key, isPercent ? parseFloat(e.target.value) / 100 : parseFloat(e.target.value));
-          }}
-        />
       </div>
     );
   };

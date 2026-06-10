@@ -28,7 +28,6 @@ const DEFAULT_INPUTS = {
 const SCENARIO_INFO = {
   cashBuyer: { label: 'Cash Buyer', dataKey: 'cashBuyerNW', color: '#6366f1' },
   cashBuyerHomeOnly: { label: 'Cash Buyer Home-Only', dataKey: 'cashBuyerHomeOnlyNW', color: '#f43f5e' },
-  discountedCashBuyer: { label: 'Discounted Cash Buyer', dataKey: 'discountedCashBuyerNW', color: '#0ea5e9' },
   mortgageBuyer: { label: 'Mortgage Buyer', dataKey: 'mortgageBuyerNW', color: '#10b981' },
   keptAsCash: { label: 'Mortgage - Kept as Cash', dataKey: 'keptAsCashNW', color: '#f59e0b' },
   savingsAccount: { label: 'Mortgage - Savings Account', dataKey: 'savingsAccountNW', color: '#8b5cf6' },
@@ -45,7 +44,6 @@ export default function App() {
   const [visibleScenarios, setVisibleScenarios] = useState({
     cashBuyer: true,
     cashBuyerHomeOnly: true,
-    discountedCashBuyer: true,
     mortgageBuyer: true,
     keptAsCash: true,
     savingsAccount: true,
