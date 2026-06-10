@@ -53,6 +53,8 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     mortgageRate,
     stockReturn,
     homeAppreciation,
+    propertyTaxRate,
+    insuranceRate,
     cashBuyerInitialStock,
     mortgageBuyerInitialStock,
     cashPurchaseDiscount,

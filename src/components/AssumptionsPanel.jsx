@@ -7,7 +7,9 @@ const PERCENT_FIELDS = [
   'stockReturn',
   'savingsRate',
   'capitalGainsRate',
-  'taxablePortion'
+  'taxablePortion',
+  'propertyTaxRate',
+  'insuranceRate'
 ];
 
 export default function AssumptionsPanel({ inputs, onChange }) {
@@ -157,6 +159,8 @@ export default function AssumptionsPanel({ inputs, onChange }) {
           <div className="assumptions-group-title">Taxes & Costs</div>
           {renderInput('capitalGainsRate', 'Capital Gains Tax Rate', 'number', 0.0, 0.50, 0.01, true)}
           {renderInput('taxablePortion', 'Taxable Portion of Gains', 'number', 0.0, 1.0, 0.05, true)}
+          {renderInput('propertyTaxRate', 'Property Tax Rate', 'number', 0.0, 0.05, 0.001, true)}
+          {renderInput('insuranceRate', 'Insurance Rate', 'number', 0.0, 0.03, 0.001, true)}
         </div>
       </div>
     </div>

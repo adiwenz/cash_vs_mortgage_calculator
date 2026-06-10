@@ -13,6 +13,8 @@ const DEFAULT_INPUTS = {
   mortgageRate: 0.065,
   stockReturn: 0.08,
   homeAppreciation: 0.03,
+  propertyTaxRate: 0.012,
+  insuranceRate: 0.005,
   cashBuyerInitialStock: 0,
   mortgageBuyerInitialStock: 240000,
   cashPurchaseDiscount: 50000,
