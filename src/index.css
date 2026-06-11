@@ -967,6 +967,15 @@ h1, h2, h3, h4, h5, h6 {
   visibility: visible;
 }
 
+@media (max-width: 768px) {
+  .tooltip-trigger::after {
+    left: 0;
+    transform: translateX(0);
+    width: 200px;
+    max-width: 60vw;
+  }
+}
+
 /* Horizontal scrollable navigation pill switcher on desktop */
 .tool-switcher {
   display: flex;
