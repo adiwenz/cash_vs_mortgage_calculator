@@ -241,29 +241,7 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {/* Tool Switcher - Desktop & Mobile (stacked) */}
-          <div className="tool-switcher">
-            <button
-              onClick={() => handleToolSwitch('cashVsMortgageSimple')}
-              className={`switcher-btn ${activeTool === 'cashVsMortgageSimple' ? 'active' : ''}`}
-            >
-              Cash v. Mortgage
-            </button>
-            <button
-              onClick={() => handleToolSwitch('cashVsMortgage')}
-              className={`switcher-btn ${activeTool === 'cashVsMortgage' ? 'active' : ''}`}
-            >
-              Tax-Aware Cash v. Mortgage
-            </button>
-            <button
-              onClick={() => handleToolSwitch('mortgageComparer')}
-              className={`switcher-btn ${activeTool === 'mortgageComparer' ? 'active' : ''}`}
-            >
-              Compare Mortgages
-            </button>
-          </div>
-
-          {/* Hamburger Menu - Medium screens only */}
+          {/* Hamburger Menu - Always visible */}
           <div className="nav-hamburger">
             <button
               className="hamburger-btn"

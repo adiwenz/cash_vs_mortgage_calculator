@@ -981,50 +981,9 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Horizontal scrollable navigation pill switcher on desktop */
-.tool-switcher {
-  display: flex;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  padding: 0.2rem;
-  border-radius: 8px;
-  gap: 0.2rem;
-  overflow-x: auto;
-  max-width: 100%;
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
-  -webkit-overflow-scrolling: touch;
-}
-
-.tool-switcher::-webkit-scrollbar {
-  display: none; /* Hide scrollbar for Safari/Chrome */
-}
-
-.switcher-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex: 0 0 auto; /* Prevent button shrinking */
-}
-
-.switcher-btn.active {
-  background: var(--primary);
-  color: #ffffff;
-}
-
-.switcher-btn:hover:not(.active) {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-/* Hamburger menu - hidden by default (desktop shows pills) */
+/* Hamburger menu - always visible */
 .nav-hamburger {
-  display: none;
+  display: block;
   position: relative;
 }
 
@@ -1107,16 +1066,6 @@ h1, h2, h3, h4, h5, h6 {
   color: #ffffff;
 }
 
-/* Medium screens: hide pills, show hamburger */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .tool-switcher {
-    display: none;
-  }
-  .nav-hamburger {
-    display: block;
-  }
-}
-
 @media (max-width: 768px) {
   .app-header {
     flex-direction: column;
@@ -1128,32 +1077,11 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
   }
   .header-actions {
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: center;
     align-items: center;
     width: 100%;
-    gap: 0.75rem;
-  }
-  .tool-switcher {
-    flex-direction: column;
-    width: 100%;
-    align-items: center;
-    background: transparent;
-    border: none;
-    padding: 0;
-    gap: 0.5rem;
-  }
-  .switcher-btn {
-    width: 100%;
-    max-width: 320px;
-    text-align: center;
-    padding: 0.6rem 1rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-  }
-  .switcher-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
+    gap: 1rem;
   }
 }
 
