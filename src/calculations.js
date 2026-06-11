@@ -349,7 +349,8 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
     stockReturn,
     savingsRate,
     amountInvestedOutside,
-    amountKeptInSavings
+    amountKeptInSavings,
+    savedMoneyDest
   } = scenario;
 
   const data = [];
@@ -368,6 +369,7 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
     homeEquity: homePrice - loanAmount,
     investmentValue: amountInvestedOutside,
     savingsValue: amountKeptInSavings,
+    cashValue: 0,
     netWorth: (homePrice - loanAmount) + amountInvestedOutside + amountKeptInSavings,
     interestPaidThisYear: 0,
     cumulativeInterestPaid: 0
@@ -375,6 +377,7 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
 
   let currentInvestments = amountInvestedOutside;
   let currentSavings = amountKeptInSavings;
+  let currentCash = 0;
 
   for (let y = 1; y <= yearsToCompute; y++) {
     const homeValue = homePrice * Math.pow(1 + homeAppreciation, y);
@@ -389,8 +392,19 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
     const annualSurplus = monthlySurplus * 12;
 
     // Compounding investments and savings
-    currentInvestments = currentInvestments * (1 + stockReturn) + annualSurplus;
+    currentInvestments = currentInvestments * (1 + stockReturn);
     currentSavings = currentSavings * (1 + savingsRate);
+    currentCash = currentCash * 1; // cash does not earn interest
+
+    // Reinvest based on user destination choice
+    const dest = savedMoneyDest || 'invest';
+    if (dest === 'invest') {
+      currentInvestments += annualSurplus;
+    } else if (dest === 'savings') {
+      currentSavings += annualSurplus;
+    } else {
+      currentCash += annualSurplus;
+    }
 
     // Cumulative interest paid calculations
     // Payments made up to year y
@@ -399,7 +413,7 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
     const principalPaid = loanAmount - mortgageBalance;
     const cumulativeInterestPaid = Math.max(0, paymentsMade - principalPaid);
 
-    const netWorth = homeEquity + currentInvestments + currentSavings;
+    const netWorth = homeEquity + currentInvestments + currentSavings + currentCash;
 
     data.push({
       year: y,
@@ -408,6 +422,7 @@ export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
       homeEquity,
       investmentValue: currentInvestments,
       savingsValue: currentSavings,
+      cashValue: currentCash,
       netWorth,
       cumulativeInterestPaid
     });

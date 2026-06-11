@@ -43,6 +43,7 @@ const DEFAULT_SCENARIOS = [
     cashAvailableToday: 150000,
     amountInvestedOutside: 100000,
     amountKeptInSavings: 25000,
+    savedMoneyDest: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[0]
   },
@@ -59,6 +60,7 @@ const DEFAULT_SCENARIOS = [
     cashAvailableToday: 150000,
     amountInvestedOutside: 40000,
     amountKeptInSavings: 10000,
+    savedMoneyDest: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[1]
   },
@@ -75,6 +77,7 @@ const DEFAULT_SCENARIOS = [
     cashAvailableToday: 150000,
     amountInvestedOutside: 40000,
     amountKeptInSavings: 10000,
+    savedMoneyDest: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[2]
   }
@@ -205,6 +208,7 @@ export default function MortgageComparer() {
       cashAvailableToday: 150000,
       amountInvestedOutside: 40000,
       amountKeptInSavings: 10000,
+      savedMoneyDest: 'invest',
       enabled: true,
       color: newColor
     };
@@ -881,6 +885,27 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
             {renderCardInput('amountKeptInSavings', 'Savings', false, true, 5000)}
             {renderCardInput('stockReturn', 'Stock Return', true, false, 0.001)}
             {renderCardInput('savingsRate', 'Savings Rate', true, false, 0.001)}
+          </div>
+          <div style={{ gridColumn: 'span 2', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+              Reinvest saved monthly payments & paid-off mortgage cash flow into:
+            </span>
+            <div className="segmented-control" style={{ maxWidth: '380px' }}>
+              {[
+                { val: 'invest', label: '📈 Invest' },
+                { val: 'savings', label: '🏦 Savings' },
+                { val: 'cash', label: '💵 Hold Cash' }
+              ].map((item) => (
+                <button
+                  key={item.val}
+                  type="button"
+                  className={`segmented-control-btn ${(scenario.savedMoneyDest || 'invest') === item.val ? 'active' : ''}`}
+                  onClick={() => onChange('savedMoneyDest', item.val)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
