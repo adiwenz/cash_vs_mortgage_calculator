@@ -702,58 +702,92 @@ export default function SimpleCalculator() {
                 </div>
               </div>
               
-              {/* Side-by-side Summary Cards */}
-              {selectedYearData && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
-                  {/* Cash Buyer Card */}
-                  <div style={{ background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: '10px', padding: '1rem' }}>
-                    <div style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#6366f1' }}>Cash Buyer</span>
-                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px', color: '#6366f1', fontWeight: '700' }}>No Loan</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Net Worth:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.cashBuyerNW)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Value:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.homeValue)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.cashBuyerStock)}</span>
-                      </div>
-                    </div>
-                  </div>
+              {selectedYearData && (() => {
+                const cashNW = selectedYearData.cashBuyerNW;
+                const mortNW = selectedYearData.mortgageBuyerNW;
+                const diff = Math.abs(cashNW - mortNW);
+                const cashWins = cashNW > mortNW;
+                const tied = cashNW === mortNW;
+                const winnerLabel = cashWins ? 'Cash Buyer' : 'Mortgage Buyer';
+                const winnerColor = cashWins ? '#6366f1' : '#10b981';
+                const winnerBg = cashWins ? 'rgba(99, 102, 241, 0.08)' : 'rgba(16, 185, 129, 0.08)';
+                const winnerBorder = cashWins ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)';
 
-                  {/* Mortgage Buyer Card */}
-                  <div style={{ background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '10px', padding: '1rem' }}>
-                    <div style={{ borderBottom: '1px solid rgba(16, 185, 129, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#10b981' }}>Mortgage Buyer</span>
-                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '4px', color: '#10b981', fontWeight: '700' }}>Leveraged</span>
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+                      {/* Cash Buyer Card */}
+                      <div style={{ background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: '10px', padding: '1rem' }}>
+                        <div style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#6366f1' }}>Cash Buyer</span>
+                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px', color: '#6366f1', fontWeight: '700' }}>No Loan</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Value:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.homeValue)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.cashBuyerStock)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(99, 102, 241, 0.12)', paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#6366f1' }}>{formatCurrency(cashNW)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mortgage Buyer Card */}
+                      <div style={{ background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '10px', padding: '1rem' }}>
+                        <div style={{ borderBottom: '1px solid rgba(16, 185, 129, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#10b981' }}>Mortgage Buyer</span>
+                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '4px', color: '#10b981', fontWeight: '700' }}>Leveraged</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Equity:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageEquity)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBuyerStock)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mortgage Balance:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBalance)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(16, 185, 129, 0.12)', paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#10b981' }}>{formatCurrency(mortNW)}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Net Worth:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBuyerNW)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Equity:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageEquity)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBuyerStock)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mortgage Balance:</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBalance)}</span>
-                      </div>
+
+                    {/* Winner Callout */}
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '0.75rem 1rem',
+                      background: tied ? 'rgba(100, 116, 139, 0.08)' : winnerBg,
+                      border: `1px solid ${tied ? 'rgba(100, 116, 139, 0.2)' : winnerBorder}`,
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span style={{ fontSize: '1.1rem' }}>{tied ? '🤝' : '🏆'}</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                        {tied ? (
+                          <><strong>It's a tie!</strong> Both buyers have the same net worth at Year {selectedYear}.</>
+                        ) : (
+                          <>At Year {selectedYear}, the <strong style={{ color: winnerColor }}>{winnerLabel}</strong> comes out ahead by <strong>{formatCurrency(diff)}</strong>.</>
+                        )}
+                      </span>
                     </div>
-                  </div>
-                </div>
-              )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Educational Callouts Section */}
