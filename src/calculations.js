@@ -428,8 +428,11 @@ export function validateSimpleInputs(inputs) {
     mortgageRate,
     mortgageTerm,
     stockReturn,
-    savingsRate
+    savingsRate,
+    cashPurchaseDiscount
   } = inputs;
+
+  const discount = cashPurchaseDiscount || 0;
 
   if (homePrice <= 0) {
     errors.push("Home price must be greater than 0.");
@@ -449,6 +452,12 @@ export function validateSimpleInputs(inputs) {
   if (savingsRate < -1.0) {
     errors.push("Savings account return cannot be less than -100%.");
   }
+  if (discount < 0) {
+    errors.push("Cash purchase discount cannot be negative.");
+  }
+  if (discount > homePrice) {
+    errors.push("Cash purchase discount cannot exceed the home price.");
+  }
 
   return errors;
 }
@@ -464,9 +473,11 @@ export function calculateSimpleScenarios(inputs, mortgageLeftoverDest, cashSavin
     mortgageTerm,
     homeAppreciation,
     stockReturn,
-    savingsRate
+    savingsRate,
+    cashPurchaseDiscount
   } = inputs;
 
+  const discount = cashPurchaseDiscount || 0;
   const data = [];
   const yearsToCompute = 30;
 
@@ -475,7 +486,7 @@ export function calculateSimpleScenarios(inputs, mortgageLeftoverDest, cashSavin
   const annualPI = monthlyPI * 12;
 
   // Year 0
-  let cashBuyerStock = 0;
+  let cashBuyerStock = discount;
   const mortgageRemainingCash = homePrice - (homePrice * downPaymentPercent);
   let mortgageBuyerStock = mortgageRemainingCash;
 

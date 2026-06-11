@@ -250,6 +250,7 @@ Use this list of test cases to verify the mathematical and validation behavior o
 * **Navigation**: Load the web app. The default view should be **Cash vs Mortgage (Simple)**.
 * **Inputs**:
   * Home Price: `$500,000`
+  * Cash Purchase Discount: `$50,000`
   * Home Appreciation: `3.0%`
   * Down Payment: `20.0%`
   * Mortgage Rate: `6.5%`
@@ -259,10 +260,10 @@ Use this list of test cases to verify the mathematical and validation behavior o
 * **Expected Output**:
   * Visual Line Chart displays Net Worth Over Time for Cash Buyer and Mortgage Buyer.
   * Year 30 summary cards display:
-    * Cash Buyer: Net Worth `$4,650,561`, Home Value `$1,213,631`, Investment Account `$3,436,929`
+    * Cash Buyer: Net Worth `$5,153,693`, Home Value `$1,213,631`, Investment Account `$3,940,062`
     * Mortgage Buyer: Net Worth `$5,238,694`, Home Equity `$1,213,631`, Investment Account `$4,025,063`, Mortgage Balance `$0`
   * Dragging the "Show Year" slider to Year 10 updates the cards to show:
-    * Cash Buyer: Net Worth `$1,111,470`, Home Value `$671,958`, Investment Account `$439,512`
+    * Cash Buyer: Net Worth `$1,219,416`, Home Value `$671,958`, Investment Account `$547,458`
     * Mortgage Buyer: Net Worth `$1,196,424`, Home Equity `$332,854`, Investment Account `$863,570`, Mortgage Balance `$339,105`
 
 ---
@@ -286,6 +287,7 @@ Use this list of test cases to verify the mathematical and validation behavior o
   * Set Mortgage Rate to `-2.0%`.
   * Set Term (Years) to `0`.
   * Set Stock Market Return to `-105%`.
+  * Set Cash Purchase Discount to `$10,000` (which triggers discount > homePrice).
 * **Expected Output**:
   * Red validation error banner blocks calculations:
     * *"Home price must be greater than 0."*
@@ -293,5 +295,7 @@ Use this list of test cases to verify the mathematical and validation behavior o
     * *"Mortgage rate cannot be negative."*
     * *"Mortgage term must be greater than 0."*
     * *"Stock market return cannot be less than -100%."*
+    * *"Cash purchase discount cannot exceed the home price."*
+
 
 

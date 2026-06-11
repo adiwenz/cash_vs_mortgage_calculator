@@ -47,7 +47,8 @@ export default function SimpleCalculator() {
     mortgageRate: 0.065,
     mortgageTerm: 30,
     stockReturn: 0.08,
-    savingsRate: 0.04
+    savingsRate: 0.04,
+    cashPurchaseDiscount: 50000
   });
 
   // Destinations choices
@@ -241,6 +242,7 @@ export default function SimpleCalculator() {
           <div className="assumptions-group">
             <div className="assumptions-group-title">Home</div>
             {renderSimpleInput('homePrice', 'Home Price', false, true, 10000)}
+            {renderSimpleInput('cashPurchaseDiscount', 'Cash Purchase Discount', false, true, 5000)}
             {renderSimpleInput('homeAppreciation', 'Annual Appreciation', true, false, 0.005)}
           </div>
 
