@@ -416,3 +416,125 @@ export function calculateMortgageScenarioData(scenario) {
     data
   };
 }
+
+/**
+ * Validates inputs for the simple cash vs mortgage calculator
+ */
+export function validateSimpleInputs(inputs) {
+  const errors = [];
+  const {
+    homePrice,
+    downPaymentPercent,
+    mortgageRate,
+    mortgageTerm,
+    stockReturn,
+    savingsRate
+  } = inputs;
+
+  if (homePrice <= 0) {
+    errors.push("Home price must be greater than 0.");
+  }
+  if (downPaymentPercent < 0 || downPaymentPercent > 1.0) {
+    errors.push("Down payment must be between 0% and 100%.");
+  }
+  if (mortgageRate < 0) {
+    errors.push("Mortgage rate cannot be negative.");
+  }
+  if (mortgageTerm <= 0) {
+    errors.push("Mortgage term must be greater than 0.");
+  }
+  if (stockReturn < -1.0) {
+    errors.push("Stock market return cannot be less than -100%.");
+  }
+  if (savingsRate < -1.0) {
+    errors.push("Savings account return cannot be less than -100%.");
+  }
+
+  return errors;
+}
+
+/**
+ * Simple calculation engine for beginner/high school students
+ */
+export function calculateSimpleScenarios(inputs, mortgageLeftoverDest, cashSavingsDest) {
+  const {
+    homePrice,
+    downPaymentPercent,
+    mortgageRate,
+    mortgageTerm,
+    homeAppreciation,
+    stockReturn,
+    savingsRate
+  } = inputs;
+
+  const data = [];
+  const yearsToCompute = 30;
+
+  const loanAmount = Math.max(0, homePrice - (homePrice * downPaymentPercent));
+  const monthlyPI = calculateMonthlyPayment(loanAmount, mortgageRate, mortgageTerm);
+  const annualPI = monthlyPI * 12;
+
+  // Year 0
+  let cashBuyerStock = 0;
+  const mortgageRemainingCash = homePrice - (homePrice * downPaymentPercent);
+  let mortgageBuyerStock = mortgageRemainingCash;
+
+  data.push({
+    year: 0,
+    homeValue: homePrice,
+    // Cash Buyer
+    cashBuyerStock,
+    cashBuyerNW: homePrice + cashBuyerStock,
+    // Mortgage Buyer
+    mortgageBalance: loanAmount,
+    mortgageBuyerStock,
+    mortgageBuyerNW: homePrice + mortgageBuyerStock - loanAmount,
+    mortgageEquity: homePrice - loanAmount
+  });
+
+  const getGrowthRate = (dest) => {
+    if (dest === 'invest') return stockReturn;
+    if (dest === 'savings') return savingsRate;
+    return 0; // 'none'
+  };
+
+  const cashBuyerStockRate = getGrowthRate(cashSavingsDest);
+  const mortgageBuyerStockRate = getGrowthRate(mortgageLeftoverDest);
+
+  let cashBuyerStockVal = cashBuyerStock;
+  let mortgageBuyerStockVal = mortgageBuyerStock;
+
+  for (let y = 1; y <= yearsToCompute; y++) {
+    const homeValue = homePrice * Math.pow(1 + homeAppreciation, y);
+    const mortgageBalance = calculateRemainingBalance(loanAmount, mortgageRate, mortgageTerm, y);
+    const mortgageEquity = homeValue - mortgageBalance;
+
+    // Cash Buyer compounding and adding avoided payment during term
+    const annualSavingsAdd = y <= mortgageTerm ? annualPI : 0;
+    cashBuyerStockVal = cashBuyerStockVal * (1 + cashBuyerStockRate) + annualSavingsAdd;
+
+    // Mortgage Buyer compounding
+    mortgageBuyerStockVal = mortgageBuyerStockVal * (1 + mortgageBuyerStockRate);
+
+    data.push({
+      year: y,
+      homeValue,
+      // Cash Buyer
+      cashBuyerStock: cashBuyerStockVal,
+      cashBuyerNW: homeValue + cashBuyerStockVal,
+      // Mortgage Buyer
+      mortgageBalance,
+      mortgageBuyerStock: mortgageBuyerStockVal,
+      mortgageBuyerNW: homeValue + mortgageBuyerStockVal - mortgageBalance,
+      mortgageEquity
+    });
+  }
+
+  return {
+    loanAmount,
+    monthlyPI,
+    annualPI,
+    data
+  };
+}
+

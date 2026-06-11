@@ -5,6 +5,7 @@ import ComparisonChart from './components/ComparisonChart';
 import ComparisonTable from './components/ComparisonTable';
 import EducationHub from './components/EducationHub';
 import MortgageComparer from './components/MortgageComparer';
+import SimpleCalculator from './components/SimpleCalculator';
 
 // Initial default inputs
 const DEFAULT_INPUTS = {
@@ -34,7 +35,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
-  const [activeTool, setActiveTool] = useState('cashVsMortgage'); // 'cashVsMortgage' | 'mortgageComparer'
+  const [activeTool, setActiveTool] = useState('cashVsMortgageSimple'); // 'cashVsMortgageSimple' | 'cashVsMortgage' | 'mortgageComparer'
 
   // Radio Decisions state
   const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
@@ -109,10 +110,15 @@ export default function App() {
         <div className="brand-section">
           <div className="brand-logo">🏡</div>
           <div className="brand-title">
-            {activeTool === 'cashVsMortgage' ? (
+            {activeTool === 'cashVsMortgageSimple' ? (
               <>
-                <h1>Cash vs. Mortgage Calculator</h1>
-                <p>Compare home buying paths and long-term net worth</p>
+                <h1>Cash vs Mortgage (Simple)</h1>
+                <p>Learn home buying basics, compounding, and leverage</p>
+              </>
+            ) : activeTool === 'cashVsMortgage' ? (
+              <>
+                <h1>Advanced Cash vs Mortgage (Tax-Aware)</h1>
+                <p>Compare home buying paths with capital gains tax and liquidation rules</p>
               </>
             ) : (
               <>
@@ -124,7 +130,23 @@ export default function App() {
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {/* Tool Switcher */}
-          <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '6px', gap: '0.2rem' }}>
+            <button
+              onClick={() => setActiveTool('cashVsMortgageSimple')}
+              style={{
+                background: activeTool === 'cashVsMortgageSimple' ? 'var(--primary)' : 'transparent',
+                color: activeTool === 'cashVsMortgageSimple' ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              Cash vs Mortgage (Simple)
+            </button>
             <button
               onClick={() => setActiveTool('cashVsMortgage')}
               style={{
@@ -139,7 +161,7 @@ export default function App() {
                 transition: 'all var(--transition-fast)'
               }}
             >
-              Cash vs. Mortgage
+              Advanced (Tax-Aware)
             </button>
             <button
               onClick={() => setActiveTool('mortgageComparer')}
@@ -169,7 +191,11 @@ export default function App() {
         </div>
       </header>
 
-      {activeTool === 'cashVsMortgage' ? (
+      {activeTool === 'cashVsMortgageSimple' ? (
+        <main style={{ marginTop: '1.5rem' }}>
+          <SimpleCalculator />
+        </main>
+      ) : activeTool === 'cashVsMortgage' ? (
         <>
           {/* Summary Widgets Strip */}
           <div className="summary-strip">

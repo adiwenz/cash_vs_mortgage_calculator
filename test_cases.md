@@ -244,3 +244,54 @@ Use this list of test cases to verify the mathematical and validation behavior o
   * Click "Del" button on Scenario C.
     * *Result*: Scenario C is removed from the scenario list.
 
+---
+
+### Test Case 20: Simple Calculator Default Baseline Check
+* **Navigation**: Load the web app. The default view should be **Cash vs Mortgage (Simple)**.
+* **Inputs**:
+  * Home Price: `$500,000`
+  * Home Appreciation: `3.0%`
+  * Down Payment: `20.0%`
+  * Mortgage Rate: `6.5%`
+  * Mortgage Term: `30 Years`
+  * Stock Market Return: `8.0%`
+  * Savings Account Rate: `4.0%`
+* **Expected Output**:
+  * Visual Line Chart displays Net Worth Over Time for Cash Buyer and Mortgage Buyer.
+  * Year 30 summary cards display:
+    * Cash Buyer: Net Worth `$4,650,561`, Home Value `$1,213,631`, Investment Account `$3,436,929`
+    * Mortgage Buyer: Net Worth `$5,238,694`, Home Equity `$1,213,631`, Investment Account `$4,025,063`, Mortgage Balance `$0`
+  * Dragging the "Show Year" slider to Year 10 updates the cards to show:
+    * Cash Buyer: Net Worth `$1,111,470`, Home Value `$671,958`, Investment Account `$439,512`
+    * Mortgage Buyer: Net Worth `$1,196,424`, Home Equity `$332,854`, Investment Account `$863,570`, Mortgage Balance `$339,105`
+
+---
+
+### Test Case 21: Simple Calculator Option Toggles
+* **Inputs**:
+  * Set Cash Buyer avoided mortgage payments to: **Keep in savings** (Savings).
+  * Set Mortgage Buyer remaining cash to: **Keep in savings** (Savings).
+* **Expected Output**:
+  * Compounding rates adjust instantly.
+  * Year 30 Net Worth values drop since savings yield is lower:
+    * Cash Buyer Net Worth drops to `$3,086,189` (with Investment Account of `$1,872,558`)
+    * Mortgage Buyer Net Worth drops to `$2,511,040` (with Investment Account of `$1,297,409`)
+
+---
+
+### Test Case 22: Simple Calculator Validation Errors
+* **Inputs**:
+  * Set Home Price to `$0`.
+  * Set Down Payment % to `-5.0%`.
+  * Set Mortgage Rate to `-2.0%`.
+  * Set Term (Years) to `0`.
+  * Set Stock Market Return to `-105%`.
+* **Expected Output**:
+  * Red validation error banner blocks calculations:
+    * *"Home price must be greater than 0."*
+    * *"Down payment must be between 0% and 100%."*
+    * *"Mortgage rate cannot be negative."*
+    * *"Mortgage term must be greater than 0."*
+    * *"Stock market return cannot be less than -100%."*
+
+
