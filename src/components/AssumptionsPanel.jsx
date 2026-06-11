@@ -7,7 +7,6 @@ const PERCENT_FIELDS = [
   'stockReturn',
   'savingsRate',
   'capitalGainsRate',
-  'taxablePortion',
   'propertyTaxRate',
   'insuranceRate'
 ];
@@ -137,14 +136,14 @@ export default function AssumptionsPanel({ inputs, onChange }) {
           {renderInput('homePrice', 'Home Price', 'number', 50000, 1500000, 10000, false, true)}
           {renderInput('cashPurchaseDiscount', 'Cash Purchase Discount', 'number', 0, 200000, 5000, false, true)}
           {renderInput('homeAppreciation', 'Annual Appreciation', 'number', 0.0, 0.15, 0.001, true)}
+          {renderInput('propertyTaxRate', 'Property Tax Rate', 'number', 0.0, 0.05, 0.001, true)}
+          {renderInput('insuranceRate', 'Insurance Rate', 'number', 0.0, 0.03, 0.001, true)}
         </div>
 
         <div className="assumptions-group" style={{ marginTop: '1.5rem' }}>
           <div className="assumptions-group-title">Mortgage Assumptions</div>
           {renderInput('downPaymentPercent', 'Down Payment %', 'number', 0.0, 1.0, 0.01, true)}
-          
           {renderInput('mortgageTerm', 'Mortgage Term (Years)', 'number', 0, 30, 1)}
-
           {renderInput('mortgageRate', 'Mortgage Rate', 'number', 0.0, 0.15, 0.001, true)}
         </div>
 
@@ -152,15 +151,37 @@ export default function AssumptionsPanel({ inputs, onChange }) {
           <div className="assumptions-group-title">Investments & Savings</div>
           {renderInput('stockReturn', 'Stock Market Return', 'number', 0.0, 0.20, 0.001, true)}
           {renderInput('savingsRate', 'Savings Account Rate', 'number', 0.0, 0.10, 0.001, true)}
-          {renderInput('mortgageBuyerInitialStock', 'Mortgage Initial Stock', 'number', 50000, 1000000, 10000, false, true)}
         </div>
 
         <div className="assumptions-group" style={{ marginTop: '1.5rem' }}>
-          <div className="assumptions-group-title">Taxes & Costs</div>
+          <div className="assumptions-group-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <span>Selling Investments to Buy</span>
+            <span 
+              className="info-icon" 
+              title="Capital gains tax is typically owed only on investment gains, not the entire amount sold."
+              style={{
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                opacity: 0.6,
+                background: 'rgba(255, 255, 255, 0.1)',
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'normal'
+              }}
+            >
+              ℹ️
+            </span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: '0.75rem', lineHeight: '1.3' }}>
+            Capital gains tax is typically owed only on investment gains, not the entire amount sold.
+          </div>
+          {renderInput('investmentPortfolioValue', 'Investment Portfolio Value', 'number', 50000, 2000000, 10000, false, true)}
+          {renderInput('investmentCostBasis', 'Investment Cost Basis', 'number', 50000, 2000000, 10000, false, true)}
           {renderInput('capitalGainsRate', 'Capital Gains Tax Rate', 'number', 0.0, 0.50, 0.01, true)}
-          {renderInput('taxablePortion', 'Taxable Portion of Gains', 'number', 0.0, 1.0, 0.05, true)}
-          {renderInput('propertyTaxRate', 'Property Tax Rate', 'number', 0.0, 0.05, 0.001, true)}
-          {renderInput('insuranceRate', 'Insurance Rate', 'number', 0.0, 0.03, 0.001, true)}
         </div>
       </div>
     </div>

@@ -15,11 +15,10 @@ const DEFAULT_INPUTS = {
   homeAppreciation: 0.03,
   propertyTaxRate: 0.012,
   insuranceRate: 0.005,
-  cashBuyerInitialStock: 0,
-  mortgageBuyerInitialStock: 240000,
+  investmentPortfolioValue: 500000,
+  investmentCostBasis: 350000,
   cashPurchaseDiscount: 50000,
   capitalGainsRate: 0.20,
-  taxablePortion: 1.0,
   savingsRate: 0.04
 };
 
@@ -54,19 +53,10 @@ export default function App() {
 
   // Handle inputs change
   const handleInputChange = (key, value) => {
-    setInputs((prev) => {
-      const nextInputs = {
-        ...prev,
-        [key]: value
-      };
-      
-      // Scale mortgage buyer's initial stock to 80% of home price when home price changes
-      if (key === 'homePrice') {
-        nextInputs.mortgageBuyerInitialStock = value * 0.80;
-      }
-      
-      return nextInputs;
-    });
+    setInputs((prev) => ({
+      ...prev,
+      [key]: value
+    }));
   };
 
   // Run financial calculations dynamically
@@ -144,11 +134,11 @@ export default function App() {
           <span className="widget-sub">Tax Paid for Down Payment</span>
         </div>
         <div className="summary-widget">
-          <span className="widget-label">Initial Uninvested Cash</span>
+          <span className="widget-label">Mortgage Buyer Starting Stock</span>
           <span className="widget-value">
-            {formatCurrency(calcResults.initialUninvestedAmount)}
+            {formatCurrency(calcResults.mortgageBuyerStartingStock)}
           </span>
-          <span className="widget-sub">Mortgage buyer stock pot (Year 0)</span>
+          <span className="widget-sub">Remaining portfolio after Down Payment Tax</span>
         </div>
         <div className="summary-widget">
           <span className="widget-label">Annual Mortgage P&I</span>

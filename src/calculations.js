@@ -36,8 +36,7 @@ export function calculateRemainingBalance(principal, annualRate, termYears, elap
  * Gross Liquidation = Net Cash / (1 - EffectiveTaxRate)
  * Tax = Gross Liquidation * EffectiveTaxRate = Net Cash * EffectiveTaxRate / (1 - EffectiveTaxRate)
  */
-export function calculateTaxPaid(netCashNeeded, capitalGainsRate, taxablePortion) {
-  const effectiveTaxRate = capitalGainsRate * taxablePortion;
+export function calculateTaxPaid(netCashNeeded, effectiveTaxRate) {
   if (effectiveTaxRate >= 1) return 0; // Prevent division by zero
   return netCashNeeded * (effectiveTaxRate / (1 - effectiveTaxRate));
 }
@@ -55,25 +54,30 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     homeAppreciation,
     propertyTaxRate,
     insuranceRate,
-    cashBuyerInitialStock,
-    mortgageBuyerInitialStock,
+    investmentPortfolioValue,
+    investmentCostBasis,
     cashPurchaseDiscount,
     capitalGainsRate,
-    taxablePortion,
     savingsRate
   } = inputs;
 
   const yearsToCompute = Math.max(30, mortgageTerm); // compute at least 30 years to show long term growth
   const data = [];
 
+  // Calculate Gain Ratio of the portfolio
+  const portfolioGain = Math.max(0, investmentPortfolioValue - investmentCostBasis);
+  const gainRatio = investmentPortfolioValue > 0 ? portfolioGain / investmentPortfolioValue : 0;
+  const effectiveTaxRate = capitalGainsRate * gainRatio;
+
   // Day 1 (Year 0) Calculations
   const cashBuyerPrice = homePrice - cashPurchaseDiscount;
-  const cashBuyerTax = calculateTaxPaid(cashBuyerPrice, capitalGainsRate, taxablePortion);
+  const cashBuyerTax = calculateTaxPaid(cashBuyerPrice, effectiveTaxRate);
+  const cashBuyerGrossSold = cashBuyerPrice + cashBuyerTax;
   
   const downPaymentAmount = homePrice * downPaymentPercent;
-  const mortgageBuyerTax = calculateTaxPaid(downPaymentAmount, capitalGainsRate, taxablePortion);
+  const mortgageBuyerTax = calculateTaxPaid(downPaymentAmount, effectiveTaxRate);
+  const mortgageBuyerGrossSold = downPaymentAmount + mortgageBuyerTax;
   
-  const initialUninvestedAmount = mortgageBuyerInitialStock - mortgageBuyerTax;
   const mortgagePrincipal = homePrice - downPaymentAmount;
   const monthlyPmt = calculateMonthlyPayment(mortgagePrincipal, mortgageRate, mortgageTerm);
   const annualPI = monthlyPmt * 12;
@@ -89,8 +93,8 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
   const mortgageBuyerStockRate = getGrowthRate(mortgageLeftoverDest);
 
   // Set up Year 0 values
-  let cashBuyerStock = cashPurchaseDiscount;
-  let mortgageBuyerStock = initialUninvestedAmount;
+  let cashBuyerStock = investmentPortfolioValue - cashBuyerGrossSold;
+  let mortgageBuyerStock = investmentPortfolioValue - mortgageBuyerGrossSold;
 
   data.push({
     year: 0,
@@ -102,7 +106,7 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     mortgageBuyerStock,
     
     // Net Worths
-    cashBuyerNW: homePrice + cashBuyerStock - cashBuyerTax,
+    cashBuyerNW: homePrice + cashBuyerStock,
     mortgageBuyerNW: homePrice + mortgageBuyerStock - mortgagePrincipal
   });
 
@@ -134,7 +138,7 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
       mortgageBuyerStock,
 
       // Net Worths
-      cashBuyerNW: homeValue + cashBuyerStock - cashBuyerTax,
+      cashBuyerNW: homeValue + cashBuyerStock,
       mortgageBuyerNW: homeValue + mortgageBuyerStock - mortgageBalance
     });
   }
@@ -143,7 +147,8 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     annualPI,
     cashBuyerTax,
     mortgageBuyerTax,
-    initialUninvestedAmount,
+    cashBuyerStartingStock: investmentPortfolioValue - cashBuyerGrossSold,
+    mortgageBuyerStartingStock: investmentPortfolioValue - mortgageBuyerGrossSold,
     data
   };
 }
