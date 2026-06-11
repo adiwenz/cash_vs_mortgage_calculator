@@ -80,6 +80,11 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -89,6 +94,8 @@ body {
   line-height: 1.5;
   transition: background-color var(--transition-normal), color var(--transition-normal);
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -116,11 +123,19 @@ h1, h2, h3, h4, h5, h6 {
 /* App Container Layout */
 .app-container {
   max-width: 1600px;
+  width: 100%;
   margin: 0 auto;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+@media (max-width: 480px) {
+  .app-container {
+    padding: 1rem 0.75rem;
+    gap: 1.25rem;
+  }
 }
 
 /* Navigation / Header */
