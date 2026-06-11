@@ -38,6 +38,11 @@ export default function App() {
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
   const [activeTool, setActiveTool] = useState('cashVsMortgageSimple'); // 'cashVsMortgageSimple' | 'cashVsMortgage' | 'mortgageComparer'
 
+  // Mobile drawer & collapsible sections state
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isTableSectionOpen, setIsTableSectionOpen] = useState(false);
+  const [isEducationSectionOpen, setIsEducationSectionOpen] = useState(false);
+
   // Radio Decisions state
   const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
   const [cashSavingsDest, setCashSavingsDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
@@ -119,7 +124,12 @@ export default function App() {
             ) : activeTool === 'cashVsMortgage' ? (
               <>
                 <h1>Advanced Cash vs Mortgage (Tax-Aware)</h1>
-                <p>Compare home buying paths with capital gains tax and liquidation rules</p>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem' }}>
+                  <span className="advanced-badge" style={{ marginTop: 0 }}>ADVANCED</span>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    For investors evaluating the tax impact of selling investments to buy a home.
+                  </p>
+                </div>
               </>
             ) : (
               <>
@@ -197,264 +207,267 @@ export default function App() {
           <SimpleCalculator />
         </main>
       ) : activeTool === 'cashVsMortgage' ? (
-        <>
-          {/* Summary Widgets Strip */}
-          <div className="summary-strip">
-            <div className="summary-widget">
-              <span className="widget-label">Cash Buyer Tax Paid</span>
-              <span className="widget-value" style={{ color: 'var(--accent-rose)', WebkitTextFillColor: 'var(--accent-rose)' }}>
-                {formatCurrency(calcResults.cashBuyerTax)}
-              </span>
-              <span className="widget-sub">Immediate Capital Gains Tax</span>
-            </div>
-            <div className="summary-widget">
-              <span className="widget-label">Mortgage Buyer Tax Paid</span>
-              <span className="widget-value" style={{ color: 'var(--accent-amber)', WebkitTextFillColor: 'var(--accent-amber)' }}>
-                {formatCurrency(calcResults.mortgageBuyerTax)}
-              </span>
-              <span className="widget-sub">Tax Paid for Down Payment</span>
-            </div>
-            <div className="summary-widget">
-              <span className="widget-label">Mortgage Buyer Starting Stock</span>
-              <span className="widget-value">
-                {formatCurrency(calcResults.mortgageBuyerStartingStock)}
-              </span>
-              <span className="widget-sub">Remaining portfolio after Down Payment Tax</span>
-            </div>
-            <div className="summary-widget">
-              <span className="widget-label">Annual Mortgage P&I</span>
-              <span className="widget-value" style={{ color: 'var(--accent-emerald)', WebkitTextFillColor: 'var(--accent-emerald)' }}>
-                {formatCurrency(calcResults.annualPI)}
-              </span>
-              <span className="widget-sub">{formatCurrency(calcResults.annualPI / 12)}/month P&I payment</span>
-            </div>
-          </div>
+        <div className="advanced-layout">
+          {/* Overlay for mobile drawer */}
+          {isMobileDrawerOpen && (
+            <div className="drawer-overlay" onClick={() => setIsMobileDrawerOpen(false)} />
+          )}
 
-          {/* Main Grid */}
-          <main className="dashboard-grid">
-            {/* Left Column: Assumptions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
-              {validation.errors.length === 0 && (
-                <CapitalGainsBreakdownCard inputs={inputs} calcResults={calcResults} />
-              )}
+          {/* Left Column: Collapsible Sidebar for Assumptions */}
+          <aside className={`assumptions-sidebar ${isMobileDrawerOpen ? 'open' : ''}`}>
+            <div className="sidebar-header-mobile">
+              <h3>Edit Assumptions</h3>
+              <button className="close-drawer-btn" onClick={() => setIsMobileDrawerOpen(false)}>
+                &times;
+              </button>
             </div>
+            <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
+          </aside>
 
-            {/* Right Column: Results & Interactive Views */}
-            <div className="results-display">
-              {/* Interactive Decisions Selector */}
-              <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
-                  Interactive Buying Decisions
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                  {/* Mortgage Buyer Choice */}
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                      Mortgage leftover cash goes to:
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {[
-                        { val: 'invest', label: '📈 Invest (Stock)' },
-                        { val: 'savings', label: '🏦 Savings Account' },
-                        { val: 'cash', label: '💵 Hold as Cash' }
-                      ].map((item) => (
-                        <label
-                          key={item.val}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            fontSize: '0.8rem',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            padding: '0.4rem 0.75rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-color)',
-                            background: mortgageLeftoverDest === item.val ? 'var(--primary-light)' : 'transparent',
-                            borderColor: mortgageLeftoverDest === item.val ? 'var(--primary)' : 'var(--border-color)',
-                            color: mortgageLeftoverDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            transition: 'all var(--transition-fast)'
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="mortgageLeftoverDest"
-                            value={item.val}
-                            checked={mortgageLeftoverDest === item.val}
-                            onChange={() => setMortgageLeftoverDest(item.val)}
-                            style={{ accentColor: 'var(--primary)' }}
-                          />
-                          {item.label}
-                        </label>
-                      ))}
-                    </div>
+          {/* Right Column: Main Content Area */}
+          <div className="advanced-main">
+            {/* Mobile Sidebar Toggle */}
+            <button
+              className="mobile-sidebar-toggle"
+              onClick={() => setIsMobileDrawerOpen(true)}
+            >
+              ⚙️ Edit Assumptions
+            </button>
+
+            {/* Grouped KPI Cards (2x2 Structure) */}
+            <div className="kpi-dashboard-grid">
+              {/* Group 1: Tax Impact */}
+              <div className="kpi-group">
+                <span className="kpi-group-label">Tax Impact</span>
+                <div className="kpi-cards-row">
+                  <div className="kpi-card text-rose">
+                    <span className="kpi-card-title">Cash Buyer Tax</span>
+                    <span className="kpi-card-value">{formatCurrency(calcResults.cashBuyerTax)}</span>
+                    <span className="kpi-card-subtitle">Immediate Gains Tax</span>
                   </div>
-
-                  {/* Cash Buyer Choice */}
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                      Cash Buyer monthly savings go to:
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {[
-                        { val: 'invest', label: '📈 Invest (Stock)' },
-                        { val: 'savings', label: '🏦 Savings Account' },
-                        { val: 'cash', label: '💵 Hold as Cash' }
-                      ].map((item) => (
-                        <label
-                          key={item.val}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            fontSize: '0.8rem',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            padding: '0.4rem 0.75rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-color)',
-                            background: cashSavingsDest === item.val ? 'var(--primary-light)' : 'transparent',
-                            borderColor: cashSavingsDest === item.val ? 'var(--primary)' : 'var(--border-color)',
-                            color: cashSavingsDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            transition: 'all var(--transition-fast)'
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="cashSavingsDest"
-                            value={item.val}
-                            checked={cashSavingsDest === item.val}
-                            onChange={() => setCashSavingsDest(item.val)}
-                            style={{ accentColor: 'var(--primary)' }}
-                          />
-                          {item.label}
-                        </label>
-                      ))}
-                    </div>
+                  <div className="kpi-card text-amber">
+                    <span className="kpi-card-title">Mortgage Buyer Tax</span>
+                    <span className="kpi-card-value">{formatCurrency(calcResults.mortgageBuyerTax)}</span>
+                    <span className="kpi-card-subtitle">Tax for Down Payment</span>
                   </div>
                 </div>
               </div>
 
-              {/* Errors list */}
-              {validation.errors.length > 0 && (
-                <div 
-                  className="glass-card" 
-                  style={{ 
-                    borderLeft: '4px solid var(--accent-rose)', 
-                    background: 'rgba(244, 63, 94, 0.05)', 
-                    padding: '1rem 1.5rem', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.5rem',
-                    marginBottom: '1rem'
+              {/* Group 2: Starting Position */}
+              <div className="kpi-group">
+                <span className="kpi-group-label">Starting Position</span>
+                <div className="kpi-card">
+                  <span className="kpi-card-title">Mortgage Buyer Starting Stock</span>
+                  <span className="kpi-card-value">
+                    {formatCurrency(calcResults.mortgageBuyerStartingStock)}
+                  </span>
+                  <span className="kpi-card-subtitle">Stock after down payment tax</span>
+                </div>
+              </div>
+
+              {/* Group 3: Mortgage Cost */}
+              <div className="kpi-group">
+                <span className="kpi-group-label">Mortgage Cost</span>
+                <div className="kpi-card text-emerald">
+                  <span className="kpi-card-title">Annual Mortgage P&I</span>
+                  <span className="kpi-card-value">{formatCurrency(calcResults.annualPI)}</span>
+                  <span className="kpi-card-subtitle">
+                    {formatCurrency(calcResults.annualPI / 12)}/month P&I
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Errors list */}
+            {validation.errors.length > 0 && (
+              <div
+                className="glass-card"
+                style={{
+                  borderLeft: '4px solid var(--accent-rose)',
+                  background: 'rgba(244, 63, 94, 0.05)',
+                  padding: '0.75rem 1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}
+              >
+                <h3 style={{ color: 'var(--accent-rose)', fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>
+                  ❌ Fix Your Assumptions
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {validation.errors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Warnings collapsible accordion */}
+            {validation.warnings.length > 0 && validation.errors.length === 0 && (
+              <div
+                className="glass-card"
+                style={{
+                  borderLeft: '4px solid var(--accent-amber)',
+                  background: 'rgba(245, 158, 11, 0.05)',
+                  padding: '0.75rem 1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem'
+                }}
+              >
+                <button
+                  onClick={() => setIsWarningsOpen(!isWarningsOpen)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 0,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    color: 'var(--accent-amber)',
+                    fontSize: '0.85rem',
+                    fontWeight: '700'
                   }}
                 >
-                  <h3 style={{ color: 'var(--accent-rose)', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    ❌ Fix Your Assumptions
-                  </h3>
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    {validation.errors.map((err, i) => (
-                      <li key={i}>{err}</li>
+                  <span>⚠️ Check Your Assumptions ({validation.warnings.length})</span>
+                  <span style={{ transition: 'transform 0.2s', transform: isWarningsOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.7rem' }}>▶</span>
+                </button>
+
+                {isWarningsOpen && (
+                  <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {validation.warnings.map((warn, i) => (
+                      <li key={i}>{warn}</li>
                     ))}
                   </ul>
+                )}
+              </div>
+            )}
+
+            {/* Comparison Chart */}
+            <ComparisonChart
+              data={calcResults.data.slice(0, zoomRange + 1)}
+              visibleScenarios={visibleScenarios}
+              onToggleScenario={handleToggleScenario}
+              scenarioInfo={SCENARIO_INFO}
+              yAxisMax={maxInvestNW}
+              zoomRange={zoomRange}
+              onZoomChange={setZoomRange}
+              disabled={validation.errors.length > 0}
+            />
+
+            {/* Interactive Decisions Section */}
+            <div className="glass-card" style={{ padding: '1rem 1.25rem' }}>
+              <h3 className="interactive-decisions-title">Interactive Buying Decisions</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {/* Mortgage Buyer Choice */}
+                <div className="segmented-control-container">
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    What happens to leftover cash? (Mortgage Buyer)
+                  </span>
+                  <div className="segmented-control">
+                    {[
+                      { val: 'invest', label: '📈 Invest' },
+                      { val: 'savings', label: '🏦 Save' },
+                      { val: 'cash', label: '💵 Hold Cash' }
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        className={`segmented-control-btn ${mortgageLeftoverDest === item.val ? 'active' : ''}`}
+                        onClick={() => setMortgageLeftoverDest(item.val)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              {/* Warnings collapsible accordion */}
-              {validation.warnings.length > 0 && validation.errors.length === 0 && (
-                <div 
-                  className="glass-card" 
-                  style={{ 
-                    borderLeft: '4px solid var(--accent-amber)', 
-                    background: 'rgba(245, 158, 11, 0.05)', 
-                    padding: '1rem 1.5rem', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.5rem',
-                    marginBottom: '1rem'
-                  }}
-                >
-                  <button
-                    onClick={() => setIsWarningsOpen(!isWarningsOpen)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: 0,
-                      margin: 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      color: 'var(--accent-amber)',
-                      fontSize: '0.9rem',
-                      fontWeight: '700'
-                    }}
-                  >
-                    <span>⚠️ Check Your Assumptions ({validation.warnings.length})</span>
-                    <span style={{ transition: 'transform 0.2s', transform: isWarningsOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.75rem' }}>▶</span>
-                  </button>
-                  
-                  {isWarningsOpen && (
-                    <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {validation.warnings.map((warn, i) => (
-                        <li key={i}>{warn}</li>
-                      ))}
-                    </ul>
-                  )}
+                {/* Cash Buyer Choice */}
+                <div className="segmented-control-container">
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    What happens to monthly savings? (Cash Buyer)
+                  </span>
+                  <div className="segmented-control">
+                    {[
+                      { val: 'invest', label: '📈 Invest Savings' },
+                      { val: 'savings', label: '🏦 Save Savings' },
+                      { val: 'cash', label: '💵 Spend Savings' }
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        className={`segmented-control-btn ${cashSavingsDest === item.val ? 'active' : ''}`}
+                        onClick={() => setCashSavingsDest(item.val)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
-
-              {/* Tab Navigation */}
-              <nav className="tab-nav">
-                <button
-                  className={`tab-btn ${activeTab === 'chart' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('chart')}
-                >
-                  📊 Visual Chart
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'table' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('table')}
-                >
-                  📋 Calculation Table
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'education' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('education')}
-                >
-                  🎓 Education Hub
-                </button>
-              </nav>
-
-              {/* Active View Container */}
-              {activeTab === 'chart' && (
-                <ComparisonChart
-                  data={calcResults.data.slice(0, zoomRange + 1)}
-                  visibleScenarios={visibleScenarios}
-                  onToggleScenario={handleToggleScenario}
-                  scenarioInfo={SCENARIO_INFO}
-                  yAxisMax={maxInvestNW}
-                  zoomRange={zoomRange}
-                  onZoomChange={setZoomRange}
-                  disabled={validation.errors.length > 0}
-                />
-              )}
-
-              {activeTab === 'table' && (
-                <ComparisonTable
-                  data={calcResults.data}
-                  visibleScenarios={visibleScenarios}
-                  scenarioInfo={SCENARIO_INFO}
-                />
-              )}
-
-              {activeTab === 'education' && <EducationHub />}
+              </div>
             </div>
-          </main>
-        </>
+
+            {/* Calculation Breakdown Section (Capital Gains breakdown) */}
+            {validation.errors.length === 0 && (
+              <CapitalGainsBreakdownCard inputs={inputs} calcResults={calcResults} />
+            )}
+
+            {/* Detailed Tables Section */}
+            <div className="dashboard-section-card">
+              <button
+                type="button"
+                className="dashboard-section-header"
+                onClick={() => setIsTableSectionOpen(!isTableSectionOpen)}
+              >
+                <h3 className="dashboard-section-title">
+                  <span>📋</span> Detailed Amortization & Net Worth Table
+                </h3>
+                <span
+                  className="dashboard-section-toggle-icon"
+                  style={{ transform: isTableSectionOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                >
+                  ▶
+                </span>
+              </button>
+              {isTableSectionOpen && (
+                <div style={{ marginTop: '1rem' }}>
+                  <ComparisonTable
+                    data={calcResults.data}
+                    visibleScenarios={visibleScenarios}
+                    scenarioInfo={SCENARIO_INFO}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Educational Content Section */}
+            <div className="dashboard-section-card">
+              <button
+                type="button"
+                className="dashboard-section-header"
+                onClick={() => setIsEducationSectionOpen(!isEducationSectionOpen)}
+              >
+                <h3 className="dashboard-section-title">
+                  <span>🎓</span> Advanced Financial Education Hub
+                </h3>
+                <span
+                  className="dashboard-section-toggle-icon"
+                  style={{ transform: isEducationSectionOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                >
+                  ▶
+                </span>
+              </button>
+              {isEducationSectionOpen && (
+                <div style={{ marginTop: '1rem' }}>
+                  <EducationHub />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <main style={{ marginTop: '1.5rem' }}>
           <MortgageComparer />
