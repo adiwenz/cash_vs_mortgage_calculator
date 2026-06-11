@@ -234,33 +234,7 @@ export default function App() {
               ⚙️ Edit Assumptions
             </button>
 
-            {/* KPI Cards Grid */}
-            <div className="kpi-dashboard-grid">
-              <div className="kpi-card text-rose">
-                <span className="kpi-card-title">Cash Buyer Tax</span>
-                <span className="kpi-card-value">{formatCurrency(calcResults.cashBuyerTax)}</span>
-                <span className="kpi-card-subtitle">Immediate Gains Tax</span>
-              </div>
-              <div className="kpi-card text-amber">
-                <span className="kpi-card-title">Mortgage Buyer Tax</span>
-                <span className="kpi-card-value">{formatCurrency(calcResults.mortgageBuyerTax)}</span>
-                <span className="kpi-card-subtitle">Tax for Down Payment</span>
-              </div>
-              <div className="kpi-card">
-                <span className="kpi-card-title">Mortgage Buyer Starting Stock</span>
-                <span className="kpi-card-value">
-                  {formatCurrency(calcResults.mortgageBuyerStartingStock)}
-                </span>
-                <span className="kpi-card-subtitle">Stock after down payment tax</span>
-              </div>
-              <div className="kpi-card text-emerald">
-                <span className="kpi-card-title">Annual Mortgage P&I</span>
-                <span className="kpi-card-value">{formatCurrency(calcResults.annualPI)}</span>
-                <span className="kpi-card-subtitle">
-                  {formatCurrency(calcResults.annualPI / 12)}/month P&I
-                </span>
-              </div>
-            </div>
+
 
             {/* Errors list */}
             {validation.errors.length > 0 && (
