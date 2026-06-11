@@ -153,18 +153,21 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.75rem;
 }
 
-.brand-logo {
-  background: linear-gradient(135deg, var(--primary), var(--accent-sky));
-  color: #fff;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.25rem;
-  box-shadow: var(--shadow-glow);
+.brand-logo-img {
+  height: 36px;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 0.25rem;
+}
+
+[data-theme='dark'] .brand-logo-img {
+  filter: invert(1) hue-rotate(180deg) brightness(1.2);
 }
 
 .brand-title h1 {

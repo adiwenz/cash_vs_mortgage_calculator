@@ -7,7 +7,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ReferenceLine
 } from 'recharts';
 
@@ -29,8 +28,33 @@ const formatYAxis = (val) => {
   return `$${val}`;
 };
 
-export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange, disabled }) {
-  const [colorBlindMode, setColorBlindMode] = React.useState(false);
+// Custom tooltip component (declared outside render to prevent recreation and state resets)
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    // Sort payload by value descending to display the highest net worth at the top
+    const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
+
+    return (
+      <div className="custom-chart-tooltip">
+        <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+          Year {label}
+        </p>
+        {sortedPayload.map((item) => (
+          <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
+            <span style={{ color: item.color, fontWeight: '500' }}>{item.name}:</span>
+            <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange, disabled, selectedYear, onSelectYear, colorBlindMode: colorBlindModeProp, onColorBlindModeChange }) {
+  const [localColorBlindMode, setLocalColorBlindMode] = React.useState(false);
+  const colorBlindMode = colorBlindModeProp !== undefined ? colorBlindModeProp : localColorBlindMode;
+  const setColorBlindMode = onColorBlindModeChange || setLocalColorBlindMode;
 
   // Compute intersection year
   const intersectionYear = React.useMemo(() => {
@@ -59,28 +83,6 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
     }
     return null;
   }, [data, visibleScenarios]);
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      // Sort payload by value descending to display the highest net worth at the top
-      const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
-
-      return (
-        <div className="custom-chart-tooltip">
-          <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-            Year {label}
-          </p>
-          {sortedPayload.map((item) => (
-            <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
-              <span style={{ color: item.color, fontWeight: '500' }}>{item.name}:</span>
-              <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -187,6 +189,12 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
             <LineChart
               data={data}
               margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+              onClick={(state) => {
+                if (onSelectYear && state && state.activeLabel !== undefined) {
+                  onSelectYear(Number(state.activeLabel));
+                }
+              }}
+              style={{ cursor: onSelectYear ? 'pointer' : 'default' }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
               <XAxis
@@ -228,6 +236,23 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
                     fontWeight: '700',
                     dy: 8,
                     dx: 4
+                  }}
+                />
+              )}
+
+              {selectedYear !== null && selectedYear !== undefined && selectedYear <= zoomRange && (
+                <ReferenceLine
+                  x={selectedYear}
+                  stroke="var(--primary)"
+                  strokeDasharray="3 3"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Selected: Yr ${selectedYear}`,
+                    position: 'insideBottom',
+                    fill: 'var(--primary)',
+                    fontSize: 10,
+                    fontWeight: '700',
+                    dy: -15
                   }}
                 />
               )}

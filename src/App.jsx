@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { calculateScenarios, validateInputs, getNumParam, getStrParam } from './calculations';
 import AssumptionsPanel from './components/AssumptionsPanel';
 import ComparisonChart from './components/ComparisonChart';
@@ -7,6 +7,7 @@ import EducationHub from './components/EducationHub';
 import MortgageComparer from './components/MortgageComparer';
 import SimpleCalculator from './components/SimpleCalculator';
 import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
+import logoImg from './assets/logo.png';
 
 // Initial default inputs
 const DEFAULT_INPUTS = {
@@ -33,6 +34,8 @@ const SCENARIO_INFO = {
 
 export default function App() {
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(30);
+  const [colorBlindMode, setColorBlindMode] = useState(false);
   // On mount, parse tool from URL query parameter
   const [activeTool, setActiveTool] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -64,7 +67,6 @@ export default function App() {
     };
   });
 
-  const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
 
@@ -167,6 +169,11 @@ export default function App() {
     return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
+  const selectedYearData = useMemo(() => {
+    if (!calcResults || !calcResults.data) return null;
+    return calcResults.data.find(row => row.year === selectedYear) || calcResults.data[30] || calcResults.data[calcResults.data.length - 1];
+  }, [calcResults, selectedYear]);
+
   const validation = useMemo(() => {
     return validateInputs(inputs);
   }, [inputs]);
@@ -207,7 +214,8 @@ export default function App() {
       {/* App Header */}
       <header className="app-header">
         <div className="brand-section">
-          <div className="brand-logo">🏡</div>
+          <img src={logoImg} alt="ProsperCalc" className="brand-logo-img" />
+          <div className="brand-separator" />
           <div className="brand-title">
             {activeTool === 'cashVsMortgageSimple' ? (
               <>
@@ -417,7 +425,132 @@ export default function App() {
               zoomRange={zoomRange}
               onZoomChange={setZoomRange}
               disabled={validation.errors.length > 0}
+              selectedYear={selectedYear}
+              onSelectYear={setSelectedYear}
+              colorBlindMode={colorBlindMode}
+              onColorBlindModeChange={setColorBlindMode}
             />
+
+            {/* Yearly Milestone Estimates Section */}
+            {validation.errors.length === 0 && (
+              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Yearly Milestone Estimates</h3>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Click on any year in the graph above to view milestone values</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Show Year:</span>
+                    <span style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--primary)', minWidth: '24px', textAlign: 'center' }}>{selectedYear}</span>
+                  </div>
+                </div>
+                
+                {selectedYearData && (() => {
+                  const cashNW = selectedYearData.cashBuyerNW;
+                  const mortNW = selectedYearData.mortgageBuyerNW;
+                  
+                  const cashColor = colorBlindMode ? '#2563eb' : '#0d9488';
+                  const mortgageColor = colorBlindMode ? '#ea580c' : '#f59e0b';
+
+                  const cashBg = colorBlindMode ? 'rgba(37, 99, 235, 0.04)' : 'rgba(13, 148, 136, 0.04)';
+                  const cashBorder = colorBlindMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(13, 148, 136, 0.15)';
+                  const cashBorderTop = colorBlindMode ? 'rgba(37, 99, 235, 0.12)' : 'rgba(13, 148, 136, 0.12)';
+                  const cashBadgeBg = colorBlindMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(13, 148, 136, 0.1)';
+
+                  const mortgageBg = colorBlindMode ? 'rgba(234, 88, 12, 0.04)' : 'rgba(245, 158, 11, 0.04)';
+                  const mortgageBorder = colorBlindMode ? 'rgba(234, 88, 12, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                  const mortgageBorderTop = colorBlindMode ? 'rgba(234, 88, 12, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+                  const mortgageBadgeBg = colorBlindMode ? 'rgba(234, 88, 12, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+
+                  const diff = Math.abs(cashNW - mortNW);
+                  const cashWins = cashNW > mortNW;
+                  const tied = cashNW === mortNW;
+                  const winnerLabel = cashWins ? 'Cash Buyer' : 'Mortgage Buyer';
+                  const winnerColor = cashWins ? cashColor : mortgageColor;
+                  const winnerBg = cashWins 
+                    ? (colorBlindMode ? 'rgba(37, 99, 235, 0.08)' : 'rgba(13, 148, 136, 0.08)') 
+                    : (colorBlindMode ? 'rgba(234, 88, 12, 0.08)' : 'rgba(245, 158, 11, 0.08)');
+                  const winnerBorder = cashWins 
+                    ? (colorBlindMode ? 'rgba(37, 99, 235, 0.25)' : 'rgba(13, 148, 136, 0.25)') 
+                    : (colorBlindMode ? 'rgba(234, 88, 12, 0.25)' : 'rgba(245, 158, 11, 0.25)');
+
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
+                        {/* Cash Buyer Card */}
+                        <div style={{ background: cashBg, border: `1px solid ${cashBorder}`, borderRadius: '10px', padding: '1rem' }}>
+                          <div style={{ borderBottom: `1px solid ${cashBorder}`, paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: cashColor }}>Cash Buyer</span>
+                            <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: cashBadgeBg, borderRadius: '4px', color: cashColor, fontWeight: '700' }}>No Loan</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Value:</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.homeValue)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.cashBuyerStock)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${cashBorderTop}`, paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
+                              <span style={{ fontSize: '0.95rem', fontWeight: '800', color: cashColor }}>{formatCurrency(cashNW)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mortgage Buyer Card */}
+                        <div style={{ background: mortgageBg, border: `1px solid ${mortgageBorder}`, borderRadius: '10px', padding: '1rem' }}>
+                          <div style={{ borderBottom: `1px solid ${mortgageBorder}`, paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: mortgageColor }}>Mortgage Buyer</span>
+                            <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: mortgageBadgeBg, borderRadius: '4px', color: mortgageColor, fontWeight: '700' }}>Leveraged</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Home Equity:</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.homeValue - selectedYearData.mortgageBalance)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBuyerStock)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mortgage Balance:</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBalance)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${mortgageBorderTop}`, paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
+                              <span style={{ fontSize: '0.95rem', fontWeight: '800', color: mortgageColor }}>{formatCurrency(mortNW)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Winner Callout */}
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem 1rem',
+                        background: tied ? 'rgba(100, 116, 139, 0.08)' : winnerBg,
+                        border: `1px solid ${tied ? 'rgba(100, 116, 139, 0.2)' : winnerBorder}`,
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <span style={{ fontSize: '1.1rem' }}>{tied ? '🤝' : '🏆'}</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                          {tied ? (
+                            <><strong>It's a tie!</strong> Both buyers have the same net worth at Year {selectedYear}.</>
+                          ) : (
+                            <>At Year {selectedYear}, the <strong style={{ color: winnerColor }}>{winnerLabel}</strong> comes out ahead by <strong>{formatCurrency(diff)}</strong>.</>
+                          )}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Interactive Decisions Section */}
             <div className="glass-card" style={{ padding: '1rem 1.25rem' }}>
