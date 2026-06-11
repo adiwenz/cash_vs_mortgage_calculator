@@ -61,6 +61,9 @@ export default function SimpleCalculator() {
   // Active chart metric
   const [chartMetric, setChartMetric] = useState('netWorth'); // 'netWorth' | 'homeEquity' | 'investment' | 'mortgageBalance'
 
+  // Zoom range state
+  const [zoomRange, setZoomRange] = useState(30); // 5 | 10 | 15 | 30
+
   // Input validation
   const errors = useMemo(() => {
     return validateSimpleInputs(inputs);
@@ -79,23 +82,24 @@ export default function SimpleCalculator() {
 
   const yAxisMax = useMemo(() => {
     if (!simpleBaselineResults) return 'auto';
+    const zoomedBaseline = simpleBaselineResults.data.slice(0, zoomRange + 1);
     if (chartMetric === 'netWorth') {
       let maxVal = 0;
-      simpleBaselineResults.data.forEach((row) => {
+      zoomedBaseline.forEach((row) => {
         if (row.cashBuyerNW > maxVal) maxVal = row.cashBuyerNW;
         if (row.mortgageBuyerNW > maxVal) maxVal = row.mortgageBuyerNW;
       });
       return Math.ceil(maxVal * 1.05);
     } else if (chartMetric === 'investment') {
       let maxVal = 0;
-      simpleBaselineResults.data.forEach((row) => {
+      zoomedBaseline.forEach((row) => {
         if (row.cashBuyerStock > maxVal) maxVal = row.cashBuyerStock;
         if (row.mortgageBuyerStock > maxVal) maxVal = row.mortgageBuyerStock;
       });
       return Math.ceil(maxVal * 1.05);
     } else if (chartMetric === 'homeEquity') {
       let maxVal = 0;
-      simpleBaselineResults.data.forEach((row) => {
+      zoomedBaseline.forEach((row) => {
         if (row.homeValue > maxVal) maxVal = row.homeValue;
       });
       return Math.ceil(maxVal * 1.05);
@@ -103,7 +107,7 @@ export default function SimpleCalculator() {
       return Math.ceil((calcResults?.loanAmount || 0) * 1.05) || 'auto';
     }
     return 'auto';
-  }, [simpleBaselineResults, chartMetric, calcResults]);
+  }, [simpleBaselineResults, chartMetric, calcResults, zoomRange]);
 
   // Local state for string input values
   const [localValues, setLocalValues] = useState({});
@@ -197,7 +201,8 @@ export default function SimpleCalculator() {
   // Chart data formatting
   const chartData = useMemo(() => {
     if (!calcResults) return [];
-    return calcResults.data.map((row) => {
+    const sliced = calcResults.data.slice(0, zoomRange + 1);
+    return sliced.map((row) => {
       const formatted = { year: row.year };
       if (chartMetric === 'netWorth') {
         formatted['Cash Buyer NW'] = Math.round(row.cashBuyerNW);
@@ -214,7 +219,7 @@ export default function SimpleCalculator() {
       }
       return formatted;
     });
-  }, [calcResults, chartMetric]);
+  }, [calcResults, chartMetric, zoomRange]);
 
   // Line keys for charts
   const lineKeys = useMemo(() => {
@@ -489,10 +494,36 @@ export default function SimpleCalculator() {
 
             {/* Interactive Visual Chart */}
             <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Growth Charts</h3>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Compare both strategies visualised over 30 years</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', flex: 1 }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Growth Charts</h3>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Compare both strategies visualised over 30 years</span>
+                  </div>
+                  
+                  {/* Zoom selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
+                    {[5, 10, 15, 30].map((years) => (
+                      <button
+                        key={years}
+                        onClick={() => setZoomRange(years)}
+                        style={{
+                          background: zoomRange === years ? 'var(--primary)' : 'transparent',
+                          color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
+                          border: 'none',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all var(--transition-fast)'
+                        }}
+                      >
+                        {years === 30 ? 'All (30y)' : `${years}y`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 
                 {/* Metric toggles */}
