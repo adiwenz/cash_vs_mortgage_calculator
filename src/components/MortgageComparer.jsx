@@ -287,20 +287,31 @@ export default function MortgageComparer() {
     return calculatedScenarios.filter((s) => s.enabled && s.errors.length === 0);
   }, [calculatedScenarios]);
 
-  // 4. Calculate maximum Y-axis value for Net Worth
+  // 4. Calculate maximum Y-axis value for Net Worth based on forced 'invest' reinvestment baseline
   const maxNetWorth = useMemo(() => {
     let maxVal = 0;
-    activeScenarios.forEach((scen) => {
-      if (scen.results && scen.results.data) {
-        scen.results.data.forEach((row) => {
-          if (row.netWorth > maxVal) {
-            maxVal = row.netWorth;
-          }
-        });
+    baseScenarios.forEach((scen) => {
+      if (scen.enabled && scen.errors.length === 0) {
+        // Force reinvestment destination to 'invest' to get the maximum possible outcome
+        const investScen = {
+          ...scen,
+          homeAppreciation: globalAppreciation,
+          stockReturn: globalStockReturn,
+          savingsRate: globalSavingsRate,
+          reinvestDestination: 'invest'
+        };
+        const results = calculateMortgageScenarioData(investScen, maxMonthlyPayment, maxDownPayment);
+        if (results && results.data) {
+          results.data.forEach((row) => {
+            if (row.netWorth > maxVal) {
+              maxVal = row.netWorth;
+            }
+          });
+        }
       }
     });
     return Math.ceil(maxVal * 1.05); // Add 5% padding
-  }, [activeScenarios]);
+  }, [baseScenarios, maxMonthlyPayment, maxDownPayment, globalAppreciation, globalStockReturn, globalSavingsRate]);
 
   // Handle input changes
   const handleScenarioChange = (id, field, value) => {
