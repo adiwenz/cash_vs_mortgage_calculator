@@ -168,6 +168,26 @@ export default function MortgageComparer() {
     return calculatedScenarios.filter((s) => s.enabled && s.errors.length === 0);
   }, [calculatedScenarios]);
 
+  // 4. Calculate maximum Y-axis value for Net Worth if all active scenarios chose to "invest"
+  const maxNetWorthInvest = useMemo(() => {
+    let maxVal = 0;
+    activeScenarios.forEach((scen) => {
+      const forceInvestScenario = {
+        ...scen,
+        savedMoneyDest: 'invest'
+      };
+      const forceInvestResults = calculateMortgageScenarioData(forceInvestScenario, maxMonthlyPayment);
+      if (forceInvestResults && forceInvestResults.data) {
+        forceInvestResults.data.forEach((row) => {
+          if (row.netWorth > maxVal) {
+            maxVal = row.netWorth;
+          }
+        });
+      }
+    });
+    return Math.ceil(maxVal * 1.05); // Add 5% padding
+  }, [activeScenarios, maxMonthlyPayment]);
+
   // Handle input changes
   const handleScenarioChange = (id, field, value) => {
     setScenarios((prev) =>
@@ -490,6 +510,7 @@ export default function MortgageComparer() {
                     fontFamily="var(--font-body)"
                     fontSize={11}
                     tickFormatter={formatYAxis}
+                    domain={compareMetric === 'netWorth' ? [0, maxNetWorthInvest] : ['auto', 'auto']}
                   />
                   <Tooltip content={<CustomLineTooltip />} />
                   <Legend />
