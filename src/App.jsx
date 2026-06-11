@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { calculateScenarios, validateInputs } from './calculations';
+import { calculateScenarios, validateInputs, getNumParam, getStrParam } from './calculations';
 import AssumptionsPanel from './components/AssumptionsPanel';
 import ComparisonChart from './components/ComparisonChart';
 import ComparisonTable from './components/ComparisonTable';
@@ -32,11 +32,40 @@ const SCENARIO_INFO = {
 };
 
 export default function App() {
-  const [inputs, setInputs] = useState(DEFAULT_INPUTS);
+  // On mount, parse tool from URL query parameter
+  const [activeTool, setActiveTool] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tool = params.get('tool');
+    if (tool === 'advanced') return 'cashVsMortgage';
+    if (tool === 'compare') return 'mortgageComparer';
+    return 'cashVsMortgageSimple';
+  });
+
+  const [inputs, setInputs] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tool = params.get('tool');
+    if (tool !== 'advanced') return DEFAULT_INPUTS;
+
+    return {
+      homePrice: getNumParam(params, 'homePrice', DEFAULT_INPUTS.homePrice),
+      downPaymentPercent: getNumParam(params, 'downPaymentPercent', DEFAULT_INPUTS.downPaymentPercent),
+      mortgageTerm: getNumParam(params, 'mortgageTerm', DEFAULT_INPUTS.mortgageTerm),
+      mortgageRate: getNumParam(params, 'mortgageRate', DEFAULT_INPUTS.mortgageRate),
+      stockReturn: getNumParam(params, 'stockReturn', DEFAULT_INPUTS.stockReturn),
+      homeAppreciation: getNumParam(params, 'homeAppreciation', DEFAULT_INPUTS.homeAppreciation),
+      propertyTaxRate: getNumParam(params, 'propertyTaxRate', DEFAULT_INPUTS.propertyTaxRate),
+      insuranceRate: getNumParam(params, 'insuranceRate', DEFAULT_INPUTS.insuranceRate),
+      investmentPortfolioValue: getNumParam(params, 'investmentPortfolioValue', DEFAULT_INPUTS.investmentPortfolioValue),
+      investmentCostBasis: getNumParam(params, 'investmentCostBasis', DEFAULT_INPUTS.investmentCostBasis),
+      cashPurchaseDiscount: getNumParam(params, 'cashPurchaseDiscount', DEFAULT_INPUTS.cashPurchaseDiscount),
+      capitalGainsRate: getNumParam(params, 'capitalGainsRate', DEFAULT_INPUTS.capitalGainsRate),
+      savingsRate: getNumParam(params, 'savingsRate', DEFAULT_INPUTS.savingsRate)
+    };
+  });
+
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
-  const [activeTool, setActiveTool] = useState('cashVsMortgageSimple'); // 'cashVsMortgageSimple' | 'cashVsMortgage' | 'mortgageComparer'
 
   // Mobile drawer & collapsible sections state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -44,8 +73,15 @@ export default function App() {
   const [isEducationSectionOpen, setIsEducationSectionOpen] = useState(false);
 
   // Radio Decisions state
-  const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
-  const [cashSavingsDest, setCashSavingsDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
+  const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'advanced' ? getStrParam(params, 'mortgageLeftoverDest', 'invest') : 'invest';
+  });
+
+  const [cashSavingsDest, setCashSavingsDest] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'advanced' ? getStrParam(params, 'cashSavingsDest', 'invest') : 'invest';
+  });
 
   // Chart Zoom Range state
   const [zoomRange, setZoomRange] = useState(30); // 5 | 10 | 15 | 30
@@ -55,6 +91,56 @@ export default function App() {
     cashBuyer: true,
     mortgageBuyer: true
   });
+
+  // URL state synchronization for active tool and browser back/forward buttons
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('tool')) {
+      params.set('tool', 'simple');
+      window.history.replaceState(null, '', `?${params.toString()}`);
+    }
+
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const tool = p.get('tool');
+      if (tool === 'advanced') {
+        setActiveTool('cashVsMortgage');
+      } else if (tool === 'compare') {
+        setActiveTool('mortgageComparer');
+      } else {
+        setActiveTool('cashVsMortgageSimple');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Sync Advanced inputs to URL search query parameters in real-time
+  useEffect(() => {
+    if (activeTool !== 'cashVsMortgage') return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('tool', 'advanced');
+    Object.keys(inputs).forEach((key) => {
+      params.set(key, inputs[key]);
+    });
+    params.set('mortgageLeftoverDest', mortgageLeftoverDest);
+    params.set('cashSavingsDest', cashSavingsDest);
+    window.history.replaceState(null, '', `?${params.toString()}`);
+  }, [inputs, mortgageLeftoverDest, cashSavingsDest, activeTool]);
+
+  // Handle active tool changes via navigation click
+  const handleToolSwitch = (tool) => {
+    setActiveTool(tool);
+    const params = new URLSearchParams();
+    if (tool === 'cashVsMortgageSimple') {
+      params.set('tool', 'simple');
+    } else if (tool === 'cashVsMortgage') {
+      params.set('tool', 'advanced');
+    } else {
+      params.set('tool', 'compare');
+    }
+    window.history.pushState(null, '', `?${params.toString()}`);
+  };
 
   // Theme synchronization
   useEffect(() => {
@@ -118,12 +204,12 @@ export default function App() {
           <div className="brand-title">
             {activeTool === 'cashVsMortgageSimple' ? (
               <>
-                <h1>Cash vs Mortgage (Simple)</h1>
+                <h1>Cash v. Mortgage</h1>
                 <p>Learn home buying basics, compounding, and leverage</p>
               </>
             ) : activeTool === 'cashVsMortgage' ? (
               <>
-                <h1>Advanced Cash vs Mortgage (Tax-Aware)</h1>
+                <h1>Tax-Aware Cash v. Mortgage</h1>
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem' }}>
                   <span className="advanced-badge" style={{ marginTop: 0 }}>ADVANCED</span>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -133,7 +219,7 @@ export default function App() {
               </>
             ) : (
               <>
-                <h1>Mortgage Options Comparer</h1>
+                <h1>Compare Mortgages</h1>
                 <p>Analyze different mortgage terms, down payments, and rates side-by-side</p>
               </>
             )}
@@ -143,7 +229,7 @@ export default function App() {
           {/* Tool Switcher */}
           <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '6px', gap: '0.2rem' }}>
             <button
-              onClick={() => setActiveTool('cashVsMortgageSimple')}
+              onClick={() => handleToolSwitch('cashVsMortgageSimple')}
               style={{
                 background: activeTool === 'cashVsMortgageSimple' ? 'var(--primary)' : 'transparent',
                 color: activeTool === 'cashVsMortgageSimple' ? '#ffffff' : 'var(--text-secondary)',
@@ -156,10 +242,10 @@ export default function App() {
                 transition: 'all var(--transition-fast)'
               }}
             >
-              Cash vs Mortgage (Simple)
+              Cash v. Mortgage
             </button>
             <button
-              onClick={() => setActiveTool('cashVsMortgage')}
+              onClick={() => handleToolSwitch('cashVsMortgage')}
               style={{
                 background: activeTool === 'cashVsMortgage' ? 'var(--primary)' : 'transparent',
                 color: activeTool === 'cashVsMortgage' ? '#ffffff' : 'var(--text-secondary)',
@@ -172,10 +258,10 @@ export default function App() {
                 transition: 'all var(--transition-fast)'
               }}
             >
-              Advanced (Tax-Aware)
+              Tax-Aware Cash v. Mortgage
             </button>
             <button
-              onClick={() => setActiveTool('mortgageComparer')}
+              onClick={() => handleToolSwitch('mortgageComparer')}
               style={{
                 background: activeTool === 'mortgageComparer' ? 'var(--primary)' : 'transparent',
                 color: activeTool === 'mortgageComparer' ? '#ffffff' : 'var(--text-secondary)',
@@ -188,7 +274,7 @@ export default function App() {
                 transition: 'all var(--transition-fast)'
               }}
             >
-              Compare Options
+              Compare Mortgages
             </button>
           </div>
 

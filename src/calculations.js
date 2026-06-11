@@ -551,3 +551,43 @@ export function calculateSimpleScenarios(inputs, mortgageLeftoverDest, cashSavin
   };
 }
 
+export function getNumParam(params, key, fallback) {
+  const val = params.get(key);
+  if (val === null || val === '') return fallback;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+export function getStrParam(params, key, fallback) {
+  const val = params.get(key);
+  return val === null ? fallback : val;
+}
+
+export function encodeScenarios(scens) {
+  try {
+    const json = JSON.stringify(scens.map(s => ({
+      id: s.id,
+      name: s.name,
+      homePrice: s.homePrice,
+      downPaymentPercent: s.downPaymentPercent,
+      mortgageRate: s.mortgageRate,
+      mortgageTerm: s.mortgageTerm,
+      reinvestDestination: s.reinvestDestination,
+      enabled: s.enabled,
+      color: s.color
+    })));
+    return btoa(unescape(encodeURIComponent(json)));
+  } catch (e) {
+    return '';
+  }
+}
+
+export function decodeScenarios(str) {
+  try {
+    const json = decodeURIComponent(escape(atob(str)));
+    return JSON.parse(json);
+  } catch (e) {
+    return null;
+  }
+}
+

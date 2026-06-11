@@ -11,7 +11,9 @@ import {
 } from 'recharts';
 import {
   calculateSimpleScenarios,
-  validateSimpleInputs
+  validateSimpleInputs,
+  getNumParam,
+  getStrParam
 } from '../calculations';
 
 const PERCENT_FIELDS = [
@@ -40,20 +42,43 @@ const formatYAxis = (val) => {
 
 export default function SimpleCalculator() {
   // Simple inputs state
-  const [inputs, setInputs] = useState({
-    homePrice: 500000,
-    homeAppreciation: 0.03,
-    downPaymentPercent: 0.20,
-    mortgageRate: 0.065,
-    mortgageTerm: 30,
-    stockReturn: 0.08,
-    savingsRate: 0.04,
-    cashPurchaseDiscount: 50000
+  const [inputs, setInputs] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tool = params.get('tool');
+    const defaultInputs = {
+      homePrice: 500000,
+      homeAppreciation: 0.03,
+      downPaymentPercent: 0.20,
+      mortgageRate: 0.065,
+      mortgageTerm: 30,
+      stockReturn: 0.08,
+      savingsRate: 0.04,
+      cashPurchaseDiscount: 50000
+    };
+    if (tool !== 'simple') return defaultInputs;
+
+    return {
+      homePrice: getNumParam(params, 'homePrice', defaultInputs.homePrice),
+      homeAppreciation: getNumParam(params, 'homeAppreciation', defaultInputs.homeAppreciation),
+      downPaymentPercent: getNumParam(params, 'downPaymentPercent', defaultInputs.downPaymentPercent),
+      mortgageRate: getNumParam(params, 'mortgageRate', defaultInputs.mortgageRate),
+      mortgageTerm: getNumParam(params, 'mortgageTerm', defaultInputs.mortgageTerm),
+      stockReturn: getNumParam(params, 'stockReturn', defaultInputs.stockReturn),
+      savingsRate: getNumParam(params, 'savingsRate', defaultInputs.savingsRate),
+      cashPurchaseDiscount: getNumParam(params, 'cashPurchaseDiscount', defaultInputs.cashPurchaseDiscount)
+    };
   });
 
   // Destinations choices
-  const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings'
-  const [cashSavingsDest, setCashSavingsDest] = useState('invest'); // 'invest' | 'savings' | 'none'
+  const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'simple' ? getStrParam(params, 'mortgageLeftoverDest', 'invest') : 'invest';
+  });
+
+  const [cashSavingsDest, setCashSavingsDest] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'simple' ? getStrParam(params, 'cashSavingsDest', 'invest') : 'invest';
+  });
 
   // Selected year for summary cards
   const [selectedYear, setSelectedYear] = useState(30);
@@ -63,6 +88,20 @@ export default function SimpleCalculator() {
 
   // Zoom range state
   const [zoomRange, setZoomRange] = useState(30); // 5 | 10 | 15 | 30
+
+  // Real-time URL synchronization
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tool = params.get('tool');
+    if (tool !== 'simple') return;
+
+    Object.keys(inputs).forEach((key) => {
+      params.set(key, inputs[key]);
+    });
+    params.set('mortgageLeftoverDest', mortgageLeftoverDest);
+    params.set('cashSavingsDest', cashSavingsDest);
+    window.history.replaceState(null, '', `?${params.toString()}`);
+  }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
   // Input validation
   const errors = useMemo(() => {

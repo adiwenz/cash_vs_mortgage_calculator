@@ -15,7 +15,11 @@ import {
 import {
   calculateMortgageScenarioData,
   validateMortgageScenario,
-  calculateMonthlyPayment
+  calculateMonthlyPayment,
+  getNumParam,
+  getStrParam,
+  encodeScenarios,
+  decodeScenarios
 } from '../calculations';
 
 // Premium Scenario Colors
@@ -92,7 +96,29 @@ const formatYAxis = (val) => {
 };
 
 export default function MortgageComparer() {
-  const [scenarios, setScenarios] = useState(DEFAULT_SCENARIOS);
+  const [scenarios, setScenarios] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tool') === 'compare') {
+      const encodedScens = params.get('scenarios');
+      if (encodedScens) {
+        const decoded = decodeScenarios(encodedScens);
+        if (decoded && Array.isArray(decoded) && decoded.length > 0) {
+          return decoded.map((s, idx) => ({
+            id: s.id || (idx + 1).toString(),
+            name: s.name,
+            homePrice: s.homePrice,
+            downPaymentPercent: s.downPaymentPercent,
+            mortgageRate: s.mortgageRate,
+            mortgageTerm: s.mortgageTerm,
+            reinvestDestination: s.reinvestDestination || 'invest',
+            enabled: s.enabled !== false,
+            color: s.color || SCENARIO_COLORS[idx % SCENARIO_COLORS.length]
+          }));
+        }
+      }
+    }
+    return DEFAULT_SCENARIOS;
+  });
   const [expandedId, setExpandedId] = useState('1'); // Expand first card by default
   const [compareMetric, setCompareMetric] = useState('netWorth'); // 'netWorth' | 'homeEquity' | 'balance' | 'interest' | 'monthlyPayment'
   const [tableMode, setTableMode] = useState('comparison'); // 'comparison' | 'detail'
@@ -100,9 +126,20 @@ export default function MortgageComparer() {
   const [tableMetric, setTableMetric] = useState('netWorth'); // Metric for comparison table mode
 
   // Global Financial Assumptions
-  const [globalAppreciation, setGlobalAppreciation] = useState(0.03);
-  const [globalStockReturn, setGlobalStockReturn] = useState(0.08);
-  const [globalSavingsRate, setGlobalSavingsRate] = useState(0.04);
+  const [globalAppreciation, setGlobalAppreciation] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'compare' ? getNumParam(params, 'globalAppreciation', 0.03) : 0.03;
+  });
+
+  const [globalStockReturn, setGlobalStockReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'compare' ? getNumParam(params, 'globalStockReturn', 0.08) : 0.08;
+  });
+
+  const [globalSavingsRate, setGlobalSavingsRate] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tool') === 'compare' ? getNumParam(params, 'globalSavingsRate', 0.04) : 0.04;
+  });
 
   // Local string states to manage inputs nicely without cursor jumping
   const [appreciationInput, setAppreciationInput] = useState('3.0');
@@ -162,6 +199,19 @@ export default function MortgageComparer() {
   const handleSavingsRateBlur = () => {
     setSavingsRateInput((globalSavingsRate * 100).toFixed(1));
   };
+
+  // Real-time URL synchronization
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tool = params.get('tool');
+    if (tool !== 'compare') return;
+
+    params.set('globalAppreciation', globalAppreciation);
+    params.set('globalStockReturn', globalStockReturn);
+    params.set('globalSavingsRate', globalSavingsRate);
+    params.set('scenarios', encodeScenarios(scenarios));
+    window.history.replaceState(null, '', `?${params.toString()}`);
+  }, [globalAppreciation, globalStockReturn, globalSavingsRate, scenarios]);
 
   // 1. Calculate base scenario stats (errors, loanAmount, monthlyPI)
   const baseScenarios = useMemo(() => {
