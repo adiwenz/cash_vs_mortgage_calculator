@@ -6,6 +6,7 @@ import ComparisonTable from './components/ComparisonTable';
 import EducationHub from './components/EducationHub';
 import MortgageComparer from './components/MortgageComparer';
 import SimpleCalculator from './components/SimpleCalculator';
+import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
 
 // Initial default inputs
 const DEFAULT_INPUTS = {
@@ -232,7 +233,12 @@ export default function App() {
           {/* Main Grid */}
           <main className="dashboard-grid">
             {/* Left Column: Assumptions */}
-            <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
+              {validation.errors.length === 0 && (
+                <CapitalGainsBreakdownCard inputs={inputs} calcResults={calcResults} />
+              )}
+            </div>
 
             {/* Right Column: Results & Interactive Views */}
             <div className="results-display">
