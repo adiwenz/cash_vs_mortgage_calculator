@@ -152,3 +152,152 @@ export function calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest
     data
   };
 }
+
+export function validateInputs(inputs) {
+  const errors = [];
+  const warnings = [];
+  const info = [];
+
+  const {
+    homePrice,
+    downPaymentPercent,
+    mortgageTerm,
+    mortgageRate,
+    stockReturn,
+    homeAppreciation,
+    propertyTaxRate,
+    insuranceRate,
+    investmentPortfolioValue,
+    investmentCostBasis,
+    cashPurchaseDiscount,
+    capitalGainsRate,
+    savingsRate
+  } = inputs;
+
+  // --- Investment Liquidation Errors & Warnings ---
+  // 1. Portfolio Value is less than or equal to 0
+  if (investmentPortfolioValue <= 0) {
+    errors.push("Enter a portfolio value greater than $0.");
+  }
+
+  // 2. Cost Basis is less than 0
+  if (investmentCostBasis < 0) {
+    errors.push("Cost basis cannot be negative.");
+  }
+
+  // 3. Cost Basis is greater than Portfolio Value
+  if (investmentPortfolioValue > 0 && investmentCostBasis > investmentPortfolioValue) {
+    warnings.push("Your cost basis is higher than your portfolio value, which means this investment has an unrealized loss. Capital gains tax will be treated as $0.");
+  }
+
+  // Calculate Gain Ratio of the portfolio for validation steps 4, 5, 9
+  const portfolioGain = Math.max(0, investmentPortfolioValue - investmentCostBasis);
+  const gainRatio = investmentPortfolioValue > 0 ? portfolioGain / investmentPortfolioValue : 0;
+  const effectiveTaxRate = capitalGainsRate * gainRatio;
+
+  // 4. Portfolio Value is less than home price for cash purchase
+  const cashBuyerPrice = homePrice - cashPurchaseDiscount;
+  if (investmentPortfolioValue > 0 && investmentPortfolioValue < cashBuyerPrice) {
+    errors.push("Your portfolio is not large enough to buy this home in cash.");
+  }
+
+  // 5. Portfolio Value is not enough to cover home price plus estimated tax
+  if (investmentPortfolioValue > 0 && investmentPortfolioValue >= cashBuyerPrice) {
+    const cashBuyerTax = calculateTaxPaid(cashBuyerPrice, effectiveTaxRate);
+    const cashBuyerGrossSold = cashBuyerPrice + cashBuyerTax;
+    if (investmentPortfolioValue < cashBuyerGrossSold) {
+      errors.push("After estimated capital gains tax, your portfolio is not large enough to complete a cash purchase.");
+    }
+  }
+
+  // --- Down Payment Errors ---
+  // 6. Down payment percent is less than 0%
+  if (downPaymentPercent < 0) {
+    errors.push("Down payment cannot be negative.");
+  }
+
+  // 7. Down payment percent is greater than 100%
+  if (downPaymentPercent > 1) {
+    errors.push("Down payment cannot be more than 100% of the home price.");
+  }
+
+  // 8. Down payment amount is greater than portfolio value
+  const downPaymentAmount = homePrice * downPaymentPercent;
+  if (downPaymentPercent >= 0 && downPaymentPercent <= 1 && investmentPortfolioValue > 0 && downPaymentAmount > investmentPortfolioValue) {
+    errors.push("Your portfolio is not large enough to fund this down payment.");
+  }
+
+  // 9. Portfolio is not enough to cover down payment plus estimated tax
+  if (downPaymentPercent >= 0 && downPaymentPercent <= 1 && investmentPortfolioValue > 0 && downPaymentAmount <= investmentPortfolioValue) {
+    const mortgageBuyerTax = calculateTaxPaid(downPaymentAmount, effectiveTaxRate);
+    const mortgageBuyerGrossSold = downPaymentAmount + mortgageBuyerTax;
+    if (investmentPortfolioValue < mortgageBuyerGrossSold) {
+      errors.push("After estimated capital gains tax, your portfolio is not large enough to fund this down payment.");
+    }
+  }
+
+  // --- Mortgage Errors ---
+  // 10. Home price is less than or equal to 0
+  if (homePrice <= 0) {
+    errors.push("Enter a home price greater than $0.");
+  }
+
+  // 11. Mortgage term is less than or equal to 0
+  if (mortgageTerm <= 0) {
+    errors.push("Mortgage term must be greater than 0 years.");
+  }
+
+  // 12. Mortgage rate is less than 0%
+  if (mortgageRate < 0) {
+    errors.push("Mortgage rate cannot be negative.");
+  }
+
+  // 13. Mortgage rate is unusually high (> 15%)
+  if (mortgageRate > 0.15) {
+    warnings.push("This mortgage rate is unusually high. Double-check that you entered the rate correctly.");
+  }
+
+  // --- Tax Errors ---
+  // 14. Capital gains tax rate is less than 0%
+  if (capitalGainsRate < 0) {
+    errors.push("Capital gains tax rate cannot be negative.");
+  }
+
+  // 15. Capital gains tax rate is greater than 100%
+  if (capitalGainsRate > 1.0) {
+    errors.push("Capital gains tax rate cannot be more than 100%.");
+  }
+
+  // --- Investment Return Warnings ---
+  // 16. Stock market return is less than 0%
+  if (stockReturn < 0) {
+    warnings.push("You entered a negative stock return. This is allowed, but the investment account will shrink over time.");
+  }
+
+  // 17. Stock market return is unusually high (> 12%)
+  if (stockReturn > 0.12) {
+    warnings.push("This stock return is very high. Long-term projections may look overly optimistic.");
+  }
+
+  // 18. Savings account return is greater than stock market return
+  if (savingsRate > stockReturn) {
+    warnings.push("Your savings account return is higher than your stock market return. This may be possible short-term, but it is unusual over long periods.");
+  }
+
+  // --- Property Cost Warnings ---
+  // 19. Property tax rate is unusually high (> 3%)
+  if (propertyTaxRate > 0.03) {
+    warnings.push("This property tax rate is high and may significantly affect affordability.");
+  }
+
+  // 20. Insurance rate is unusually high (> 2%)
+  if (insuranceRate > 0.02) {
+    warnings.push("This insurance rate is high and may significantly affect affordability.");
+  }
+
+  return {
+    errors,
+    warnings,
+    info
+  };
+}

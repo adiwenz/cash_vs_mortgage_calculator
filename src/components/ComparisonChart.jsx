@@ -28,7 +28,7 @@ const formatYAxis = (val) => {
   return `$${val}`;
 };
 
-export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange }) {
+export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange, disabled }) {
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -105,47 +105,81 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
       </div>
 
       {/* Recharts Render */}
-      <div className="chart-container-inner">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+      <div className="chart-container-inner" style={{ position: 'relative' }}>
+        {disabled && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '2rem',
+              borderRadius: 'var(--radius-md)',
+              color: '#ffffff',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              border: '1px dashed var(--accent-rose)'
+            }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-            <XAxis
-              dataKey="year"
-              stroke="var(--text-tertiary)"
-              fontFamily="var(--font-body)"
-              fontSize={11}
-              dy={10}
-            />
-            <YAxis
-              stroke="var(--text-tertiary)"
-              fontFamily="var(--font-body)"
-              fontSize={11}
-              tickFormatter={formatYAxis}
-              dx={-10}
-              domain={[0, yAxisMax]}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            
-            {Object.entries(scenarioInfo).map(([key, info]) => {
-              if (!visibleScenarios[key]) return null;
-              return (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={info.dataKey}
-                  name={info.label}
-                  stroke={info.color}
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 6, strokeWidth: 0 }}
-                />
-              );
-            })}
-          </LineChart>
-        </ResponsiveContainer>
+            <div>
+              <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>⚠️</span>
+              Chart disabled due to input errors. <br />
+              <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>
+                Please correct the assumptions on the left.
+              </span>
+            </div>
+          </div>
+        )}
+        <div style={{ width: '100%', height: '100%', opacity: disabled ? 0.15 : 1, pointerEvents: disabled ? 'none' : 'auto' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <XAxis
+                dataKey="year"
+                stroke="var(--text-tertiary)"
+                fontFamily="var(--font-body)"
+                fontSize={11}
+                dy={10}
+              />
+              <YAxis
+                stroke="var(--text-tertiary)"
+                fontFamily="var(--font-body)"
+                fontSize={11}
+                tickFormatter={formatYAxis}
+                dx={-10}
+                domain={[0, yAxisMax]}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              
+              {Object.entries(scenarioInfo).map(([key, info]) => {
+                if (!visibleScenarios[key]) return null;
+                return (
+                  <Line
+                    key={key}
+                    type="monotone"
+                    dataKey={info.dataKey}
+                    name={info.label}
+                    stroke={info.color}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                );
+              })}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { calculateScenarios } from './calculations';
+import { calculateScenarios, validateInputs } from './calculations';
 import AssumptionsPanel from './components/AssumptionsPanel';
 import ComparisonChart from './components/ComparisonChart';
 import ComparisonTable from './components/ComparisonTable';
@@ -32,6 +32,7 @@ export default function App() {
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+  const [isWarningsOpen, setIsWarningsOpen] = useState(true);
 
   // Radio Decisions state
   const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
@@ -63,6 +64,10 @@ export default function App() {
   const calcResults = useMemo(() => {
     return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
+
+  const validation = useMemo(() => {
+    return validateInputs(inputs);
+  }, [inputs]);
 
   // Calculate invested baseline for Y-axis scale based on zoom range
   const investResults = useMemo(() => {
@@ -250,6 +255,77 @@ export default function App() {
             </div>
           </div>
 
+          {/* Errors list */}
+          {validation.errors.length > 0 && (
+            <div 
+              className="glass-card" 
+              style={{ 
+                borderLeft: '4px solid var(--accent-rose)', 
+                background: 'rgba(244, 63, 94, 0.05)', 
+                padding: '1rem 1.5rem', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}
+            >
+              <h3 style={{ color: 'var(--accent-rose)', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                ❌ Fix Your Assumptions
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {validation.errors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Warnings collapsible accordion */}
+          {validation.warnings.length > 0 && validation.errors.length === 0 && (
+            <div 
+              className="glass-card" 
+              style={{ 
+                borderLeft: '4px solid var(--accent-amber)', 
+                background: 'rgba(245, 158, 11, 0.05)', 
+                padding: '1rem 1.5rem', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}
+            >
+              <button
+                onClick={() => setIsWarningsOpen(!isWarningsOpen)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: 0,
+                  margin: 0,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: 'var(--accent-amber)',
+                  fontSize: '0.9rem',
+                  fontWeight: '700'
+                }}
+              >
+                <span>⚠️ Check Your Assumptions ({validation.warnings.length})</span>
+                <span style={{ transition: 'transform 0.2s', transform: isWarningsOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.75rem' }}>▶</span>
+              </button>
+              
+              {isWarningsOpen && (
+                <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {validation.warnings.map((warn, i) => (
+                    <li key={i}>{warn}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <nav className="tab-nav">
             <button
@@ -282,6 +358,7 @@ export default function App() {
               yAxisMax={maxInvestNW}
               zoomRange={zoomRange}
               onZoomChange={setZoomRange}
+              disabled={validation.errors.length > 0}
             />
           )}
 
