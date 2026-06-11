@@ -17,6 +17,17 @@ import {
   getStrParam
 } from '../calculations';
 
+const DEFAULT_INPUTS = {
+  homePrice: 500000,
+  homeAppreciation: 0.03,
+  downPaymentPercent: 0.20,
+  mortgageRate: 0.065,
+  mortgageTerm: 30,
+  stockReturn: 0.08,
+  savingsRate: 0.04,
+  cashPurchaseDiscount: 50000
+};
+
 const PERCENT_FIELDS = [
   'homeAppreciation',
   'downPaymentPercent',
@@ -47,27 +58,17 @@ export default function SimpleCalculator() {
   const [inputs, setInputs] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const tool = params.get('tool');
-    const defaultInputs = {
-      homePrice: 500000,
-      homeAppreciation: 0.03,
-      downPaymentPercent: 0.20,
-      mortgageRate: 0.065,
-      mortgageTerm: 30,
-      stockReturn: 0.08,
-      savingsRate: 0.04,
-      cashPurchaseDiscount: 50000
-    };
-    if (tool !== 'simple') return defaultInputs;
+    if (tool !== 'simple') return DEFAULT_INPUTS;
 
     return {
-      homePrice: getNumParam(params, 'homePrice', defaultInputs.homePrice),
-      homeAppreciation: getNumParam(params, 'homeAppreciation', defaultInputs.homeAppreciation),
-      downPaymentPercent: getNumParam(params, 'downPaymentPercent', defaultInputs.downPaymentPercent),
-      mortgageRate: getNumParam(params, 'mortgageRate', defaultInputs.mortgageRate),
-      mortgageTerm: getNumParam(params, 'mortgageTerm', defaultInputs.mortgageTerm),
-      stockReturn: getNumParam(params, 'stockReturn', defaultInputs.stockReturn),
-      savingsRate: getNumParam(params, 'savingsRate', defaultInputs.savingsRate),
-      cashPurchaseDiscount: getNumParam(params, 'cashPurchaseDiscount', defaultInputs.cashPurchaseDiscount)
+      homePrice: getNumParam(params, 'homePrice', DEFAULT_INPUTS.homePrice),
+      homeAppreciation: getNumParam(params, 'homeAppreciation', DEFAULT_INPUTS.homeAppreciation),
+      downPaymentPercent: getNumParam(params, 'downPaymentPercent', DEFAULT_INPUTS.downPaymentPercent),
+      mortgageRate: getNumParam(params, 'mortgageRate', DEFAULT_INPUTS.mortgageRate),
+      mortgageTerm: getNumParam(params, 'mortgageTerm', DEFAULT_INPUTS.mortgageTerm),
+      stockReturn: getNumParam(params, 'stockReturn', DEFAULT_INPUTS.stockReturn),
+      savingsRate: getNumParam(params, 'savingsRate', DEFAULT_INPUTS.savingsRate),
+      cashPurchaseDiscount: getNumParam(params, 'cashPurchaseDiscount', DEFAULT_INPUTS.cashPurchaseDiscount)
     };
   });
 
@@ -98,10 +99,22 @@ export default function SimpleCalculator() {
     if (tool !== 'simple') return;
 
     Object.keys(inputs).forEach((key) => {
-      params.set(key, inputs[key]);
+      if (inputs[key] !== DEFAULT_INPUTS[key]) {
+        params.set(key, inputs[key]);
+      } else {
+        params.delete(key);
+      }
     });
-    params.set('mortgageLeftoverDest', mortgageLeftoverDest);
-    params.set('cashSavingsDest', cashSavingsDest);
+    if (mortgageLeftoverDest !== 'invest') {
+      params.set('mortgageLeftoverDest', mortgageLeftoverDest);
+    } else {
+      params.delete('mortgageLeftoverDest');
+    }
+    if (cashSavingsDest !== 'invest') {
+      params.set('cashSavingsDest', cashSavingsDest);
+    } else {
+      params.delete('cashSavingsDest');
+    }
     window.history.replaceState(null, '', `?${params.toString()}`);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest]);
 
@@ -215,16 +228,7 @@ export default function SimpleCalculator() {
   };
 
   const handleReset = () => {
-    setInputs({
-      homePrice: 500000,
-      homeAppreciation: 0.03,
-      downPaymentPercent: 0.20,
-      mortgageRate: 0.065,
-      mortgageTerm: 30,
-      stockReturn: 0.08,
-      savingsRate: 0.04,
-      cashPurchaseDiscount: 50000
-    });
+    setInputs(DEFAULT_INPUTS);
     setMortgageLeftoverDest('invest');
     setCashSavingsDest('invest');
   };

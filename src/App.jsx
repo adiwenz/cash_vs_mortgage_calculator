@@ -118,16 +118,27 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sync Advanced inputs to URL search query parameters in real-time
   useEffect(() => {
     if (activeTool !== 'cashVsMortgage') return;
     const params = new URLSearchParams(window.location.search);
     params.set('tool', 'advanced');
     Object.keys(inputs).forEach((key) => {
-      params.set(key, inputs[key]);
+      if (inputs[key] !== DEFAULT_INPUTS[key]) {
+        params.set(key, inputs[key]);
+      } else {
+        params.delete(key);
+      }
     });
-    params.set('mortgageLeftoverDest', mortgageLeftoverDest);
-    params.set('cashSavingsDest', cashSavingsDest);
+    if (mortgageLeftoverDest !== 'invest') {
+      params.set('mortgageLeftoverDest', mortgageLeftoverDest);
+    } else {
+      params.delete('mortgageLeftoverDest');
+    }
+    if (cashSavingsDest !== 'invest') {
+      params.set('cashSavingsDest', cashSavingsDest);
+    } else {
+      params.delete('cashSavingsDest');
+    }
     window.history.replaceState(null, '', `?${params.toString()}`);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest, activeTool]);
 
