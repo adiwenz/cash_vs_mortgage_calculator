@@ -17,7 +17,7 @@ const formatCurrencyShort = (val) => {
   return `$${val}`;
 };
 
-export default function AssumptionsPanel({ inputs, onChange }) {
+export default function AssumptionsPanel({ inputs, onChange, onReset }) {
 
   // Local state to hold the string representation of inputs during editing
   const [localValues, setLocalValues] = useState({});
@@ -92,13 +92,18 @@ export default function AssumptionsPanel({ inputs, onChange }) {
     }));
   };
 
-  const renderInput = (key, label, type, min, max, step, isPercent = false, isCurrency = false) => {
+  const renderInput = (key, label, type, min, max, step, isPercent = false, isCurrency = false, tooltipText = null) => {
     const valString = localValues[key] ?? '';
 
     return (
       <div className="input-wrapper" key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.35rem' }}>
         <div className="input-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="input-name" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{label}</span>
+          <span className="input-name" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            {label}{' '}
+            {tooltipText && (
+              <span className="tooltip-trigger" data-tooltip={tooltipText}>ⓘ</span>
+            )}
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
             {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>$</span>}
             <input
@@ -131,14 +136,29 @@ export default function AssumptionsPanel({ inputs, onChange }) {
 
   return (
     <div className="glass-card" style={{ padding: '1.25rem' }}>
-      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="card-title" style={{ fontSize: '1rem', margin: 0 }}>Advanced Assumptions</h2>
+        <button
+          onClick={onReset}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--primary)',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            padding: 0,
+            textDecoration: 'underline'
+          }}
+        >
+          Reset to defaults
+        </button>
       </div>
 
       {/* Home Assumptions */}
       <FormSection title="Home Assumptions">
         {renderInput('homePrice', 'Home Price', 'number', 50000, 1500000, 10000, false, true)}
-        {renderInput('cashPurchaseDiscount', 'Cash Discount', 'number', 0, 200000, 5000, false, true)}
+        {renderInput('cashPurchaseDiscount', 'Cash Discount Negotiated', 'number', 0, 200000, 5000, false, true, "Cash buyers often negotiate 5-15% below list. Enter $0 if none.")}
         {renderInput('homeAppreciation', 'Annual Appreciation', 'number', 0.0, 0.15, 0.001, true)}
         {renderInput('propertyTaxRate', 'Property Tax Rate', 'number', 0.0, 0.05, 0.001, true)}
         {renderInput('insuranceRate', 'Insurance Rate', 'number', 0.0, 0.03, 0.001, true)}

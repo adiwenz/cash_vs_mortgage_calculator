@@ -7,7 +7,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  ReferenceLine
 } from 'recharts';
 
 // Format dollar values cleanly
@@ -29,6 +30,35 @@ const formatYAxis = (val) => {
 };
 
 export default function ComparisonChart({ data, visibleScenarios, onToggleScenario, scenarioInfo, yAxisMax, zoomRange, onZoomChange, disabled }) {
+  const [colorBlindMode, setColorBlindMode] = React.useState(false);
+
+  // Compute intersection year
+  const intersectionYear = React.useMemo(() => {
+    if (!data || data.length < 2 || !visibleScenarios.cashBuyer || !visibleScenarios.mortgageBuyer) return null;
+    
+    for (let i = 0; i < data.length - 1; i++) {
+      const rowA = data[i];
+      const rowB = data[i + 1];
+      
+      const valA_cash = rowA.cashBuyerNW;
+      const valA_mort = rowA.mortgageBuyerNW;
+      const valB_cash = rowB.cashBuyerNW;
+      const valB_mort = rowB.mortgageBuyerNW;
+      
+      const diffA = valA_cash - valA_mort;
+      const diffB = valB_cash - valB_mort;
+      
+      if (diffA === 0) return rowA.year;
+      if (diffB === 0) return rowB.year;
+      
+      if (diffA * diffB < 0) {
+        const t = diffA / (diffA - diffB);
+        const crossYear = rowA.year + t * (rowB.year - rowA.year);
+        return parseFloat(crossYear.toFixed(1));
+      }
+    }
+    return null;
+  }, [data, visibleScenarios]);
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -59,27 +89,38 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
           <h2 className="card-title">Net Worth Comparison Over Time</h2>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Adjust assumptions on the left to see changes instantly</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
-          {[5, 10, 15, 30].map((years) => (
-            <button
-              key={years}
-              onClick={() => onZoomChange(years)}
-              style={{
-                background: zoomRange === years ? 'var(--primary)' : 'transparent',
-                color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)'
-              }}
-            >
-              {years === 30 ? 'All (30y)' : `${years}y`}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
+            <input
+              type="checkbox"
+              checked={colorBlindMode}
+              onChange={(e) => setColorBlindMode(e.target.checked)}
+              style={{ accentColor: 'var(--primary)' }}
+            />
+            👁️ Color-blind Mode
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
+            {[5, 10, 15, 30].map((years) => (
+              <button
+                key={years}
+                onClick={() => onZoomChange(years)}
+                style={{
+                  background: zoomRange === years ? 'var(--primary)' : 'transparent',
+                  color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
+                  border: 'none',
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}
+              >
+                {years === 30 ? 'All (30y)' : `${years}y`}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -87,11 +128,14 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
       <div className="scenario-selector-grid">
         {Object.entries(scenarioInfo).map(([key, info]) => {
           const isSelected = visibleScenarios[key];
+          const displayColor = colorBlindMode
+            ? (key === 'mortgageBuyer' ? '#ea580c' : '#2563eb')
+            : info.color;
           return (
             <label
               key={key}
               className={`scenario-checkbox-label ${isSelected ? 'selected' : ''}`}
-              style={{ borderLeft: `4px solid ${info.color}` }}
+              style={{ borderLeft: `4px solid ${displayColor}` }}
             >
               <input
                 type="checkbox"
@@ -146,7 +190,15 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
               <XAxis
+                type="number"
                 dataKey="year"
+                domain={[0, zoomRange]}
+                ticks={
+                  zoomRange === 5 ? [0, 1, 2, 3, 4, 5] :
+                  zoomRange === 10 ? [0, 2, 4, 6, 8, 10] :
+                  zoomRange === 15 ? [0, 3, 6, 9, 12, 15] :
+                  [0, 5, 10, 15, 20, 25, 30]
+                }
                 stroke="var(--text-tertiary)"
                 fontFamily="var(--font-body)"
                 fontSize={11}
@@ -162,15 +214,37 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
               />
               <Tooltip content={<CustomTooltip />} />
               
+              {intersectionYear !== null && intersectionYear <= zoomRange && (
+                <ReferenceLine
+                  x={intersectionYear}
+                  stroke="var(--text-secondary)"
+                  strokeDasharray="5 5 1 5"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Break-even: Yr ${intersectionYear}`,
+                    position: 'insideTopRight',
+                    fill: 'var(--text-primary)',
+                    fontSize: 10,
+                    fontWeight: '700',
+                    dy: 8,
+                    dx: 4
+                  }}
+                />
+              )}
+              
               {Object.entries(scenarioInfo).map(([key, info]) => {
                 if (!visibleScenarios[key]) return null;
+                const isMortgage = key === 'mortgageBuyer';
+                const lineColor = colorBlindMode
+                  ? (isMortgage ? '#ea580c' : '#2563eb')
+                  : info.color;
                 return (
                   <Line
                     key={key}
                     type="monotone"
                     dataKey={info.dataKey}
                     name={info.label}
-                    stroke={info.color}
+                    stroke={lineColor}
                     strokeWidth={2.5}
                     dot={false}
                     activeDot={{ r: 6, strokeWidth: 0 }}

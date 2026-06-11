@@ -1036,7 +1036,8 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
               fontWeight: '600', 
               color: 'var(--text-primary)', 
               padding: 0, 
-              width: '280px', 
+              flex: 1,
+              minWidth: '100px', 
               textAlign: 'left',
               boxShadow: 'none',
               cursor: 'text'

@@ -27,8 +27,8 @@ const DEFAULT_INPUTS = {
 
 // Scenario Metadata
 const SCENARIO_INFO = {
-  cashBuyer: { label: 'Cash Buyer', dataKey: 'cashBuyerNW', color: '#6366f1' },
-  mortgageBuyer: { label: 'Mortgage Buyer', dataKey: 'mortgageBuyerNW', color: '#10b981' }
+  cashBuyer: { label: 'Cash Buyer', dataKey: 'cashBuyerNW', color: '#0d9488' }, // Teal
+  mortgageBuyer: { label: 'Mortgage Buyer', dataKey: 'mortgageBuyerNW', color: '#f59e0b' } // Amber
 };
 
 export default function App() {
@@ -155,6 +155,12 @@ export default function App() {
     }));
   };
 
+  const handleReset = () => {
+    setInputs(DEFAULT_INPUTS);
+    setMortgageLeftoverDest('invest');
+    setCashSavingsDest('invest');
+  };
+
   // Run financial calculations dynamically
   const calcResults = useMemo(() => {
     return calculateScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
@@ -227,52 +233,22 @@ export default function App() {
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {/* Tool Switcher */}
-          <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '6px', gap: '0.2rem' }}>
+          <div className="tool-switcher">
             <button
               onClick={() => handleToolSwitch('cashVsMortgageSimple')}
-              style={{
-                background: activeTool === 'cashVsMortgageSimple' ? 'var(--primary)' : 'transparent',
-                color: activeTool === 'cashVsMortgageSimple' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '4px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)'
-              }}
+              className={`switcher-btn ${activeTool === 'cashVsMortgageSimple' ? 'active' : ''}`}
             >
               Cash v. Mortgage
             </button>
             <button
               onClick={() => handleToolSwitch('cashVsMortgage')}
-              style={{
-                background: activeTool === 'cashVsMortgage' ? 'var(--primary)' : 'transparent',
-                color: activeTool === 'cashVsMortgage' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '4px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)'
-              }}
+              className={`switcher-btn ${activeTool === 'cashVsMortgage' ? 'active' : ''}`}
             >
               Tax-Aware Cash v. Mortgage
             </button>
             <button
               onClick={() => handleToolSwitch('mortgageComparer')}
-              style={{
-                background: activeTool === 'mortgageComparer' ? 'var(--primary)' : 'transparent',
-                color: activeTool === 'mortgageComparer' ? '#ffffff' : 'var(--text-secondary)',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '4px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)'
-              }}
+              className={`switcher-btn ${activeTool === 'mortgageComparer' ? 'active' : ''}`}
             >
               Compare Mortgages
             </button>
@@ -307,7 +283,7 @@ export default function App() {
                 &times;
               </button>
             </div>
-            <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
+            <AssumptionsPanel inputs={inputs} onChange={handleInputChange} onReset={handleReset} />
           </aside>
 
           {/* Right Column: Main Content Area */}

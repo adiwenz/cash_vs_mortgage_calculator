@@ -7,7 +7,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  ReferenceLine
 } from 'recharts';
 import {
   calculateSimpleScenarios,
@@ -41,6 +42,7 @@ const formatYAxis = (val) => {
 };
 
 export default function SimpleCalculator() {
+  const [colorBlindMode, setColorBlindMode] = useState(false);
   // Simple inputs state
   const [inputs, setInputs] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -212,12 +214,32 @@ export default function SimpleCalculator() {
     setLocalValues((prev) => ({ ...prev, [key]: displayVal }));
   };
 
-  const renderSimpleInput = (key, label, isPercent = false, isCurrency = false, step = 1) => {
+  const handleReset = () => {
+    setInputs({
+      homePrice: 500000,
+      homeAppreciation: 0.03,
+      downPaymentPercent: 0.20,
+      mortgageRate: 0.065,
+      mortgageTerm: 30,
+      stockReturn: 0.08,
+      savingsRate: 0.04,
+      cashPurchaseDiscount: 50000
+    });
+    setMortgageLeftoverDest('invest');
+    setCashSavingsDest('invest');
+  };
+
+  const renderSimpleInput = (key, label, isPercent = false, isCurrency = false, step = 1, tooltipText = null) => {
     const valString = localValues[key] ?? '';
     return (
       <div className="input-wrapper" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{label}</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+            {label}{' '}
+            {tooltipText && (
+              <span className="tooltip-trigger" data-tooltip={tooltipText}>ⓘ</span>
+            )}
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
             {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', fontWeight: '600' }}>$</span>}
             <input
@@ -262,38 +284,75 @@ export default function SimpleCalculator() {
 
   // Line keys for charts
   const lineKeys = useMemo(() => {
+    const getColors = (isCash) => {
+      if (colorBlindMode) {
+        return isCash ? '#2563eb' : '#ea580c';
+      }
+      return isCash ? '#0d9488' : '#f59e0b';
+    };
+
     if (chartMetric === 'netWorth') {
       return [
-        { key: 'Cash Buyer NW', color: '#6366f1' },
-        { key: 'Mortgage Buyer NW', color: '#10b981' }
+        { key: 'Cash Buyer NW', color: getColors(true) },
+        { key: 'Mortgage Buyer NW', color: getColors(false) }
       ];
     } else if (chartMetric === 'homeEquity') {
       return [
-        { key: 'Cash Buyer Equity', color: '#6366f1' },
-        { key: 'Mortgage Buyer Equity', color: '#10b981' }
+        { key: 'Cash Buyer Equity', color: getColors(true) },
+        { key: 'Mortgage Buyer Equity', color: getColors(false) }
       ];
     } else if (chartMetric === 'investment') {
       return [
-        { key: 'Cash Buyer Investments', color: '#6366f1' },
-        { key: 'Mortgage Buyer Investments', color: '#10b981' }
+        { key: 'Cash Buyer Investments', color: getColors(true) },
+        { key: 'Mortgage Buyer Investments', color: getColors(false) }
       ];
     } else if (chartMetric === 'mortgageBalance') {
       return [
-        { key: 'Cash Buyer Loan', color: '#6366f1' },
-        { key: 'Mortgage Buyer Loan', color: '#10b981' }
+        { key: 'Cash Buyer Loan', color: getColors(true) },
+        { key: 'Mortgage Buyer Loan', color: getColors(false) }
       ];
     }
     return [];
-  }, [chartMetric]);
+  }, [chartMetric, colorBlindMode]);
+
+  const intersectionYear = useMemo(() => {
+    if (!chartData || chartData.length < 2 || lineKeys.length < 2) return null;
+    const key1 = lineKeys[0].key;
+    const key2 = lineKeys[1].key;
+    
+    for (let i = 0; i < chartData.length - 1; i++) {
+      const rowA = chartData[i];
+      const rowB = chartData[i + 1];
+      
+      const valA1 = rowA[key1];
+      const valA2 = rowA[key2];
+      const valB1 = rowB[key1];
+      const valB2 = rowB[key2];
+      
+      const diffA = valA1 - valA2;
+      const diffB = valB1 - valB2;
+      
+      if (diffA === 0) return rowA.year;
+      if (diffB === 0) return rowB.year;
+      
+      if (diffA * diffB < 0) {
+        const t = diffA / (diffA - diffB);
+        const crossYear = rowA.year + t * (rowB.year - rowA.year);
+        return parseFloat(crossYear.toFixed(1));
+      }
+    }
+    return null;
+  }, [chartData, lineKeys]);
 
   const CustomChartTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
       return (
         <div className="custom-chart-tooltip">
           <p style={{ fontWeight: '700', marginBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.2rem' }}>
             Year {label}
           </p>
-          {payload.map((item) => (
+          {sortedPayload.map((item) => (
             <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.15rem 0' }}>
               <span style={{ color: item.stroke || item.color, fontWeight: '600' }}>{item.name}:</span>
               <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
@@ -316,12 +375,29 @@ export default function SimpleCalculator() {
       {/* Left Column: Input Panel */}
       <div className="assumptions-section">
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h2 className="card-title">Simple Assumptions</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+            <h2 className="card-title" style={{ margin: 0 }}>Simple Assumptions</h2>
+            <button
+              onClick={handleReset}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--primary)',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: 0,
+                textDecoration: 'underline'
+              }}
+            >
+              Reset to defaults
+            </button>
+          </div>
           
           <div className="assumptions-group">
             <div className="assumptions-group-title">Home</div>
             {renderSimpleInput('homePrice', 'Home Price', false, true, 10000)}
-            {renderSimpleInput('cashPurchaseDiscount', 'Cash Purchase Discount', false, true, 5000)}
+            {renderSimpleInput('cashPurchaseDiscount', 'Cash Discount Negotiated', false, true, 5000, "Cash buyers often negotiate 5-15% below list. Enter $0 if none.")}
             {renderSimpleInput('homeAppreciation', 'Annual Appreciation', true, false, 0.005)}
           </div>
 
@@ -452,12 +528,173 @@ export default function SimpleCalculator() {
           </div>
         ) : (
           <>
+            {/* Interactive Visual Chart */}
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', flex: 1 }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Growth Charts</h3>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Compare both strategies visualised over 30 years</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                        <input
+                          type="checkbox"
+                          checked={colorBlindMode}
+                          onChange={(e) => setColorBlindMode(e.target.checked)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        👁️ Color-blind Mode
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
+                        {[5, 10, 15, 30].map((years) => (
+                          <button
+                            key={years}
+                            onClick={() => setZoomRange(years)}
+                            style={{
+                              background: zoomRange === years ? 'var(--primary)' : 'transparent',
+                              color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
+                              border: 'none',
+                              padding: '0.35rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all var(--transition-fast)'
+                            }}
+                          >
+                            {years === 30 ? 'All (30y)' : `${years}y`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                </div>
+                
+                {/* Metric toggles */}
+                <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem', flexWrap: 'wrap' }}>
+                  {[
+                    { val: 'netWorth', label: 'Net Worth' },
+                    { val: 'homeEquity', label: 'Home Equity' },
+                    { val: 'investment', label: 'Investments' },
+                    { val: 'mortgageBalance', label: 'Loan Balance' }
+                  ].map((m) => (
+                    <button
+                      key={m.val}
+                      onClick={() => setChartMetric(m.val)}
+                      style={{
+                        background: chartMetric === m.val ? 'var(--primary)' : 'transparent',
+                        color: chartMetric === m.val ? '#ffffff' : 'var(--text-secondary)',
+                        border: 'none',
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all var(--transition-fast)'
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="chart-container-inner" style={{ height: '320px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
+                    onClick={(state) => {
+                      if (state && state.activeLabel !== undefined) {
+                        setSelectedYear(Number(state.activeLabel));
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis
+                        type="number"
+                        dataKey="year"
+                        domain={[0, zoomRange]}
+                        ticks={
+                          zoomRange === 5 ? [0, 1, 2, 3, 4, 5] :
+                          zoomRange === 10 ? [0, 2, 4, 6, 8, 10] :
+                          zoomRange === 15 ? [0, 3, 6, 9, 12, 15] :
+                          [0, 5, 10, 15, 20, 25, 30]
+                        }
+                        stroke="var(--text-tertiary)"
+                        fontFamily="var(--font-body)"
+                        fontSize={11}
+                      />
+                    <YAxis
+                      stroke="var(--text-tertiary)"
+                      fontFamily="var(--font-body)"
+                      fontSize={11}
+                      tickFormatter={formatYAxis}
+                      domain={[0, yAxisMax]}
+                    />
+                    <Tooltip content={<CustomChartTooltip />} />
+                    <Legend />
+                    {intersectionYear !== null && intersectionYear <= zoomRange && (
+                        <ReferenceLine
+                          x={intersectionYear}
+                          stroke="var(--text-secondary)"
+                          strokeDasharray="5 5 1 5"
+                          strokeWidth={1.5}
+                          label={{
+                            value: `Break-even: Yr ${intersectionYear}`,
+                            position: 'insideTopRight',
+                            fill: 'var(--text-primary)',
+                            fontSize: 10,
+                            fontWeight: '700',
+                            dy: 8,
+                            dx: 4
+                          }}
+                        />
+                      )}
+                      {selectedYear <= zoomRange && (
+                        <ReferenceLine
+                          x={selectedYear}
+                          stroke="var(--primary)"
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          label={{
+                            value: `Selected: Yr ${selectedYear}`,
+                            position: 'insideBottomRight',
+                            fill: 'var(--primary)',
+                            fontSize: 10,
+                            fontWeight: '700',
+                            dy: -14,
+                            dx: 4
+                          }}
+                        />
+                      )}
+                      {lineKeys.map((lk) => {
+                        return (
+                          <Line
+                            key={lk.key}
+                            type="monotone"
+                            dataKey={lk.key}
+                            stroke={lk.color}
+                            strokeWidth={2.5}
+                            dot={false}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        );
+                      })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             {/* Year Selector & Summary Cards Header */}
             <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Yearly Milestone Estimates</h3>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Drag the slider to see values for any specific year</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Click on any year in the graph above to view milestone values</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Show Year:</span>
@@ -465,22 +702,9 @@ export default function SimpleCalculator() {
                 </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-tertiary)' }}>Year 0</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="30"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="custom-range"
-                />
-                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-tertiary)' }}>Year 30</span>
-              </div>
-
               {/* Side-by-side Summary Cards */}
               {selectedYearData && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
                   {/* Cash Buyer Card */}
                   <div style={{ background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: '10px', padding: '1rem' }}>
                     <div style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -530,107 +754,6 @@ export default function SimpleCalculator() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Interactive Visual Chart */}
-            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', flex: 1 }}>
-                  <div>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Growth Charts</h3>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>Compare both strategies visualised over 30 years</span>
-                  </div>
-                  
-                  {/* Zoom selector */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem', borderRadius: '8px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>Zoom:</span>
-                    {[5, 10, 15, 30].map((years) => (
-                      <button
-                        key={years}
-                        onClick={() => setZoomRange(years)}
-                        style={{
-                          background: zoomRange === years ? 'var(--primary)' : 'transparent',
-                          color: zoomRange === years ? '#ffffff' : 'var(--text-secondary)',
-                          border: 'none',
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all var(--transition-fast)'
-                        }}
-                      >
-                        {years === 30 ? 'All (30y)' : `${years}y`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Metric toggles */}
-                <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem', flexWrap: 'wrap' }}>
-                  {[
-                    { val: 'netWorth', label: 'Net Worth' },
-                    { val: 'homeEquity', label: 'Home Equity' },
-                    { val: 'investment', label: 'Investments' },
-                    { val: 'mortgageBalance', label: 'Loan Balance' }
-                  ].map((m) => (
-                    <button
-                      key={m.val}
-                      onClick={() => setChartMetric(m.val)}
-                      style={{
-                        background: chartMetric === m.val ? 'var(--primary)' : 'transparent',
-                        color: chartMetric === m.val ? '#ffffff' : 'var(--text-secondary)',
-                        border: 'none',
-                        padding: '0.35rem 0.65rem',
-                        borderRadius: '6px',
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="chart-container-inner" style={{ height: '320px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={chartData}
-                    margin={{ top: 15, right: 10, left: 10, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                    <XAxis
-                      dataKey="year"
-                      stroke="var(--text-tertiary)"
-                      fontFamily="var(--font-body)"
-                      fontSize={11}
-                    />
-                    <YAxis
-                      stroke="var(--text-tertiary)"
-                      fontFamily="var(--font-body)"
-                      fontSize={11}
-                      tickFormatter={formatYAxis}
-                      domain={[0, yAxisMax]}
-                    />
-                    <Tooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    {lineKeys.map((lk) => (
-                      <Line
-                        key={lk.key}
-                        type="monotone"
-                        dataKey={lk.key}
-                        stroke={lk.color}
-                        strokeWidth={2.5}
-                        dot={false}
-                        activeDot={{ r: 6, strokeWidth: 0 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
             </div>
 
             {/* Educational Callouts Section */}
