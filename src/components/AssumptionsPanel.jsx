@@ -18,19 +18,6 @@ const formatCurrencyShort = (val) => {
 };
 
 export default function AssumptionsPanel({ inputs, onChange }) {
-  const [openSections, setOpenSections] = useState({
-    home: false,
-    mortgage: false,
-    investment: false,
-    selling: false
-  });
-
-  const toggleSection = (section) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
 
   // Local state to hold the string representation of inputs during editing
   const [localValues, setLocalValues] = useState({});
@@ -149,95 +136,48 @@ export default function AssumptionsPanel({ inputs, onChange }) {
       </div>
 
       {/* Home Assumptions */}
-      <AccordionSection
-        title="Home Assumptions"
-        summary={homeSummary}
-        isOpen={openSections.home}
-        onToggle={() => toggleSection('home')}
-      >
+      <FormSection title="Home Assumptions">
         {renderInput('homePrice', 'Home Price', 'number', 50000, 1500000, 10000, false, true)}
         {renderInput('cashPurchaseDiscount', 'Cash Discount', 'number', 0, 200000, 5000, false, true)}
         {renderInput('homeAppreciation', 'Annual Appreciation', 'number', 0.0, 0.15, 0.001, true)}
         {renderInput('propertyTaxRate', 'Property Tax Rate', 'number', 0.0, 0.05, 0.001, true)}
         {renderInput('insuranceRate', 'Insurance Rate', 'number', 0.0, 0.03, 0.001, true)}
-      </AccordionSection>
+      </FormSection>
 
       {/* Mortgage Assumptions */}
-      <AccordionSection
-        title="Mortgage Assumptions"
-        summary={mortgageSummary}
-        isOpen={openSections.mortgage}
-        onToggle={() => toggleSection('mortgage')}
-      >
+      <FormSection title="Mortgage Assumptions">
         {renderInput('downPaymentPercent', 'Down Payment %', 'number', 0.0, 1.0, 0.01, true)}
         {renderInput('mortgageTerm', 'Mortgage Term (Years)', 'number', 0, 30, 1)}
         {renderInput('mortgageRate', 'Mortgage Rate', 'number', 0.0, 0.15, 0.001, true)}
-      </AccordionSection>
+      </FormSection>
 
       {/* Investment Assumptions */}
-      <AccordionSection
-        title="Investment Assumptions"
-        summary={investSummary}
-        isOpen={openSections.investment}
-        onToggle={() => toggleSection('investment')}
-      >
+      <FormSection title="Investment Assumptions">
         {renderInput('stockReturn', 'Stock Market Return', 'number', 0.0, 0.20, 0.001, true)}
         {renderInput('savingsRate', 'Savings Account Rate', 'number', 0.0, 0.10, 0.001, true)}
-      </AccordionSection>
+      </FormSection>
 
       {/* Selling Investments Assumptions */}
-      <AccordionSection
-        title="Selling Investments to Buy"
-        summary={sellingSummary}
-        isOpen={openSections.selling}
-        onToggle={() => toggleSection('selling')}
-        isLast
-      >
+      <FormSection title="Selling Investments to Buy" isLast>
         {renderInput('investmentPortfolioValue', 'Portfolio Value', 'number', 50000, 2000000, 10000, false, true)}
         {renderInput('investmentCostBasis', 'Portfolio Cost Basis', 'number', 50000, 2000000, 10000, false, true)}
         {renderInput('capitalGainsRate', 'Capital Gains Tax Rate', 'number', 0.0, 0.50, 0.01, true)}
-      </AccordionSection>
+      </FormSection>
     </div>
   );
 }
 
-function AccordionSection({ title, summary, isOpen, onToggle, children, isLast }) {
+function FormSection({ title, children, isLast }) {
   return (
     <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border-color)', paddingBottom: '0.6rem', marginBottom: '0.6rem' }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: '100%',
-          background: 'none',
-          border: 'none',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          cursor: 'pointer',
-          padding: '0.2rem 0',
-          textAlign: 'left',
-          color: 'var(--text-primary)',
-          outline: 'none'
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
-            {title}
-          </span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-            {summary}
-          </span>
-        </div>
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-          ▶
+      <div style={{ padding: '0.2rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+          {title}
         </span>
-      </button>
-      {isOpen && (
-        <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.15rem' }}>
-          {children}
-        </div>
-      )}
+      </div>
+      <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.15rem' }}>
+        {children}
+      </div>
     </div>
   );
 }

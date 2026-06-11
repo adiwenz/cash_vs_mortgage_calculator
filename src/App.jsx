@@ -234,47 +234,31 @@ export default function App() {
               ⚙️ Edit Assumptions
             </button>
 
-            {/* Grouped KPI Cards (2x2 Structure) */}
+            {/* KPI Cards Grid */}
             <div className="kpi-dashboard-grid">
-              {/* Group 1: Tax Impact */}
-              <div className="kpi-group">
-                <span className="kpi-group-label">Tax Impact</span>
-                <div className="kpi-cards-row">
-                  <div className="kpi-card text-rose">
-                    <span className="kpi-card-title">Cash Buyer Tax</span>
-                    <span className="kpi-card-value">{formatCurrency(calcResults.cashBuyerTax)}</span>
-                    <span className="kpi-card-subtitle">Immediate Gains Tax</span>
-                  </div>
-                  <div className="kpi-card text-amber">
-                    <span className="kpi-card-title">Mortgage Buyer Tax</span>
-                    <span className="kpi-card-value">{formatCurrency(calcResults.mortgageBuyerTax)}</span>
-                    <span className="kpi-card-subtitle">Tax for Down Payment</span>
-                  </div>
-                </div>
+              <div className="kpi-card text-rose">
+                <span className="kpi-card-title">Cash Buyer Tax</span>
+                <span className="kpi-card-value">{formatCurrency(calcResults.cashBuyerTax)}</span>
+                <span className="kpi-card-subtitle">Immediate Gains Tax</span>
               </div>
-
-              {/* Group 2: Starting Position */}
-              <div className="kpi-group">
-                <span className="kpi-group-label">Starting Position</span>
-                <div className="kpi-card">
-                  <span className="kpi-card-title">Mortgage Buyer Starting Stock</span>
-                  <span className="kpi-card-value">
-                    {formatCurrency(calcResults.mortgageBuyerStartingStock)}
-                  </span>
-                  <span className="kpi-card-subtitle">Stock after down payment tax</span>
-                </div>
+              <div className="kpi-card text-amber">
+                <span className="kpi-card-title">Mortgage Buyer Tax</span>
+                <span className="kpi-card-value">{formatCurrency(calcResults.mortgageBuyerTax)}</span>
+                <span className="kpi-card-subtitle">Tax for Down Payment</span>
               </div>
-
-              {/* Group 3: Mortgage Cost */}
-              <div className="kpi-group">
-                <span className="kpi-group-label">Mortgage Cost</span>
-                <div className="kpi-card text-emerald">
-                  <span className="kpi-card-title">Annual Mortgage P&I</span>
-                  <span className="kpi-card-value">{formatCurrency(calcResults.annualPI)}</span>
-                  <span className="kpi-card-subtitle">
-                    {formatCurrency(calcResults.annualPI / 12)}/month P&I
-                  </span>
-                </div>
+              <div className="kpi-card">
+                <span className="kpi-card-title">Mortgage Buyer Starting Stock</span>
+                <span className="kpi-card-value">
+                  {formatCurrency(calcResults.mortgageBuyerStartingStock)}
+                </span>
+                <span className="kpi-card-subtitle">Stock after down payment tax</span>
+              </div>
+              <div className="kpi-card text-emerald">
+                <span className="kpi-card-title">Annual Mortgage P&I</span>
+                <span className="kpi-card-value">{formatCurrency(calcResults.annualPI)}</span>
+                <span className="kpi-card-subtitle">
+                  {formatCurrency(calcResults.annualPI / 12)}/month P&I
+                </span>
               </div>
             </div>
 
