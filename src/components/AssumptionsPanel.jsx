@@ -17,7 +17,7 @@ const formatCurrencyShort = (val) => {
   return `$${val}`;
 };
 
-export default function AssumptionsPanel({ inputs, onChange, onReset }) {
+export default function AssumptionsPanel({ inputs, onChange, onReset, onClose }) {
 
   // Local state to hold the string representation of inputs during editing
   const [localValues, setLocalValues] = useState({});
@@ -138,21 +138,39 @@ export default function AssumptionsPanel({ inputs, onChange, onReset }) {
     <div className="glass-card" style={{ padding: '1.25rem' }}>
       <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="card-title" style={{ fontSize: '1rem', margin: 0 }}>Advanced Assumptions</h2>
-        <button
-          onClick={onReset}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--primary)',
-            fontSize: '0.8rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            padding: 0,
-            textDecoration: 'underline'
-          }}
-        >
-          Reset to defaults
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            onClick={onReset}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--primary)',
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              padding: 0,
+              textDecoration: 'underline'
+            }}
+          >
+            {onClose ? 'Reset' : 'Reset to defaults'}
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                lineHeight: 1,
+                padding: '0 0.25rem'
+              }}
+            >
+              &times;
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Home Assumptions */}
@@ -183,6 +201,30 @@ export default function AssumptionsPanel({ inputs, onChange, onReset }) {
         {renderInput('investmentCostBasis', 'Portfolio Cost Basis', 'number', 50000, 2000000, 10000, false, true)}
         {renderInput('capitalGainsRate', 'Capital Gains Tax Rate', 'number', 0.0, 0.50, 0.01, true)}
       </FormSection>
+
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            background: 'var(--primary)',
+            color: '#ffffff',
+            border: 'none',
+            padding: '0.65rem 1.5rem',
+            borderRadius: 'var(--radius-sm)',
+            fontWeight: '700',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            alignSelf: 'center',
+            marginTop: '1rem',
+            display: 'block',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          Done
+        </button>
+      )}
     </div>
   );
 }

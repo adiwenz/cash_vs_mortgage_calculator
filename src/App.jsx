@@ -307,33 +307,37 @@ export default function App() {
         </main>
       ) : activeTool === 'cashVsMortgage' ? (
         <div className="advanced-layout">
-          {/* Overlay for mobile drawer */}
-          {isMobileDrawerOpen && (
-            <div className="drawer-overlay" onClick={() => setIsMobileDrawerOpen(false)} />
-          )}
-
-          {/* Left Column: Collapsible Sidebar for Assumptions */}
-          <aside className={`assumptions-sidebar ${isMobileDrawerOpen ? 'open' : ''}`}>
-            <div className="sidebar-header-mobile">
-              <h3>Edit Assumptions</h3>
-              <button className="close-drawer-btn" onClick={() => setIsMobileDrawerOpen(false)}>
-                &times;
-              </button>
-            </div>
+          {/* Left Column: Sidebar for Assumptions (desktop only) */}
+          <aside className="assumptions-sidebar assumptions-desktop-only">
             <AssumptionsPanel inputs={inputs} onChange={handleInputChange} onReset={handleReset} />
           </aside>
 
           {/* Right Column: Main Content Area */}
           <div className="advanced-main">
-            {/* Mobile Sidebar Toggle */}
+            {/* Edit Assumptions Button - visible on medium/small screens only */}
             <button
-              className="mobile-sidebar-toggle"
+              className="edit-assumptions-btn"
               onClick={() => setIsMobileDrawerOpen(true)}
             >
               ⚙️ Edit Assumptions
             </button>
 
-
+            {/* Assumptions Modal - centered overlay */}
+            {isMobileDrawerOpen && (
+              <>
+                <div className="simple-modal-overlay" onClick={() => setIsMobileDrawerOpen(false)} />
+                <div className="simple-modal">
+                  <div className="simple-modal-content">
+                    <AssumptionsPanel
+                      inputs={inputs}
+                      onChange={handleInputChange}
+                      onReset={handleReset}
+                      onClose={() => setIsMobileDrawerOpen(false)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Errors list */}
             {validation.errors.length > 0 && (

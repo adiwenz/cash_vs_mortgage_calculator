@@ -509,7 +509,7 @@ export default function SimpleCalculator() {
 
       {/* Edit Assumptions Button - visible on medium/small screens only */}
       <button
-        className="simple-modal-toggle"
+        className="edit-assumptions-btn"
         onClick={() => setIsModalOpen(true)}
       >
         ⚙️ Edit Assumptions
@@ -888,22 +888,40 @@ export default function SimpleCalculator() {
               {selectedYearData && (() => {
                 const cashNW = selectedYearData.cashBuyerNW;
                 const mortNW = selectedYearData.mortgageBuyerNW;
+                
+                const cashColor = colorBlindMode ? '#2563eb' : '#0d9488';
+                const mortgageColor = colorBlindMode ? '#ea580c' : '#f59e0b';
+
+                const cashBg = colorBlindMode ? 'rgba(37, 99, 235, 0.04)' : 'rgba(13, 148, 136, 0.04)';
+                const cashBorder = colorBlindMode ? 'rgba(37, 99, 235, 0.15)' : 'rgba(13, 148, 136, 0.15)';
+                const cashBorderTop = colorBlindMode ? 'rgba(37, 99, 235, 0.12)' : 'rgba(13, 148, 136, 0.12)';
+                const cashBadgeBg = colorBlindMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(13, 148, 136, 0.1)';
+
+                const mortgageBg = colorBlindMode ? 'rgba(234, 88, 12, 0.04)' : 'rgba(245, 158, 11, 0.04)';
+                const mortgageBorder = colorBlindMode ? 'rgba(234, 88, 12, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                const mortgageBorderTop = colorBlindMode ? 'rgba(234, 88, 12, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+                const mortgageBadgeBg = colorBlindMode ? 'rgba(234, 88, 12, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+
                 const diff = Math.abs(cashNW - mortNW);
                 const cashWins = cashNW > mortNW;
                 const tied = cashNW === mortNW;
                 const winnerLabel = cashWins ? 'Cash Buyer' : 'Mortgage Buyer';
-                const winnerColor = cashWins ? '#6366f1' : '#10b981';
-                const winnerBg = cashWins ? 'rgba(99, 102, 241, 0.08)' : 'rgba(16, 185, 129, 0.08)';
-                const winnerBorder = cashWins ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)';
+                const winnerColor = cashWins ? cashColor : mortgageColor;
+                const winnerBg = cashWins 
+                  ? (colorBlindMode ? 'rgba(37, 99, 235, 0.08)' : 'rgba(13, 148, 136, 0.08)') 
+                  : (colorBlindMode ? 'rgba(234, 88, 12, 0.08)' : 'rgba(245, 158, 11, 0.08)');
+                const winnerBorder = cashWins 
+                  ? (colorBlindMode ? 'rgba(37, 99, 235, 0.25)' : 'rgba(13, 148, 136, 0.25)') 
+                  : (colorBlindMode ? 'rgba(234, 88, 12, 0.25)' : 'rgba(245, 158, 11, 0.25)');
 
                 return (
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '0.5rem' }}>
                       {/* Cash Buyer Card */}
-                      <div style={{ background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: '10px', padding: '1rem' }}>
-                        <div style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#6366f1' }}>Cash Buyer</span>
-                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px', color: '#6366f1', fontWeight: '700' }}>No Loan</span>
+                      <div style={{ background: cashBg, border: `1px solid ${cashBorder}`, borderRadius: '10px', padding: '1rem' }}>
+                        <div style={{ borderBottom: `1px solid ${cashBorder}`, paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: cashColor }}>Cash Buyer</span>
+                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: cashBadgeBg, borderRadius: '4px', color: cashColor, fontWeight: '700' }}>No Loan</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -914,18 +932,18 @@ export default function SimpleCalculator() {
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Investment Account:</span>
                             <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.cashBuyerStock)}</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(99, 102, 241, 0.12)', paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${cashBorderTop}`, paddingTop: '0.5rem', marginTop: '0.15rem' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
-                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#6366f1' }}>{formatCurrency(cashNW)}</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: cashColor }}>{formatCurrency(cashNW)}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Mortgage Buyer Card */}
-                      <div style={{ background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '10px', padding: '1rem' }}>
-                        <div style={{ borderBottom: '1px solid rgba(16, 185, 129, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#10b981' }}>Mortgage Buyer</span>
-                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '4px', color: '#10b981', fontWeight: '700' }}>Leveraged</span>
+                      <div style={{ background: mortgageBg, border: `1px solid ${mortgageBorder}`, borderRadius: '10px', padding: '1rem' }}>
+                        <div style={{ borderBottom: `1px solid ${mortgageBorder}`, paddingBottom: '0.4rem', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: mortgageColor }}>Mortgage Buyer</span>
+                          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', padding: '0.15rem 0.4rem', background: mortgageBadgeBg, borderRadius: '4px', color: mortgageColor, fontWeight: '700' }}>Leveraged</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -940,9 +958,9 @@ export default function SimpleCalculator() {
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mortgage Balance:</span>
                             <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(selectedYearData.mortgageBalance)}</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(16, 185, 129, 0.12)', paddingTop: '0.5rem', marginTop: '0.15rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${mortgageBorderTop}`, paddingTop: '0.5rem', marginTop: '0.15rem' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>Net Worth:</span>
-                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#10b981' }}>{formatCurrency(mortNW)}</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '800', color: mortgageColor }}>{formatCurrency(mortNW)}</span>
                           </div>
                         </div>
                       </div>

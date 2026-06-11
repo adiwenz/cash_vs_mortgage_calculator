@@ -477,7 +477,7 @@ export default function MortgageComparer() {
   };
 
   return (
-    <div className="mortgage-comparer-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+    <div className="mortgage-comparer-container">
       
       {/* Left Column: Scenario Manager */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -635,7 +635,7 @@ export default function MortgageComparer() {
           </div>
 
           {/* Chart Display Area */}
-          <div className="chart-container-inner" style={{ position: 'relative', height: '350px' }}>
+          <div className="chart-container-inner" style={{ position: 'relative', height: '350px', width: '100%' }}>
             {activeScenarios.length === 0 ? (
               <div 
                 style={{
@@ -721,7 +721,7 @@ export default function MortgageComparer() {
                     domain={compareMetric === 'netWorth' ? [0, maxNetWorth] : ['auto', 'auto']}
                   />
                   <Tooltip content={<CustomLineTooltip />} />
-                  <Legend />
+                  <Legend verticalAlign="bottom" height={70} />
                   {activeScenarios.map((scen) => (
                     <Line
                       key={scen.id}
@@ -841,7 +841,7 @@ export default function MortgageComparer() {
               )}
 
               {/* Table element */}
-              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
                 <table className="comparison-table">
                   <thead>
                     {tableMode === 'comparison' ? (
@@ -982,21 +982,21 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
 
     return (
       <div className="input-wrapper" key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.35rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{label}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-            {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>$</span>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'stretch' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '500' }}>{label}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', width: '100%' }}>
+            {isCurrency && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600', marginRight: '0.15rem' }}>$</span>}
             <input
               type="number"
               className="input-number-box"
-              style={{ width: '85px', fontSize: '0.8rem', padding: '0.2rem 0.4rem', height: 'auto' }}
+              style={{ width: '100%', fontSize: '0.8rem', padding: '0.2rem 0.4rem', height: 'auto', flex: 1 }}
               value={valString}
               step={isPercent ? step * 100 : step}
               onFocus={() => { activeFieldRef.current = key; }}
               onChange={(e) => handleInputChange(key, e.target.value)}
               onBlur={() => handleBlur(key)}
             />
-            {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>%</span>}
+            {isPercent && <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600', marginLeft: '0.15rem' }}>%</span>}
           </div>
         </div>
       </div>

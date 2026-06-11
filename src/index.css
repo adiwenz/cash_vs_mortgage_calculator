@@ -214,20 +214,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: start;
 }
 
-@media (max-width: 1200px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-  .assumptions-desktop-only {
-    display: none;
-  }
-  .simple-modal-toggle {
-    display: flex;
-  }
-}
-
-/* Simple Calculator: Edit Assumptions toggle button (hidden on desktop) */
-.simple-modal-toggle {
+/* Edit Assumptions toggle button (hidden on desktop) */
+.edit-assumptions-btn {
   display: none;
   align-items: center;
   gap: 0.5rem;
@@ -241,9 +229,10 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   transition: all var(--transition-fast);
   width: fit-content;
+  margin-bottom: 1rem;
 }
 
-.simple-modal-toggle:hover {
+.edit-assumptions-btn:hover {
   background: var(--primary-hover);
 }
 
@@ -847,56 +836,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 0.25rem;
 }
 
-/* Mobile Drawer Styles */
-.mobile-sidebar-toggle {
-  display: none;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--primary-light);
-  color: var(--text-primary);
-  border: 1px solid var(--primary);
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  width: fit-content;
-}
-
-.mobile-sidebar-toggle:hover {
-  background: var(--primary);
-  color: #fff;
-}
-
-.sidebar-header-mobile {
-  display: none;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.sidebar-header-mobile h3 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.close-drawer-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.close-drawer-btn:hover {
-  color: var(--text-primary);
-}
+/* Mobile Drawer Styles removed */
 
 /* Section Container on Dashboard */
 .dashboard-section-card {
@@ -962,37 +902,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 1024px) {
-  .advanced-layout {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .assumptions-sidebar {
-    position: fixed;
-    top: 0;
-    left: -370px;
-    width: 350px;
-    height: 100vh;
-    background: var(--bg-secondary);
-    box-shadow: var(--shadow-lg);
-    z-index: 1000;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 1.5rem;
-    border-right: 1px solid var(--border-color);
-  }
-
-  .assumptions-sidebar.open {
-    left: 0;
-  }
-
-  .sidebar-header-mobile {
-    display: flex;
-  }
-
-  .mobile-sidebar-toggle {
-    display: flex;
-  }
-
   .kpi-dashboard-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
@@ -1245,4 +1154,47 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+@media (max-width: 1200px) {
+  .dashboard-grid,
+  .advanced-layout {
+    grid-template-columns: 1fr;
+  }
+  .assumptions-desktop-only {
+    display: none !important;
+  }
+  .edit-assumptions-btn {
+    display: flex;
+  }
+}
 
+.mortgage-comparer-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+}
+
+.mortgage-comparer-container > div {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .mortgage-comparer-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .segmented-control {
+    flex-direction: column;
+    border-radius: var(--radius-md);
+    gap: 0.25rem;
+  }
+  .segmented-control-btn {
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+  }
+}
