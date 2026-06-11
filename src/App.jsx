@@ -32,6 +32,7 @@ const SCENARIO_INFO = {
 };
 
 export default function App() {
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   // On mount, parse tool from URL query parameter
   const [activeTool, setActiveTool] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -232,7 +233,7 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {/* Tool Switcher */}
+          {/* Tool Switcher - Desktop & Mobile (stacked) */}
           <div className="tool-switcher">
             <button
               onClick={() => handleToolSwitch('cashVsMortgageSimple')}
@@ -252,6 +253,42 @@ export default function App() {
             >
               Compare Mortgages
             </button>
+          </div>
+
+          {/* Hamburger Menu - Medium screens only */}
+          <div className="nav-hamburger">
+            <button
+              className="hamburger-btn"
+              onClick={() => setIsNavMenuOpen(!isNavMenuOpen)}
+              title="Switch calculator"
+            >
+              <span className="hamburger-icon">
+                <span /><span /><span />
+              </span>
+            </button>
+            {isNavMenuOpen && (
+              <>
+                <div className="hamburger-overlay" onClick={() => setIsNavMenuOpen(false)} />
+                <div className="hamburger-dropdown">
+                  {[
+                    { tool: 'cashVsMortgageSimple', label: 'Cash v. Mortgage' },
+                    { tool: 'cashVsMortgage', label: 'Tax-Aware Cash v. Mortgage' },
+                    { tool: 'mortgageComparer', label: 'Compare Mortgages' }
+                  ].map((item) => (
+                    <button
+                      key={item.tool}
+                      className={`hamburger-item ${activeTool === item.tool ? 'active' : ''}`}
+                      onClick={() => {
+                        handleToolSwitch(item.tool);
+                        setIsNavMenuOpen(false);
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           <button

@@ -370,10 +370,12 @@ export default function SimpleCalculator() {
     return calcResults.data.find((row) => row.year === selectedYear) || calcResults.data[30];
   }, [calcResults, selectedYear]);
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
     <div className="dashboard-grid">
-      {/* Left Column: Input Panel */}
-      <div className="assumptions-section">
+      {/* Left Column: Input Panel - visible on wide screens only */}
+      <div className="assumptions-section assumptions-desktop-only">
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
             <h2 className="card-title" style={{ margin: 0 }}>Simple Assumptions</h2>
@@ -504,6 +506,187 @@ export default function SimpleCalculator() {
           </div>
         </div>
       </div>
+
+      {/* Edit Assumptions Button - visible on medium/small screens only */}
+      <button
+        className="simple-modal-toggle"
+        onClick={() => setIsModalOpen(true)}
+      >
+        ⚙️ Edit Assumptions
+      </button>
+
+      {/* Assumptions Modal - centered overlay */}
+      {isModalOpen && (
+        <>
+          <div className="simple-modal-overlay" onClick={() => setIsModalOpen(false)} />
+          <div className="simple-modal">
+            <div className="simple-modal-content glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h2 className="card-title" style={{ margin: 0 }}>Simple Assumptions</h2>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <button
+                    onClick={handleReset}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary)',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                      lineHeight: 1,
+                      padding: '0 0.25rem'
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+              
+              <div className="assumptions-group">
+                <div className="assumptions-group-title">Home</div>
+                {renderSimpleInput('homePrice', 'Home Price', false, true, 10000)}
+                {renderSimpleInput('cashPurchaseDiscount', 'Cash Discount Negotiated', false, true, 5000, "Cash buyers often negotiate 5-15% below list. Enter $0 if none.")}
+                {renderSimpleInput('homeAppreciation', 'Annual Appreciation', true, false, 0.005)}
+              </div>
+
+              <div className="assumptions-group">
+                <div className="assumptions-group-title">Mortgage</div>
+                {renderSimpleInput('downPaymentPercent', 'Down Payment %', true, false, 0.05)}
+                {renderSimpleInput('mortgageRate', 'Mortgage Rate', true, false, 0.005)}
+                {renderSimpleInput('mortgageTerm', 'Term (Years)', false, false, 1)}
+              </div>
+
+              <div className="assumptions-group">
+                <div className="assumptions-group-title">Investing</div>
+                {renderSimpleInput('stockReturn', 'Stock Market Return', true, false, 0.005)}
+                {renderSimpleInput('savingsRate', 'Savings Account Rate', true, false, 0.005)}
+              </div>
+
+              {/* Buying Decisions in Modal */}
+              <div className="assumptions-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)' }}>
+                  Buying Decisions
+                </span>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    Mortgage Buyer remaining cash goes to:
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                      { val: 'invest', label: '📈 Stocks' },
+                      { val: 'savings', label: '🏦 Savings' },
+                      { val: 'none', label: '💵 Do not invest' }
+                    ].map((item) => (
+                      <label
+                        key={item.val}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          background: mortgageLeftoverDest === item.val ? 'var(--primary-light)' : 'transparent',
+                          borderColor: mortgageLeftoverDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                          color: mortgageLeftoverDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)'
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="modalMortgageLeftoverDest"
+                          value={item.val}
+                          checked={mortgageLeftoverDest === item.val}
+                          onChange={() => setMortgageLeftoverDest(item.val)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                    Cash Buyer avoided mortgage payments go to:
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                      { val: 'invest', label: '📈 Stocks' },
+                      { val: 'savings', label: '🏦 Savings' },
+                      { val: 'none', label: '💵 Do not invest' }
+                    ].map((item) => (
+                      <label
+                        key={item.val}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          background: cashSavingsDest === item.val ? 'var(--primary-light)' : 'transparent',
+                          borderColor: cashSavingsDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                          color: cashSavingsDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)'
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="modalCashSavingsDest"
+                          value={item.val}
+                          checked={cashSavingsDest === item.val}
+                          onChange={() => setCashSavingsDest(item.val)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsModalOpen(false)}
+                style={{
+                  background: 'var(--primary)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '0.65rem 1.5rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  alignSelf: 'center',
+                  marginTop: '0.25rem',
+                  transition: 'all var(--transition-fast)'
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Right Column: Visualizations & Summary */}
       <div className="results-display">

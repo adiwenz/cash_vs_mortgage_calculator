@@ -218,6 +218,84 @@ h1, h2, h3, h4, h5, h6 {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .assumptions-desktop-only {
+    display: none;
+  }
+  .simple-modal-toggle {
+    display: flex;
+  }
+}
+
+/* Simple Calculator: Edit Assumptions toggle button (hidden on desktop) */
+.simple-modal-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: fit-content;
+}
+
+.simple-modal-toggle:hover {
+  background: var(--primary-hover);
+}
+
+/* Simple Calculator: Centered Modal */
+.simple-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+}
+
+.simple-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  pointer-events: none;
+}
+
+.simple-modal-content {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  animation: modalSlideIn 0.25s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .simple-modal {
+    padding: 1rem;
+  }
+  .simple-modal-content {
+    max-height: 90vh;
+  }
 }
 
 /* Premium Card (Glassmorphism) */
@@ -1030,6 +1108,101 @@ h1, h2, h3, h4, h5, h6 {
 .switcher-btn:hover:not(.active) {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.02);
+}
+
+/* Hamburger menu - hidden by default (desktop shows pills) */
+.nav-hamburger {
+  display: none;
+  position: relative;
+}
+
+.hamburger-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.hamburger-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 18px;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--text-primary);
+  border-radius: 2px;
+}
+
+.hamburger-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.hamburger-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.35rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.hamburger-item {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.hamburger-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.hamburger-item.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* Medium screens: hide pills, show hamburger */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tool-switcher {
+    display: none;
+  }
+  .nav-hamburger {
+    display: block;
+  }
 }
 
 @media (max-width: 768px) {
