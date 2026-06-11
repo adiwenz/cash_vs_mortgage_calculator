@@ -339,7 +339,7 @@ export function validateMortgageScenario(scenario) {
   return errors;
 }
 
-export function calculateMortgageScenarioData(scenario) {
+export function calculateMortgageScenarioData(scenario, maxMonthlyPayment = 0) {
   const {
     homePrice,
     downPaymentPercent,
@@ -381,8 +381,15 @@ export function calculateMortgageScenarioData(scenario) {
     const mortgageBalance = calculateRemainingBalance(loanAmount, mortgageRate, mortgageTerm, y);
     const homeEquity = homeValue - mortgageBalance;
 
+    // Determine actual payment in year y
+    const actualMonthlyPayment = y <= mortgageTerm ? monthlyPI : 0;
+    
+    // Reinvest difference relative to maximum housing payment across all scenarios
+    const monthlySurplus = Math.max(0, maxMonthlyPayment - actualMonthlyPayment);
+    const annualSurplus = monthlySurplus * 12;
+
     // Compounding investments and savings
-    currentInvestments = currentInvestments * (1 + stockReturn);
+    currentInvestments = currentInvestments * (1 + stockReturn) + annualSurplus;
     currentSavings = currentSavings * (1 + savingsRate);
 
     // Cumulative interest paid calculations

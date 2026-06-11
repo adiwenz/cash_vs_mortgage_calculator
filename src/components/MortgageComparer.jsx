@@ -13,7 +13,8 @@ import {
 } from 'recharts';
 import {
   calculateMortgageScenarioData,
-  validateMortgageScenario
+  validateMortgageScenario,
+  calculateMonthlyPayment
 } from '../calculations';
 
 // Premium Scenario Colors
@@ -113,21 +114,51 @@ export default function MortgageComparer() {
   const [activeDetailScenarioId, setActiveDetailScenarioId] = useState('1');
   const [tableMetric, setTableMetric] = useState('netWorth'); // Metric for comparison table mode
 
-  // Compute calculated results and errors dynamically
-  const calculatedScenarios = useMemo(() => {
+  // 1. Calculate base scenario stats (errors, loanAmount, monthlyPI)
+  const baseScenarios = useMemo(() => {
     return scenarios.map((scen) => {
       const errors = validateMortgageScenario(scen);
-      let results = null;
+      let loanAmount = 0;
+      let monthlyPI = 0;
       if (errors.length === 0) {
-        results = calculateMortgageScenarioData(scen);
+        loanAmount = Math.max(0, scen.homePrice - (scen.homePrice * scen.downPaymentPercent));
+        monthlyPI = calculateMonthlyPayment(loanAmount, scen.mortgageRate, scen.mortgageTerm);
       }
       return {
         ...scen,
         errors,
-        results
+        loanAmount,
+        monthlyPI
       };
     });
   }, [scenarios]);
+
+  // 2. Find the max monthly payment among all enabled, valid scenarios
+  const maxMonthlyPayment = useMemo(() => {
+    let maxPI = 0;
+    baseScenarios.forEach((scen) => {
+      if (scen.enabled && scen.errors.length === 0) {
+        if (scen.monthlyPI > maxPI) {
+          maxPI = scen.monthlyPI;
+        }
+      }
+    });
+    return maxPI;
+  }, [baseScenarios]);
+
+  // 3. Compute final calculated results with reinvestment of savings
+  const calculatedScenarios = useMemo(() => {
+    return baseScenarios.map((scen) => {
+      let results = null;
+      if (scen.errors.length === 0) {
+        results = calculateMortgageScenarioData(scen, maxMonthlyPayment);
+      }
+      return {
+        ...scen,
+        results
+      };
+    });
+  }, [baseScenarios, maxMonthlyPayment]);
 
   // Scenarios to include in comparison (enabled + no errors)
   const activeScenarios = useMemo(() => {
