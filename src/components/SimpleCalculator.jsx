@@ -72,6 +72,39 @@ export default function SimpleCalculator() {
     return calculateSimpleScenarios(inputs, mortgageLeftoverDest, cashSavingsDest);
   }, [inputs, mortgageLeftoverDest, cashSavingsDest, errors]);
 
+  const simpleBaselineResults = useMemo(() => {
+    if (errors.length > 0) return null;
+    return calculateSimpleScenarios(inputs, 'invest', 'invest');
+  }, [inputs, errors]);
+
+  const yAxisMax = useMemo(() => {
+    if (!simpleBaselineResults) return 'auto';
+    if (chartMetric === 'netWorth') {
+      let maxVal = 0;
+      simpleBaselineResults.data.forEach((row) => {
+        if (row.cashBuyerNW > maxVal) maxVal = row.cashBuyerNW;
+        if (row.mortgageBuyerNW > maxVal) maxVal = row.mortgageBuyerNW;
+      });
+      return Math.ceil(maxVal * 1.05);
+    } else if (chartMetric === 'investment') {
+      let maxVal = 0;
+      simpleBaselineResults.data.forEach((row) => {
+        if (row.cashBuyerStock > maxVal) maxVal = row.cashBuyerStock;
+        if (row.mortgageBuyerStock > maxVal) maxVal = row.mortgageBuyerStock;
+      });
+      return Math.ceil(maxVal * 1.05);
+    } else if (chartMetric === 'homeEquity') {
+      let maxVal = 0;
+      simpleBaselineResults.data.forEach((row) => {
+        if (row.homeValue > maxVal) maxVal = row.homeValue;
+      });
+      return Math.ceil(maxVal * 1.05);
+    } else if (chartMetric === 'mortgageBalance') {
+      return Math.ceil((calcResults?.loanAmount || 0) * 1.05) || 'auto';
+    }
+    return 'auto';
+  }, [simpleBaselineResults, chartMetric, calcResults]);
+
   // Local state for string input values
   const [localValues, setLocalValues] = useState({});
   const activeFieldRef = useRef(null);
@@ -509,6 +542,7 @@ export default function SimpleCalculator() {
                       fontFamily="var(--font-body)"
                       fontSize={11}
                       tickFormatter={formatYAxis}
+                      domain={[0, yAxisMax]}
                     />
                     <Tooltip content={<CustomChartTooltip />} />
                     <Legend />
