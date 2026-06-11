@@ -312,7 +312,8 @@ export default function SimpleCalculator() {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {[
                   { val: 'invest', label: '📈 Stocks' },
-                  { val: 'savings', label: '🏦 Savings' }
+                  { val: 'savings', label: '🏦 Savings' },
+                  { val: 'none', label: '💵 Do not invest' }
                 ].map((item) => (
                   <label
                     key={item.val}
@@ -594,7 +595,7 @@ export default function SimpleCalculator() {
             </div>
 
             {/* Educational Callouts Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem' }}>
               <div style={{ background: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.1)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   ⏳ Opportunity Cost
@@ -627,7 +628,7 @@ export default function SimpleCalculator() {
                   🛡️ Why Cash Wins
                 </span>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  The cash buyer avoids paying substantial interest over 30 years, has no monthly payment obligations, and enjoys immediate 100% home equity.
+                  The cash buyer avoids paying substantial interest over 30 years, has no monthly payment obligations, and enjoys immediate 100% home equity. Cash buyers also have higher negotiating power, which can secure a purchase discount.
                 </p>
               </div>
             </div>

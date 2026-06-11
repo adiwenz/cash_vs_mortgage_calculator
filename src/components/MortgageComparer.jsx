@@ -5,6 +5,7 @@ import {
   Line,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,13 +38,7 @@ const DEFAULT_SCENARIOS = [
     downPaymentPercent: 0.05,
     mortgageRate: 0.065,
     mortgageTerm: 30,
-    homeAppreciation: 0.03,
-    stockReturn: 0.08,
-    savingsRate: 0.04,
-    cashAvailableToday: 150000,
-    amountInvestedOutside: 100000,
-    amountKeptInSavings: 25000,
-    savedMoneyDest: 'invest',
+    reinvestDestination: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[0]
   },
@@ -54,13 +49,7 @@ const DEFAULT_SCENARIOS = [
     downPaymentPercent: 0.20,
     mortgageRate: 0.065,
     mortgageTerm: 30,
-    homeAppreciation: 0.03,
-    stockReturn: 0.08,
-    savingsRate: 0.04,
-    cashAvailableToday: 150000,
-    amountInvestedOutside: 40000,
-    amountKeptInSavings: 10000,
-    savedMoneyDest: 'invest',
+    reinvestDestination: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[1]
   },
@@ -71,13 +60,7 @@ const DEFAULT_SCENARIOS = [
     downPaymentPercent: 0.20,
     mortgageRate: 0.060,
     mortgageTerm: 15,
-    homeAppreciation: 0.03,
-    stockReturn: 0.08,
-    savingsRate: 0.04,
-    cashAvailableToday: 150000,
-    amountInvestedOutside: 40000,
-    amountKeptInSavings: 10000,
-    savedMoneyDest: 'invest',
+    reinvestDestination: 'invest',
     enabled: true,
     color: SCENARIO_COLORS[2]
   }
@@ -87,8 +70,7 @@ const PERCENT_FIELDS = [
   'downPaymentPercent',
   'mortgageRate',
   'homeAppreciation',
-  'stockReturn',
-  'savingsRate'
+  'stockReturn'
 ];
 
 // Helper to format dollar values
@@ -116,6 +98,70 @@ export default function MortgageComparer() {
   const [tableMode, setTableMode] = useState('comparison'); // 'comparison' | 'detail'
   const [activeDetailScenarioId, setActiveDetailScenarioId] = useState('1');
   const [tableMetric, setTableMetric] = useState('netWorth'); // Metric for comparison table mode
+
+  // Global Financial Assumptions
+  const [globalAppreciation, setGlobalAppreciation] = useState(0.03);
+  const [globalStockReturn, setGlobalStockReturn] = useState(0.08);
+  const [globalSavingsRate, setGlobalSavingsRate] = useState(0.04);
+
+  // Local string states to manage inputs nicely without cursor jumping
+  const [appreciationInput, setAppreciationInput] = useState('3.0');
+  const [stockReturnInput, setStockReturnInput] = useState('8.0');
+  const [savingsRateInput, setSavingsRateInput] = useState('4.0');
+
+  useEffect(() => {
+    setAppreciationInput((globalAppreciation * 100).toString());
+  }, [globalAppreciation]);
+
+  useEffect(() => {
+    setStockReturnInput((globalStockReturn * 100).toString());
+  }, [globalStockReturn]);
+
+  useEffect(() => {
+    setSavingsRateInput((globalSavingsRate * 100).toString());
+  }, [globalSavingsRate]);
+
+  const handleAppreciationChange = (valueString) => {
+    setAppreciationInput(valueString);
+    const parsed = parseFloat(valueString);
+    if (!isNaN(parsed)) {
+      setGlobalAppreciation(parsed / 100);
+    } else {
+      setGlobalAppreciation(0);
+    }
+  };
+
+  const handleAppreciationBlur = () => {
+    setAppreciationInput((globalAppreciation * 100).toFixed(1));
+  };
+
+  const handleStockReturnChange = (valueString) => {
+    setStockReturnInput(valueString);
+    const parsed = parseFloat(valueString);
+    if (!isNaN(parsed)) {
+      setGlobalStockReturn(parsed / 100);
+    } else {
+      setGlobalStockReturn(0);
+    }
+  };
+
+  const handleStockReturnBlur = () => {
+    setStockReturnInput((globalStockReturn * 100).toFixed(1));
+  };
+
+  const handleSavingsRateChange = (valueString) => {
+    setSavingsRateInput(valueString);
+    const parsed = parseFloat(valueString);
+    if (!isNaN(parsed)) {
+      setGlobalSavingsRate(parsed / 100);
+    } else {
+      setGlobalSavingsRate(0);
+    }
+  };
+
+  const handleSavingsRateBlur = () => {
+    setSavingsRateInput((globalSavingsRate * 100).toFixed(1));
+  };
 
   // 1. Calculate base scenario stats (errors, loanAmount, monthlyPI)
   const baseScenarios = useMemo(() => {
@@ -149,36 +195,54 @@ export default function MortgageComparer() {
     return maxPI;
   }, [baseScenarios]);
 
+  // Find the max down payment among all enabled, valid scenarios
+  const maxDownPayment = useMemo(() => {
+    let maxDP = 0;
+    baseScenarios.forEach((scen) => {
+      if (scen.enabled && scen.errors.length === 0) {
+        const dp = scen.homePrice * scen.downPaymentPercent;
+        if (dp > maxDP) {
+          maxDP = dp;
+        }
+      }
+    });
+    return maxDP;
+  }, [baseScenarios]);
+
   // 3. Compute final calculated results with reinvestment of savings
   const calculatedScenarios = useMemo(() => {
     return baseScenarios.map((scen) => {
       let results = null;
       if (scen.errors.length === 0) {
-        results = calculateMortgageScenarioData(scen, maxMonthlyPayment);
+        const scenarioWithGlobals = {
+          ...scen,
+          homeAppreciation: globalAppreciation,
+          stockReturn: globalStockReturn,
+          savingsRate: globalSavingsRate
+        };
+        results = calculateMortgageScenarioData(scenarioWithGlobals, maxMonthlyPayment, maxDownPayment);
       }
       return {
         ...scen,
+        homeAppreciation: globalAppreciation,
+        stockReturn: globalStockReturn,
+        savingsRate: globalSavingsRate,
         results
       };
     });
-  }, [baseScenarios, maxMonthlyPayment]);
+  }, [baseScenarios, maxMonthlyPayment, maxDownPayment, globalAppreciation, globalStockReturn, globalSavingsRate]);
 
   // Scenarios to include in comparison (enabled + no errors)
   const activeScenarios = useMemo(() => {
     return calculatedScenarios.filter((s) => s.enabled && s.errors.length === 0);
   }, [calculatedScenarios]);
 
-  // 4. Calculate maximum Y-axis value for Net Worth if all active scenarios chose to "invest"
-  const maxNetWorthInvest = useMemo(() => {
+  // 4. Calculate maximum Y-axis value for Net Worth
+  const maxNetWorth = useMemo(() => {
     let maxVal = 0;
     activeScenarios.forEach((scen) => {
-      const forceInvestScenario = {
-        ...scen,
-        savedMoneyDest: 'invest'
-      };
-      const forceInvestResults = calculateMortgageScenarioData(forceInvestScenario, maxMonthlyPayment);
-      if (forceInvestResults && forceInvestResults.data) {
-        forceInvestResults.data.forEach((row) => {
+      if (scen.results && scen.results.data) {
+        scen.results.data.forEach((row) => {
           if (row.netWorth > maxVal) {
             maxVal = row.netWorth;
           }
@@ -186,7 +250,7 @@ export default function MortgageComparer() {
       }
     });
     return Math.ceil(maxVal * 1.05); // Add 5% padding
-  }, [activeScenarios, maxMonthlyPayment]);
+  }, [activeScenarios]);
 
   // Handle input changes
   const handleScenarioChange = (id, field, value) => {
@@ -222,13 +286,7 @@ export default function MortgageComparer() {
       downPaymentPercent: 0.20,
       mortgageRate: 0.065,
       mortgageTerm: 30,
-      homeAppreciation: 0.03,
-      stockReturn: 0.08,
-      savingsRate: 0.04,
-      cashAvailableToday: 150000,
-      amountInvestedOutside: 40000,
-      amountKeptInSavings: 10000,
-      savedMoneyDest: 'invest',
+      reinvestDestination: 'invest',
       enabled: true,
       color: newColor
     };
@@ -340,9 +398,9 @@ export default function MortgageComparer() {
     } else {
       const targetScen = activeScenarios.find((s) => s.id === activeDetailScenarioId);
       if (!targetScen) return;
-      csvContent += `Year,Home Value,Mortgage Balance,Home Equity,Investment Value,Savings Value,Net Worth\n`;
+      csvContent += `Year,Home Value,Mortgage Balance,Home Equity,Investment Value,Net Worth\n`;
       targetScen.results.data.forEach((row) => {
-        csvContent += `${row.year},${Math.round(row.homeValue)},${Math.round(row.mortgageBalance)},${Math.round(row.homeEquity)},${Math.round(row.investmentValue)},${Math.round(row.savingsValue)},${Math.round(row.netWorth)}\n`;
+        csvContent += `${row.year},${Math.round(row.homeValue)},${Math.round(row.mortgageBalance)},${Math.round(row.homeEquity)},${Math.round(row.investmentValue)},${Math.round(row.netWorth)}\n`;
       });
     }
 
@@ -362,6 +420,24 @@ export default function MortgageComparer() {
       
       {/* Left Column: Scenario Manager */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        
+        {/* Info Callout: Cash Baseline Strategy */}
+        <div className="glass-card" style={{ 
+          padding: '1.25rem', 
+          borderLeft: '4px solid var(--primary)', 
+          background: 'rgba(99, 102, 241, 0.05)',
+          fontSize: '0.85rem',
+          lineHeight: '1.45'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span>ℹ️</span> Cash Baseline Strategy
+          </h3>
+          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+            Each scenario starts with the same total cash, equal to the highest down payment among all enabled scenarios. For scenarios with a lower down payment, the surplus cash is automatically invested or saved according to your reinvestment choice. This ensures a fair, apples-to-apples comparison.
+          </p>
+        </div>
+
+        {/* Mortgage Scenarios Card */}
         <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 className="card-title" style={{ margin: 0 }}>Mortgage Scenarios</h2>
@@ -389,6 +465,71 @@ export default function MortgageComparer() {
             ))}
           </div>
         </div>
+
+        {/* General Assumptions Card */}
+        <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
+          <h2 className="card-title" style={{ fontSize: '1rem', margin: '0 0 1rem 0' }}>General Assumptions</h2>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Appreciation */}
+            <div className="input-wrapper" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Annual Home Appreciation</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '85px', fontSize: '0.8rem', padding: '0.2rem 0.4rem', height: 'auto' }}
+                    value={appreciationInput}
+                    step={0.1}
+                    onChange={(e) => handleAppreciationChange(e.target.value)}
+                    onBlur={handleAppreciationBlur}
+                  />
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stock Return */}
+            <div className="input-wrapper" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Annual Stock Market Return</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '85px', fontSize: '0.8rem', padding: '0.2rem 0.4rem', height: 'auto' }}
+                    value={stockReturnInput}
+                    step={0.1}
+                    onChange={(e) => handleStockReturnChange(e.target.value)}
+                    onBlur={handleStockReturnBlur}
+                  />
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Savings Rate */}
+            <div className="input-wrapper" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Savings Account Rate</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '85px', fontSize: '0.8rem', padding: '0.2rem 0.4rem', height: 'auto' }}
+                    value={savingsRateInput}
+                    step={0.1}
+                    onChange={(e) => handleSavingsRateChange(e.target.value)}
+                    onBlur={handleSavingsRateBlur}
+                  />
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: '600' }}>%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Right Column: Graphs and Data */}
@@ -477,6 +618,12 @@ export default function MortgageComparer() {
                     stroke="var(--text-tertiary)"
                     fontFamily="var(--font-body)"
                     fontSize={11}
+                    tickFormatter={(value) => {
+                      if (value && value.includes(':')) {
+                        return value.split(':')[0].trim();
+                      }
+                      return value && value.length > 15 ? value.substring(0, 15) + '...' : value;
+                    }}
                   />
                   <YAxis
                     stroke="var(--text-tertiary)"
@@ -487,7 +634,7 @@ export default function MortgageComparer() {
                   <Tooltip content={<CustomBarTooltip />} />
                   <Bar dataKey="Monthly Payment" radius={[6, 6, 0, 0]}>
                     {barChartData.map((entry, idx) => (
-                      <Bar key={`bar-${idx}`} dataKey="Monthly Payment" fill={entry.color} />
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -510,7 +657,7 @@ export default function MortgageComparer() {
                     fontFamily="var(--font-body)"
                     fontSize={11}
                     tickFormatter={formatYAxis}
-                    domain={compareMetric === 'netWorth' ? [0, maxNetWorthInvest] : ['auto', 'auto']}
+                    domain={compareMetric === 'netWorth' ? [0, maxNetWorth] : ['auto', 'auto']}
                   />
                   <Tooltip content={<CustomLineTooltip />} />
                   <Legend />
@@ -650,7 +797,6 @@ export default function MortgageComparer() {
                         <th>Mortgage Balance</th>
                         <th>Home Equity</th>
                         <th>Investments</th>
-                        <th>Savings</th>
                         <th>Net Worth</th>
                       </tr>
                     )}
@@ -683,7 +829,6 @@ export default function MortgageComparer() {
                             <td>{y === 0 && row.mortgageBalance === 0 ? '-' : formatCurrency(row.mortgageBalance)}</td>
                             <td>{formatCurrency(row.homeEquity)}</td>
                             <td>{formatCurrency(row.investmentValue)}</td>
-                            <td>{formatCurrency(row.savingsValue)}</td>
                             <td className="table-highlight-col">{formatCurrency(row.netWorth)}</td>
                           </tr>
                         );
@@ -830,40 +975,43 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
               fontWeight: '600', 
               color: 'var(--text-primary)', 
               padding: 0, 
-              width: '160px', 
+              width: '280px', 
+              textAlign: 'left',
               boxShadow: 'none',
               cursor: 'text'
             }}
             value={scenario.name}
             onChange={(e) => onChange('name', e.target.value)}
             placeholder="Scenario Name"
+            maxLength={40}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <button 
-            onClick={onDuplicate} 
-            className="btn-icon" 
-            title="Duplicate Scenario" 
-            style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
-          >
-            📋 Dup
-          </button>
           {canDelete && (
             <button 
               onClick={onDelete} 
               className="btn-icon" 
               title="Delete Scenario" 
-              style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.7rem', background: 'rgba(244, 63, 94, 0.1)', color: 'var(--accent-rose)' }}
+              style={{ 
+                width: '32px', 
+                height: '32px', 
+                padding: 0, 
+                fontSize: '0.85rem', 
+                background: 'rgba(244, 63, 94, 0.1)', 
+                borderColor: 'rgba(244, 63, 94, 0.2)',
+                color: 'var(--accent-rose)' 
+              }}
             >
-              🗑️ Del
+              🗑️
             </button>
           )}
           <button 
             onClick={onExpandToggle} 
             className="btn-icon" 
-            style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+            title={isExpanded ? "Collapse" : "Edit Scenario"} 
+            style={{ width: '32px', height: '32px', padding: 0, fontSize: '0.85rem' }}
           >
-            {isExpanded ? '▲ Collapse' : '▼ Edit'}
+            {isExpanded ? '▲' : '▼'}
           </button>
         </div>
       </div>
@@ -890,43 +1038,51 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
 
       {/* Card Content: Form (Expanded) or Summaries (Collapsed) */}
       {isExpanded ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            <h4 style={{ fontSize: '0.75rem', color: 'var(--primary)', margin: '0.25rem 0 0.1rem 0', textTransform: 'uppercase' }}>Home & Loan</h4>
-            {renderCardInput('homePrice', 'Home Price', false, true, 10000)}
-            {renderCardInput('downPaymentPercent', 'Down Payment %', true, false, 0.01)}
-            {renderCardInput('mortgageRate', 'Mortgage Rate', true, false, 0.001)}
-            {renderCardInput('mortgageTerm', 'Term (Years)', false, false, 1)}
-            {renderCardInput('homeAppreciation', 'Appreciation', true, false, 0.001)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {renderCardInput('homePrice', 'Home Price', false, true, 10000)}
+              {renderCardInput('downPaymentPercent', 'Down Payment %', true, false, 0.01)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {renderCardInput('mortgageRate', 'Mortgage Rate', true, false, 0.001)}
+              {renderCardInput('mortgageTerm', 'Term (Years)', false, false, 1)}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            <h4 style={{ fontSize: '0.75rem', color: 'var(--primary)', margin: '0.25rem 0 0.1rem 0', textTransform: 'uppercase' }}>Assets & Cash</h4>
-            {renderCardInput('cashAvailableToday', 'Cash Today', false, true, 10000)}
-            {renderCardInput('amountInvestedOutside', 'Investments', false, true, 10000)}
-            {renderCardInput('amountKeptInSavings', 'Savings', false, true, 5000)}
-            {renderCardInput('stockReturn', 'Stock Return', true, false, 0.001)}
-            {renderCardInput('savingsRate', 'Savings Rate', true, false, 0.001)}
-          </div>
-          <div style={{ gridColumn: 'span 2', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+
+          {/* Reinvestment Destination Selector */}
+          <div className="segmented-control-container" style={{ gap: '0.25rem', marginTop: '0.25rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-              Reinvest saved monthly payments & paid-off mortgage cash flow into:
+              Reinvest Leftover Cash Flow
             </span>
-            <div className="segmented-control" style={{ maxWidth: '380px' }}>
+            <div className="segmented-control">
               {[
                 { val: 'invest', label: '📈 Invest' },
-                { val: 'savings', label: '🏦 Savings' },
+                { val: 'savings', label: '🏦 Save' },
                 { val: 'cash', label: '💵 Hold Cash' }
               ].map((item) => (
                 <button
                   key={item.val}
                   type="button"
-                  className={`segmented-control-btn ${(scenario.savedMoneyDest || 'invest') === item.val ? 'active' : ''}`}
-                  onClick={() => onChange('savedMoneyDest', item.val)}
+                  className={`segmented-control-btn ${scenario.reinvestDestination === item.val ? 'active' : ''}`}
+                  onClick={() => onChange('reinvestDestination', item.val)}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
+          </div>
+
+          <div style={{ 
+            fontSize: '0.75rem', 
+            color: 'var(--text-tertiary)', 
+            fontStyle: 'italic', 
+            marginTop: '0.25rem', 
+            lineHeight: '1.4', 
+            borderLeft: '2px solid var(--primary)', 
+            paddingLeft: '0.5rem' 
+          }}>
+            All scenarios are assumed to start with the same available cash. Any unused down-payment funds are automatically reinvested or held.
           </div>
         </div>
       ) : (
@@ -947,10 +1103,6 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplic
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Total Interest</span>
               <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(scenario.results.totalInterestPaid)}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>NW Year 10</span>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(scenario.results.data[10]?.netWorth || 0)}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>NW Year 30</span>
