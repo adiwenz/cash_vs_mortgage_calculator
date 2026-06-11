@@ -187,3 +187,60 @@ Use this list of test cases to verify the mathematical and validation behavior o
     * *"This property tax rate is high and may significantly affect affordability."*
     * *"This insurance rate is high and may significantly affect affordability."*
   * Chart remains active.
+
+---
+
+### Test Case 16: Mortgage Scenario Comparer Valid Default Baseline
+* **Navigation**: Click "Compare Options" switcher in the header.
+* **Expected Output**:
+  * Displays three default scenario cards:
+    * Scenario A: Low Down Payment (Indigo line)
+    * Scenario B: Standard Down Payment (Emerald line)
+    * Scenario C: Shorter Loan (Amber line)
+  * Chart Visualizer renders lines showing Net Worth growth over 30 years for all three scenarios.
+  * Collapsed scenario cards display summary chips:
+    * Scenario A: Monthly P&I `$3,002`, Down Payment `$25,000`, Loan `$475,000`, Total Interest `$605,836`, NW Year 10 `$522,170`, NW Year 30 `$2,300,982`
+    * Scenario B: Monthly P&I `$2,528`, Down Payment `$100,000`, Loan `$400,000`, Total Interest `$510,178`, NW Year 10 `$513,674`, NW Year 30 `$2,305,622`
+    * Scenario C: Monthly P&I `$3,375`, Down Payment `$100,000`, Loan `$400,000`, Total Interest `$207,568`, NW Year 10 `$504,506`, NW Year 30 `$2,437,344`
+
+---
+
+### Test Case 17: Cash Allocation Limit Error
+* **Inputs (Scenario A)**:
+  * Click "Edit" on Scenario A.
+  * Change "Investments" (outside the home) to `$140,000`.
+  * *Calculation Note*: Down Payment ($25,000) + Investments ($140,000) + Savings ($25,000) = $190,000. This exceeds "Cash Today" ($150,000).
+* **Expected Output**:
+  * An error banner is shown inline in the Scenario A card:
+    * *"Cash allocated to down payment, investments, and savings cannot exceed total cash available."*
+  * Scenario A is immediately excluded from the comparison chart and tables.
+  * Re-adjusting Investments to `$100,000` clears the error and restores the scenario to comparison.
+
+---
+
+### Test Case 18: Mortgage Scenario Invalid Parameters
+* **Inputs (Scenario B)**:
+  * Click "Edit" on Scenario B.
+  * Set "Home Price" to `$0`.
+  * Set "Mortgage Rate" to `-1%`.
+  * Set "Term (Years)" to `0`.
+* **Expected Output**:
+  * Error banners display inside the Scenario B card:
+    * *"Home price must be greater than $0."*
+    * *"Mortgage rate cannot be negative."*
+    * *"Mortgage term must be greater than 0."*
+  * Scenario B is excluded from comparison charts and tables.
+
+---
+
+### Test Case 19: Scenario Management Actions
+* **Actions**:
+  * Click "Add Scenario" button in the "Mortgage Scenarios" header.
+    * *Result*: A new card "Scenario D" is created with default parameters and Indigo/Rose border.
+  * Click "Dup" button on Scenario B.
+    * *Result*: A copy "Scenario B (Copy)" is created with identical parameters.
+  * Uncheck the checkbox next to Scenario C.
+    * *Result*: Scenario C is hidden from the comparison chart and table.
+  * Click "Del" button on Scenario C.
+    * *Result*: Scenario C is removed from the scenario list.
+

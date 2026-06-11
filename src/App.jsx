@@ -4,6 +4,7 @@ import AssumptionsPanel from './components/AssumptionsPanel';
 import ComparisonChart from './components/ComparisonChart';
 import ComparisonTable from './components/ComparisonTable';
 import EducationHub from './components/EducationHub';
+import MortgageComparer from './components/MortgageComparer';
 
 // Initial default inputs
 const DEFAULT_INPUTS = {
@@ -33,6 +34,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'education'
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
+  const [activeTool, setActiveTool] = useState('cashVsMortgage'); // 'cashVsMortgage' | 'mortgageComparer'
 
   // Radio Decisions state
   const [mortgageLeftoverDest, setMortgageLeftoverDest] = useState('invest'); // 'invest' | 'savings' | 'cash'
@@ -107,11 +109,56 @@ export default function App() {
         <div className="brand-section">
           <div className="brand-logo">🏡</div>
           <div className="brand-title">
-            <h1>Cash vs. Mortgage Calculator</h1>
-            <p>Compare home buying paths and long-term net worth</p>
+            {activeTool === 'cashVsMortgage' ? (
+              <>
+                <h1>Cash vs. Mortgage Calculator</h1>
+                <p>Compare home buying paths and long-term net worth</p>
+              </>
+            ) : (
+              <>
+                <h1>Mortgage Options Comparer</h1>
+                <p>Analyze different mortgage terms, down payments, and rates side-by-side</p>
+              </>
+            )}
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Tool Switcher */}
+          <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.2rem', borderRadius: '6px' }}>
+            <button
+              onClick={() => setActiveTool('cashVsMortgage')}
+              style={{
+                background: activeTool === 'cashVsMortgage' ? 'var(--primary)' : 'transparent',
+                color: activeTool === 'cashVsMortgage' ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              Cash vs. Mortgage
+            </button>
+            <button
+              onClick={() => setActiveTool('mortgageComparer')}
+              style={{
+                background: activeTool === 'mortgageComparer' ? 'var(--primary)' : 'transparent',
+                color: activeTool === 'mortgageComparer' ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              Compare Options
+            </button>
+          </div>
+
           <button
             className="btn-icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -122,257 +169,265 @@ export default function App() {
         </div>
       </header>
 
-      {/* Summary Widgets Strip */}
-      <div className="summary-strip">
-        <div className="summary-widget">
-          <span className="widget-label">Cash Buyer Tax Paid</span>
-          <span className="widget-value" style={{ color: 'var(--accent-rose)', WebkitTextFillColor: 'var(--accent-rose)' }}>
-            {formatCurrency(calcResults.cashBuyerTax)}
-          </span>
-          <span className="widget-sub">Immediate Capital Gains Tax</span>
-        </div>
-        <div className="summary-widget">
-          <span className="widget-label">Mortgage Buyer Tax Paid</span>
-          <span className="widget-value" style={{ color: 'var(--accent-amber)', WebkitTextFillColor: 'var(--accent-amber)' }}>
-            {formatCurrency(calcResults.mortgageBuyerTax)}
-          </span>
-          <span className="widget-sub">Tax Paid for Down Payment</span>
-        </div>
-        <div className="summary-widget">
-          <span className="widget-label">Mortgage Buyer Starting Stock</span>
-          <span className="widget-value">
-            {formatCurrency(calcResults.mortgageBuyerStartingStock)}
-          </span>
-          <span className="widget-sub">Remaining portfolio after Down Payment Tax</span>
-        </div>
-        <div className="summary-widget">
-          <span className="widget-label">Annual Mortgage P&I</span>
-          <span className="widget-value" style={{ color: 'var(--accent-emerald)', WebkitTextFillColor: 'var(--accent-emerald)' }}>
-            {formatCurrency(calcResults.annualPI)}
-          </span>
-          <span className="widget-sub">{formatCurrency(calcResults.annualPI / 12)}/month P&I payment</span>
-        </div>
-      </div>
-
-      {/* Main Grid */}
-      <main className="dashboard-grid">
-        {/* Left Column: Assumptions */}
-        <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
-
-        {/* Right Column: Results & Interactive Views */}
-        <div className="results-display">
-          {/* Interactive Decisions Selector */}
-          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
-              Interactive Buying Decisions
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {/* Mortgage Buyer Choice */}
-              <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                  Mortgage leftover cash goes to:
-                </span>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {[
-                    { val: 'invest', label: '📈 Invest (Stock)' },
-                    { val: 'savings', label: '🏦 Savings Account' },
-                    { val: 'cash', label: '💵 Hold as Cash' }
-                  ].map((item) => (
-                    <label
-                      key={item.val}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        padding: '0.4rem 0.75rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)',
-                        background: mortgageLeftoverDest === item.val ? 'var(--primary-light)' : 'transparent',
-                        borderColor: mortgageLeftoverDest === item.val ? 'var(--primary)' : 'var(--border-color)',
-                        color: mortgageLeftoverDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="mortgageLeftoverDest"
-                        value={item.val}
-                        checked={mortgageLeftoverDest === item.val}
-                        onChange={() => setMortgageLeftoverDest(item.val)}
-                        style={{ accentColor: 'var(--primary)' }}
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Cash Buyer Choice */}
-              <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                  Cash Buyer monthly savings go to:
-                </span>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {[
-                    { val: 'invest', label: '📈 Invest (Stock)' },
-                    { val: 'savings', label: '🏦 Savings Account' },
-                    { val: 'cash', label: '💵 Hold as Cash' }
-                  ].map((item) => (
-                    <label
-                      key={item.val}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        fontSize: '0.8rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        padding: '0.4rem 0.75rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)',
-                        background: cashSavingsDest === item.val ? 'var(--primary-light)' : 'transparent',
-                        borderColor: cashSavingsDest === item.val ? 'var(--primary)' : 'var(--border-color)',
-                        color: cashSavingsDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="cashSavingsDest"
-                        value={item.val}
-                        checked={cashSavingsDest === item.val}
-                        onChange={() => setCashSavingsDest(item.val)}
-                        style={{ accentColor: 'var(--primary)' }}
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+      {activeTool === 'cashVsMortgage' ? (
+        <>
+          {/* Summary Widgets Strip */}
+          <div className="summary-strip">
+            <div className="summary-widget">
+              <span className="widget-label">Cash Buyer Tax Paid</span>
+              <span className="widget-value" style={{ color: 'var(--accent-rose)', WebkitTextFillColor: 'var(--accent-rose)' }}>
+                {formatCurrency(calcResults.cashBuyerTax)}
+              </span>
+              <span className="widget-sub">Immediate Capital Gains Tax</span>
+            </div>
+            <div className="summary-widget">
+              <span className="widget-label">Mortgage Buyer Tax Paid</span>
+              <span className="widget-value" style={{ color: 'var(--accent-amber)', WebkitTextFillColor: 'var(--accent-amber)' }}>
+                {formatCurrency(calcResults.mortgageBuyerTax)}
+              </span>
+              <span className="widget-sub">Tax Paid for Down Payment</span>
+            </div>
+            <div className="summary-widget">
+              <span className="widget-label">Mortgage Buyer Starting Stock</span>
+              <span className="widget-value">
+                {formatCurrency(calcResults.mortgageBuyerStartingStock)}
+              </span>
+              <span className="widget-sub">Remaining portfolio after Down Payment Tax</span>
+            </div>
+            <div className="summary-widget">
+              <span className="widget-label">Annual Mortgage P&I</span>
+              <span className="widget-value" style={{ color: 'var(--accent-emerald)', WebkitTextFillColor: 'var(--accent-emerald)' }}>
+                {formatCurrency(calcResults.annualPI)}
+              </span>
+              <span className="widget-sub">{formatCurrency(calcResults.annualPI / 12)}/month P&I payment</span>
             </div>
           </div>
 
-          {/* Errors list */}
-          {validation.errors.length > 0 && (
-            <div 
-              className="glass-card" 
-              style={{ 
-                borderLeft: '4px solid var(--accent-rose)', 
-                background: 'rgba(244, 63, 94, 0.05)', 
-                padding: '1rem 1.5rem', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}
-            >
-              <h3 style={{ color: 'var(--accent-rose)', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                ❌ Fix Your Assumptions
-              </h3>
-              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {validation.errors.map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Main Grid */}
+          <main className="dashboard-grid">
+            {/* Left Column: Assumptions */}
+            <AssumptionsPanel inputs={inputs} onChange={handleInputChange} />
 
-          {/* Warnings collapsible accordion */}
-          {validation.warnings.length > 0 && validation.errors.length === 0 && (
-            <div 
-              className="glass-card" 
-              style={{ 
-                borderLeft: '4px solid var(--accent-amber)', 
-                background: 'rgba(245, 158, 11, 0.05)', 
-                padding: '1rem 1.5rem', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}
-            >
-              <button
-                onClick={() => setIsWarningsOpen(!isWarningsOpen)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: 0,
-                  margin: 0,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  color: 'var(--accent-amber)',
-                  fontSize: '0.9rem',
-                  fontWeight: '700'
-                }}
-              >
-                <span>⚠️ Check Your Assumptions ({validation.warnings.length})</span>
-                <span style={{ transition: 'transform 0.2s', transform: isWarningsOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.75rem' }}>▶</span>
-              </button>
-              
-              {isWarningsOpen && (
-                <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {validation.warnings.map((warn, i) => (
-                    <li key={i}>{warn}</li>
-                  ))}
-                </ul>
+            {/* Right Column: Results & Interactive Views */}
+            <div className="results-display">
+              {/* Interactive Decisions Selector */}
+              <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+                  Interactive Buying Decisions
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  {/* Mortgage Buyer Choice */}
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                      Mortgage leftover cash goes to:
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {[
+                        { val: 'invest', label: '📈 Invest (Stock)' },
+                        { val: 'savings', label: '🏦 Savings Account' },
+                        { val: 'cash', label: '💵 Hold as Cash' }
+                      ].map((item) => (
+                        <label
+                          key={item.val}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            padding: '0.4rem 0.75rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            background: mortgageLeftoverDest === item.val ? 'var(--primary-light)' : 'transparent',
+                            borderColor: mortgageLeftoverDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                            color: mortgageLeftoverDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            transition: 'all var(--transition-fast)'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="mortgageLeftoverDest"
+                            value={item.val}
+                            checked={mortgageLeftoverDest === item.val}
+                            onChange={() => setMortgageLeftoverDest(item.val)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          {item.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cash Buyer Choice */}
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                      Cash Buyer monthly savings go to:
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {[
+                        { val: 'invest', label: '📈 Invest (Stock)' },
+                        { val: 'savings', label: '🏦 Savings Account' },
+                        { val: 'cash', label: '💵 Hold as Cash' }
+                      ].map((item) => (
+                        <label
+                          key={item.val}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            padding: '0.4rem 0.75rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            background: cashSavingsDest === item.val ? 'var(--primary-light)' : 'transparent',
+                            borderColor: cashSavingsDest === item.val ? 'var(--primary)' : 'var(--border-color)',
+                            color: cashSavingsDest === item.val ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            transition: 'all var(--transition-fast)'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="cashSavingsDest"
+                            value={item.val}
+                            checked={cashSavingsDest === item.val}
+                            onChange={() => setCashSavingsDest(item.val)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          {item.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Errors list */}
+              {validation.errors.length > 0 && (
+                <div 
+                  className="glass-card" 
+                  style={{ 
+                    borderLeft: '4px solid var(--accent-rose)', 
+                    background: 'rgba(244, 63, 94, 0.05)', 
+                    padding: '1rem 1.5rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem',
+                    marginBottom: '1rem'
+                  }}
+                >
+                  <h3 style={{ color: 'var(--accent-rose)', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    ❌ Fix Your Assumptions
+                  </h3>
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {validation.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
+
+              {/* Warnings collapsible accordion */}
+              {validation.warnings.length > 0 && validation.errors.length === 0 && (
+                <div 
+                  className="glass-card" 
+                  style={{ 
+                    borderLeft: '4px solid var(--accent-amber)', 
+                    background: 'rgba(245, 158, 11, 0.05)', 
+                    padding: '1rem 1.5rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem',
+                    marginBottom: '1rem'
+                  }}
+                >
+                  <button
+                    onClick={() => setIsWarningsOpen(!isWarningsOpen)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: 'var(--accent-amber)',
+                      fontSize: '0.9rem',
+                      fontWeight: '700'
+                    }}
+                  >
+                    <span>⚠️ Check Your Assumptions ({validation.warnings.length})</span>
+                    <span style={{ transition: 'transform 0.2s', transform: isWarningsOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.75rem' }}>▶</span>
+                  </button>
+                  
+                  {isWarningsOpen && (
+                    <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {validation.warnings.map((warn, i) => (
+                        <li key={i}>{warn}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Tab Navigation */}
+              <nav className="tab-nav">
+                <button
+                  className={`tab-btn ${activeTab === 'chart' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('chart')}
+                >
+                  📊 Visual Chart
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'table' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('table')}
+                >
+                  📋 Calculation Table
+                </button>
+                <button
+                  className={`tab-btn ${activeTab === 'education' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('education')}
+                >
+                  🎓 Education Hub
+                </button>
+              </nav>
+
+              {/* Active View Container */}
+              {activeTab === 'chart' && (
+                <ComparisonChart
+                  data={calcResults.data.slice(0, zoomRange + 1)}
+                  visibleScenarios={visibleScenarios}
+                  onToggleScenario={handleToggleScenario}
+                  scenarioInfo={SCENARIO_INFO}
+                  yAxisMax={maxInvestNW}
+                  zoomRange={zoomRange}
+                  onZoomChange={setZoomRange}
+                  disabled={validation.errors.length > 0}
+                />
+              )}
+
+              {activeTab === 'table' && (
+                <ComparisonTable
+                  data={calcResults.data}
+                  visibleScenarios={visibleScenarios}
+                  scenarioInfo={SCENARIO_INFO}
+                />
+              )}
+
+              {activeTab === 'education' && <EducationHub />}
             </div>
-          )}
-
-          {/* Tab Navigation */}
-          <nav className="tab-nav">
-            <button
-              className={`tab-btn ${activeTab === 'chart' ? 'active' : ''}`}
-              onClick={() => setActiveTab('chart')}
-            >
-              📊 Visual Chart
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'table' ? 'active' : ''}`}
-              onClick={() => setActiveTab('table')}
-            >
-              📋 Calculation Table
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'education' ? 'active' : ''}`}
-              onClick={() => setActiveTab('education')}
-            >
-              🎓 Education Hub
-            </button>
-          </nav>
-
-          {/* Active View Container */}
-          {activeTab === 'chart' && (
-            <ComparisonChart
-              data={calcResults.data.slice(0, zoomRange + 1)}
-              visibleScenarios={visibleScenarios}
-              onToggleScenario={handleToggleScenario}
-              scenarioInfo={SCENARIO_INFO}
-              yAxisMax={maxInvestNW}
-              zoomRange={zoomRange}
-              onZoomChange={setZoomRange}
-              disabled={validation.errors.length > 0}
-            />
-          )}
-
-          {activeTab === 'table' && (
-            <ComparisonTable
-              data={calcResults.data}
-              visibleScenarios={visibleScenarios}
-              scenarioInfo={SCENARIO_INFO}
-            />
-          )}
-
-          {activeTab === 'education' && <EducationHub />}
-        </div>
-      </main>
+          </main>
+        </>
+      ) : (
+        <main style={{ marginTop: '1.5rem' }}>
+          <MortgageComparer />
+        </main>
+      )}
     </div>
   );
 }

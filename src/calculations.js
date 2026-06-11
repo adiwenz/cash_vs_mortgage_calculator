@@ -301,3 +301,118 @@ export function validateInputs(inputs) {
     info
   };
 }
+
+export function validateMortgageScenario(scenario) {
+  const errors = [];
+  const {
+    homePrice,
+    downPaymentPercent,
+    mortgageRate,
+    mortgageTerm,
+    cashAvailableToday,
+    amountInvestedOutside,
+    amountKeptInSavings
+  } = scenario;
+
+  if (homePrice <= 0) {
+    errors.push("Home price must be greater than $0.");
+  }
+  if (downPaymentPercent < 0) {
+    errors.push("Down payment cannot be negative.");
+  }
+  if (downPaymentPercent > 1.0) {
+    errors.push("Down payment cannot exceed 100%.");
+  }
+  if (mortgageRate < 0) {
+    errors.push("Mortgage rate cannot be negative.");
+  }
+  if (mortgageTerm <= 0) {
+    errors.push("Mortgage term must be greater than 0.");
+  }
+
+  const downPaymentAmount = homePrice * downPaymentPercent;
+  const cashAllocated = downPaymentAmount + amountInvestedOutside + amountKeptInSavings;
+  if (cashAllocated > cashAvailableToday) {
+    errors.push("Cash allocated to down payment, investments, and savings cannot exceed total cash available.");
+  }
+
+  return errors;
+}
+
+export function calculateMortgageScenarioData(scenario) {
+  const {
+    homePrice,
+    downPaymentPercent,
+    mortgageRate,
+    mortgageTerm,
+    homeAppreciation,
+    stockReturn,
+    savingsRate,
+    amountInvestedOutside,
+    amountKeptInSavings
+  } = scenario;
+
+  const data = [];
+  const loanAmount = Math.max(0, homePrice - (homePrice * downPaymentPercent));
+  const monthlyPI = calculateMonthlyPayment(loanAmount, mortgageRate, mortgageTerm);
+  const annualPI = monthlyPI * 12;
+
+  // Let's compute up to 30 years
+  const yearsToCompute = 30;
+
+  // Year 0
+  data.push({
+    year: 0,
+    homeValue: homePrice,
+    mortgageBalance: loanAmount,
+    homeEquity: homePrice - loanAmount,
+    investmentValue: amountInvestedOutside,
+    savingsValue: amountKeptInSavings,
+    netWorth: (homePrice - loanAmount) + amountInvestedOutside + amountKeptInSavings,
+    interestPaidThisYear: 0,
+    cumulativeInterestPaid: 0
+  });
+
+  let currentInvestments = amountInvestedOutside;
+  let currentSavings = amountKeptInSavings;
+
+  for (let y = 1; y <= yearsToCompute; y++) {
+    const homeValue = homePrice * Math.pow(1 + homeAppreciation, y);
+    const mortgageBalance = calculateRemainingBalance(loanAmount, mortgageRate, mortgageTerm, y);
+    const homeEquity = homeValue - mortgageBalance;
+
+    // Compounding investments and savings
+    currentInvestments = currentInvestments * (1 + stockReturn);
+    currentSavings = currentSavings * (1 + savingsRate);
+
+    // Cumulative interest paid calculations
+    // Payments made up to year y
+    const paymentsMade = annualPI * Math.min(y, mortgageTerm);
+    // Principal paid up to year y
+    const principalPaid = loanAmount - mortgageBalance;
+    const cumulativeInterestPaid = Math.max(0, paymentsMade - principalPaid);
+
+    const netWorth = homeEquity + currentInvestments + currentSavings;
+
+    data.push({
+      year: y,
+      homeValue,
+      mortgageBalance,
+      homeEquity,
+      investmentValue: currentInvestments,
+      savingsValue: currentSavings,
+      netWorth,
+      cumulativeInterestPaid
+    });
+  }
+
+  // Calculate total interest paid over the life of the loan
+  const totalInterestPaid = Math.max(0, (annualPI * mortgageTerm) - loanAmount);
+
+  return {
+    loanAmount,
+    monthlyPI,
+    totalInterestPaid,
+    data
+  };
+}
