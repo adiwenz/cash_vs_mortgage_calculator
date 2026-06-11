@@ -110,6 +110,8 @@ export default function SimpleCalculator() {
         } else if (key === 'mortgageTerm') {
           if (parsedVal > 30) sanitized = '30';
           if (parsedVal < 0) sanitized = '0';
+        } else if (key === 'cashPurchaseDiscount') {
+          if (parsedVal < 0) sanitized = '0';
         }
       }
     }

@@ -452,9 +452,6 @@ export function validateSimpleInputs(inputs) {
   if (savingsRate < -1.0) {
     errors.push("Savings account return cannot be less than -100%.");
   }
-  if (discount < 0) {
-    errors.push("Cash purchase discount cannot be negative.");
-  }
   if (discount > homePrice) {
     errors.push("Cash purchase discount cannot exceed the home price.");
   }
