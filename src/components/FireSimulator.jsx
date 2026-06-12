@@ -4061,25 +4061,6 @@ export default function FireSimulator() {
             </div>
           )}
 
-          {/* Wizard Footer Nav */}
-          <div className="wizard-footer-nav" style={{ marginTop: '1rem' }}>
-            <button
-              type="button"
-              className="btn-icon"
-              style={{ padding: '0.6rem 1.25rem' }}
-              onClick={() => setActiveStep(1)}
-            >
-              ← Back to Today
-            </button>
-            <button
-              type="button"
-              className="btn-icon"
-              style={{ padding: '0.6rem 1.25rem', borderColor: 'var(--accent-rose)', color: 'var(--accent-rose)' }}
-              onClick={handleStartOver}
-            >
-              🔄 Start Over
-            </button>
-          </div>
         </div>
       )}
 
