@@ -1157,14 +1157,7 @@
   margin-top: 0.5rem;
 }
 
-@media (min-width: 600px) {
-  .improvement-plan-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .improvement-plan-grid-balanced {
-    grid-column: span 2;
-  }
-}
+
 
 .improvement-plan-card {
   background: rgba(30, 41, 59, 0.3);
@@ -1194,25 +1187,25 @@
 }
 
 @media (min-width: 768px) {
-  .improvement-plan-card-balanced {
+  .improvement-plan-card {
     display: grid;
     grid-template-columns: 1fr 240px;
     grid-template-rows: auto auto;
     gap: 1.25rem;
   }
 
-  .improvement-plan-card-balanced .improvement-plan-card-main-content {
+  .improvement-plan-card .improvement-plan-card-main-content {
     grid-column: 1;
     grid-row: 1 / span 2;
   }
 
-  .improvement-plan-card-balanced .improvement-plan-card-kpi-block {
+  .improvement-plan-card .improvement-plan-card-kpi-block {
     grid-column: 2;
     grid-row: 1;
     flex-direction: column;
   }
 
-  .improvement-plan-card-balanced .improvement-plan-card-apply-btn {
+  .improvement-plan-card .improvement-plan-card-apply-btn {
     grid-column: 2;
     grid-row: 2;
     margin-top: 0;

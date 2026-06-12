@@ -231,9 +231,9 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
     case 'notSustainable':
       return {
         label: 'Needs Adjusting',
-        badge: '🔴 Needs Adjusting',
-        color: 'var(--accent-rose)',
-        bg: 'rgba(244, 63, 94, 0.1)',
+        badge: '⚪ Needs Adjusting',
+        color: 'var(--text-secondary)',
+        bg: 'rgba(148, 163, 184, 0.15)',
         desc: `Under current assumptions, assets are projected to be depleted significantly before life expectancy (at Age ${runOutAge || 'N/A'}).`
       };
     default:
