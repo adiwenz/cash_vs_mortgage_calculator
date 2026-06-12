@@ -247,12 +247,12 @@
   min-width: 800px;
   position: relative;
   padding-bottom: 2rem;
-  height: 140px;
+  height: 145px;
 }
 
 .timeline-line-axis {
   position: absolute;
-  top: 105px;
+  top: 120px;
   left: 70px;
   right: 70px;
   height: 4px;
@@ -263,7 +263,7 @@
 
 .timeline-progress-line {
   position: absolute;
-  top: 105px;
+  top: 120px;
   left: 70px;
   height: 4px;
   background: var(--primary);
@@ -281,7 +281,7 @@
 
 .timeline-node {
   position: absolute;
-  top: 88px; /* Center the 33px dot on the 105px axis line */
+  top: 83px; /* Position the 33px dot completely above the 120px axis line */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;

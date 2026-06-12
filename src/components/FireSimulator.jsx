@@ -4461,12 +4461,12 @@ export default function FireSimulator() {
 
             {/* Horizontal Timeline (Desktop) */}
             <div className="timeline-wrapper">
-              <div className="timeline-track-container" style={{ height: '140px' }}>
-                <div className="timeline-line-axis" style={{ top: '105px' }} />
+              <div className="timeline-track-container" style={{ height: '145px' }}>
+                <div className="timeline-line-axis" style={{ top: '120px' }} />
                 <div
                   className="timeline-progress-line"
                   style={{
-                    top: '105px',
+                    top: '120px',
                     width: activeResults.targetRetirementAge 
                       ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
                       : '0px'
@@ -4474,7 +4474,7 @@ export default function FireSimulator() {
                 />
 
                 {/* Chronological Axis Number Line Ticks */}
-                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '105px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '120px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const ticks = [];
@@ -4515,7 +4515,7 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${89 - (evt.stackIndex * 32)}px`, 
+                          top: `${83 - (evt.stackIndex * 36)}px`, 
                           transform: 'translateX(-50%)',
                           cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
                         }}
