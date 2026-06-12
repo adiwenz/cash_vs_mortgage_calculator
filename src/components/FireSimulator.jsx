@@ -2931,11 +2931,241 @@ export default function FireSimulator() {
       {activeStep === 2 && (
         <div className="roadmap-step-container">
           
+          {/* visual Retirement Plan Summary Card (Full-Width at Top) */}
+          {(() => {
+            const details = getOutcomeDetails(
+              activeResults.retirementOutcome,
+              activeResults.runOutAge,
+              inputs.readinessCriteria,
+              activeResults.retirementReadyAge,
+              inputs.lifeExpectancy
+            );
+            return (
+              <div className="glass-card" style={{ padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                    🏆 Retirement Plan Summary
+                  </h3>
+                  <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
+                    <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
+                      <button
+                        type="button"
+                        className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
+                        style={{ 
+                          flex: 1, 
+                          fontSize: '0.7rem', 
+                          padding: '0.35rem 0.5rem', 
+                          borderRadius: '6px', 
+                          background: inputs.readinessCriteria === 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
+                          color: inputs.readinessCriteria === 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
+                      >
+                        Sustainable
+                        <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                          <span className="toggle-tooltip-icon">i</span>
+                          <span className="toggle-tooltip-text">
+                            <strong style={{ color: 'var(--primary)' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
+                        style={{ 
+                          flex: 1, 
+                          fontSize: '0.7rem', 
+                          padding: '0.35rem 0.5rem', 
+                          borderRadius: '6px', 
+                          background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
+                          color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
+                      >
+                        Comfortable
+                        <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                          <span className="toggle-tooltip-icon">i</span>
+                          <span className="toggle-tooltip-text">
+                            <strong style={{ color: '#fbbf24' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
+                        style={{ 
+                          flex: 1, 
+                          fontSize: '0.7rem', 
+                          padding: '0.35rem 0.5rem', 
+                          borderRadius: '6px', 
+                          background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
+                          color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
+                      >
+                        Indefinite
+                        <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                          <span className="toggle-tooltip-icon">i</span>
+                          <span className="toggle-tooltip-text">
+                            <strong style={{ color: '#10b981' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Outcome Banner (Compact) */}
+                <div style={{ 
+                  background: details.bg, 
+                  border: `1px solid ${details.color}44`, 
+                  borderRadius: '6px', 
+                  padding: '0.5rem 0.85rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', fontWeight: '800', color: details.color }}>
+                    {details.badge}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', flex: 1, minWidth: '250px' }}>
+                    {details.desc}
+                  </p>
+                </div>
+                
+                {/* Planning Concepts & Key Values Grid (6-Column Compact) */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                  gap: '1rem', 
+                  paddingTop: '0.25rem' 
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Planned Retirement</span>
+                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                      {inputs.readinessCriteria === 'lastsLifeExp' 
+                        ? 'Sustainable Age' 
+                        : inputs.readinessCriteria === 'lastsComfortable' 
+                        ? 'Comfortable Age' 
+                        : 'Indefinite Age'}
+                    </span>
+                    <strong style={{ fontSize: '1.15rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', fontWeight: '800' }}>
+                      {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                      {inputs.readinessCriteria === 'lastsLifeExp' 
+                        ? 'Sustainable Target' 
+                        : inputs.readinessCriteria === 'lastsComfortable' 
+                          ? 'Comfortable Target' 
+                          : 'Indefinite Target'}
+                    </span>
+                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                      {formatCurrency(activeResults.retirementReadyTarget)}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
+                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                      {activeResults.targetRetirementAge === inputs.lifeExpectancy ? 'N/A' : formatCurrency(activeResults.portfolioAtRetirement)}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Retirement Income</span>
+                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(activeResults.retirementIncomeSources)} / yr</strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Annual Spending</span>
+                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                      {formatCurrency(activeResults.annualRetirementSpending)} / yr
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Retirement Improvement Plan Banner (Compact) */}
+                {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                  <div className="improvement-banner-container" style={{ marginTop: '1rem', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="improvement-banner-btn"
+                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', margin: 0 }}
+                      onClick={() => setShowImprovementModal(true)}
+                    >
+                      View Action Plan
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          
           {/* Centerpiece Timeline */}
           <div className="glass-card timeline-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Interactive Roadmap</h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Interactive Roadmap</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
+              </div>
+              <div style={{ width: '100%', maxWidth: '280px' }}>
+                <select
+                  className="add-event-dropdown"
+                  style={{ width: '100%' }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleCreateEvent(e.target.value);
+                      e.target.value = ''; // reset selection
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>➕ Add Life Decision or Milestone...</option>
+                  <option value="buyHouse">🏠 Buy a House</option>
+                  <option value="haveChild">👶 Have a Child</option>
+                  <option value="careerChange">💼 Career Change</option>
+                  <option value="move">📍 Move / Relocate</option>
+                  <option value="retire">🏖 Retire</option>
+                  <option value="socialSecurity">💰 Social Security</option>
+                  <option value="pension">📜 Pension</option>
+                  <option value="rentalIncome">🏢 Rental Income</option>
+                  <option value="annuity">📈 Annuity</option>
+                  <option value="otherRetirementIncome">💵 Other Income</option>
+                  <option value="windfall">💰 Windfall</option>
+                  <option value="college">🎓 College Costs</option>
+                  <option value="debtPayoff">💸 Debt Payoff</option>
+                  <option value="custom">➕ Custom Event</option>
+                </select>
+              </div>
             </div>
 
             {/* Horizontal Timeline (Desktop) */}
@@ -3136,374 +3366,138 @@ export default function FireSimulator() {
             </div>
           </div>
 
+          {/* Net Worth Trajectory Graph (Full Width, directly below timeline) */}
+          {validation.errors.length === 0 && (
+            <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Net Worth Trajectory</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+              </div>
+              <div className="chart-container-inner" style={{ height: '240px', cursor: 'crosshair' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={activeResults.data}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+                    onClick={(data) => {
+                      if (data && data.activeLabel) {
+                        setSelectedYear(Number(data.activeLabel));
+                      }
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis
+                      dataKey="age"
+                      stroke="var(--text-tertiary)"
+                      fontFamily="var(--font-body)"
+                      fontSize={10}
+                    />
+                    <YAxis
+                      stroke="var(--text-tertiary)"
+                      fontFamily="var(--font-body)"
+                      fontSize={10}
+                      tickFormatter={formatYAxis}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="custom-chart-tooltip">
+                              <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+                                Age {label}
+                              </p>
+                              {payload.map((item) => (
+                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
+                                  <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
+                                  <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netWorth"
+                      name="Net Worth"
+                      stroke={colorBlindMode ? '#ea580c' : '#6366f1'}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+
+                    {/* 1. Planned Retirement Age */}
+                    {activeResults.targetRetirementAge && (
+                      <ReferenceLine
+                        x={activeResults.targetRetirementAge}
+                        stroke="#a855f7"
+                        strokeDasharray="3 3"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Retirement: Age ${activeResults.targetRetirementAge}`,
+                          position: 'insideTopRight',
+                          fill: 'var(--text-primary)',
+                          fontSize: 9,
+                          dy: 10
+                        }}
+                      />
+                    )}
+
+                    {/* 2. Retirement Ready Age */}
+                    {activeResults.retirementReadyAge && (
+                      <ReferenceLine
+                        x={activeResults.retirementReadyAge}
+                        stroke="#10b981"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${activeResults.retirementReadyAge}`,
+                          position: 'insideTopRight',
+                          fill: 'var(--text-primary)',
+                          fontSize: 9,
+                          dy: 25
+                        }}
+                      />
+                    )}
+
+                    {/* 3. Assets Depleted Age */}
+                    {activeResults.runOutAge && (
+                      <ReferenceLine
+                        x={activeResults.runOutAge}
+                        stroke="#ef4444"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Assets Run Out: Age ${activeResults.runOutAge}`,
+                          position: 'insideTopRight',
+                          fill: 'var(--text-primary)',
+                          fontSize: 9,
+                          dy: 40
+                        }}
+                      />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
           <div className="roadmap-grid-layout">
             
-            {/* Left Column: Plan Story & Event Dropdown */}
+            {/* Left Column: Plan Story */}
             <div className="roadmap-grid-col-left">
               {/* Life Story Summary */}
               <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <h2 className="card-title" style={{ fontSize: '1.25rem', margin: 0 }}>Your Life Plan</h2>
-                  <div style={{ width: '100%', maxWidth: '280px' }}>
-                    <select
-                      className="add-event-dropdown"
-                      style={{ width: '100%' }}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleCreateEvent(e.target.value);
-                          e.target.value = ''; // reset selection
-                        }
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>➕ Add Life Decision or Milestone...</option>
-                      <option value="buyHouse">🏠 Buy a House</option>
-                      <option value="haveChild">👶 Have a Child</option>
-                      <option value="careerChange">💼 Career Change</option>
-                      <option value="move">📍 Move / Relocate</option>
-                      <option value="retire">🏖 Retire</option>
-                      <option value="socialSecurity">💰 Social Security</option>
-                      <option value="pension">📜 Pension</option>
-                      <option value="rentalIncome">🏢 Rental Income</option>
-                      <option value="annuity">📈 Annuity</option>
-                      <option value="otherRetirementIncome">💵 Other Income</option>
-                      <option value="windfall">💰 Windfall</option>
-                      <option value="college">🎓 College Costs</option>
-                      <option value="debtPayoff">💸 Debt Payoff</option>
-                      <option value="custom">➕ Custom Event</option>
-                    </select>
-                  </div>
-                </div>
+                <h2 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Your Life Plan</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-                  Select a life decision or milestone from the dropdown to add it. Drag events on the timeline above or edit them below to map out your roadmap.
+                  Select a life decision or milestone from the dropdown above the timeline to add it. Drag events on the timeline above or edit them below to map out your roadmap.
                 </p>
                 {generateLifeStory(inputs, activeResults)}
               </div>
             </div>
 
-            {/* Right Column: Scorecard & Interactive Timeline */}
+            {/* Right Column: Graphs, Snapshot, and Settings */}
             <div className="roadmap-grid-col-right">
-              {/* visual Retirement Plan Summary Card */}
-              {(() => {
-                const details = getOutcomeDetails(
-                  activeResults.retirementOutcome,
-                  activeResults.runOutAge,
-                  inputs.readinessCriteria,
-                  activeResults.retirementReadyAge,
-                  inputs.lifeExpectancy
-                );
-                return (
-                  <div className="glass-card" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                        🏆 Retirement Plan Summary
-                      </h3>
-                      <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
-                        <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
-                            style={{ 
-                              flex: 1, 
-                              fontSize: '0.7rem', 
-                              padding: '0.35rem 0.5rem', 
-                              borderRadius: '6px', 
-                              background: inputs.readinessCriteria === 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
-                              color: inputs.readinessCriteria === 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
-                          >
-                            Sustainable
-                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                              <span className="toggle-tooltip-icon">i</span>
-                              <span className="toggle-tooltip-text">
-                                <strong style={{ color: 'var(--primary)' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
-                              </span>
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
-                            style={{ 
-                              flex: 1, 
-                              fontSize: '0.7rem', 
-                              padding: '0.35rem 0.5rem', 
-                              borderRadius: '6px', 
-                              background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
-                              color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
-                          >
-                            Comfortable
-                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                              <span className="toggle-tooltip-icon">i</span>
-                              <span className="toggle-tooltip-text">
-                                <strong style={{ color: '#fbbf24' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
-                              </span>
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
-                            style={{ 
-                              flex: 1, 
-                              fontSize: '0.7rem', 
-                              padding: '0.35rem 0.5rem', 
-                              borderRadius: '6px', 
-                              background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
-                              color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
-                          >
-                            Indefinite
-                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                              <span className="toggle-tooltip-icon">i</span>
-                              <span className="toggle-tooltip-text">
-                                <strong style={{ color: '#10b981' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
-                              </span>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Outcome Banner */}
-                    <div style={{ 
-                      background: details.bg, 
-                      border: `1px solid ${details.color}`, 
-                      borderRadius: 'var(--radius-md)', 
-                      padding: '1.25rem',
-                      marginBottom: '1.5rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem', fontWeight: '800', color: details.color, marginBottom: '0.5rem' }}>
-                        {details.badge}
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        {details.desc}
-                      </p>
-                    </div>
-
-                    {/* Planning Concepts Breakdown Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem', paddingBottom: '1.25rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>Planned Retirement</span>
-                        <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', display: 'block', margin: '0.15rem 0' }}>Age {inputs.targetRetirementAge}</strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Your planned retirement age decision.</span>
-                      </div>
-                       <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>
-                          {inputs.readinessCriteria === 'lastsLifeExp' 
-                            ? 'Sustainable Retire Age' 
-                            : inputs.readinessCriteria === 'lastsComfortable' 
-                            ? 'Comfortable Retire Age' 
-                            : 'Indefinite Retire Age'}
-                        </span>
-                        <strong style={{ fontSize: '1.15rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', display: 'block', margin: '0.15rem 0' }}>
-                          {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
-                        </strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                          {inputs.readinessCriteria === 'lastsLifeExp'
-                            ? "Earliest age that survives through life expectancy."
-                            : inputs.readinessCriteria === 'lastsComfortable'
-                            ? `Earliest age that survives through life expectancy plus 10 years (Age ${Number(inputs.lifeExpectancy || 85) + 10}).`
-                            : "Earliest age that meets safe perpetual SWR target."}
-                        </span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>Retirement Income</span>
-                        <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', display: 'block', margin: '0.15rem 0' }}>{formatCurrency(activeResults.retirementIncomeSources)} / yr</strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Projected Social Security, pensions, and rental income.</span>
-                      </div>
-                    </div>
-
-                    {/* Key Values Bar */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
-                          {inputs.readinessCriteria === 'lastsLifeExp' 
-                            ? 'Sustainable Target' 
-                            : inputs.readinessCriteria === 'lastsComfortable' 
-                              ? 'Comfortable Target' 
-                              : 'Indefinite Target'}
-                        </span>
-                        <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                          {formatCurrency(activeResults.retirementReadyTarget)}
-                        </strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Projected Portfolio at Retirement</span>
-                        <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                          {activeResults.targetRetirementAge === inputs.lifeExpectancy ? 'N/A' : formatCurrency(activeResults.portfolioAtRetirement)}
-                        </strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Retirement Spending</span>
-                        <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                          {formatCurrency(activeResults.annualRetirementSpending)} / yr
-                        </strong>
-                      </div>
-                    </div>
-
-                    {/* Retirement Improvement Plan Banner */}
-                    {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                      <div className="improvement-banner-container" style={{ marginTop: '1.5rem' }}>
-                        <div className="improvement-banner-text-col">
-                          <span className="improvement-banner-title">
-                            💡 Retirement Improvement Plan Available
-                          </span>
-                          <p className="improvement-banner-desc">
-                            Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="improvement-banner-btn"
-                          onClick={() => setShowImprovementModal(true)}
-                        >
-                          View Action Plan
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Net Worth Graph */}
-              {validation.errors.length === 0 && (
-                <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Net Worth Trajectory</h3>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
-                  </div>
-                  <div className="chart-container-inner" style={{ height: '200px', cursor: 'crosshair' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={activeResults.data}
-                        margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
-                        onClick={(data) => {
-                          if (data && data.activeLabel) {
-                            setSelectedYear(Number(data.activeLabel));
-                          }
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                        <XAxis
-                          dataKey="age"
-                          stroke="var(--text-tertiary)"
-                          fontFamily="var(--font-body)"
-                          fontSize={10}
-                        />
-                        <YAxis
-                          stroke="var(--text-tertiary)"
-                          fontFamily="var(--font-body)"
-                          fontSize={10}
-                          tickFormatter={formatYAxis}
-                        />
-                        <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="custom-chart-tooltip">
-                                  <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-                                    Age {label}
-                                  </p>
-                                  {payload.map((item) => (
-                                    <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
-                                      <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                      <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="netWorth"
-                          name="Net Worth"
-                          stroke={colorBlindMode ? '#ea580c' : '#6366f1'}
-                          strokeWidth={2}
-                          dot={false}
-                        />
-
-                        {/* 1. Planned Retirement Age */}
-                        {activeResults.targetRetirementAge && (
-                          <ReferenceLine
-                            x={activeResults.targetRetirementAge}
-                            stroke="#a855f7"
-                            strokeDasharray="3 3"
-                            strokeWidth={1.5}
-                            label={{
-                              value: `Retirement: Age ${activeResults.targetRetirementAge}`,
-                              position: 'insideTopRight',
-                              fill: 'var(--text-primary)',
-                              fontSize: 9,
-                              dy: 10
-                            }}
-                          />
-                        )}
-
-                        {/* 2. Retirement Ready Age */}
-                        {activeResults.retirementReadyAge && (
-                          <ReferenceLine
-                            x={activeResults.retirementReadyAge}
-                            stroke="#10b981"
-                            strokeDasharray="4 4"
-                            strokeWidth={1.5}
-                            label={{
-                              value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${activeResults.retirementReadyAge}`,
-                              position: 'insideTopRight',
-                              fill: 'var(--text-primary)',
-                              fontSize: 9,
-                              dy: 25
-                            }}
-                          />
-                        )}
-
-                        {/* 3. Assets Depleted Age */}
-                        {activeResults.runOutAge && (
-                          <ReferenceLine
-                            x={activeResults.runOutAge}
-                            stroke="#ef4444"
-                            strokeDasharray="4 4"
-                            strokeWidth={1.5}
-                            label={{
-                              value: `Assets Run Out: Age ${activeResults.runOutAge}`,
-                              position: 'insideTopRight',
-                              fill: 'var(--text-primary)',
-                              fontSize: 9,
-                              dy: 40
-                            }}
-                          />
-                        )}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
 
               {/* Benchmarks Snapshot */}
               {validation.errors.length === 0 && (() => {
@@ -3514,7 +3508,7 @@ export default function FireSimulator() {
                 const isWorking = activeYear < activeResults.targetRetirementAge;
                 
                 return (
-                  <div className="glass-card" style={{ padding: '1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                       <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                         🔍 Age {activeYear} Financial Snapshot
@@ -3646,7 +3640,7 @@ export default function FireSimulator() {
               })()}
 
               {/* Advanced Detail Collapsible Accordion (Simulation Assumptions) */}
-              <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginTop: '1rem' }}>
+              <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
                 <button
                   type="button"
                   className="collapsible-trigger-btn"
