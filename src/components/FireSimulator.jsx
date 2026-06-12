@@ -247,6 +247,106 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
   }
 };
 
+const applyScenarioToInputs = (currentInputs, type, value) => {
+  const currentIncome = Number(currentInputs.simpleIncome) || 0;
+  const currentExpenses = Number(currentInputs.simpleExpenses) || 0;
+
+  if (type === 'savings' || type === 'spending') {
+    const bestDeltaRate = value;
+    const annualSavingsDelta = (bestDeltaRate * currentIncome) / 100;
+    const newExpenses = Math.round(Math.max(0, currentExpenses - annualSavingsDelta));
+
+    return {
+      ...currentInputs,
+      simpleExpenses: newExpenses,
+      spendingPhases: currentInputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          return {
+            ...phase,
+            amount: newExpenses,
+            annualSpending: newExpenses
+          };
+        }
+        return phase;
+      })
+    };
+  }
+
+  if (type === 'workLonger') {
+    const yearsDelay = value;
+    const newRetirementAge = currentInputs.targetRetirementAge + yearsDelay;
+
+    return {
+      ...currentInputs,
+      targetRetirementAge: newRetirementAge,
+      incomeList: currentInputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: newRetirementAge };
+        }
+        return inc;
+      }),
+      lifeEvents: currentInputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: newRetirementAge };
+        }
+        return ev;
+      })
+    };
+  }
+
+  if (type === 'income') {
+    const extraIncome = value;
+    const newIncome = currentInputs.simpleIncome + extraIncome;
+
+    return {
+      ...currentInputs,
+      simpleIncome: newIncome,
+      incomeList: currentInputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
+        }
+        return inc;
+      })
+    };
+  }
+
+  if (type === 'combined') {
+    const savingsDelta = (0.03 * currentIncome) + 1200;
+    const newExpenses = Math.round(Math.max(0, currentExpenses - savingsDelta));
+    const newRetirementAge = currentInputs.targetRetirementAge + 2;
+
+    return {
+      ...currentInputs,
+      targetRetirementAge: newRetirementAge,
+      simpleExpenses: newExpenses,
+      spendingPhases: currentInputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          return {
+            ...phase,
+            amount: newExpenses,
+            annualSpending: newExpenses
+          };
+        }
+        return phase;
+      }),
+      incomeList: currentInputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: newRetirementAge };
+        }
+        return inc;
+      }),
+      lifeEvents: currentInputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: newRetirementAge };
+        }
+        return ev;
+      })
+    };
+  }
+
+  return currentInputs;
+};
+
 export default function FireSimulator() {
   const [colorBlindMode, setColorBlindMode] = useState(false);
   const [currentScenarioId, setCurrentScenarioId] = useState('baseline');
@@ -260,6 +360,7 @@ export default function FireSimulator() {
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [showImprovementModal, setShowImprovementModal] = useState(false);
+  const [hasAutoPopped, setHasAutoPopped] = useState(false);
   const dragOccurredRef = useRef(false);
 
   // Scenarios state
@@ -526,18 +627,17 @@ export default function FireSimulator() {
         ...inputs,
         simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta)
       };
-      if (inputs.isAdvanced) {
-        testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
-          if (idx === 0) {
-            const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
-            return {
-              ...phase,
-              amount: Math.max(0, currentAmt - annualSavingsDelta)
-            };
-          }
-          return phase;
-        });
-      }
+      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
+          return {
+            ...phase,
+            amount: Math.max(0, currentAmt - annualSavingsDelta),
+            annualSpending: Math.max(0, currentAmt - annualSavingsDelta)
+          };
+        }
+        return phase;
+      });
       return runFireSimulation(testInputs);
     };
 
@@ -579,6 +679,7 @@ export default function FireSimulator() {
         extraAction: `E.g., set up an automatic monthly transfer of ${formatCurrency(extraMonthly)} to your investment account.`,
         readyAge: bestNewReadyAge,
         yearsImprovement,
+        value: bestDeltaRate,
         disruption: 2
       });
 
@@ -594,6 +695,7 @@ export default function FireSimulator() {
         extraAction: `E.g., review subscriptions, travel plans, or dining out to find ${formatCurrency(extraMonthly)} in monthly savings.`,
         readyAge: bestNewReadyAge,
         yearsImprovement,
+        value: bestDeltaRate,
         disruption: 2
       });
     }
@@ -604,14 +706,18 @@ export default function FireSimulator() {
         ...inputs,
         targetRetirementAge: inputs.targetRetirementAge + yearsDelay
       };
-      if (inputs.isAdvanced) {
-        testInputs.incomeList = inputs.incomeList.map(inc => {
-          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-            return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
-          }
-          return inc;
-        });
-      }
+      testInputs.incomeList = inputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
+        }
+        return inc;
+      });
+      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: inputs.targetRetirementAge + yearsDelay };
+        }
+        return ev;
+      });
       return runFireSimulation(testInputs);
     };
 
@@ -659,6 +765,7 @@ export default function FireSimulator() {
         ],
         readyAge: workLongerNewReadyAge,
         yearsImprovement,
+        value: bestDelay,
         disruption: 3
       });
     }
@@ -669,14 +776,12 @@ export default function FireSimulator() {
         ...inputs,
         simpleIncome: inputs.simpleIncome + extraIncome
       };
-      if (inputs.isAdvanced) {
-        testInputs.incomeList = inputs.incomeList.map(inc => {
-          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-            return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
-          }
-          return inc;
-        });
-      }
+      testInputs.incomeList = inputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
+        }
+        return inc;
+      });
       return runFireSimulation(testInputs);
     };
 
@@ -712,11 +817,11 @@ export default function FireSimulator() {
         ],
         readyAge: incomeNewReadyAge,
         yearsImprovement,
+        value: bestExtraIncome,
         disruption: 1
       });
     }
 
-    // Balanced Combined Plan
     const getCombinedPlanResult = () => {
       const savingsDelta = (0.03 * currentIncome) + 1200;
       const testInputs = {
@@ -724,24 +829,29 @@ export default function FireSimulator() {
         targetRetirementAge: inputs.targetRetirementAge + 2,
         simpleExpenses: Math.max(0, currentExpenses - savingsDelta)
       };
-      if (inputs.isAdvanced) {
-        testInputs.incomeList = inputs.incomeList.map(inc => {
-          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-            return { ...inc, endAge: inputs.targetRetirementAge + 2 };
-          }
-          return inc;
-        });
-        testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
-          if (idx === 0) {
-            const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
-            return {
-              ...phase,
-              amount: Math.max(0, currentAmt - savingsDelta)
-            };
-          }
-          return phase;
-        });
-      }
+      testInputs.incomeList = inputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: inputs.targetRetirementAge + 2 };
+        }
+        return inc;
+      });
+      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
+          return {
+            ...phase,
+            amount: Math.max(0, currentAmt - savingsDelta),
+            annualSpending: Math.max(0, currentAmt - savingsDelta)
+          };
+        }
+        return phase;
+      });
+      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: inputs.targetRetirementAge + 2 };
+        }
+        return ev;
+      });
       return runFireSimulation(testInputs);
     };
 
@@ -765,6 +875,7 @@ export default function FireSimulator() {
         ],
         readyAge: combinedNewReadyAge,
         yearsImprovement,
+        value: null,
         disruption: 1
       });
     }
@@ -791,6 +902,38 @@ export default function FireSimulator() {
       currentReadyAge
     };
   }, [inputs, activeResults]);
+
+  // Reset auto-pop when switching scenarios
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasAutoPopped(false);
+  }, [currentScenarioId]);
+
+  // Auto-pop the improvement plan modal when a plan becomes available
+  useEffect(() => {
+    if (improvementPlan) {
+      if (!hasAutoPopped) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShowImprovementModal(true);
+        setHasAutoPopped(true);
+      }
+    } else {
+      setHasAutoPopped(false);
+    }
+  }, [improvementPlan, hasAutoPopped]);
+
+  const handleApplyImprovementScenario = (scenario) => {
+    setScenarios(prev => prev.map(scen => {
+      if (scen.id === currentScenarioId) {
+        return {
+          ...scen,
+          inputs: applyScenarioToInputs(scen.inputs, scenario.type, scenario.value)
+        };
+      }
+      return scen;
+    }));
+    setShowImprovementModal(false);
+  };
 
   // Income Phases handlers
   const addIncomeItem = () => {
@@ -3768,6 +3911,14 @@ export default function FireSimulator() {
                             ✨ Achieves sustainable retirement!
                           </div>
                         ) : null}
+
+                        <button
+                          type="button"
+                          className="improvement-plan-card-apply-btn"
+                          onClick={() => handleApplyImprovementScenario(scenario)}
+                        >
+                          Apply Scenario
+                        </button>
                       </div>
                     );
                   })}
