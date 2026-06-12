@@ -940,6 +940,90 @@ export default function FireSimulator() {
       });
     }
 
+    // 1b. Retire at Target Age (always included if baseline is not successful at target age)
+    let targetAgeDeltaRate = null;
+    let targetAgeNewReadyAge = null;
+    let foundTargetAgePlan = false;
+
+    const maxDeltaTarget = Math.max(0, 95 - currentSavingsRate);
+    let lowTarget = 0;
+    let highTarget = maxDeltaTarget;
+
+    while (lowTarget <= highTarget) {
+      const mid = Math.floor((lowTarget + highTarget) / 2);
+      const testRes = getTestSavingsResult(mid);
+      const testReadyAge = testRes.retirementReadyAge;
+      const moneyLasts = testRes.moneyLasts;
+
+      if (moneyLasts && testReadyAge && testReadyAge <= inputs.targetRetirementAge) {
+        targetAgeDeltaRate = mid;
+        targetAgeNewReadyAge = testReadyAge;
+        foundTargetAgePlan = true;
+        highTarget = mid - 1;
+      } else {
+        lowTarget = mid + 1;
+      }
+    }
+
+    // Force-generate fallback if not found
+    let targetAgeGoesBroke = false;
+    let targetAgeRunOutAge = null;
+    if (!foundTargetAgePlan) {
+      targetAgeDeltaRate = Math.max(0, 90 - currentSavingsRate);
+      targetAgeNewReadyAge = inputs.targetRetirementAge;
+      foundTargetAgePlan = true;
+      
+      const finalTestRes = getTestSavingsResult(targetAgeDeltaRate);
+      targetAgeGoesBroke = !finalTestRes.moneyLasts;
+      targetAgeRunOutAge = finalTestRes.runOutAge;
+    } else {
+      const finalTestRes = getTestSavingsResult(targetAgeDeltaRate);
+      targetAgeGoesBroke = !finalTestRes.moneyLasts;
+      targetAgeRunOutAge = finalTestRes.runOutAge;
+    }
+
+    if (foundTargetAgePlan && targetAgeDeltaRate !== null) {
+      const extraMonthly = Math.round((targetAgeDeltaRate * currentIncome) / 1200);
+      const targetAgePaceLabel = targetAgeDeltaRate === 0 
+        ? 'Steady Savings Pace' 
+        : targetAgeDeltaRate <= 5 
+          ? `Gentle Savings Pace (+${targetAgeDeltaRate}%)` 
+          : targetAgeDeltaRate <= 12 
+            ? `Moderate Savings Pace (+${targetAgeDeltaRate}%)` 
+            : `Active Savings Pace (+${targetAgeDeltaRate}%)`;
+
+      const bulletPoints = [];
+      if (targetAgeDeltaRate > 0) {
+        bulletPoints.push(`Boost your savings rate by +${targetAgeDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + targetAgeDeltaRate}%).`);
+        bulletPoints.push(`Save and invest an additional ${formatCurrency(extraMonthly)}/month.`);
+      } else {
+        bulletPoints.push(`Retire at Age ${inputs.targetRetirementAge} under your current budget (no extra savings required).`);
+      }
+
+      if (targetAgeGoesBroke) {
+        const runOut = targetAgeRunOutAge !== null ? targetAgeRunOutAge : 95;
+        bulletPoints.push(`Note: Even with high savings, assets may run out around Age ${runOut} (additional adjustments needed).`);
+      } else {
+        bulletPoints.push(`Enables a successful, positive net worth trajectory through age 95.`);
+      }
+
+      list.push({
+        type: 'savings',
+        icon: '🎯',
+        title: `Retire at Age ${inputs.targetRetirementAge} (Target Age)`,
+        details: targetAgeDeltaRate > 0
+          ? `Retire successfully at your set target age of ${inputs.targetRetirementAge} by adjusting your savings rate by +${targetAgeDeltaRate}%.`
+          : `Retire successfully at your set target age of ${inputs.targetRetirementAge} under your current budget.`,
+        bulletPoints,
+        readyAge: targetAgeNewReadyAge,
+        yearsImprovement: null,
+        value: targetAgeDeltaRate,
+        disruption: targetAgeDeltaRate,
+        savingsFocus: targetAgePaceLabel,
+        savingsEffortScore: targetAgeDeltaRate
+      });
+    }
+
     // Helper to simulate delaying retirement
     const getTestWorkLongerResult = (yearsDelay) => {
       const testInputs = {
@@ -1160,9 +1244,8 @@ export default function FireSimulator() {
       foundRetire65Plan = true;
     }
 
-    // Only show Retire 65 card if it offers a lower savings rate increase than the standard Savings card
-    const showRetire65 = foundRetire65Plan && retire65NewReadyAge !== null && 
-      (!foundSavingsImprovement || retire65DeltaRate < bestDeltaRate);
+    // Always show Retire 65 card if target65Age is different from targetRetirementAge
+    const showRetire65 = foundRetire65Plan && retire65NewReadyAge !== null && target65Age !== inputs.targetRetirementAge;
 
     if (showRetire65) {
       const extraMonthly = Math.round((retire65DeltaRate * currentIncome) / 1200);
