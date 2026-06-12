@@ -1938,7 +1938,7 @@ export default function FireSimulator() {
       return (
         <div className="plan-summary-story-card">
           <p className="plan-summary-story-text" style={{ margin: 0 }}>
-            No future events yet. Add some life decisions below to build your roadmap!
+            No future events yet. Add some life decisions using the dropdown above to build your roadmap!
           </p>
         </div>
       );
@@ -2930,48 +2930,252 @@ export default function FireSimulator() {
       {/* Screen 2: Your Life Plan */}
       {activeStep === 2 && (
         <div className="roadmap-step-container">
-          <div className="roadmap-grid-layout">
-            
-            {/* Left Column: Plan Story & Event Builder */}
-            <div className="roadmap-grid-col-left">
-              {/* Event Builder Grid */}
-              <div className="glass-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem' }}>Add Life Decisions & Milestones</h3>
-                <div className="event-builder-grid">
-                  {[
-                    { type: 'buyHouse', label: 'Buy a House', icon: '🏠' },
-                    { type: 'haveChild', label: 'Have a Child', icon: '👶' },
-                    { type: 'careerChange', label: 'Career Change', icon: '💼' },
-                    { type: 'move', label: 'Move / Relocate', icon: '📍' },
-                    { type: 'retire', label: 'Retire', icon: '🏖' },
-                    { type: 'socialSecurity', label: 'Social Security', icon: '💰' },
-                    { type: 'pension', label: 'Pension', icon: '📜' },
-                    { type: 'rentalIncome', label: 'Rental Income', icon: '🏢' },
-                    { type: 'annuity', label: 'Annuity', icon: '📈' },
-                    { type: 'otherRetirementIncome', label: 'Other Income', icon: '💵' },
-                    { type: 'windfall', label: 'Windfall', icon: '💰' },
-                    { type: 'college', label: 'College Costs', icon: '🎓' },
-                    { type: 'debtPayoff', label: 'Debt Payoff', icon: '💸' },
-                    { type: 'custom', label: 'Custom Event', icon: '➕' }
-                  ].map(evType => (
-                    <button
-                      key={evType.type}
-                      type="button"
-                      className="event-builder-btn"
-                      onClick={() => handleCreateEvent(evType.type)}
-                    >
-                      <span className="event-builder-btn-icon">{evType.icon}</span>
-                      <span className="event-builder-btn-label">{evType.label}</span>
-                    </button>
-                  ))}
+          
+          {/* Centerpiece Timeline */}
+          <div className="glass-card timeline-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Interactive Roadmap</h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
+            </div>
+
+            {/* Horizontal Timeline (Desktop) */}
+            <div className="timeline-wrapper">
+              <div className="timeline-track-container" style={{ height: '200px' }}>
+                <div className="timeline-line-axis" style={{ top: '145px' }} />
+                <div
+                  className="timeline-progress-line"
+                  style={{
+                    top: '145px',
+                    width: activeResults.targetRetirementAge 
+                      ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
+                      : '0px'
+                  }}
+                />
+
+                {/* Chronological Axis Number Line Ticks */}
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '145px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                  {(() => {
+                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                    const ticks = [];
+                    const tickInterval = 5;
+                    const startTick = Math.ceil(inputs.currentAge / tickInterval) * tickInterval;
+                    const endTick = Math.floor(inputs.lifeExpectancy / tickInterval) * tickInterval;
+                    for (let age = startTick; age <= endTick; age += tickInterval) {
+                      ticks.push(age);
+                    }
+                    return ticks.map((age, idx) => {
+                      const percent = totalYears > 0 ? ((age - inputs.currentAge) / totalYears) * 100 : 0;
+                      const leftOffset = `calc(70px + (100% - 140px) * ${percent} / 100)`;
+                      return (
+                        <div key={idx} className="timeline-tick" style={{ position: 'absolute', left: leftOffset, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <div className="timeline-tick-mark" style={{ width: '2px', height: '6px', background: 'var(--border-color)', opacity: 0.8 }} />
+                          <span className="timeline-tick-label" style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-tertiary)', marginTop: '4px' }}>{age}</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                
+                <div className="timeline-events-container">
+                  {timelineEvents.map((evt, idx) => {
+                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                    const isDraggingThis = !!(draggingInfo && (
+                      (evt.originalId && draggingInfo.originalId === evt.originalId) ||
+                      (!evt.originalId && draggingInfo.type === evt.type)
+                    ));
+
+                    const displayAge = isDraggingThis ? draggingInfo.currentAge : evt.age;
+                    const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
+                    const leftOffset = `calc(70px + (100% - 140px) * ${percent} / 100)`;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
+                        style={{ 
+                          left: leftOffset, 
+                          top: `${133 - (evt.stackIndex * 32)}px`, 
+                          transform: 'translateX(-50%)',
+                          cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
+                        }}
+                        onMouseDown={(e) => handleNodeDragStart(e, evt)}
+                        onTouchStart={(e) => handleNodeDragStart(e, evt)}
+                        onClick={(e) => {
+                          if (dragOccurredRef.current) {
+                            e.stopPropagation();
+                            return;
+                          }
+                          setSelectedTimelineEvent(evt);
+                          setSelectedYear(Math.floor(evt.age));
+                        }}
+                      >
+                        <div className="timeline-node-dot">
+                          {evt.icon}
+                          {/* Premium hover tooltip */}
+                          <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
+                            <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
+                              {evt.title}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '150px', lineHeight: '1.3' }}>
+                              Age {displayAge} • {evt.description}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            </div>
 
+            {/* Clickable Event Details Card Panel */}
+            {selectedTimelineEvent && (
+              <div className="timeline-event-details-card" style={{ marginTop: '0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTimelineEvent(null)}
+                  style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '0.5rem',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-tertiary)',
+                    cursor: 'pointer',
+                    fontSize: '1rem'
+                  }}
+                >
+                  ✖
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>{selectedTimelineEvent.icon}</span>
+                  <span style={{ fontWeight: '800', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    Age {selectedTimelineEvent.age} - {selectedTimelineEvent.title}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  {selectedTimelineEvent.description}
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  {isEditableEvent(selectedTimelineEvent) && (
+                    <button
+                      type="button"
+                      className="list-builder-edit-btn"
+                      onClick={() => {
+                        handleEditRoadmapEvent(selectedTimelineEvent);
+                        setSelectedTimelineEvent(null);
+                      }}
+                    >
+                      ✏️ Edit Event
+                    </button>
+                  )}
+                  {!selectedTimelineEvent.isMilestone && (
+                    <button
+                      type="button"
+                      className="list-builder-remove-btn"
+                      style={{ padding: '0.2rem 0.5rem', alignSelf: 'flex-start' }}
+                      onClick={() => {
+                        handleDeleteRoadmapEvent(selectedTimelineEvent);
+                        setSelectedTimelineEvent(null);
+                      }}
+                    >
+                      🗑️ Remove Event
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Vertical Timeline (Mobile Stacked) */}
+            <div className="vertical-timeline-container">
+              <div className="vertical-timeline-line" />
+              {timelineEvents.map((evt, idx) => (
+                <div
+                  key={idx}
+                  className={`vertical-timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''}`}
+                  onClick={() => setSelectedTimelineEvent(evt)}
+                >
+                  <div className="vertical-timeline-dot">
+                    {evt.icon}
+                  </div>
+                  <div className="vertical-timeline-content">
+                    <div style={{ display: 'flex', justifyItems: 'center', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <span className="vertical-timeline-age">Age {evt.age} - {evt.title}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {isEditableEvent(evt) && (
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.1rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditRoadmapEvent(evt);
+                            }}
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {!evt.isMilestone && (
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRoadmapEvent(evt);
+                              setSelectedTimelineEvent(null);
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <span className="vertical-timeline-label">{evt.description}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="roadmap-grid-layout">
+            
+            {/* Left Column: Plan Story & Event Dropdown */}
+            <div className="roadmap-grid-col-left">
               {/* Life Story Summary */}
               <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
-                <h2 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Your Life Plan</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                  Click on the life event buttons above to map out major decisions. The timeline and simulation will update dynamically.
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <h2 className="card-title" style={{ fontSize: '1.25rem', margin: 0 }}>Your Life Plan</h2>
+                  <div style={{ width: '100%', maxWidth: '240px' }}>
+                    <select
+                      className="input-number-box"
+                      style={{ width: '100%', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleCreateEvent(e.target.value);
+                          e.target.value = ''; // reset selection
+                        }
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>➕ Add Life Decision or Milestone...</option>
+                      <option value="buyHouse">🏠 Buy a House</option>
+                      <option value="haveChild">👶 Have a Child</option>
+                      <option value="careerChange">💼 Career Change</option>
+                      <option value="move">📍 Move / Relocate</option>
+                      <option value="retire">🏖 Retire</option>
+                      <option value="socialSecurity">💰 Social Security</option>
+                      <option value="pension">📜 Pension</option>
+                      <option value="rentalIncome">🏢 Rental Income</option>
+                      <option value="annuity">📈 Annuity</option>
+                      <option value="otherRetirementIncome">💵 Other Income</option>
+                      <option value="windfall">💰 Windfall</option>
+                      <option value="college">🎓 College Costs</option>
+                      <option value="debtPayoff">💸 Debt Payoff</option>
+                      <option value="custom">➕ Custom Event</option>
+                    </select>
+                  </div>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                  Select a life decision or milestone from the dropdown to add it. Drag events on the timeline above or edit them below to map out your roadmap.
                 </p>
                 {generateLifeStory(inputs, activeResults)}
               </div>
@@ -2989,7 +3193,7 @@ export default function FireSimulator() {
                   inputs.lifeExpectancy
                 );
                 return (
-                  <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1rem', marginTop: '1rem' }}>
+                  <div className="glass-card" style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                       <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                         🏆 Retirement Plan Summary
@@ -3163,7 +3367,7 @@ export default function FireSimulator() {
 
                     {/* Retirement Improvement Plan Banner */}
                     {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                      <div className="improvement-banner-container">
+                      <div className="improvement-banner-container" style={{ marginTop: '1.5rem' }}>
                         <div className="improvement-banner-text-col">
                           <span className="improvement-banner-title">
                             💡 Retirement Improvement Plan Available
@@ -3185,212 +3389,7 @@ export default function FireSimulator() {
                 );
               })()}
 
-              {/* Centerpiece Timeline */}
-              <div className="glass-card timeline-card" style={{ padding: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Interactive Roadmap</h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
-                </div>
-
-                {/* Horizontal Timeline (Desktop) */}
-                <div className="timeline-wrapper">
-                  <div className="timeline-track-container" style={{ height: '200px' }}>
-                    <div className="timeline-line-axis" style={{ top: '145px' }} />
-                    <div
-                      className="timeline-progress-line"
-                      style={{
-                        top: '145px',
-                        width: activeResults.targetRetirementAge 
-                          ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
-                          : '0px'
-                      }}
-                    />
-
-                    {/* Chronological Axis Number Line Ticks */}
-                    <div className="timeline-ticks-container" style={{ position: 'absolute', top: '145px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
-                      {(() => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        const ticks = [];
-                        const tickInterval = 5;
-                        const startTick = Math.ceil(inputs.currentAge / tickInterval) * tickInterval;
-                        const endTick = Math.floor(inputs.lifeExpectancy / tickInterval) * tickInterval;
-                        for (let age = startTick; age <= endTick; age += tickInterval) {
-                          ticks.push(age);
-                        }
-                        return ticks.map((age, idx) => {
-                          const percent = totalYears > 0 ? ((age - inputs.currentAge) / totalYears) * 100 : 0;
-                          const leftOffset = `calc(70px + (100% - 140px) * ${percent} / 100)`;
-                          return (
-                            <div key={idx} className="timeline-tick" style={{ position: 'absolute', left: leftOffset, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <div className="timeline-tick-mark" style={{ width: '2px', height: '6px', background: 'var(--border-color)', opacity: 0.8 }} />
-                              <span className="timeline-tick-label" style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-tertiary)', marginTop: '4px' }}>{age}</span>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                    
-                    <div className="timeline-events-container">
-                      {timelineEvents.map((evt, idx) => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        const isDraggingThis = !!(draggingInfo && (
-                          (evt.originalId && draggingInfo.originalId === evt.originalId) ||
-                          (!evt.originalId && draggingInfo.type === evt.type)
-                        ));
-
-                        const displayAge = isDraggingThis ? draggingInfo.currentAge : evt.age;
-                        const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
-                        const leftOffset = `calc(70px + (100% - 140px) * ${percent} / 100)`;
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
-                            style={{ 
-                              left: leftOffset, 
-                              top: `${133 - (evt.stackIndex * 32)}px`, 
-                              transform: 'translateX(-50%)',
-                              cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
-                            }}
-                            onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                            onTouchStart={(e) => handleNodeDragStart(e, evt)}
-                            onClick={(e) => {
-                              if (dragOccurredRef.current) {
-                                e.stopPropagation();
-                                return;
-                              }
-                              setSelectedTimelineEvent(evt);
-                              setSelectedYear(Math.floor(evt.age));
-                            }}
-                          >
-                            <div className="timeline-node-dot">
-                              {evt.icon}
-                              {/* Premium hover tooltip */}
-                              <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
-                                <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                                  {evt.title}
-                                </div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '150px', lineHeight: '1.3' }}>
-                                  Age {displayAge} • {evt.description}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clickable Event Details Card Panel */}
-                {selectedTimelineEvent && (
-                  <div className="timeline-event-details-card" style={{ marginTop: '0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', position: 'relative' }}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTimelineEvent(null)}
-                      style={{
-                        position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-tertiary)',
-                        cursor: 'pointer',
-                        fontSize: '1rem'
-                      }}
-                    >
-                      ✖
-                    </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                      <span style={{ fontSize: '1.25rem' }}>{selectedTimelineEvent.icon}</span>
-                      <span style={{ fontWeight: '800', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                        Age {selectedTimelineEvent.age} - {selectedTimelineEvent.title}
-                      </span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      {selectedTimelineEvent.description}
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                      {isEditableEvent(selectedTimelineEvent) && (
-                        <button
-                          type="button"
-                          className="list-builder-edit-btn"
-                          onClick={() => {
-                            handleEditRoadmapEvent(selectedTimelineEvent);
-                            setSelectedTimelineEvent(null);
-                          }}
-                        >
-                          ✏️ Edit Event
-                        </button>
-                      )}
-                      {!selectedTimelineEvent.isMilestone && (
-                        <button
-                          type="button"
-                          className="list-builder-remove-btn"
-                          style={{ padding: '0.2rem 0.5rem', alignSelf: 'flex-start' }}
-                          onClick={() => {
-                            handleDeleteRoadmapEvent(selectedTimelineEvent);
-                            setSelectedTimelineEvent(null);
-                          }}
-                        >
-                          🗑️ Remove Event
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Vertical Timeline (Mobile Stacked) */}
-                <div className="vertical-timeline-container">
-                  <div className="vertical-timeline-line" />
-                  {timelineEvents.map((evt, idx) => (
-                    <div
-                      key={idx}
-                      className={`vertical-timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''}`}
-                      onClick={() => setSelectedTimelineEvent(evt)}
-                    >
-                      <div className="vertical-timeline-dot">
-                        {evt.icon}
-                      </div>
-                      <div className="vertical-timeline-content">
-                        <div style={{ display: 'flex', justifyItems: 'center', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span className="vertical-timeline-age">Age {evt.age} - {evt.title}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {isEditableEvent(evt) && (
-                              <button
-                                type="button"
-                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem', padding: '0.1rem' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditRoadmapEvent(evt);
-                                }}
-                              >
-                                ✏️
-                              </button>
-                            )}
-                            {!evt.isMilestone && (
-                              <button
-                                type="button"
-                                style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRoadmapEvent(evt);
-                                  setSelectedTimelineEvent(null);
-                                }}
-                              >
-                                🗑️
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <span className="vertical-timeline-label">{evt.description}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Net Worth Graph under timeline */}
+              {/* Net Worth Graph */}
               {validation.errors.length === 0 && (
                 <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3506,7 +3505,7 @@ export default function FireSimulator() {
                 </div>
               )}
 
-              {/* Benchmarks KPI Card */}
+              {/* Benchmarks Snapshot */}
               {validation.errors.length === 0 && (() => {
                 const activeYear = selectedYear !== null ? selectedYear : Number(inputs.currentAge);
                 const yearData = activeResults.data.find(d => d.age === activeYear);
