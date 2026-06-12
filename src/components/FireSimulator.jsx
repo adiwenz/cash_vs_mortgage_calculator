@@ -3242,7 +3242,7 @@ export default function FireSimulator() {
                         <div className="timeline-node-dot">
                           {evt.icon}
                           {/* Premium hover tooltip */}
-                          <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
+                          <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''} ${evt.stackIndex >= 2 ? 'tooltip-below' : ''}`}>
                             <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
                               {evt.title}
                             </div>

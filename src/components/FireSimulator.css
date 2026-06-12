@@ -239,7 +239,7 @@
 
 .timeline-wrapper {
   overflow-x: auto;
-  padding: 2.25rem 0.5rem 0.75rem 0.5rem;
+  padding: 3.75rem 0.5rem 0.75rem 0.5rem;
   scrollbar-width: thin;
 }
 
@@ -1598,4 +1598,51 @@
   font-weight: 600;
   padding: 0.5rem;
 }
+
+/* Position tooltip below for high-stacked nodes to prevent top clipping */
+.timeline-tooltip.tooltip-below {
+  bottom: auto;
+  top: 140%;
+  transform: translateX(-50%) translateY(-5px);
+}
+
+.timeline-tooltip.tooltip-below::after {
+  top: auto;
+  bottom: 100%;
+  border-color: transparent transparent rgba(15, 23, 42, 0.95) transparent;
+}
+
+.timeline-node:hover .timeline-tooltip.tooltip-below {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Align left/right combinations */
+.timeline-tooltip.tooltip-below.align-left {
+  transform: translateY(-5px);
+}
+
+.timeline-node:hover .timeline-tooltip.tooltip-below.align-left {
+  transform: translateY(0);
+}
+
+.timeline-tooltip.tooltip-below.align-right {
+  transform: translateY(-5px);
+}
+
+.timeline-node:hover .timeline-tooltip.tooltip-below.align-right {
+  transform: translateY(0);
+}
+
+.timeline-node.dragging .timeline-tooltip.tooltip-below {
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+.timeline-node.dragging .timeline-tooltip.tooltip-below.align-left {
+  transform: none !important;
+}
+
+.timeline-node.dragging .timeline-tooltip.tooltip-below.align-right {
+  transform: none !important;
+}
+
 
