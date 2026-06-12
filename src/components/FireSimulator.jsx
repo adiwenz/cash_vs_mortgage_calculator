@@ -2940,12 +2940,12 @@ export default function FireSimulator() {
 
             {/* Horizontal Timeline (Desktop) */}
             <div className="timeline-wrapper">
-              <div className="timeline-track-container" style={{ height: '200px' }}>
-                <div className="timeline-line-axis" style={{ top: '145px' }} />
+              <div className="timeline-track-container" style={{ height: '140px' }}>
+                <div className="timeline-line-axis" style={{ top: '105px' }} />
                 <div
                   className="timeline-progress-line"
                   style={{
-                    top: '145px',
+                    top: '105px',
                     width: activeResults.targetRetirementAge 
                       ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
                       : '0px'
@@ -2953,7 +2953,7 @@ export default function FireSimulator() {
                 />
 
                 {/* Chronological Axis Number Line Ticks */}
-                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '145px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '105px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const ticks = [];
@@ -2994,7 +2994,7 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${133 - (evt.stackIndex * 32)}px`, 
+                          top: `${93 - (evt.stackIndex * 24)}px`, 
                           transform: 'translateX(-50%)',
                           cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
                         }}
@@ -3144,10 +3144,10 @@ export default function FireSimulator() {
               <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
                   <h2 className="card-title" style={{ fontSize: '1.25rem', margin: 0 }}>Your Life Plan</h2>
-                  <div style={{ width: '100%', maxWidth: '240px' }}>
+                  <div style={{ width: '100%', maxWidth: '280px' }}>
                     <select
-                      className="input-number-box"
-                      style={{ width: '100%', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                      className="add-event-dropdown"
+                      style={{ width: '100%' }}
                       onChange={(e) => {
                         if (e.target.value) {
                           handleCreateEvent(e.target.value);

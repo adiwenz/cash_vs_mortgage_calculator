@@ -239,7 +239,7 @@
 
 .timeline-wrapper {
   overflow-x: auto;
-  padding: 3.5rem 0.5rem 0.75rem 0.5rem;
+  padding: 2.25rem 0.5rem 0.75rem 0.5rem;
   scrollbar-width: thin;
 }
 
@@ -247,12 +247,12 @@
   min-width: 800px;
   position: relative;
   padding-bottom: 2rem;
-  height: 200px;
+  height: 140px;
 }
 
 .timeline-line-axis {
   position: absolute;
-  top: 145px;
+  top: 105px;
   left: 70px;
   right: 70px;
   height: 4px;
@@ -263,7 +263,7 @@
 
 .timeline-progress-line {
   position: absolute;
-  top: 145px;
+  top: 105px;
   left: 70px;
   height: 4px;
   background: var(--primary);
@@ -281,7 +281,7 @@
 
 .timeline-node {
   position: absolute;
-  top: 133px; /* Center the 24px dot on the 145px axis line */
+  top: 93px; /* Center the 24px dot on the 105px axis line */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -1560,5 +1560,42 @@
   visibility: visible;
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Add Life Event dropdown button styling */
+.add-event-dropdown {
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid var(--primary);
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1.1rem;
+  padding-right: 2.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.add-event-dropdown:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.add-event-dropdown option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 0.5rem;
 }
 
