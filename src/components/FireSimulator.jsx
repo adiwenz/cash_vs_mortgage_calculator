@@ -259,6 +259,7 @@ export default function FireSimulator() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
+  const [showImprovementModal, setShowImprovementModal] = useState(false);
   const dragOccurredRef = useRef(false);
 
   // Scenarios state
@@ -3071,70 +3072,24 @@ export default function FireSimulator() {
                       </div>
                     </div>
 
-                    {/* Retirement Improvement Plan Section */}
+                    {/* Retirement Improvement Plan Banner */}
                     {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                      <div className="improvement-plan-container">
-                        <div className="improvement-plan-header">
-                          💡 Retirement Improvement Plan
+                      <div className="improvement-banner-container">
+                        <div className="improvement-banner-text-col">
+                          <span className="improvement-banner-title">
+                            💡 Retirement Improvement Plan Available
+                          </span>
+                          <p className="improvement-banner-desc">
+                            Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection.
+                          </p>
                         </div>
-                        <p className="improvement-plan-subtitle">
-                          Your current path may not fully support retirement, but small changes can have a meaningful impact. Here are the adjustments with the biggest payoff:
-                        </p>
-                        <div className="improvement-plan-grid">
-                          {improvementPlan.rankedPlan.map((scenario) => {
-                            const isBalanced = scenario.type === 'combined';
-                            return (
-                              <div 
-                                key={scenario.type} 
-                                className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
-                              >
-                                <div className="improvement-plan-card-header">
-                                  <span className="improvement-plan-card-title">
-                                    <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
-                                    <span>{scenario.title}</span>
-                                  </span>
-                                  {isBalanced && (
-                                    <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended">
-                                      {scenario.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="improvement-plan-card-details">
-                                  <p style={{ margin: '0 0 0.4rem 0', fontWeight: '600', color: 'var(--text-primary)' }}>
-                                    {scenario.details}
-                                  </p>
-                                  {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
-                                    <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)' }}>
-                                      {scenario.bulletPoints.map((pt, i) => (
-                                        <li key={i} style={{ marginBottom: '0.2rem' }}>{pt}</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  {scenario.extraAction && (
-                                    <p style={{ margin: '0.4rem 0 0 0', fontStyle: 'italic', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
-                                      {scenario.extraAction}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="improvement-plan-card-outcome">
-                                  <span>Estimated Ready Age:</span>
-                                  <span className="improvement-plan-card-outcome-value">
-                                    Age {scenario.readyAge}
-                                  </span>
-                                </div>
-                                {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
-                                  <div className="improvement-plan-card-gain">
-                                    ⚡ Move retirement {scenario.yearsImprovement} {scenario.yearsImprovement === 1 ? 'year' : 'years'} earlier
-                                  </div>
-                                ) : improvementPlan.currentReadyAge === null ? (
-                                  <div className="improvement-plan-card-gain" style={{ color: 'var(--primary)' }}>
-                                    ✨ Achieves sustainable retirement!
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <button
+                          type="button"
+                          className="improvement-banner-btn"
+                          onClick={() => setShowImprovementModal(true)}
+                        >
+                          View Action Plan
+                        </button>
                       </div>
                     )}
                   </div>
@@ -3741,6 +3696,96 @@ export default function FireSimulator() {
 
           {/* Render the modal at the step root, outside any glass-card */}
           {editingEvent && renderEventForm(editingEvent)}
+
+          {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+            <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
+              <div className="improvement-modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="improvement-modal-header">
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                    💡 Retirement Improvement Plan
+                  </h3>
+                  <button 
+                    type="button" 
+                    className="improvement-modal-close-btn"
+                    onClick={() => setShowImprovementModal(false)}
+                  >
+                    &times;
+                  </button>
+                </div>
+                
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: '1.45' }}>
+                  Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or retiring slightly later can make a massive difference:
+                </p>
+
+                <div className="improvement-plan-grid">
+                  {improvementPlan.rankedPlan.map((scenario) => {
+                    const isBalanced = scenario.type === 'combined';
+                    return (
+                      <div 
+                        key={scenario.type} 
+                        className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
+                      >
+                        <div className="improvement-plan-card-header">
+                          <span className="improvement-plan-card-title">
+                            <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
+                            <span>{scenario.title}</span>
+                          </span>
+                          {isBalanced && (
+                            <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended">
+                              {scenario.badge}
+                            </span>
+                          )}
+                        </div>
+                        <div className="improvement-plan-card-details">
+                          <p style={{ margin: '0 0 0.4rem 0', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            {scenario.details}
+                          </p>
+                          {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)' }}>
+                              {scenario.bulletPoints.map((pt, i) => (
+                                <li key={i} style={{ marginBottom: '0.2rem' }}>{pt}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {scenario.extraAction && (
+                            <p style={{ margin: '0.4rem 0 0 0', fontStyle: 'italic', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                              {scenario.extraAction}
+                            </p>
+                          )}
+                        </div>
+                        <div className="improvement-plan-card-outcome">
+                          <span>Estimated Ready Age:</span>
+                          <span className="improvement-plan-card-outcome-value">
+                            Age {scenario.readyAge}
+                          </span>
+                        </div>
+                        {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
+                          <div className="improvement-plan-card-gain">
+                            ⚡ Move retirement {scenario.yearsImprovement} {scenario.yearsImprovement === 1 ? 'year' : 'years'} earlier
+                          </div>
+                        ) : improvementPlan.currentReadyAge === null ? (
+                          <div className="improvement-plan-card-gain" style={{ color: 'var(--primary)' }}>
+                            ✨ Achieves sustainable retirement!
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', borderRadius: '6px' }}
+                    onClick={() => setShowImprovementModal(false)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Wizard Footer Nav */}
           <div className="wizard-footer-nav" style={{ marginTop: '1rem' }}>
