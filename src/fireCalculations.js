@@ -90,6 +90,22 @@ function solveTraditionalWithdrawal(remainingDeficit, maxPreTaxAvailable, I_0, s
   return W;
 }
 
+export function getSocialSecurityFactor(claimingAge) {
+  const age = Math.max(62, Math.min(70, claimingAge));
+  if (age === 67) return 1.0;
+  if (age < 67) {
+    const monthsEarly = (67 - age) * 12;
+    if (monthsEarly <= 36) {
+      return 1 - monthsEarly * (5 / 900);
+    } else {
+      return 1 - (36 * (5 / 900) + (monthsEarly - 36) * (5 / 1200));
+    }
+  } else {
+    const monthsLate = Math.min(36, (age - 67) * 12);
+    return 1 + monthsLate * (8 / 1200);
+  }
+}
+
 export function runFireSimulation(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
@@ -117,6 +133,7 @@ export function runFireSimulation(inputs) {
   const fireMode = inputs.fireMode || 'traditional'; // 'traditional' | 'coast' | 'barista' | 'lean' | 'fat'
 
   const includeTaxes = !!inputs.includeTaxes;
+  const enableHealthcareModel = inputs.enableHealthcareModel !== false;
   const filingStatus = inputs.filingStatus || 'single';
   const isAdvanced = !!inputs.isAdvancedMode;
 
@@ -462,7 +479,14 @@ export function runFireSimulation(inputs) {
       if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
         const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
         if (age >= claimingAge) {
-          const monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+          let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+          if (ev.type === 'socialSecurity') {
+            if (claimingAge < 62) {
+              monthlyBenefit = 0;
+            } else {
+              monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
+            }
+          }
           let annualAmt = monthlyBenefit * 12;
           if (ev.inflationAdjusted) {
             annualAmt = annualAmt * nominalFactor;
@@ -528,6 +552,18 @@ export function runFireSimulation(inputs) {
       lastWorkingYearSpendingNominal = spendingForYear;
     }
     annualExpenses += spendingForYear;
+
+    // Add Healthcare Bridge & Medicare costs if enabled and retired
+    if (enableHealthcareModel && age >= targetRetirementAge) {
+      const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
+      const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
+      
+      if (age < 65) {
+        annualExpenses += preMedicarePremium * nominalFactor;
+      } else {
+        annualExpenses += medicarePremium * nominalFactor;
+      }
+    }
 
     // Add children events childcare/support
     enabledEvents.forEach(ev => {
@@ -1013,6 +1049,19 @@ export function runFireSimulation(inputs) {
       }
     }
 
+    // Add Healthcare Bridge & Medicare costs to retirement base expenses if enabled
+    if (enableHealthcareModel) {
+      const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
+      const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
+      
+      const referenceAge = Math.max(age, targetRetirementAge);
+      if (referenceAge < 65) {
+        retirementBaseExpenses += preMedicarePremium * nominalFactor;
+      } else {
+        retirementBaseExpenses += medicarePremium * nominalFactor;
+      }
+    }
+
     // Calculate active retirement income sources for the current age, and discount future ones
     let activeRetirementIncomeThisYearInTodayDollars = 0;
     let futureRetirementIncomeDiscountedSumInTodayDollars = 0;
@@ -1020,7 +1069,14 @@ export function runFireSimulation(inputs) {
     enabledEvents.forEach(ev => {
       if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
         const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
-        const monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+        let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+        if (ev.type === 'socialSecurity') {
+          if (claimingAge < 62) {
+            monthlyBenefit = 0;
+          } else {
+            monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
+          }
+        }
         let annualAmt = monthlyBenefit * 12;
         
         if (age >= claimingAge) {
@@ -1208,7 +1264,19 @@ export function runFireSimulation(inputs) {
       const rate = (initialPhase && initialPhase.inflationOverride !== null && initialPhase.inflationOverride !== undefined && initialPhase.inflationOverride !== '')
         ? (Number(initialPhase.inflationOverride) / 100)
         : inflationRate;
-      const estRetSpending = baseSpending * Math.pow(1 + rate + lifestyleUpgrades, retirementReadyAge - currentAge) * retirementSpendingPercent;
+      let estRetSpending = baseSpending * Math.pow(1 + rate + lifestyleUpgrades, retirementReadyAge - currentAge) * retirementSpendingPercent;
+      
+      if (enableHealthcareModel) {
+        const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
+        const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
+        
+        if (retirementReadyAge < 65) {
+          estRetSpending += preMedicarePremium * factor;
+        } else {
+          estRetSpending += medicarePremium * factor;
+        }
+      }
+      
       let activeRetIncome = 0;
       let futureRetIncomeDiscountedSum = 0;
       const realReturn = Math.max(0.001, postRetirementReturn - inflationRate);
@@ -1216,7 +1284,14 @@ export function runFireSimulation(inputs) {
       enabledEvents.forEach(ev => {
         if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
           const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
-          const monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+          let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+          if (ev.type === 'socialSecurity') {
+            if (claimingAge < 62) {
+              monthlyBenefit = 0;
+            } else {
+              monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
+            }
+          }
           let annualAmt = monthlyBenefit * 12; // in today's dollars
           
           if (retirementReadyAge >= claimingAge) {

@@ -13,7 +13,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { runFireSimulation, validateFireInputs } from '../fireCalculations';
+import { runFireSimulation, validateFireInputs, getSocialSecurityFactor } from '../fireCalculations';
 import './FireSimulator.css';
 
 // Default base values for the simulator
@@ -31,6 +31,9 @@ const DEFAULT_FIRE_INPUTS = {
   filingStatus: 'single',
   isAdvancedMode: false, // Simple Mode by default
   readinessCriteria: 'lastsComfortable',
+  enableHealthcareModel: true,
+  preMedicarePremium: 10000,
+  medicarePremium: 4000,
   simpleIncome: 50000,
   simpleExpenses: 42500,
   simpleInvestments: 5000,
@@ -1465,9 +1468,15 @@ export default function FireSimulator() {
             amount: editingEvent.amount
           };
         } else if (isRetIncomeType) {
+          let claimingAge = editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65);
+          if (type === 'socialSecurity') {
+            claimingAge = Math.max(62, Math.min(70, claimingAge));
+          }
           newEventObj = {
             ...newEventObj,
-            claimingAge: editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65),
+            claimingAge,
+            startAge: claimingAge,
+            age: claimingAge,
             monthlyBenefit: editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000,
             inflationAdjusted: editingEvent.inflationAdjusted !== false
           };
@@ -1606,9 +1615,13 @@ export default function FireSimulator() {
               updated.startAge = newAge;
               updated.endAge = newAge + duration;
             } else if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(e.type)) {
-              updated.claimingAge = newAge;
-              updated.startAge = newAge;
-              updated.age = newAge;
+              let finalAge = newAge;
+              if (e.type === 'socialSecurity') {
+                finalAge = Math.max(62, Math.min(70, newAge));
+              }
+              updated.claimingAge = finalAge;
+              updated.startAge = finalAge;
+              updated.age = finalAge;
             } else if (e.type === 'windfall') {
               updated.ageReceived = newAge;
               updated.age = newAge;
@@ -1880,9 +1893,18 @@ export default function FireSimulator() {
           });
         } else if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
           const label = ev.type === 'socialSecurity' ? 'Social Security' : ev.name || 'Retirement Income';
+          let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+          const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
+          if (ev.type === 'socialSecurity') {
+            if (claimingAge < 62) {
+              monthlyBenefit = 0;
+            } else {
+              monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
+            }
+          }
           list.push({
-            age: Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65,
-            text: `Receive ${label} benefits (${formatCurrency(ev.monthlyBenefit)}/mo)`
+            age: claimingAge,
+            text: `Receive ${label} benefits (${formatCurrency(monthlyBenefit)}/mo${ev.type === 'socialSecurity' && claimingAge !== 67 ? ' - claiming age adjusted' : ''})`
           });
         } else {
           list.push({
@@ -2063,6 +2085,28 @@ export default function FireSimulator() {
             else if (ev.type === 'annuity') { icon = '📈'; label = ev.name || 'Annuity'; }
             else if (ev.type === 'otherRetirementIncome') { icon = '💵'; label = ev.name || 'Other Income'; }
 
+            let desc = `Receiving ${label} of ${formatCurrency(ev.monthlyBenefit)}/month (${formatCurrency(ev.monthlyBenefit * 12)}/year).`;
+            if (ev.type === 'socialSecurity') {
+              let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+              if (age < 62) {
+                desc = `Social Security cannot be claimed before age 62 (Benefit: $0/mo).`;
+              } else {
+                const factor = getSocialSecurityFactor(age);
+                monthlyBenefit = monthlyBenefit * factor;
+                const penaltyPct = Math.round((1 - factor) * 100);
+                const bonusPct = Math.round((factor - 1) * 100);
+                
+                desc = `Receiving Social Security of ${formatCurrency(monthlyBenefit)}/month (${formatCurrency(monthlyBenefit * 12)}/year) claimed at age ${age}. `;
+                if (age === 67) {
+                  desc += `Full retirement benefit (100%).`;
+                } else if (age < 67) {
+                  desc += `Benefit is permanently reduced by ${penaltyPct}% from full benefit (at age 67: ${formatCurrency(ev.monthlyBenefit)}/mo) due to early claim.`;
+                } else {
+                  desc += `Benefit is permanently increased by ${bonusPct}% from full benefit (at age 67: ${formatCurrency(ev.monthlyBenefit)}/mo) due to delayed claim.`;
+                }
+              }
+            }
+
             events.push({
               originalId: ev.id,
               age,
@@ -2070,7 +2114,7 @@ export default function FireSimulator() {
               label: label,
               icon: icon,
               type: ev.type,
-              description: `Receiving ${label} of ${formatCurrency(ev.monthlyBenefit)}/month (${formatCurrency(ev.monthlyBenefit * 12)}/year).`
+              description: desc
             });
           } else if (ev.type === 'retire') {
             events.push({
@@ -2172,7 +2216,29 @@ export default function FireSimulator() {
       });
     }
 
-    const sorted = events.sort((a, b) => a.age - b.age);
+    // Medicare Milestone
+    if (inp.enableHealthcareModel !== false) {
+      events.push({
+        age: 65,
+        title: `Medicare Eligibility`,
+        label: `Medicare`,
+        icon: '🏥',
+        type: 'medicareEligibility',
+        isMilestone: true,
+        description: `You become eligible for Medicare. Healthcare costs drop from your pre-Medicare private premium (${formatCurrency(inp.preMedicarePremium || 10000)}/yr) to Medicare rates (${formatCurrency(inp.medicarePremium || 4000)}/yr).`
+      });
+    }
+
+    const sorted = events.sort((a, b) => {
+      if (a.age !== b.age) {
+        return a.age - b.age;
+      }
+      const aIsMilestone = !!a.isMilestone;
+      const bIsMilestone = !!b.isMilestone;
+      if (aIsMilestone && !bIsMilestone) return -1;
+      if (!aIsMilestone && bIsMilestone) return 1;
+      return 0;
+    });
 
     const ageCounts = {};
     return sorted.map(evt => {
@@ -3787,6 +3853,61 @@ export default function FireSimulator() {
                           </div>
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
                             ℹ️ Taxes are calculated using progressive brackets (10% to 37%) and standard deductions ($16,100 Single / $32,200 Married for 2026), inflated annually.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Healthcare & Medicare Bridge */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                        <input
+                          type="checkbox"
+                          checked={inputs.enableHealthcareModel !== false}
+                          onChange={(e) => updateInput('enableHealthcareModel', e.target.checked)}
+                        />
+                        🏥 Enable Healthcare & Medicare Bridge
+                      </label>
+                      {inputs.enableHealthcareModel !== false && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
+                            <div className="input-wrapper">
+                              <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span className="input-name">Pre-Medicare Cost ($/yr)</span>
+                                <span className="tooltip-icon">?</span>
+                                <span className="tooltip-text">
+                                  Estimated annual cost of private health insurance (ACA/COBRA) if you retire before age 65.
+                                </span>
+                              </div>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%', marginTop: '0.15rem' }}
+                                value={inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000}
+                                step="500"
+                                onChange={(e) => updateInput('preMedicarePremium', parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <div className="input-wrapper">
+                              <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span className="input-name">Medicare Cost ($/yr)</span>
+                                <span className="tooltip-icon">?</span>
+                                <span className="tooltip-text">
+                                  Estimated annual cost of Medicare premiums and out-of-pocket costs after age 65.
+                                </span>
+                              </div>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%', marginTop: '0.15rem' }}
+                                value={inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000}
+                                step="200"
+                                onChange={(e) => updateInput('medicarePremium', parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
+                          <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
+                            ℹ️ Pre-Medicare costs apply from retirement age until age 65. Medicare eligibility starts at age 65. Both are adjusted for inflation.
                           </p>
                         </div>
                       )}
