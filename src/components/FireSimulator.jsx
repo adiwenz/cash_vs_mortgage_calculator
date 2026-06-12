@@ -223,18 +223,10 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
     case 'retirementGap':
       return {
         label: 'Retirement Gap',
-        badge: '🟠 Retirement Gap',
-        color: '#f97316',
-        bg: 'rgba(249, 115, 22, 0.1)',
-        desc: `Your projected assets are projected to run out at Age ${runOutAge} (before life expectancy). Additional savings, later retirement, or reduced spending may be needed.`
-      };
-    case 'notSustainable':
-      return {
-        label: 'Needs Adjusting',
-        badge: '⚪ Needs Adjusting',
+        badge: '⚪ Retirement Gap',
         color: 'var(--text-secondary)',
         bg: 'rgba(148, 163, 184, 0.15)',
-        desc: `Under current assumptions, assets are projected to be depleted significantly before life expectancy (at Age ${runOutAge || 'N/A'}).`
+        desc: `Your projected assets are projected to run out at Age ${runOutAge} (before life expectancy). Additional savings, later retirement, or reduced spending may be needed.`
       };
     default:
       return {

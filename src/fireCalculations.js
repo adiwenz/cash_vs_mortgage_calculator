@@ -1267,13 +1267,7 @@ export function runFireSimulation(inputs) {
     }
   } else {
     // runs out before life expectancy
-    if (plannedResults.runOutAge <= targetRetirementAge) {
-      retirementOutcome = 'notSustainable';
-    } else if (plannedResults.runOutAge < targetRetirementAge + 10) {
-      retirementOutcome = 'notSustainable';
-    } else {
-      retirementOutcome = 'retirementGap';
-    }
+    retirementOutcome = 'retirementGap';
   }
 
   return {
