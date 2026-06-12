@@ -281,13 +281,15 @@
 
 .timeline-node {
   position: absolute;
-  top: 89px; /* Center the 32px dot on the 105px axis line */
+  top: 86px; /* Center the 38px dot on the 105px axis line */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
   transition: transform 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .timeline-node:hover {
@@ -296,19 +298,23 @@
 }
 
 .timeline-node-dot {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 3px solid var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem; /* Larger emoji inside */
+  font-size: 1.35rem; /* Larger emoji inside */
+  line-height: 1;
+  overflow: hidden;
   color: var(--text-secondary);
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
   z-index: 5;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .timeline-node.active .timeline-node-dot {
@@ -481,18 +487,22 @@
 
 .vertical-timeline-dot {
   position: absolute;
-  left: -1.8rem;
-  top: 6px;
-  width: 24px;
-  height: 24px;
+  left: -33px;
+  top: 4px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 2px solid var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 1rem;
+  line-height: 1;
+  overflow: hidden;
   z-index: 5;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .vertical-timeline-node.active .vertical-timeline-dot {
