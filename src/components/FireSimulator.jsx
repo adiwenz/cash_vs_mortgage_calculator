@@ -1287,8 +1287,6 @@ export default function FireSimulator() {
       defaults = { ...defaults, name: 'Senior Manager', startAge: 40, amount: 150000, growthRate: 3.5 };
     } else if (type === 'move') {
       defaults = { ...defaults, location: 'Dominican Republic', moveAge: 55, newSpending: 40000 };
-    } else if (type === 'coastFire') {
-      defaults = { ...defaults, age: 45 };
     } else if (type === 'retire') {
       defaults = { ...defaults, age: 55, spendingPercent: 70 };
     } else if (type === 'windfall') {
@@ -1366,9 +1364,6 @@ export default function FireSimulator() {
           spendingPercent: editingEvent.spendingPercent !== undefined ? editingEvent.spendingPercent : 70
         };
         newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
-      } else if (type === 'coastFire') {
-        newInputs.fireMode = 'coast';
-        newInputs.targetRetirementAge = editingEvent.age;
       } else if (type === 'move') {
         const newPhase = {
           id: editingEvent.id && editingEvent.id !== 'move' ? editingEvent.id : `spend-${Date.now()}`,
@@ -1565,16 +1560,6 @@ export default function FireSimulator() {
           return e;
         });
       }
-      // 2. Coast FIRE
-      else if (evt.type === 'coastFire') {
-        newInputs.targetRetirementAge = newAge;
-        newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
-          if (e.type === 'coastFire') {
-            return { ...e, age: newAge };
-          }
-          return e;
-        });
-      }
       // 3. Relocation spending phase (move / lifestyle)
       else if (evt.type === 'move' || evt.type === 'lifestyle') {
         newInputs.spendingPhases = newInputs.spendingPhases.map(p => {
@@ -1732,13 +1717,13 @@ export default function FireSimulator() {
 
   const isEditableEvent = (evt) => {
     if (!evt) return false;
-    return !!evt.originalId || evt.type === 'retire' || evt.type === 'coastFire';
+    return !!evt.originalId || evt.type === 'retire';
   };
 
   const handleEditRoadmapEvent = (evt) => {
     if (!evt) return;
 
-    // 1. Retirement and Coast FIRE
+    // 1. Retirement
     if (evt.type === 'retire') {
       const existingRetire = inputs.lifeEvents.find(e => e.type === 'retire') || {};
       setEditingEvent({
@@ -1746,14 +1731,6 @@ export default function FireSimulator() {
         type: 'retire',
         age: evt.age,
         spendingPercent: existingRetire.spendingPercent !== undefined ? existingRetire.spendingPercent : 70
-      });
-      return;
-    }
-    if (evt.type === 'coastFire') {
-      setEditingEvent({
-        id: 'coastFire',
-        type: 'coastFire',
-        age: evt.age
       });
       return;
     }
@@ -1919,12 +1896,13 @@ export default function FireSimulator() {
 
 
 
-    const isSustainable = inputs.readinessCriteria === 'lastsLifeExp';
+    const criteria = inputs.readinessCriteria;
+    const roadmapLabel = criteria === 'lastsLifeExp' ? 'Sustainable' : criteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite';
     const retirementReadyAge = results.retirementReadyAge;
     if (retirementReadyAge) {
       list.push({
         age: retirementReadyAge,
-        text: `<strong style="color: var(--accent-emerald)">Reach ${isSustainable ? 'Sustainable' : 'Comfortable'} Retirement (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
+        text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
       });
     }
 
@@ -2178,12 +2156,24 @@ export default function FireSimulator() {
           description: `Age at which you can retire and have your portfolio survive through your life expectancy (Age ${inp.lifeExpectancy}) under current assumptions.`
         });
       }
+    } else if (inp.readinessCriteria === 'lastsComfortable') {
+      if (calc.retirementReadyAgeComfortable) {
+        events.push({
+          age: calc.retirementReadyAgeComfortable,
+          title: `Comfortable Retirement (lasts to Life Expectancy + 10)`,
+          label: `Comfortable Retire`,
+          icon: '🎉',
+          type: 'retirementReadyComfortable',
+          isMilestone: true,
+          description: `Age at which you can retire and have your portfolio survive through your life expectancy plus 10 years (Age ${inp.lifeExpectancy + 10}) under current assumptions.`
+        });
+      }
     } else {
       if (calc.retirementReadyAgeSWR) {
         events.push({
           age: calc.retirementReadyAgeSWR,
-          title: `Comfortable Retirement (lasts indefinitely)`,
-          label: `Comfortable Retire`,
+          title: `Indefinite Retirement (lasts indefinitely)`,
+          label: `Indefinite Retire`,
           icon: '🎉',
           type: 'retirementReadySWR',
           isMilestone: true,
@@ -2288,7 +2278,6 @@ export default function FireSimulator() {
           {type === 'haveChild' && '👶 Have a Child'}
           {type === 'careerChange' && '💼 Career Change'}
           {type === 'move' && '📍 Move / Relocate'}
-          {type === 'coastFire' && '☕ Schedule Coast FIRE'}
           {type === 'retire' && '🏖 Schedule Retirement'}
           {type === 'socialSecurity' && '💰 Claim Social Security'}
           {type === 'pension' && '📜 Add Pension'}
@@ -2455,20 +2444,6 @@ export default function FireSimulator() {
                 />
               </div>
             </>
-          )}
-
-          {/* COAST FIRE FIELDS */}
-          {type === 'coastFire' && (
-            <div className="input-wrapper">
-              <span className="input-name">Coast Age</span>
-              <input
-                type="number"
-                className="input-number-box"
-                style={{ width: '100%' }}
-                value={editingEvent.age}
-                onChange={(e) => setEditingEvent({ ...editingEvent, age: parseInt(e.target.value) || 30 })}
-              />
-            </div>
           )}
 
           {/* RETIRE FIELDS */}
@@ -2946,7 +2921,6 @@ export default function FireSimulator() {
                     { type: 'haveChild', label: 'Have a Child', icon: '👶' },
                     { type: 'careerChange', label: 'Career Change', icon: '💼' },
                     { type: 'move', label: 'Move / Relocate', icon: '📍' },
-                    { type: 'coastFire', label: 'Coast FIRE', icon: '☕' },
                     { type: 'retire', label: 'Retire', icon: '🏖' },
                     { type: 'socialSecurity', label: 'Social Security', icon: '💰' },
                     { type: 'pension', label: 'Pension', icon: '📜' },
@@ -3575,7 +3549,7 @@ export default function FireSimulator() {
                             strokeDasharray="4 4"
                             strokeWidth={1.5}
                             label={{
-                              value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : 'Comfortable'} Ready: Age ${activeResults.retirementReadyAge}`,
+                              value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${activeResults.retirementReadyAge}`,
                               position: 'insideTopRight',
                               fill: 'var(--text-primary)',
                               fontSize: 9,

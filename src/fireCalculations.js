@@ -1363,6 +1363,7 @@ export function runFireSimulation(inputs) {
     retirementReadyAge: retirementReadyAge,
     retirementReadyTarget: retirementReadyTarget,
     retirementReadyAgeSWR,
+    retirementReadyAgeComfortable,
     retirementReadyAgeSurvival,
     readinessCriteria,
     retirementIncomeSources: retirementIncomeSourcesInTodayDollars,
