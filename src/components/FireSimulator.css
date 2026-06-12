@@ -281,7 +281,7 @@
 
 .timeline-node {
   position: absolute;
-  top: 86px; /* Center the 38px dot on the 105px axis line */
+  top: 88px; /* Center the 33px dot on the 105px axis line */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -298,15 +298,15 @@
 }
 
 .timeline-node-dot {
-  width: 38px;
-  height: 38px;
+  width: 33px;
+  height: 33px;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 3px solid var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem; /* Larger emoji inside */
+  font-size: 1.12rem; /* Clean emoji size inside */
   line-height: 1;
   overflow: hidden;
   color: var(--text-secondary);
@@ -487,17 +487,17 @@
 
 .vertical-timeline-dot {
   position: absolute;
-  left: -33px;
-  top: 4px;
-  width: 28px;
-  height: 28px;
+  left: -31px;
+  top: 6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 2px solid var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.85rem;
   line-height: 1;
   overflow: hidden;
   z-index: 5;
