@@ -3904,9 +3904,9 @@ export default function FireSimulator() {
                           </div>
                           <div className="improvement-plan-kpi-item">
                             <span className="kpi-item-label">Retirement Gain</span>
-                            <strong className="kpi-item-value gain-value">
+                            <strong className="kpi-item-value gain-value" style={{ fontSize: '0.8rem' }}>
                               {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
-                                `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner`
+                                `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner (vs. Age ${activeResults.retirementReadyAge} on current path)`
                               ) : (
                                 '✨ Sustainable!'
                               )}
