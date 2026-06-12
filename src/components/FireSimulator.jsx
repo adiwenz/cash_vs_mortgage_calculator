@@ -30,7 +30,7 @@ const DEFAULT_FIRE_INPUTS = {
   includeTaxes: false,
   filingStatus: 'single',
   isAdvancedMode: false, // Simple Mode by default
-  readinessCriteria: 'lastsIndefinitely',
+  readinessCriteria: 'lastsComfortable',
   simpleIncome: 50000,
   simpleExpenses: 42500,
   simpleInvestments: 5000,
@@ -3048,11 +3048,20 @@ export default function FireSimulator() {
                               border: 'none',
                               cursor: 'pointer',
                               fontWeight: '600',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
                           >
                             Sustainable
+                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                              <span className="toggle-tooltip-icon">i</span>
+                              <span className="toggle-tooltip-text">
+                                <strong style={{ color: 'var(--primary)' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
+                              </span>
+                            </span>
                           </button>
                           <button
                             type="button"
@@ -3067,11 +3076,20 @@ export default function FireSimulator() {
                               border: 'none',
                               cursor: 'pointer',
                               fontWeight: '600',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
                           >
                             Comfortable
+                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                              <span className="toggle-tooltip-icon">i</span>
+                              <span className="toggle-tooltip-text">
+                                <strong style={{ color: '#fbbf24' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
+                              </span>
+                            </span>
                           </button>
                           <button
                             type="button"
@@ -3086,37 +3104,22 @@ export default function FireSimulator() {
                               border: 'none',
                               cursor: 'pointer',
                               fontWeight: '600',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
                           >
                             Indefinite
+                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                              <span className="toggle-tooltip-icon">i</span>
+                              <span className="toggle-tooltip-text">
+                                <strong style={{ color: '#10b981' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
+                              </span>
+                            </span>
                           </button>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Educational Definitions Box */}
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.02)', 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: '8px', 
-                      padding: '0.85rem 1rem', 
-                      marginBottom: '1.25rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.45rem',
-                      fontSize: '0.75rem',
-                      lineHeight: '1.45'
-                    }}>
-                      <div>
-                        <strong style={{ color: 'var(--primary)', fontWeight: '700' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
-                      </div>
-                      <div>
-                        <strong style={{ color: '#fbbf24', fontWeight: '700' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
-                      </div>
-                      <div>
-                        <strong style={{ color: '#10b981', fontWeight: '700' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
                       </div>
                     </div>
                     
