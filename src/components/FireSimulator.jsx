@@ -217,7 +217,7 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
         desc: readinessCriteria === 'lastsIndefinitely'
-          ? `Your portfolio is projected to last through your life expectancy, but does not meet the safety margin to last indefinitely. Consider working until your Retirement Ready Age (Age ${retirementReadyAge || 'N/A'}) to ensure your money lasts forever.`
+          ? `Your portfolio is projected to last through your life expectancy, but does not meet the safety margin to last indefinitely. Consider working until your Comfortable Retire Age (Age ${retirementReadyAge || 'N/A'}) to ensure your money lasts forever.`
           : 'Your projected assets remain positive through life expectancy. Your portfolio gradually declines but is projected to last.'
       };
     case 'retirementGap':
@@ -1482,11 +1482,12 @@ export default function FireSimulator() {
 
 
 
+    const isSustainable = inputs.readinessCriteria === 'lastsLifeExp';
     const retirementReadyAge = results.retirementReadyAge;
     if (retirementReadyAge) {
       list.push({
         age: retirementReadyAge,
-        text: `<strong style="color: var(--accent-emerald)">Reach Retirement Ready (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
+        text: `<strong style="color: var(--accent-emerald)">Reach ${isSustainable ? 'Sustainable' : 'Comfortable'} Retirement (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
       });
     }
 
@@ -1710,8 +1711,8 @@ export default function FireSimulator() {
       if (calc.retirementReadyAgeSurvival) {
         events.push({
           age: calc.retirementReadyAgeSurvival,
-          title: `Survival Ready (lasts until Life Expectancy)`,
-          label: `Retirement Ready`,
+          title: `Sustainable Retirement (lasts to Life Expectancy)`,
+          label: `Sustainable Retire`,
           icon: '🎉',
           type: 'retirementReadySurvival',
           isMilestone: true,
@@ -1722,12 +1723,12 @@ export default function FireSimulator() {
       if (calc.retirementReadyAgeSWR) {
         events.push({
           age: calc.retirementReadyAgeSWR,
-          title: `SWR Ready (lasts indefinitely)`,
-          label: `Retirement Ready`,
+          title: `Comfortable Retirement (lasts indefinitely)`,
+          label: `Comfortable Retire`,
           icon: '🎉',
           type: 'retirementReadySWR',
           isMilestone: true,
-          description: `Age at which your portfolio meets the safe perpetual withdrawal target (${formatCurrency(calc.retirementReadyTarget)}), ensuring it lasts indefinitely.`
+          description: `Age at which your portfolio meets the safe perpetual Safe Withdrawal Rate (SWR) target (${formatCurrency(calc.retirementReadyTarget)}), ensuring it lasts indefinitely.`
         });
       }
     }
@@ -2506,7 +2507,9 @@ export default function FireSimulator() {
                  {/* 1. Retirement Ready Age */}
                  <div className="simple-metric-tile">
                    <div className="tooltip-container">
-                     <span className="simple-metric-label">Retirement Ready Age</span>
+                     <span className="simple-metric-label">
+                       {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Retire Age' : 'Comfortable Retire Age'}
+                     </span>
                      <span className="tooltip-icon">?</span>
                      <span className="tooltip-text">
                        {inputs.readinessCriteria === 'lastsLifeExp' 
@@ -2526,7 +2529,9 @@ export default function FireSimulator() {
                  {/* 2. Retirement Ready Target */}
                  <div className="simple-metric-tile">
                    <div className="tooltip-container">
-                     <span className="simple-metric-label">Retirement Ready Target</span>
+                     <span className="simple-metric-label">
+                       {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Target' : 'Comfortable Target'}
+                     </span>
                      <span className="tooltip-icon">?</span>
                      <span className="tooltip-text">
                        {inputs.readinessCriteria === 'lastsLifeExp'
@@ -2614,7 +2619,7 @@ export default function FireSimulator() {
                       <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                         🏆 Retirement Plan Summary
                       </h3>
-                      <div className="segmented-control-container" style={{ margin: 0, minWidth: '320px' }}>
+                      <div className="segmented-control-container" style={{ margin: 0, minWidth: '340px' }}>
                         <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex' }}>
                           <button
                             type="button"
@@ -2633,7 +2638,7 @@ export default function FireSimulator() {
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
                           >
-                            Lasts to Life Expectancy
+                            Sustainable Retirement
                           </button>
                           <button
                             type="button"
@@ -2652,9 +2657,30 @@ export default function FireSimulator() {
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
                           >
-                            Lasts Indefinitely (SWR)
+                            Comfortable Retirement
                           </button>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Educational Definitions Box */}
+                    <div style={{ 
+                      background: 'rgba(255, 255, 255, 0.02)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '8px', 
+                      padding: '0.85rem 1rem', 
+                      marginBottom: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem',
+                      fontSize: '0.75rem',
+                      lineHeight: '1.45'
+                    }}>
+                      <div>
+                        <strong style={{ color: 'var(--primary)', fontWeight: '700' }}>Sustainable Retirement:</strong> Money is projected to last through your planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), but you may draw down the portfolio to $0. Requires less starting capital but leaves no buffer if you live longer.
+                      </div>
+                      <div>
+                        <strong style={{ color: '#10b981', fontWeight: '700' }}>Comfortable Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely. Requires more starting capital but eliminates longevity risk.
                       </div>
                     </div>
                     
@@ -2682,7 +2708,9 @@ export default function FireSimulator() {
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Your planned retirement age decision.</span>
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>Retirement Ready Age</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>
+                          {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Retire Age' : 'Comfortable Retire Age'}
+                        </span>
                         <strong style={{ fontSize: '1.15rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', display: 'block', margin: '0.15rem 0' }}>
                           {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
                         </strong>
@@ -2702,7 +2730,9 @@ export default function FireSimulator() {
                     {/* Key Values Bar */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
                       <div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>Retirement Ready Target</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
+                          {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Target' : 'Comfortable Target'}
+                        </span>
                         <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
                           {formatCurrency(activeResults.retirementReadyTarget)}
                         </strong>
@@ -3010,7 +3040,7 @@ export default function FireSimulator() {
                             strokeDasharray="4 4"
                             strokeWidth={1.5}
                             label={{
-                              value: `Retirement Ready: Age ${activeResults.retirementReadyAge}`,
+                              value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : 'Comfortable'} Ready: Age ${activeResults.retirementReadyAge}`,
                               position: 'insideTopRight',
                               fill: 'var(--text-primary)',
                               fontSize: 9,
