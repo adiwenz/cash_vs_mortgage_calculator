@@ -825,7 +825,8 @@ export default function FireSimulator() {
     }
 
     const getCombinedPlanResult = () => {
-      const savingsDelta = (0.03 * currentIncome) + 1200;
+      const extraSavingsFrom3Percent = Math.round((0.03 * currentIncome) / 12);
+      const savingsDelta = (extraSavingsFrom3Percent * 12) * 2;
       const testInputs = {
         ...inputs,
         targetRetirementAge: inputs.targetRetirementAge + 2,
@@ -872,7 +873,7 @@ export default function FireSimulator() {
         details: 'A balanced combination of small, realistic adjustments that yields a massive improvement:',
         bulletPoints: [
           `Save 3% more (approx. ${formatCurrency(extraSavingsFrom3Percent)}/month)`,
-          `Reduce monthly spending by ${formatCurrency(100)}/month`,
+          `Reduce monthly spending by ${formatCurrency(extraSavingsFrom3Percent)}/month`,
           `Work 2 additional years (delaying retirement to Age ${inputs.targetRetirementAge + 2})`
         ],
         readyAge: combinedNewReadyAge,
