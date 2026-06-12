@@ -369,6 +369,7 @@ export default function FireSimulator() {
   const [showImprovementModal, setShowImprovementModal] = useState(false);
   const [hasAutoPopped, setHasAutoPopped] = useState(false);
   const dragOccurredRef = useRef(false);
+  const lastNonZeroSavingsRateRef = useRef(15); // default to 15% pre-tax savings rate
 
   // Scenarios state
   const [scenarios, setScenarios] = useState([
@@ -429,6 +430,16 @@ export default function FireSimulator() {
   // Get active inputs
   const activeScenario = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
   const inputs = activeScenario.inputs;
+
+  // Track last non-zero savings rate to preserve it during empty/zero income editing states
+  useEffect(() => {
+    const income = Number(inputs.simpleIncome) || 0;
+    const expenses = Number(inputs.simpleExpenses) || 0;
+    if (income > 0) {
+      const rate = Math.round(((income - expenses) / income) * 100);
+      lastNonZeroSavingsRateRef.current = rate;
+    }
+  }, [inputs.simpleIncome, inputs.simpleExpenses]);
 
   // Sync state helpers
   const updateInput = (key, value) => {
@@ -1192,10 +1203,8 @@ export default function FireSimulator() {
             return inc;
           });
 
-          // Calculate current savings rate to preserve it
-          const currentExpenses = Number(scen.inputs.simpleExpenses) || 0;
-          const currentIncome = Number(scen.inputs.simpleIncome) || 0;
-          const rate = currentIncome > 0 ? ((currentIncome - currentExpenses) / currentIncome) : 0.20; // fallback to 20%
+          // Preserve the pre-tax savings rate percentage from the ref
+          const rate = lastNonZeroSavingsRateRef.current / 100;
           const newExpenses = Math.round(val * (1 - rate));
 
           const updatedSpendingPhases = scen.inputs.spendingPhases.map(phase => {
@@ -2786,6 +2795,7 @@ export default function FireSimulator() {
                   onChange={(e) => {
                     const rate = parseFloat(e.target.value) || 0;
                     const clampedRate = Math.min(100, Math.max(0, rate));
+                    lastNonZeroSavingsRateRef.current = clampedRate;
                     const income = Number(inputs.simpleIncome) || 0;
                     const newExpenses = Math.round(income * (1 - clampedRate / 100));
                     handleStep1Change('simpleExpenses', newExpenses);
