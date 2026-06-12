@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export default function CapitalGainsBreakdownCard({ inputs, calcResults }) {
   const [costBasisMethod, setCostBasisMethod] = useState('average'); // 'average' | 'lots'

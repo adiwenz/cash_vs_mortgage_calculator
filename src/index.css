@@ -349,7 +349,9 @@ h1, h2, h3, h4, h5, h6 {
 .input-wrapper {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 0.35rem;
+  height: 100%;
 }
 
 .input-label-row {

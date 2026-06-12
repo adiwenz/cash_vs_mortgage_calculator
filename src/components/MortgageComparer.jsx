@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -17,7 +17,6 @@ import {
   validateMortgageScenario,
   calculateMonthlyPayment,
   getNumParam,
-  getStrParam,
   encodeScenarios,
   decodeScenarios
 } from '../calculations';
@@ -147,14 +146,17 @@ export default function MortgageComparer() {
   const [savingsRateInput, setSavingsRateInput] = useState('4.0');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAppreciationInput((globalAppreciation * 100).toString());
   }, [globalAppreciation]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStockReturnInput((globalStockReturn * 100).toString());
   }, [globalStockReturn]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSavingsRateInput((globalSavingsRate * 100).toString());
   }, [globalSavingsRate]);
 
@@ -320,21 +322,6 @@ export default function MortgageComparer() {
     );
   };
 
-  // Duplicate scenario
-  const handleDuplicateScenario = (id) => {
-    const target = scenarios.find((s) => s.id === id);
-    if (!target) return;
-    const newId = Date.now().toString();
-    const newColor = SCENARIO_COLORS[scenarios.length % SCENARIO_COLORS.length];
-    const newScenario = {
-      ...target,
-      id: newId,
-      name: `${target.name} (Copy)`,
-      color: newColor
-    };
-    setScenarios((prev) => [...prev, newScenario]);
-    setExpandedId(newId);
-  };
 
   // Add a new empty scenario
   const handleAddScenario = () => {
@@ -401,43 +388,7 @@ export default function MortgageComparer() {
     }));
   }, [activeScenarios]);
 
-  // Custom Line Chart Tooltip
-  const CustomLineTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
-      return (
-        <div className="custom-chart-tooltip">
-          <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-            Year {label}
-          </p>
-          {sortedPayload.map((item) => (
-            <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
-              <span style={{ color: item.stroke || item.color, fontWeight: '600' }}>{item.name}:</span>
-              <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
-  // Custom Bar Chart Tooltip
-  const CustomBarTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const item = payload[0];
-      return (
-        <div className="custom-chart-tooltip">
-          <p style={{ fontWeight: '700', marginBottom: '0.25rem' }}>{item.payload.name}</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-            <span style={{ color: 'var(--primary)', fontWeight: '600' }}>Monthly P&I:</span>
-            <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Export Combined Table Data as CSV
   const handleExportCSV = () => {
@@ -512,14 +463,13 @@ export default function MortgageComparer() {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {calculatedScenarios.map((scen, idx) => (
+            {calculatedScenarios.map((scen) => (
               <ScenarioCard
                 key={scen.id}
                 scenario={scen}
                 isExpanded={expandedId === scen.id}
                 onExpandToggle={() => setExpandedId(expandedId === scen.id ? null : scen.id)}
                 onChange={(field, value) => handleScenarioChange(scen.id, field, value)}
-                onDuplicate={() => handleDuplicateScenario(scen.id)}
                 onDelete={() => handleDeleteScenario(scen.id)}
                 canDelete={scenarios.length > 1}
               />
@@ -692,7 +642,23 @@ export default function MortgageComparer() {
                     fontSize={11}
                     tickFormatter={formatYAxis}
                   />
-                  <Tooltip content={<CustomBarTooltip />} />
+                   <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const item = payload[0];
+                        return (
+                          <div className="custom-chart-tooltip">
+                            <p style={{ fontWeight: '700', marginBottom: '0.25rem' }}>{item.payload.name}</p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                              <span style={{ color: 'var(--primary)', fontWeight: '600' }}>Monthly P&I:</span>
+                              <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                   <Bar dataKey="Monthly Payment" radius={[6, 6, 0, 0]}>
                     {barChartData.map((entry, idx) => (
                       <Cell key={`cell-${idx}`} fill={entry.color} />
@@ -720,7 +686,27 @@ export default function MortgageComparer() {
                     tickFormatter={formatYAxis}
                     domain={compareMetric === 'netWorth' ? [0, maxNetWorth] : ['auto', 'auto']}
                   />
-                  <Tooltip content={<CustomLineTooltip />} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
+                        return (
+                          <div className="custom-chart-tooltip">
+                            <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+                              Year {label}
+                            </p>
+                            {sortedPayload.map((item) => (
+                              <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
+                                <span style={{ color: item.stroke || item.color, fontWeight: '600' }}>{item.name}:</span>
+                                <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                   <Legend verticalAlign="bottom" height={70} />
                   {activeScenarios.map((scen) => (
                     <Line
@@ -907,7 +893,7 @@ export default function MortgageComparer() {
 }
 
 // Stateful ScenarioCard Component
-function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDuplicate, onDelete, canDelete }) {
+function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDelete, canDelete }) {
   const [localValues, setLocalValues] = useState({});
   const activeFieldRef = useRef(null);
 

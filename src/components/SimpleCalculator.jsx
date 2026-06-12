@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -347,26 +347,6 @@ export default function SimpleCalculator() {
     }
     return null;
   }, [chartData, lineKeys]);
-
-  const CustomChartTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
-      return (
-        <div className="custom-chart-tooltip">
-          <p style={{ fontWeight: '700', marginBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.2rem' }}>
-            Year {label}
-          </p>
-          {sortedPayload.map((item) => (
-            <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.15rem 0' }}>
-              <span style={{ color: item.stroke || item.color, fontWeight: '600' }}>{item.name}:</span>
-              <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Get data at selected year
   const selectedYearData = useMemo(() => {
@@ -822,7 +802,27 @@ export default function SimpleCalculator() {
                       tickFormatter={formatYAxis}
                       domain={[0, yAxisMax]}
                     />
-                    <Tooltip content={<CustomChartTooltip />} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
+                          return (
+                            <div className="custom-chart-tooltip">
+                              <p style={{ fontWeight: '700', marginBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.2rem' }}>
+                                Year {label}
+                              </p>
+                              {sortedPayload.map((item) => (
+                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.15rem 0' }}>
+                                  <span style={{ color: item.stroke || item.color, fontWeight: '600' }}>{item.name}:</span>
+                                  <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
                     <Legend />
                     {intersectionYear !== null && intersectionYear <= zoomRange && (
                         <ReferenceLine

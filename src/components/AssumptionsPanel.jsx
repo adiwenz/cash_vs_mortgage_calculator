@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const PERCENT_FIELDS = [
   'homeAppreciation',
@@ -10,12 +10,6 @@ const PERCENT_FIELDS = [
   'propertyTaxRate',
   'insuranceRate'
 ];
-
-const formatCurrencyShort = (val) => {
-  if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-  if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}K`;
-  return `$${val}`;
-};
 
 export default function AssumptionsPanel({ inputs, onChange, onReset, onClose }) {
 
@@ -128,11 +122,6 @@ export default function AssumptionsPanel({ inputs, onChange, onReset, onClose })
       </div>
     );
   };
-
-  const homeSummary = `${formatCurrencyShort(inputs.homePrice)} home • ${(inputs.homeAppreciation * 100).toFixed(1)}% appreciation`;
-  const mortgageSummary = `${(inputs.downPaymentPercent * 100).toFixed(0)}% down • ${(inputs.mortgageRate * 100).toFixed(1)}% rate • ${inputs.mortgageTerm} years`;
-  const investSummary = `${(inputs.stockReturn * 100).toFixed(1)}% stock • ${(inputs.savingsRate * 100).toFixed(1)}% savings`;
-  const sellingSummary = `${formatCurrencyShort(inputs.investmentPortfolioValue)} portfolio • ${formatCurrencyShort(inputs.investmentCostBasis)} basis • ${(inputs.capitalGainsRate * 100).toFixed(0)}% tax`;
 
   return (
     <div className="glass-card" style={{ padding: '1.25rem' }}>

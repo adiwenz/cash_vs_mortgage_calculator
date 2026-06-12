@@ -7,6 +7,7 @@ import EducationHub from './components/EducationHub';
 import MortgageComparer from './components/MortgageComparer';
 import SimpleCalculator from './components/SimpleCalculator';
 import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
+import FireSimulator from './components/FireSimulator';
 import logoImg from './assets/logo.png';
 
 // Initial default inputs
@@ -42,6 +43,7 @@ export default function App() {
     const tool = params.get('tool');
     if (tool === 'advanced') return 'cashVsMortgage';
     if (tool === 'compare') return 'mortgageComparer';
+    if (tool === 'fire') return 'fireSimulator';
     return 'cashVsMortgageSimple';
   });
 
@@ -110,6 +112,8 @@ export default function App() {
         setActiveTool('cashVsMortgage');
       } else if (tool === 'compare') {
         setActiveTool('mortgageComparer');
+      } else if (tool === 'fire') {
+        setActiveTool('fireSimulator');
       } else {
         setActiveTool('cashVsMortgageSimple');
       }
@@ -150,6 +154,8 @@ export default function App() {
       params.set('tool', 'simple');
     } else if (tool === 'cashVsMortgage') {
       params.set('tool', 'advanced');
+    } else if (tool === 'fireSimulator') {
+      params.set('tool', 'fire');
     } else {
       params.set('tool', 'compare');
     }
@@ -243,6 +249,11 @@ export default function App() {
                   </p>
                 </div>
               </>
+            ) : activeTool === 'fireSimulator' ? (
+              <>
+                <h1>FIRE & Life Simulator</h1>
+                <p>Interactive compounding life-planning and financial independence simulator</p>
+              </>
             ) : (
               <>
                 <h1>Compare Mortgages</h1>
@@ -270,7 +281,8 @@ export default function App() {
                   {[
                     { tool: 'cashVsMortgageSimple', label: 'Cash v. Mortgage' },
                     { tool: 'cashVsMortgage', label: 'Tax-Aware Cash v. Mortgage' },
-                    { tool: 'mortgageComparer', label: 'Compare Mortgages' }
+                    { tool: 'mortgageComparer', label: 'Compare Mortgages' },
+                    { tool: 'fireSimulator', label: 'FIRE & Life Simulator' }
                   ].map((item) => (
                     <button
                       key={item.tool}
@@ -651,6 +663,10 @@ export default function App() {
             </div>
           </div>
         </div>
+      ) : activeTool === 'fireSimulator' ? (
+        <main style={{ marginTop: '1.5rem', width: '100%' }}>
+          <FireSimulator />
+        </main>
       ) : (
         <main style={{ marginTop: '1.5rem' }}>
           <MortgageComparer />

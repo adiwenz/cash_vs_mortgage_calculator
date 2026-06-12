@@ -1,4 +1,3 @@
-import React from 'react';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -15,7 +14,7 @@ export default function ComparisonTable({ data, visibleScenarios, scenarioInfo }
   const handleExportCSV = () => {
     // Construct CSV Header
     let headers = ['Year', 'Home Value', 'Mortgage Balance'];
-    activeScenarios.forEach(([_, info]) => {
+    activeScenarios.forEach(([, info]) => {
       headers.push(info.label);
     });
 
@@ -24,7 +23,7 @@ export default function ComparisonTable({ data, visibleScenarios, scenarioInfo }
     // Construct CSV rows
     data.forEach((row) => {
       let line = [row.year, Math.round(row.homeValue), Math.round(row.mortgageBalance)];
-      activeScenarios.forEach(([_, info]) => {
+      activeScenarios.forEach(([, info]) => {
         line.push(Math.round(row[info.dataKey]));
       });
       csvContent += line.join(',') + '\n';

@@ -164,7 +164,6 @@ export function validateInputs(inputs) {
     mortgageTerm,
     mortgageRate,
     stockReturn,
-    homeAppreciation,
     propertyTaxRate,
     insuranceRate,
     investmentPortfolioValue,
@@ -577,7 +576,7 @@ export function encodeScenarios(scens) {
       color: s.color
     })));
     return btoa(unescape(encodeURIComponent(json)));
-  } catch (e) {
+  } catch {
     return '';
   }
 }
@@ -586,7 +585,7 @@ export function decodeScenarios(str) {
   try {
     const json = decodeURIComponent(escape(atob(str)));
     return JSON.parse(json);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
