@@ -3612,6 +3612,51 @@ export default function FireSimulator() {
                       </div>
                     </div>
 
+                    {/* Baseline Simulation Assumptions */}
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                        ⚙️ Baseline Assumptions
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Pre-Retire Return:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.expectedReturn}%
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Post-Retire Return:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.postRetirementReturn !== undefined ? inputs.postRetirementReturn : inputs.expectedReturn}%
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Inflation Rate:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.inflationRate}%
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Safe Withdrawal (SWR):</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.swr}%
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Taxes (Progressive):</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.includeTaxes ? 'Enabled' : 'Disabled'}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Healthcare Bridge:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {inputs.enableHealthcareModel !== false ? 'Enabled' : 'Disabled'}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Property / Debt info if active */}
                     {(yearData.homeValue > 0 || yearData.mortgageBalance > 0 || yearData.debtBalance > 0) && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
