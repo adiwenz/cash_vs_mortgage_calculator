@@ -3615,43 +3615,43 @@ export default function FireSimulator() {
                     {/* Baseline Simulation Assumptions */}
                     <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
                       <h4 style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
-                        ⚙️ Baseline Assumptions
+                        ⚙️ Baseline Assumptions (Screen 1)
                       </h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Pre-Retire Return:</span>
+                          <span>Current Age:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.expectedReturn}%
+                            {inputs.currentAge}
                           </strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Post-Retire Return:</span>
+                          <span>Life Expectancy:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.postRetirementReturn !== undefined ? inputs.postRetirementReturn : inputs.expectedReturn}%
+                            {inputs.lifeExpectancy}
                           </strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Inflation Rate:</span>
+                          <span>Starting Savings:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.inflationRate}%
+                            {formatCurrency(inputs.simpleInvestments)}
                           </strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Safe Withdrawal (SWR):</span>
+                          <span>Annual Income:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.swr}%
+                            {formatCurrency(inputs.simpleIncome)}
                           </strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Taxes (Progressive):</span>
+                          <span>Pre-Tax Savings Rate:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.includeTaxes ? 'Enabled' : 'Disabled'}
+                            {simpleSavingsRate}%
                           </strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
-                          <span>Healthcare Bridge:</span>
+                          <span>Annual Savings:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>
-                            {inputs.enableHealthcareModel !== false ? 'Enabled' : 'Disabled'}
+                            {formatCurrency(Math.max(0, inputs.simpleIncome - inputs.simpleExpenses))}
                           </strong>
                         </div>
                       </div>
