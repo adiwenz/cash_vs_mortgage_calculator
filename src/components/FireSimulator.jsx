@@ -205,12 +205,22 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
   switch (outcome) {
     case 'comfortable':
       return {
-        label: 'Comfortable Retirement',
-        badge: '🟢 Comfortable',
+        label: readinessCriteria === 'lastsIndefinitely' 
+          ? 'Indefinite Retirement' 
+          : readinessCriteria === 'lastsComfortable' 
+          ? 'Comfortable Retirement' 
+          : 'Sustainable Retirement',
+        badge: readinessCriteria === 'lastsIndefinitely'
+          ? '🟢 Indefinite'
+          : readinessCriteria === 'lastsComfortable'
+          ? '🟢 Comfortable'
+          : '🟢 Sustainable',
         color: 'var(--accent-emerald)',
         bg: 'rgba(16, 185, 129, 0.1)',
         desc: readinessCriteria === 'lastsIndefinitely'
           ? `Your projected assets meet the safe perpetual withdrawal target, ensuring your portfolio lasts indefinitely (beyond Age ${lifeExpectancy || 85}).`
+          : readinessCriteria === 'lastsComfortable'
+          ? `Your projected assets remain positive through your life expectancy plus 10 years safety buffer (Age ${Number(lifeExpectancy || 85) + 10}).`
           : 'Your projected assets remain positive through life expectancy and you maintain a substantial portfolio cushion.'
       };
     case 'sustainable':
@@ -220,7 +230,9 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
         desc: readinessCriteria === 'lastsIndefinitely'
-          ? `Your portfolio is projected to last through your life expectancy, but does not meet the safety margin to last indefinitely. Consider working until your Comfortable Retire Age (Age ${retirementReadyAge || 'N/A'}) to ensure your money lasts forever.`
+          ? `Your portfolio is projected to last through your life expectancy, but does not meet the safety margin to last indefinitely. Consider working until your Indefinite Retire Age (Age ${retirementReadyAge || 'N/A'}) to ensure your money lasts forever.`
+          : readinessCriteria === 'lastsComfortable'
+          ? `Your portfolio is projected to last through your life expectancy, but does not meet the 10-year safety buffer. Consider working until your Comfortable Retire Age (Age ${retirementReadyAge || 'N/A'}).`
           : 'Your projected assets remain positive through life expectancy. Your portfolio gradually declines but is projected to last.'
       };
     case 'retirementGap':
@@ -2963,12 +2975,18 @@ export default function FireSimulator() {
                  <div className="simple-metric-tile">
                    <div className="tooltip-container">
                      <span className="simple-metric-label">
-                       {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Retire Age' : 'Comfortable Retire Age'}
+                       {inputs.readinessCriteria === 'lastsLifeExp' 
+                         ? 'Sustainable Retire Age' 
+                         : inputs.readinessCriteria === 'lastsComfortable' 
+                         ? 'Comfortable Retire Age' 
+                         : 'Indefinite Retire Age'}
                      </span>
                      <span className="tooltip-icon">?</span>
                      <span className="tooltip-text">
                        {inputs.readinessCriteria === 'lastsLifeExp' 
                          ? "The age when your investments plus Social Security, pensions, and other retirement income can support your spending through your life expectancy."
+                         : inputs.readinessCriteria === 'lastsComfortable'
+                         ? `The age when your investments can support your spending through life expectancy plus a 10-year safety buffer (Age ${Number(inputs.lifeExpectancy || 85) + 10}).`
                          : "The age when your investments reach the Safe Withdrawal Rate (SWR) target to support spending indefinitely."}
                      </span>
                    </div>
@@ -2985,12 +3003,18 @@ export default function FireSimulator() {
                  <div className="simple-metric-tile">
                    <div className="tooltip-container">
                      <span className="simple-metric-label">
-                       {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Target' : 'Comfortable Target'}
+                       {inputs.readinessCriteria === 'lastsLifeExp' 
+                          ? 'Sustainable Target' 
+                          : inputs.readinessCriteria === 'lastsComfortable' 
+                          ? 'Comfortable Target' 
+                          : 'Indefinite Target'}
                      </span>
                      <span className="tooltip-icon">?</span>
                      <span className="tooltip-text">
                        {inputs.readinessCriteria === 'lastsLifeExp'
-                         ? "The safe perpetual target (SWR) for this age. Note: Survival-based retirement requires less than this target because it runs for a finite duration."
+                         ? "The target portfolio balance needed for your investments to survive through your life expectancy."
+                         : inputs.readinessCriteria === 'lastsComfortable'
+                         ? `The target portfolio balance needed for your investments to survive through your life expectancy plus 10 years (Age ${Number(inputs.lifeExpectancy || 85) + 10}).`
                          : "The target portfolio balance needed when combined with your retirement income sources (like Social Security) to cover your spending indefinitely."}
                      </span>
                    </div>
@@ -3187,9 +3211,13 @@ export default function FireSimulator() {
                         <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', display: 'block', margin: '0.15rem 0' }}>Age {inputs.targetRetirementAge}</strong>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Your planned retirement age decision.</span>
                       </div>
-                      <div>
+                       <div>
                         <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block', letterSpacing: '0.05em' }}>
-                          {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Retire Age' : 'Comfortable Retire Age'}
+                          {inputs.readinessCriteria === 'lastsLifeExp' 
+                            ? 'Sustainable Retire Age' 
+                            : inputs.readinessCriteria === 'lastsComfortable' 
+                            ? 'Comfortable Retire Age' 
+                            : 'Indefinite Retire Age'}
                         </span>
                         <strong style={{ fontSize: '1.15rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', display: 'block', margin: '0.15rem 0' }}>
                           {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
@@ -3197,6 +3225,8 @@ export default function FireSimulator() {
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                           {inputs.readinessCriteria === 'lastsLifeExp'
                             ? "Earliest age that survives through life expectancy."
+                            : inputs.readinessCriteria === 'lastsComfortable'
+                            ? `Earliest age that survives through life expectancy plus 10 years (Age ${Number(inputs.lifeExpectancy || 85) + 10}).`
                             : "Earliest age that meets safe perpetual SWR target."}
                         </span>
                       </div>
