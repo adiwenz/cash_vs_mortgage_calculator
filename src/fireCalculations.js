@@ -62,21 +62,22 @@ function getMarginalTaxRate(grossIncome, standardDeduction, brackets) {
   return 0.37;
 }
 
-function solveTraditionalWithdrawal(remainingDeficit, maxPreTaxAvailable, I_0, standardDeduction, nominalBrackets) {
+function solveTraditionalWithdrawal(remainingDeficit, maxPreTaxAvailable, I_0, standardDeduction, nominalBrackets, penaltyRate = 0.0) {
+  const P = penaltyRate;
   if (remainingDeficit <= 0) return 0;
   const T_0 = calculateUSTax(I_0, standardDeduction, nominalBrackets);
-  const netMax = maxPreTaxAvailable - (calculateUSTax(I_0 + maxPreTaxAvailable, standardDeduction, nominalBrackets) - T_0);
+  const netMax = maxPreTaxAvailable * (1 - P) - (calculateUSTax(I_0 + maxPreTaxAvailable, standardDeduction, nominalBrackets) - T_0);
   if (remainingDeficit >= netMax) {
     return maxPreTaxAvailable;
   }
-  let W = remainingDeficit / (1 - getMarginalTaxRate(I_0, standardDeduction, nominalBrackets));
+  let W = remainingDeficit / (1 - P - getMarginalTaxRate(I_0, standardDeduction, nominalBrackets));
   for (let iter = 0; iter < 10; iter++) {
     const taxCurrent = calculateUSTax(I_0 + W, standardDeduction, nominalBrackets);
-    const netCurrent = W - (taxCurrent - T_0);
+    const netCurrent = W * (1 - P) - (taxCurrent - T_0);
     const diff = netCurrent - remainingDeficit;
     if (Math.abs(diff) < 0.01) break;
     const marginalRate = getMarginalTaxRate(I_0 + W, standardDeduction, nominalBrackets);
-    const slope = 1 - marginalRate;
+    const slope = 1 - P - marginalRate;
     W -= diff / slope;
     if (W < 0) {
       W = 0;
@@ -135,6 +136,7 @@ export function runFireSimulation(inputs) {
   const includeTaxes = !!inputs.includeTaxes;
   const enableHealthcareModel = inputs.enableHealthcareModel !== false;
   const filingStatus = inputs.filingStatus || 'single';
+  const enforceEarlyWithdrawalPenalty = true;
   const isAdvanced = !!inputs.isAdvancedMode;
 
   let year0Taxes = 0;
@@ -282,55 +284,16 @@ export function runFireSimulation(inputs) {
     let standardDeduction = 0;
     let nominalBrackets = [];
     let taxableIncome = 0;
+    let annualEarlyWithdrawalPenalties = 0;
 
     // Drawdowns / Shortfall coverage order
-    const coverShortfall = (amountToDeduct) => {
+    const coverShortfall = (amountToDeduct, age) => {
       let remaining = amountToDeduct;
       
       // Withdrawal order: Cash -> Emergency Fund -> Brokerage -> Trad accounts (grossed for taxes) -> Roth IRA -> HSA -> Other
       const drawdownSequence = ['cash', 'emergencyFund', 'brokerage'];
     
-    for (const key of drawdownSequence) {
-      if (balances[key] > 0) {
-        const withdraw = Math.min(balances[key], remaining);
-        balances[key] -= withdraw;
-        remaining -= withdraw;
-        if (remaining <= 0) return 0;
-      }
-    }
-
-    // Pre-tax accounts (Traditional 401k & IRA) withdrawals are taxable post-retirement
-    if (includeTaxes) {
-      const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0);
-      if (maxPreTaxAvailable > 0 && remaining > 0) {
-        const totalGrossPreTaxWithdrawal = solveTraditionalWithdrawal(
-          remaining,
-          maxPreTaxAvailable,
-          taxableIncome,
-          standardDeduction,
-          nominalBrackets
-        );
-
-        const T_0 = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
-        const T_final = calculateUSTax(taxableIncome + totalGrossPreTaxWithdrawal, standardDeduction, nominalBrackets);
-        const actualNetProceeds = totalGrossPreTaxWithdrawal - (T_final - T_0);
-
-        let withdrawalRemaining = totalGrossPreTaxWithdrawal;
-        const preTaxSequence = ['trad401k', 'tradIra'];
-        for (const key of preTaxSequence) {
-          if (balances[key] > 0) {
-            const withdraw = Math.min(balances[key], withdrawalRemaining);
-            balances[key] -= withdraw;
-            withdrawalRemaining -= withdraw;
-          }
-        }
-
-        remaining -= actualNetProceeds;
-        taxableIncome += totalGrossPreTaxWithdrawal;
-      }
-    } else {
-      const preTaxSequence = ['trad401k', 'tradIra'];
-      for (const key of preTaxSequence) {
+      for (const key of drawdownSequence) {
         if (balances[key] > 0) {
           const withdraw = Math.min(balances[key], remaining);
           balances[key] -= withdraw;
@@ -338,42 +301,104 @@ export function runFireSimulation(inputs) {
           if (remaining <= 0) return 0;
         }
       }
-    }
 
-    // Roth IRA, HSA, Other
-    const taxFreeSequence = ['rothIra', 'hsa', 'other'];
-    for (const key of taxFreeSequence) {
-      if (balances[key] > 0) {
-        const withdraw = Math.min(balances[key], remaining);
-        balances[key] -= withdraw;
-        remaining -= withdraw;
-        if (remaining <= 0) return 0;
+      // Pre-tax accounts (Traditional 401k & IRA) withdrawals are taxable post-retirement
+      if (includeTaxes) {
+        const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0);
+        if (maxPreTaxAvailable > 0 && remaining > 0) {
+          const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+          const totalGrossPreTaxWithdrawal = solveTraditionalWithdrawal(
+            remaining,
+            maxPreTaxAvailable,
+            taxableIncome,
+            standardDeduction,
+            nominalBrackets,
+            pRate
+          );
+
+          const T_0 = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
+          const T_final = calculateUSTax(taxableIncome + totalGrossPreTaxWithdrawal, standardDeduction, nominalBrackets);
+          const penalty = totalGrossPreTaxWithdrawal * pRate;
+          const actualNetProceeds = totalGrossPreTaxWithdrawal - (T_final - T_0) - penalty;
+          annualEarlyWithdrawalPenalties += penalty;
+
+          let withdrawalRemaining = totalGrossPreTaxWithdrawal;
+          const preTaxSequence = ['trad401k', 'tradIra'];
+          for (const key of preTaxSequence) {
+            if (balances[key] > 0) {
+              const withdraw = Math.min(balances[key], withdrawalRemaining);
+              balances[key] -= withdraw;
+              withdrawalRemaining -= withdraw;
+            }
+          }
+
+          remaining -= actualNetProceeds;
+          taxableIncome += totalGrossPreTaxWithdrawal;
+        }
+      } else {
+        const preTaxSequence = ['trad401k', 'tradIra'];
+        for (const key of preTaxSequence) {
+          if (balances[key] > 0) {
+            const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+            const grossNeeded = remaining / (1 - pRate);
+            const withdraw = Math.min(balances[key], grossNeeded);
+            const penalty = withdraw * pRate;
+            const netProceeds = withdraw - penalty;
+            balances[key] -= withdraw;
+            remaining -= netProceeds;
+            annualEarlyWithdrawalPenalties += penalty;
+            if (remaining <= 0.01) return 0;
+          }
+        }
       }
-    }
 
-    return remaining; // Leftover shortfall
-  };
-
-  // Helper to withdraw for down payments
-  const deductFromLiquidAssets = (amountToDeduct) => {
-    let remaining = amountToDeduct;
-    // Prefer cash / emergency fund / brokerage / other for large capital expenditures
-    const order = ['cash', 'emergencyFund', 'brokerage', 'other', 'rothIra', 'tradIra', 'trad401k', 'hsa'];
-    for (const assetKey of order) {
-      if (balances[assetKey] > 0) {
-        const withdraw = Math.min(balances[assetKey], remaining);
-        balances[assetKey] -= withdraw;
-        remaining -= withdraw;
-        if (remaining <= 0) break;
+      // Roth IRA, HSA, Other
+      const taxFreeSequence = ['rothIra', 'hsa', 'other'];
+      for (const key of taxFreeSequence) {
+        if (balances[key] > 0) {
+          const withdraw = Math.min(balances[key], remaining);
+          balances[key] -= withdraw;
+          remaining -= withdraw;
+          if (remaining <= 0) return 0;
+        }
       }
-    }
-    return remaining;
-  };
+
+      return remaining; // Leftover shortfall
+    };
+
+    // Helper to withdraw for down payments
+    const deductFromLiquidAssets = (amountToDeduct, age) => {
+      let remaining = amountToDeduct;
+      // Prefer cash / emergency fund / brokerage / other for large capital expenditures
+      const order = ['cash', 'emergencyFund', 'brokerage', 'other', 'rothIra', 'tradIra', 'trad401k', 'hsa'];
+      for (const assetKey of order) {
+        if (balances[assetKey] > 0) {
+          let withdraw;
+          if (assetKey === 'tradIra' || assetKey === 'trad401k') {
+            const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+            const grossNeeded = remaining / (1 - pRate);
+            withdraw = Math.min(balances[assetKey], grossNeeded);
+            const penalty = withdraw * pRate;
+            const netProceeds = withdraw - penalty;
+            balances[assetKey] -= withdraw;
+            remaining -= netProceeds;
+            annualEarlyWithdrawalPenalties += penalty;
+          } else {
+            withdraw = Math.min(balances[assetKey], remaining);
+            balances[assetKey] -= withdraw;
+            remaining -= withdraw;
+          }
+          if (remaining <= 0.01) break;
+        }
+      }
+      return remaining;
+    };
 
   // Run simulation year-by-year
   for (let year = 0; year <= simYearsToCompute; year++) {
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
+    annualEarlyWithdrawalPenalties = 0;
 
     // Set progressive tax values for this year (adjusted for inflation)
     const taxConfig = U_S_TAX_DATA[filingStatus] || U_S_TAX_DATA.single;
@@ -632,7 +657,13 @@ export function runFireSimulation(inputs) {
 
         if (purchaseType === 'cash') {
           const closingCosts = p * 0.02;
-          deductFromLiquidAssets(p + closingCosts);
+          const houseShortfall = deductFromLiquidAssets(p + closingCosts, age);
+          if (houseShortfall > 0.01) {
+            hasRunOut = true;
+            if (runOutAge === null) {
+              runOutAge = age;
+            }
+          }
 
           purchasedProperties.push({
             purchaseAge: age,
@@ -650,7 +681,13 @@ export function runFireSimulation(inputs) {
         } else {
           const dp = Number(ev.downPayment) || 0;
           const closingCosts = p * 0.02;
-          deductFromLiquidAssets(dp + closingCosts);
+          const houseShortfall = deductFromLiquidAssets(dp + closingCosts, age);
+          if (houseShortfall > 0.01) {
+            hasRunOut = true;
+            if (runOutAge === null) {
+              runOutAge = age;
+            }
+          }
 
           const rate = (Number(ev.mortgageRate) || 6.5) / 100;
           const mortgageTerm = Number(ev.loanTerm) || 30;
@@ -757,7 +794,13 @@ export function runFireSimulation(inputs) {
     enabledEvents.forEach(ev => {
       if (ev.type === 'debtPayoff' && age === Number(ev.payoffAge)) {
         const amt = Number(ev.remainingBalance) || 0;
-        deductFromLiquidAssets(amt);
+        const debtShortfall = deductFromLiquidAssets(amt, age);
+        if (debtShortfall > 0.01) {
+          hasRunOut = true;
+          if (runOutAge === null) {
+            runOutAge = age;
+          }
+        }
         debtBalance = 0;
       }
     });
@@ -780,12 +823,14 @@ export function runFireSimulation(inputs) {
           rate: b.rate
         }));
 
+        const pRateAtRetirement = (enforceEarlyWithdrawalPenalty && targetRetirementAge < 59.5) ? 0.10 : 0.0;
         projectedExpensesAtRetirement = solveTraditionalWithdrawal(
           projectedExpensesAtRetirement,
           Infinity,
           0,
           stdDeductionAtRetirement,
-          bracketsAtRetirement
+          bracketsAtRetirement,
+          pRateAtRetirement
         );
       }
       const targetPortfolioAtRetirement = projectedExpensesAtRetirement / swr;
@@ -1004,16 +1049,14 @@ export function runFireSimulation(inputs) {
 
     if (netCashFlow < 0) {
       const deficit = -netCashFlow;
-      const leftShortfall = coverShortfall(deficit);
+      const leftShortfall = coverShortfall(deficit, age);
       withdrawal = deficit - leftShortfall;
 
       if (leftShortfall > 0.01) {
         shortfall = leftShortfall;
-        if (age >= targetRetirementAge) {
-          hasRunOut = true;
-          if (runOutAge === null) {
-            runOutAge = age;
-          }
+        hasRunOut = true;
+        if (runOutAge === null) {
+          runOutAge = age;
         }
       }
     }
@@ -1022,8 +1065,13 @@ export function runFireSimulation(inputs) {
       const isPostRet = age >= targetRetirementAge;
       if (isPostRet) {
         taxes = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
+      } else {
+        const adjustedTaxable = Math.max(0, taxableIncome - totalPreTaxAllocations);
+        taxes = calculateUSTax(adjustedTaxable, standardDeduction, nominalBrackets);
       }
     }
+
+    taxes += annualEarlyWithdrawalPenalties;
 
     // Sum of remaining loan balances
     const currentDebtSum = activeLoans.reduce((sum, l) => sum + l.balance, 0) + debtBalance;
@@ -1206,36 +1254,56 @@ export function runFireSimulation(inputs) {
     };
   });
 
-  // Search for the earliest retirement ready age (SWR-based / Indefinite)
   let retirementReadyAgeSWR = null;
-  for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
-    const testRes = executeSimulation(testAge);
-    if (testRes.moneyLasts) {
-      const lastLog = testRes.logs[testRes.logs.length - 1];
-      if (lastLog && lastLog.portfolio >= lastLog.retirementReadyTarget) {
-        retirementReadyAgeSWR = testAge;
-        break;
+  let retirementReadyAgeComfortable = null;
+  let retirementReadyAgeSurvival = null;
+
+  if (!inputs.skipReadyAgeSearch) {
+    // Binary search for retirementReadyAgeSWR
+    let lowSWR = currentAge;
+    let highSWR = lifeExpectancy;
+    while (lowSWR <= highSWR) {
+      const mid = Math.floor((lowSWR + highSWR) / 2);
+      const testRes = executeSimulation(mid);
+      if (testRes.moneyLasts) {
+        const lastLog = testRes.logs[testRes.logs.length - 1];
+        if (lastLog && lastLog.portfolio >= lastLog.retirementReadyTarget) {
+          retirementReadyAgeSWR = mid;
+          highSWR = mid - 1; // Try to retire even earlier
+        } else {
+          lowSWR = mid + 1; // Need to work longer
+        }
+      } else {
+        lowSWR = mid + 1;
       }
     }
-  }
 
-  // Search for the earliest retirement ready age (Comfortable: survives to lifeExpectancy + 10)
-  let retirementReadyAgeComfortable = null;
-  for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
-    const testRes = executeSimulation(testAge, lifeExpectancy + 10);
-    if (testRes.moneyLasts) {
-      retirementReadyAgeComfortable = testAge;
-      break;
+    // Binary search for retirementReadyAgeComfortable
+    let lowC = currentAge;
+    let highC = lifeExpectancy;
+    while (lowC <= highC) {
+      const mid = Math.floor((lowC + highC) / 2);
+      const testRes = executeSimulation(mid, lifeExpectancy + 10);
+      if (testRes.moneyLasts) {
+        retirementReadyAgeComfortable = mid;
+        highC = mid - 1;
+      } else {
+        lowC = mid + 1;
+      }
     }
-  }
 
-  // Search for the earliest retirement ready age (Survival-based / Sustainable)
-  let retirementReadyAgeSurvival = null;
-  for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
-    const testRes = executeSimulation(testAge);
-    if (testRes.moneyLasts) {
-      retirementReadyAgeSurvival = testAge;
-      break;
+    // Binary search for retirementReadyAgeSurvival
+    let lowS = currentAge;
+    let highS = lifeExpectancy;
+    while (lowS <= highS) {
+      const mid = Math.floor((lowS + highS) / 2);
+      const testRes = executeSimulation(mid);
+      if (testRes.moneyLasts) {
+        retirementReadyAgeSurvival = mid;
+        highS = mid - 1;
+      } else {
+        lowS = mid + 1;
+      }
     }
   }
 

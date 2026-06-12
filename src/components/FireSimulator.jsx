@@ -318,9 +318,12 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
   }
 
   if (type === 'combined') {
-    const savingsDelta = (0.03 * currentIncome) + 1200;
+    const savingsPercent = value && typeof value === 'object' ? value.savings : 3;
+    const yearsDelay = value && typeof value === 'object' ? value.delay : 2;
+
+    const savingsDelta = (savingsPercent / 100 * currentIncome);
     const newExpenses = Math.round(Math.max(0, currentExpenses - savingsDelta));
-    const newRetirementAge = currentInputs.targetRetirementAge + 2;
+    const newRetirementAge = currentInputs.targetRetirementAge + yearsDelay;
 
     return {
       ...currentInputs,
@@ -351,7 +354,98 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
     };
   }
 
+  if (type === 'retire65') {
+    const target65Age = currentInputs.currentAge < 65 ? 65 : currentInputs.currentAge;
+    const deltaRate = value;
+    const annualSavingsDelta = (deltaRate * currentIncome) / 100;
+    const newExpenses = Math.round(Math.max(0, currentExpenses - annualSavingsDelta));
+
+    return {
+      ...currentInputs,
+      targetRetirementAge: target65Age,
+      simpleExpenses: newExpenses,
+      spendingPhases: currentInputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          return {
+            ...phase,
+            amount: newExpenses,
+            annualSpending: newExpenses
+          };
+        }
+        return phase;
+      }),
+      incomeList: currentInputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: target65Age };
+        }
+        return inc;
+      }),
+      lifeEvents: currentInputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: target65Age };
+        }
+        return ev;
+      })
+    };
+  }
+
   return currentInputs;
+};
+
+const getPaceBadgeStyles = (savingsFocus) => {
+  if (!savingsFocus) return {
+    color: 'var(--text-secondary)',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid var(--border-color)'
+  };
+  const focusLower = savingsFocus.toLowerCase();
+  if (focusLower.includes('steady')) {
+    return {
+      color: '#10b981',
+      background: 'rgba(16, 185, 129, 0.12)',
+      border: '1px solid rgba(16, 185, 129, 0.3)'
+    };
+  }
+  if (focusLower.includes('gentle')) {
+    return {
+      color: '#3b82f6',
+      background: 'rgba(59, 130, 246, 0.12)',
+      border: '1px solid rgba(59, 130, 246, 0.3)'
+    };
+  }
+  if (focusLower.includes('balanced')) {
+    return {
+      color: '#6366f1',
+      background: 'rgba(99, 102, 241, 0.12)',
+      border: '1px solid rgba(99, 102, 241, 0.3)'
+    };
+  }
+  if (focusLower.includes('moderate')) {
+    return {
+      color: '#f59e0b',
+      background: 'rgba(245, 158, 11, 0.12)',
+      border: '1px solid rgba(245, 158, 11, 0.3)'
+    };
+  }
+  if (focusLower.includes('earnings') || focusLower.includes('active')) {
+    return {
+      color: '#8b5cf6',
+      background: 'rgba(139, 92, 246, 0.12)',
+      border: '1px solid rgba(139, 92, 246, 0.3)'
+    };
+  }
+  if (focusLower.includes('accelerated') || focusLower.includes('proactive') || focusLower.includes('dynamic')) {
+    return {
+      color: '#ec4899',
+      background: 'rgba(236, 72, 153, 0.12)',
+      border: '1px solid rgba(236, 72, 153, 0.3)'
+    };
+  }
+  return {
+    color: 'var(--text-secondary)',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid var(--border-color)'
+  };
 };
 
 export default function FireSimulator() {
@@ -365,6 +459,7 @@ export default function FireSimulator() {
   const [activeStep, setActiveStep] = useState(1);
   const [editingEvent, setEditingEvent] = useState(null);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
+  const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [showImprovementModal, setShowImprovementModal] = useState(false);
   const [hasAutoPopped, setHasAutoPopped] = useState(false);
@@ -619,6 +714,7 @@ export default function FireSimulator() {
 
   // Suggestion engine for Retirement Improvement Plan
   const improvementPlan = useMemo(() => {
+    if (activeStep !== 2) return null;
     const currentReadyAge = activeResults.retirementReadyAge;
     const isSustainable = inputs.readinessCriteria === 'lastsLifeExp';
     const isComfortable = inputs.readinessCriteria === 'lastsComfortable';
@@ -656,34 +752,56 @@ export default function FireSimulator() {
         }
         return phase;
       });
+
+      // Synchronize allocationRules in test inputs to match test savings rate
+      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
+      testInputs.allocationRules = inputs.allocationRules.map(rule => {
+        if (rule.id === 'simple-alloc-pretax') {
+          return { ...rule, value: testSavingsRate };
+        }
+        return rule;
+      });
+
       return runFireSimulation(testInputs);
     };
 
-    let bestDeltaRate = 5; // fallback
+    // 1. Savings Scenario (Binary Search)
+    let bestDeltaRate = null;
     let bestNewReadyAge = null;
     let foundSavingsImprovement = false;
 
-    // Search from +1% to +15% savings rate
-    for (let d = 1; d <= 15; d++) {
-      if (currentSavingsRate + d > 70) break; // Avoid extreme suggestions
-      const testRes = getTestSavingsResult(d);
+    const maxSavingsDelta = Math.min(30, Math.max(0, 95 - currentSavingsRate));
+    let lowSavings = 1;
+    let highSavings = maxSavingsDelta;
+
+    while (lowSavings <= highSavings) {
+      const mid = Math.floor((lowSavings + highSavings) / 2);
+      const testRes = getTestSavingsResult(mid);
       const testReadyAge = testRes.retirementReadyAge;
-      
-      if (testReadyAge) {
-        if (!currentReadyAge || testReadyAge < currentReadyAge || (currentReadyAge > inputs.lifeExpectancy && testReadyAge <= inputs.lifeExpectancy)) {
-          bestDeltaRate = d;
-          bestNewReadyAge = testReadyAge;
-          foundSavingsImprovement = true;
-          if (testReadyAge <= inputs.lifeExpectancy) {
-            break;
-          }
-        }
+      const goesBroke = !testRes.moneyLasts;
+
+      if (!goesBroke && testReadyAge && (!currentReadyAge || testReadyAge < currentReadyAge || (currentReadyAge > inputs.lifeExpectancy && testReadyAge <= inputs.lifeExpectancy))) {
+        bestDeltaRate = mid;
+        bestNewReadyAge = testReadyAge;
+        foundSavingsImprovement = true;
+        highSavings = mid - 1; // Try to find a smaller savings rate increase
+      } else {
+        lowSavings = mid + 1; // Need a higher savings rate increase
       }
+    }
+
+    if (!foundSavingsImprovement) {
+      bestDeltaRate = 5; // fallback
     }
 
     if (foundSavingsImprovement && bestNewReadyAge) {
       const extraMonthly = Math.round((bestDeltaRate * currentIncome) / 1200);
       const yearsImprovement = currentReadyAge ? (currentReadyAge - bestNewReadyAge) : null;
+      const savingsPaceLabel = bestDeltaRate <= 5 
+        ? `Moderate Savings Pace (+${bestDeltaRate}%)` 
+        : bestDeltaRate <= 12 
+          ? `Active Savings Pace (+${bestDeltaRate}%)` 
+          : `Accelerated Savings Pace (+${bestDeltaRate}%)`;
 
       list.push({
         type: 'savings',
@@ -698,7 +816,9 @@ export default function FireSimulator() {
         readyAge: bestNewReadyAge,
         yearsImprovement,
         value: bestDeltaRate,
-        disruption: 2
+        disruption: bestDeltaRate,
+        savingsFocus: savingsPaceLabel,
+        savingsEffortScore: bestDeltaRate
       });
     }
 
@@ -723,6 +843,7 @@ export default function FireSimulator() {
       return runFireSimulation(testInputs);
     };
 
+    // 2. Work Longer Scenario
     let bestDelay = 3;
     let workLongerNewReadyAge = null;
     let foundWorkImprovement = false;
@@ -732,6 +853,10 @@ export default function FireSimulator() {
       if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
       const testRes = getTestWorkLongerResult(delay);
       const testReadyAge = testRes.retirementReadyAge;
+      
+      const goesBroke = !testRes.moneyLasts;
+      if (goesBroke) continue;
+
       if (testReadyAge && testReadyAge <= inputs.lifeExpectancy) {
         bestDelay = delay;
         workLongerNewReadyAge = testReadyAge;
@@ -745,6 +870,10 @@ export default function FireSimulator() {
         if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
         const testRes = getTestWorkLongerResult(delay);
         const testReadyAge = testRes.retirementReadyAge;
+        
+        const goesBroke = !testRes.moneyLasts;
+        if (goesBroke) continue;
+
         if (testReadyAge && (!currentReadyAge || testReadyAge < currentReadyAge)) {
           bestDelay = delay;
           workLongerNewReadyAge = testReadyAge;
@@ -768,7 +897,9 @@ export default function FireSimulator() {
         readyAge: workLongerNewReadyAge,
         yearsImprovement,
         value: bestDelay,
-        disruption: 3
+        disruption: 0,
+        savingsFocus: 'Steady Savings Pace',
+        savingsEffortScore: 0
       });
     }
 
@@ -787,6 +918,7 @@ export default function FireSimulator() {
       return runFireSimulation(testInputs);
     };
 
+    // 3. Increase Income Scenario
     let bestExtraIncome = 10000;
     let incomeNewReadyAge = null;
     let foundIncomeImprovement = false;
@@ -795,6 +927,10 @@ export default function FireSimulator() {
     for (const incAmt of incomeIncrements) {
       const testRes = getTestIncomeResult(incAmt);
       const testReadyAge = testRes.retirementReadyAge;
+      
+      const goesBroke = !testRes.moneyLasts;
+      if (goesBroke) continue;
+
       if (testReadyAge && (testReadyAge <= inputs.lifeExpectancy || !currentReadyAge || testReadyAge < currentReadyAge)) {
         bestExtraIncome = incAmt;
         incomeNewReadyAge = testReadyAge;
@@ -807,9 +943,12 @@ export default function FireSimulator() {
 
     if (foundIncomeImprovement && incomeNewReadyAge) {
       const yearsImprovement = currentReadyAge ? (currentReadyAge - incomeNewReadyAge) : null;
+      const equivDelta = currentIncome > 0 ? Math.round((bestExtraIncome / currentIncome) * 100) : 5;
+      const incomePaceLabel = `Earnings-Backed Pace (+${equivDelta}%)`;
+
       list.push({
         type: 'income',
-        icon: '📈',
+        icon: '💵',
         title: 'Increase Income',
         details: `Increase your gross annual earnings by ${formatCurrency(bestExtraIncome)}/year and save the difference.`,
         bulletPoints: [
@@ -820,21 +959,153 @@ export default function FireSimulator() {
         readyAge: incomeNewReadyAge,
         yearsImprovement,
         value: bestExtraIncome,
-        disruption: 1
+        disruption: equivDelta,
+        savingsFocus: incomePaceLabel,
+        savingsEffortScore: equivDelta
       });
     }
 
-    const getCombinedPlanResult = () => {
-      const extraSavingsFrom3Percent = Math.round((0.03 * currentIncome) / 12);
-      const savingsDelta = extraSavingsFrom3Percent * 12; // 3% of income saved by reducing spending
+    // 4. Retire at Age 65 (always included)
+    const target65Age = inputs.currentAge < 65 ? 65 : inputs.currentAge;
+    
+    const getTestRetire65Result = (deltaRate) => {
+      const annualSavingsDelta = (deltaRate * currentIncome) / 100;
       const testInputs = {
         ...inputs,
-        targetRetirementAge: inputs.targetRetirementAge + 2,
-        simpleExpenses: Math.max(0, currentExpenses - savingsDelta)
+        targetRetirementAge: target65Age,
+        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta),
+        skipReadyAgeSearch: true
       };
       testInputs.incomeList = inputs.incomeList.map(inc => {
         if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-          return { ...inc, endAge: inputs.targetRetirementAge + 2 };
+          return { ...inc, endAge: target65Age };
+        }
+        return inc;
+      });
+      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
+          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
+          return {
+            ...phase,
+            amount: Math.max(0, currentAmt - annualSavingsDelta),
+            annualSpending: Math.max(0, currentAmt - annualSavingsDelta)
+          };
+        }
+        return phase;
+      });
+      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
+        if (ev.type === 'retire') {
+          return { ...ev, age: target65Age };
+        }
+        return ev;
+      });
+
+      // Synchronize allocationRules in test inputs to match test savings rate
+      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
+      testInputs.allocationRules = inputs.allocationRules.map(rule => {
+        if (rule.id === 'simple-alloc-pretax') {
+          return { ...rule, value: testSavingsRate };
+        }
+        return rule;
+      });
+
+      return runFireSimulation(testInputs);
+    };
+
+    let retire65DeltaRate = null;
+    let retire65NewReadyAge = null;
+    let foundRetire65Plan = false;
+
+    // Search delta rate up to 95% total savings rate (Binary Search)
+    const maxDelta65 = Math.max(0, 95 - currentSavingsRate);
+    let low65 = 0;
+    let high65 = maxDelta65;
+
+    while (low65 <= high65) {
+      const mid = Math.floor((low65 + high65) / 2);
+      const testRes = getTestRetire65Result(mid);
+      const testReadyAge = testRes.retirementReadyAge;
+      const goesBroke = !testRes.moneyLasts;
+
+      if (!goesBroke && testReadyAge && testReadyAge <= target65Age) {
+        retire65DeltaRate = mid;
+        retire65NewReadyAge = testReadyAge;
+        foundRetire65Plan = true;
+        high65 = mid - 1; // Try to find a smaller delta
+      } else {
+        low65 = mid + 1; // Need a higher savings rate to prevent going broke
+      }
+    }
+
+    // Force-generate if not found
+    if (!foundRetire65Plan) {
+      retire65DeltaRate = Math.max(0, 90 - currentSavingsRate);
+      retire65NewReadyAge = target65Age;
+      foundRetire65Plan = true;
+    }
+
+    if (foundRetire65Plan && retire65NewReadyAge !== null) {
+      const extraMonthly = Math.round((retire65DeltaRate * currentIncome) / 1200);
+      const bulletPoints = [];
+      if (retire65DeltaRate > 0) {
+        bulletPoints.push(`Boost your savings rate by +${retire65DeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + retire65DeltaRate}%).`);
+        bulletPoints.push(`Save and invest an additional ${formatCurrency(extraMonthly)}/month.`);
+      } else {
+        bulletPoints.push(`Retire at ${target65Age === 65 ? 'Age 65' : `Age ${target65Age}`} under your current budget (no extra savings required).`);
+      }
+
+      // Check if they go broke on this path
+      const finalTestRes = getTestRetire65Result(retire65DeltaRate);
+      const goesBroke = !finalTestRes.moneyLasts;
+
+      if (goesBroke) {
+        const runOutAgeVal = finalTestRes.runOutAge !== null ? finalTestRes.runOutAge : 95;
+        bulletPoints.push(`Note: Even with high savings, assets may run out around Age ${runOutAgeVal} (additional adjustments needed).`);
+      } else {
+        bulletPoints.push(`Enables a successful, positive net worth trajectory through age 95.`);
+      }
+
+      const titleLabel = target65Age === 65 ? 'Retire at Age 65' : `Retire at Age ${target65Age}`;
+      const detailsLabel = retire65DeltaRate > 0
+        ? `Lock in your retirement age at ${target65Age === 65 ? '65' : target65Age} by adjusting your savings rate by +${retire65DeltaRate}%.`
+        : `Lock in your retirement age at ${target65Age === 65 ? '65' : target65Age} under your current budget.`;
+
+      const retire65PaceLabel = retire65DeltaRate === 0 
+        ? 'Steady Savings Pace' 
+        : retire65DeltaRate <= 5 
+          ? `Gentle Savings Pace (+${retire65DeltaRate}%)` 
+          : retire65DeltaRate <= 12 
+            ? `Moderate Savings Pace (+${retire65DeltaRate}%)` 
+            : `Active Savings Pace (+${retire65DeltaRate}%)`;
+
+      list.push({
+        type: 'retire65',
+        icon: '📅',
+        title: titleLabel,
+        details: detailsLabel,
+        bulletPoints,
+        readyAge: target65Age,
+        yearsImprovement: currentReadyAge ? (currentReadyAge - target65Age) : null,
+        value: retire65DeltaRate,
+        disruption: retire65DeltaRate,
+        savingsFocus: retire65PaceLabel,
+        savingsEffortScore: retire65DeltaRate
+      });
+    }
+
+    // Helper for combined plan
+    const getCombinedPlanResult = (savingsPercent, yearsDelay) => {
+      const extraSavings = Math.round((savingsPercent * currentIncome) / 100 / 12);
+      const savingsDelta = extraSavings * 12;
+      const testInputs = {
+        ...inputs,
+        targetRetirementAge: inputs.targetRetirementAge + yearsDelay,
+        simpleExpenses: Math.max(0, currentExpenses - savingsDelta),
+        skipReadyAgeSearch: true
+      };
+      testInputs.incomeList = inputs.incomeList.map(inc => {
+        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
         }
         return inc;
       });
@@ -851,19 +1122,63 @@ export default function FireSimulator() {
       });
       testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
         if (ev.type === 'retire') {
-          return { ...ev, age: inputs.targetRetirementAge + 2 };
+          return { ...ev, age: inputs.targetRetirementAge + yearsDelay };
         }
         return ev;
       });
+
+      // Synchronize allocationRules in test inputs to match test savings rate
+      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
+      testInputs.allocationRules = inputs.allocationRules.map(rule => {
+        if (rule.id === 'simple-alloc-pretax') {
+          return { ...rule, value: testSavingsRate };
+        }
+        return rule;
+      });
+
       return runFireSimulation(testInputs);
     };
 
-    const combinedRes = getCombinedPlanResult();
-    const combinedNewReadyAge = combinedRes.retirementReadyAge;
+    // 5. Combined Plan Scenario
+    const combinedCombos = [];
+    for (let s = 3; s <= 6; s++) {
+      for (let w = 2; w <= 5; w++) {
+        combinedCombos.push({ savings: s, delay: w });
+      }
+    }
+    combinedCombos.sort((a, b) => {
+      const sumA = a.savings + a.delay;
+      const sumB = b.savings + b.delay;
+      if (sumA !== sumB) return sumA - sumB;
+      return a.savings - b.savings;
+    });
 
-    if (combinedNewReadyAge) {
+    let bestCombinedSavings = null;
+    let bestCombinedDelay = null;
+    let combinedNewReadyAge = null;
+
+    for (const combo of combinedCombos) {
+      if (currentSavingsRate + combo.savings > 70) continue;
+      if (inputs.targetRetirementAge + combo.delay > inputs.lifeExpectancy) continue;
+
+      const testRes = getCombinedPlanResult(combo.savings, combo.delay);
+      const testReadyAge = testRes.retirementReadyAge;
+
+      if (testReadyAge) {
+        const goesBroke = !testRes.moneyLasts;
+
+        if (!goesBroke) {
+          bestCombinedSavings = combo.savings;
+          bestCombinedDelay = combo.delay;
+          combinedNewReadyAge = testReadyAge;
+          break;
+        }
+      }
+    }
+
+    if (combinedNewReadyAge && bestCombinedSavings !== null && bestCombinedDelay !== null) {
       const yearsImprovement = currentReadyAge ? (currentReadyAge - combinedNewReadyAge) : null;
-      const extraSavingsFrom3Percent = Math.round((0.03 * currentIncome) / 12);
+      const extraSavingsMonthly = Math.round((bestCombinedSavings * currentIncome) / 1200);
       
       list.push({
         type: 'combined',
@@ -872,57 +1187,51 @@ export default function FireSimulator() {
         badge: 'Recommended',
         details: 'A balanced combination of small, realistic adjustments that yields a massive improvement:',
         bulletPoints: [
-          `Save 3% more (approx. ${formatCurrency(extraSavingsFrom3Percent)}/month) or reduce monthly spending by ${formatCurrency(extraSavingsFrom3Percent)}/month`,
-          `Work 2 additional years (delaying retirement to Age ${inputs.targetRetirementAge + 2})`
+          `Save ${bestCombinedSavings}% more (approx. ${formatCurrency(extraSavingsMonthly)}/month) or reduce monthly spending by ${formatCurrency(extraSavingsMonthly)}/month.`,
+          `Work ${bestCombinedDelay} additional years (delaying retirement to Age ${inputs.targetRetirementAge + bestCombinedDelay}).`
         ],
         readyAge: combinedNewReadyAge,
         yearsImprovement,
-        value: null,
-        disruption: 1
+        value: { savings: bestCombinedSavings, delay: bestCombinedDelay },
+        disruption: bestCombinedSavings,
+        savingsFocus: `Balanced Pace (+${bestCombinedSavings}%)`,
+        savingsEffortScore: bestCombinedSavings
       });
     }
 
-    const balancedItem = list.find(item => item.type === 'combined');
-    const otherItems = list.filter(item => item.type !== 'combined');
-
-    otherItems.sort((a, b) => {
-      const aImprove = a.yearsImprovement || 0;
-      const bImprove = b.yearsImprovement || 0;
-      if (aImprove !== bImprove) {
-        return bImprove - aImprove;
+    // Sort all scenarios strictly by savingsEffortScore (aggressiveness) ascending, then by readyAge ascending
+    list.sort((a, b) => {
+      const scoreA = a.savingsEffortScore !== undefined ? a.savingsEffortScore : 5;
+      const scoreB = b.savingsEffortScore !== undefined ? b.savingsEffortScore : 5;
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
       }
-      return a.disruption - b.disruption;
+      return a.readyAge - b.readyAge;
     });
-
-    const rankedPlan = [];
-    if (balancedItem) rankedPlan.push(balancedItem);
-    rankedPlan.push(...otherItems);
 
     return {
       showImprovementPlan: true,
-      rankedPlan,
+      rankedPlan: list,
       currentReadyAge
     };
-  }, [inputs, activeResults]);
+  }, [inputs, activeResults, activeStep]);
 
-  // Reset auto-pop when switching scenarios
+  // Reset auto-pop when switching scenarios or active step
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasAutoPopped(false);
-  }, [currentScenarioId]);
+  }, [currentScenarioId, activeStep]);
 
-  // Auto-pop the improvement plan modal when a plan becomes available
+  // Auto-pop the improvement plan modal when a plan becomes available (Screen 2 only)
   useEffect(() => {
-    if (improvementPlan) {
+    if (activeStep === 2 && improvementPlan) {
       if (!hasAutoPopped) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowImprovementModal(true);
         setHasAutoPopped(true);
       }
-    } else {
-      setHasAutoPopped(false);
     }
-  }, [improvementPlan, hasAutoPopped]);
+  }, [activeStep, improvementPlan, hasAutoPopped]);
 
   const handleApplyImprovementScenario = (scenario) => {
     setScenarios(prev => prev.map(scen => {
@@ -2732,190 +3041,204 @@ export default function FireSimulator() {
 
       {/* Screen 1: Your Life Today */}
       {activeStep === 1 && (
-        <div className="today-screen-layout">
+        <div className="today-screen-layout" style={{ alignItems: 'stretch' }}>
           {/* Inputs Grid */}
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h2 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Your Life Today</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <h2 className="card-title" style={{ fontSize: '1.3rem', marginBottom: '0.25rem' }}>Your Life Today</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.45' }}>
               Let's estimate your path to financial independence. Fill in your current numbers to see your baseline projection instantly.
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="input-wrapper">
-                <span className="input-name">Current Age</span>
-                <input
-                  type="number"
-                  className="input-number-box"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '1.1rem', padding: '0.6rem 0.8rem' }}
-                  value={inputs.currentAge}
-                  onChange={(e) => handleStep1Change('currentAge', parseInt(e.target.value) || 0)}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.currentAge}
+                    placeholder="e.g. 35"
+                    onChange={(e) => handleStep1Change('currentAge', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
                   Your current age today (e.g. 35)
                 </span>
               </div>
 
-              <div className="input-wrapper">
-                <span className="input-name">Life Expectancy</span>
-                <input
-                  type="number"
-                  className="input-number-box"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '1.1rem', padding: '0.6rem 0.8rem' }}
-                  value={inputs.lifeExpectancy}
-                  onChange={(e) => handleStep1Change('lifeExpectancy', parseInt(e.target.value) || 0)}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Life Expectancy</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.lifeExpectancy}
+                    placeholder="e.g. 85"
+                    onChange={(e) => handleStep1Change('lifeExpectancy', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
                   Age you expect to live to (e.g. 85)
                 </span>
               </div>
 
-              <div className="input-wrapper">
-                <span className="input-name">Annual Income ($)</span>
-                <input
-                  type="number"
-                  className="input-number-box"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '1.1rem', padding: '0.6rem 0.8rem' }}
-                  value={inputs.simpleIncome}
-                  onChange={(e) => handleStep1Change('simpleIncome', parseFloat(e.target.value) || 0)}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleIncome}
+                    placeholder="e.g. 120000"
+                    onChange={(e) => handleStep1Change('simpleIncome', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
                   Your total yearly gross income (e.g. $120,000)
                 </span>
               </div>
 
-              <div className="input-wrapper">
-                <span className="input-name">Pre-Tax Savings Rate (%)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="input-number-box"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '1.1rem', padding: '0.6rem 0.8rem' }}
-                  value={simpleSavingsRate}
-                  onChange={(e) => {
-                    const rate = parseFloat(e.target.value) || 0;
-                    const clampedRate = Math.min(100, Math.max(0, rate));
-                    lastNonZeroSavingsRateRef.current = clampedRate;
-                    const income = Number(inputs.simpleIncome) || 0;
-                    const newExpenses = Math.round(income * (1 - clampedRate / 100));
-                    handleStep1Change('simpleExpenses', newExpenses);
-                  }}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
+                    value={simpleSavingsRate}
+                    placeholder="e.g. 20"
+                    onChange={(e) => {
+                      const rate = parseFloat(e.target.value) || 0;
+                      const clampedRate = Math.min(100, Math.max(0, rate));
+                      lastNonZeroSavingsRateRef.current = clampedRate;
+                      const income = Number(inputs.simpleIncome) || 0;
+                      const newExpenses = Math.round(income * (1 - clampedRate / 100));
+                      handleStep1Change('simpleExpenses', newExpenses);
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
                   Percent of income saved pre-tax (e.g. 20%)
                 </span>
               </div>
 
-              <div className="input-wrapper">
-                <span className="input-name">Current Savings ($)</span>
-                <input
-                  type="number"
-                  className="input-number-box"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '1.1rem', padding: '0.6rem 0.8rem' }}
-                  value={inputs.simpleInvestments}
-                  onChange={(e) => handleStep1Change('simpleInvestments', parseFloat(e.target.value) || 0)}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleInvestments}
+                    placeholder="e.g. 250000"
+                    onChange={(e) => handleStep1Change('simpleInvestments', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
                   Your total savings, retirement, and investment accounts combined (e.g. $250,000)
                 </span>
               </div>
-
             </div>
 
           </div>
 
           {/* Immediate Value Display Progress Board */}
-          <div className="progress-board-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem' }}>
+          <div className="progress-board-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', padding: '1.25rem 1.5rem', height: 'auto' }}>
             <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Your Financial Snapshot</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Your Financial Snapshot</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>
                 Your current starting point parameters:
               </p>
             </div>
 
             {/* Positive Metrics Deck */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', width: '100%' }}>
-              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.15rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%' }}>
+              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
                   Annual Income
                 </span>
-                <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '1.15' }}>
                   {formatCurrency(inputs.simpleIncome)}
                 </span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.15rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
                   Pre-Tax Savings Rate
                 </span>
-                <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--primary)' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.15' }}>
                   {simpleSavingsRate}%
                 </span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.15rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
                   Annual Surplus
                 </span>
-                <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--accent-emerald)' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-emerald)', lineHeight: '1.15' }}>
                   {formatCurrency(Math.max(0, inputs.simpleIncome - inputs.simpleExpenses))}
                 </span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.15rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
                   Current Net Worth
                 </span>
-                <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--primary)' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.15' }}>
                   {formatCurrency(totalNetWorth)}
                 </span>
               </div>
             </div>
 
             {/* Encouraging Insights */}
-            <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '8px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', textAlign: 'left' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', textAlign: 'left' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Starting Point Insights
               </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
                   <span>💡</span>
                   <span>
                     {simpleSavingsRate >= 15 
                       ? `Strong Start: You are currently saving ${simpleSavingsRate}% of your income pre-tax.`
                       : simpleSavingsRate > 0
-                        ? `Good Start: You are currently saving ${simpleSavingsRate}% of your income pre-tax. Every bit helps build momentum!`
+                        ? `Good Start: You are currently saving ${simpleSavingsRate}% of your income pre-tax.`
                         : `Action Plan: Try adjusting your spending to create a surplus and start saving.`}
                   </span>
                 </div>
                 {inputs.simpleIncome - inputs.simpleExpenses > 0 && (
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
                     <span>🌱</span>
                     <span>
-                      {`Annual Investing: You have approximately ${formatCurrency(inputs.simpleIncome - inputs.simpleExpenses)} per year available to build wealth.`}
+                      {`Annual Investing: You have ${formatCurrency(inputs.simpleIncome - inputs.simpleExpenses)}/yr to build wealth.`}
                     </span>
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
                   <span>✨</span>
                   <span>
-                    {`Current Status: This is your starting point. Future career growth and life decisions can dramatically change your timeline.`}
+                    {`Current Status: This is your starting point. Life choices can change your timeline.`}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Next Step CTA */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: 'auto' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: 'auto', width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Next Step
                 </span>
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   Now let’s see how future life choices affect your path.
                 </span>
               </div>
               <button
                 type="button"
                 className="btn-primary"
-                style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem', fontWeight: '700', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
+                style={{ width: '100%', padding: '0.65rem', fontSize: '1.05rem', fontWeight: '700', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
                 onClick={() => {
                   setActiveStep(2);
                 }}
@@ -3149,7 +3472,7 @@ export default function FireSimulator() {
                   }}
                   defaultValue=""
                 >
-                  <option value="" disabled>➕ Add Life Decision or Milestone...</option>
+                  <option value="" disabled>➕ Add Life Decision...</option>
                   <option value="buyHouse">🏠 Buy a House</option>
                   <option value="haveChild">👶 Have a Child</option>
                   <option value="careerChange">💼 Career Change</option>
@@ -3906,22 +4229,41 @@ export default function FireSimulator() {
                 <div className="improvement-plan-grid">
                   {improvementPlan.rankedPlan.map((scenario) => {
                     const isBalanced = scenario.type === 'combined';
+                    const badgeStyle = getPaceBadgeStyles(scenario.savingsFocus);
                     return (
                       <div 
                         key={scenario.type} 
                         className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
                       >
                         <div className="improvement-plan-card-main-content">
-                          <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <h4 className="improvement-plan-card-title">
+                          <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <h4 className="improvement-plan-card-title" style={{ margin: 0 }}>
                               <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
                               <span>{scenario.title}</span>
                             </h4>
-                            {isBalanced && (
-                              <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
-                                {scenario.badge}
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              {isBalanced && (
+                                <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
+                                  {scenario.badge}
+                                </span>
+                              )}
+                              <span 
+                                className="improvement-plan-card-badge" 
+                                style={{ 
+                                  fontSize: '0.65rem', 
+                                  textTransform: 'uppercase', 
+                                  fontWeight: '800', 
+                                  padding: '0.15rem 0.45rem', 
+                                  borderRadius: '4px', 
+                                  letterSpacing: '0.05em',
+                                  background: badgeStyle.background,
+                                  color: badgeStyle.color,
+                                  border: badgeStyle.border
+                                }}
+                              >
+                                {scenario.savingsFocus}
                               </span>
-                            )}
+                            </div>
                           </div>
                           <div className="improvement-plan-card-details">
                             <p className="improvement-plan-card-description">
@@ -3988,71 +4330,86 @@ export default function FireSimulator() {
         </div>
       )}
 
-      {/* Calculation Assumptions & Methodology Footer Section */}
-      <div className="glass-card" style={{ padding: '1.5rem', marginTop: '2rem', textAlign: 'left' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          📝 Calculation Assumptions & Methodology
-        </h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-          To maintain financial realism, the FIRE Retirement Simulator operates under several standard U.S. financial planning and tax rules. Key calculations and background assumptions include:
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              🏖 Retirement Spending Model
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              Target retirement spending defaults to <strong>{inputs.isAdvancedMode ? 'your customized spending phases' : '70% of pre-retirement lifestyle spending'}</strong> (not final salary), ensuring SWR targets scale with actual lifestyle costs rather than gross income.
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              💰 Social Security Claiming Scale
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              Benefits scale dynamically based on the claiming age relative to Full Retirement Age (FRA, age 67):
-              <span style={{ display: 'block', marginTop: '0.25rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-color)' }}>
-                • Age 62 (Early Claiming): <strong>70%</strong> of full benefit.<br />
-                • Age 67 (Full Retirement): <strong>100%</strong> of benefit.<br />
-                • Age 70 (Delayed Credits): <strong>124%</strong> of benefit.<br />
-                • Prior to claiming age, benefit is <strong>$0</strong>.
-              </span>
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              🏥 Healthcare & Medicare Bridge
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              If enabled, retirees pay an unsubsidized pre-Medicare premium bridge (default <strong>$10,000/yr</strong>) until age <strong>65</strong>. At age 65, costs automatically transition to Medicare premiums (default <strong>$4,000/yr</strong>).
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              📈 Annual Inflation Adjustments
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              All variables—including standard salary growth, spending phases, Social Security benefits, pension income, tax brackets, and health insurance premiums—are adjusted annually using the inflation rate to report final values in constant, today's dollars.
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              🔄 Portfolio Drawdown Order
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              Deficits are covered from liquid accounts in a strict tax-efficient hierarchy: Cash → Emergency Fund → Taxable Brokerage → Pre-tax (Traditional 401k/IRA, grossed up to cover taxes) → Roth accounts → HSA → Other.
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              ⚖️ Taxation & Standard Deductions
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-              Pre-tax withdrawals (Traditional 401k/IRA) are taxed as ordinary income. The engine simulates standard deductions and federal income tax brackets (Single or Married Filing Jointly) adjusted annually for inflation.
-            </p>
-          </div>
+      {/* Calculation Assumptions & Methodology Footer Section (Screen 2 Only, Collapsible) */}
+      {activeStep === 2 && (
+        <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginTop: '2rem', textAlign: 'left' }}>
+          <button
+            type="button"
+            className="collapsible-trigger-btn"
+            onClick={() => setExpandedMethodology(!expandedMethodology)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '1rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <span style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
+              📝 Calculation Assumptions & Methodology
+            </span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{expandedMethodology ? 'Hide ▲' : 'Show Details ▼'}</span>
+          </button>
+          
+          {expandedMethodology && (
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                To maintain financial realism, the FIRE Retirement Simulator operates under several standard U.S. financial planning and tax rules. Key calculations and background assumptions include:
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    🏖 Retirement Spending Model
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    Target retirement spending defaults to <strong>{inputs.isAdvancedMode ? 'your customized spending phases' : '70% of pre-retirement lifestyle spending'}</strong> (not final salary), ensuring SWR targets scale with actual lifestyle costs rather than gross income.
+                  </p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    💰 Social Security Claiming Scale
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    Benefits scale dynamically based on the claiming age relative to Full Retirement Age (FRA, age 67):
+                    <span style={{ display: 'block', marginTop: '0.25rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-color)' }}>
+                      • Age 62 (Early Claiming): <strong>70%</strong> of full benefit.<br />
+                      • Age 67 (Full Retirement): <strong>100%</strong> of benefit.<br />
+                      • Age 70 (Delayed Credits): <strong>124%</strong> of benefit.<br />
+                      • Prior to claiming age, benefit is <strong>$0</strong>.
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    🏥 Healthcare & Medicare Bridge
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    If enabled, retirees pay an unsubsidized pre-Medicare premium bridge (default <strong>$10,000/yr</strong>) until age <strong>65</strong>. At age 65, costs automatically transition to Medicare premiums (default <strong>$4,000/yr</strong>).
+                  </p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    📈 Annual Inflation Adjustments
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    All variables—including standard salary growth, spending phases, Social Security benefits, pension income, tax brackets, and health insurance premiums—are adjusted annually using the inflation rate to report final values in constant, today's dollars.
+                  </p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    🔄 Portfolio Drawdown Order
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    Deficits are covered from liquid accounts in a strict tax-efficient hierarchy: Cash → Emergency Fund → Taxable Brokerage → Pre-tax (Traditional 401k/IRA, grossed up to cover taxes) → Roth accounts → HSA → Other.
+                  </p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    ⚖️ Taxation & Early Withdrawal Penalties
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    Pre-tax withdrawals (Traditional 401k/IRA) are taxed as ordinary income. The engine simulates standard deductions and progressive federal income tax brackets (Single or Married Filing Jointly) adjusted annually for inflation. Additionally, a <strong>10% early withdrawal tax penalty</strong> is automatically enforced for all Traditional 401k/IRA drawdowns made before age <strong>59.5</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
     </div>
   );
