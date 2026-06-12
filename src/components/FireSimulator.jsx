@@ -230,8 +230,8 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
       };
     case 'notSustainable':
       return {
-        label: 'Not Sustainable',
-        badge: '🔴 Not Sustainable',
+        label: 'Needs Adjusting',
+        badge: '🔴 Needs Adjusting',
         color: 'var(--accent-rose)',
         bg: 'rgba(244, 63, 94, 0.1)',
         desc: `Under current assumptions, assets are projected to be depleted significantly before life expectancy (at Age ${runOutAge || 'N/A'}).`
@@ -670,29 +670,13 @@ export default function FireSimulator() {
       list.push({
         type: 'savings',
         icon: '📈',
-        title: 'Increase Savings',
-        details: `Increase savings rate by +${bestDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + bestDeltaRate}%).`,
+        title: 'Increase Savings Rate',
+        details: `Boost your savings rate by +${bestDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + bestDeltaRate}%).`,
         bulletPoints: [
-          `Save an additional ${formatCurrency(extraMonthly)}/month.`,
-          `New retirement ready age: Age ${bestNewReadyAge}.`
+          `Save and invest an additional ${formatCurrency(extraMonthly)}/month.`,
+          `This can be achieved by increasing pre-tax retirement contributions or trimming discretionary costs (which mathematically has the same positive impact on your cash flow surplus).`
         ],
-        extraAction: `E.g., set up an automatic monthly transfer of ${formatCurrency(extraMonthly)} to your investment account.`,
-        readyAge: bestNewReadyAge,
-        yearsImprovement,
-        value: bestDeltaRate,
-        disruption: 2
-      });
-
-      list.push({
-        type: 'spending',
-        icon: '💵',
-        title: 'Reduce Spending',
-        details: `Reduce your pre-retirement living expenses by ${formatCurrency(extraMonthly)}/month.`,
-        bulletPoints: [
-          `Cut monthly discretionary spending by ${formatCurrency(extraMonthly)}.`,
-          `New retirement ready age: Age ${bestNewReadyAge}.`
-        ],
-        extraAction: `E.g., review subscriptions, travel plans, or dining out to find ${formatCurrency(extraMonthly)} in monthly savings.`,
+        extraAction: `E.g., increase paycheck 401(k) contributions, automate transfer of ${formatCurrency(extraMonthly)}/mo to brokerage, or trim subscription/dining budgets.`,
         readyAge: bestNewReadyAge,
         yearsImprovement,
         value: bestDeltaRate,
@@ -3868,49 +3852,53 @@ export default function FireSimulator() {
                         key={scenario.type} 
                         className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
                       >
-                        <div className="improvement-plan-card-header">
-                          <span className="improvement-plan-card-title">
-                            <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
-                            <span>{scenario.title}</span>
-                          </span>
-                          {isBalanced && (
-                            <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended">
-                              {scenario.badge}
-                            </span>
-                          )}
-                        </div>
-                        <div className="improvement-plan-card-details">
-                          <p style={{ margin: '0 0 0.4rem 0', fontWeight: '600', color: 'var(--text-primary)' }}>
-                            {scenario.details}
-                          </p>
-                          {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
-                            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)' }}>
-                              {scenario.bulletPoints.map((pt, i) => (
-                                <li key={i} style={{ marginBottom: '0.2rem' }}>{pt}</li>
-                              ))}
-                            </ul>
-                          )}
-                          {scenario.extraAction && (
-                            <p style={{ margin: '0.4rem 0 0 0', fontStyle: 'italic', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
-                              {scenario.extraAction}
+                        <div className="improvement-plan-card-main-content">
+                          <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <h4 className="improvement-plan-card-title">
+                              <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
+                              <span>{scenario.title}</span>
+                            </h4>
+                            {isBalanced && (
+                              <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
+                                {scenario.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="improvement-plan-card-details">
+                            <p className="improvement-plan-card-description">
+                              {scenario.details}
                             </p>
-                          )}
-                        </div>
-                        <div className="improvement-plan-card-outcome">
-                          <span>Estimated Ready Age:</span>
-                          <span className="improvement-plan-card-outcome-value">
-                            Age {scenario.readyAge}
-                          </span>
-                        </div>
-                        {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
-                          <div className="improvement-plan-card-gain">
-                            ⚡ Move retirement {scenario.yearsImprovement} {scenario.yearsImprovement === 1 ? 'year' : 'years'} earlier
+                            {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                              <ul className="improvement-plan-card-bullets">
+                                {scenario.bulletPoints.map((pt, i) => (
+                                  <li key={i}>{pt}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {scenario.extraAction && (
+                              <p className="improvement-plan-card-extra">
+                                {scenario.extraAction}
+                              </p>
+                            )}
                           </div>
-                        ) : improvementPlan.currentReadyAge === null ? (
-                          <div className="improvement-plan-card-gain" style={{ color: 'var(--primary)' }}>
-                            ✨ Achieves sustainable retirement!
+                        </div>
+
+                        <div className="improvement-plan-card-kpi-block">
+                          <div className="improvement-plan-kpi-item">
+                            <span className="kpi-item-label">Estimated Ready Age</span>
+                            <strong className="kpi-item-value">Age {scenario.readyAge}</strong>
                           </div>
-                        ) : null}
+                          <div className="improvement-plan-kpi-item">
+                            <span className="kpi-item-label">Retirement Gain</span>
+                            <strong className="kpi-item-value gain-value">
+                              {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
+                                `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner`
+                              ) : (
+                                '✨ Sustainable!'
+                              )}
+                            </strong>
+                          </div>
+                        </div>
 
                         <button
                           type="button"

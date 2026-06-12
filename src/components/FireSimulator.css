@@ -1167,30 +1167,56 @@
 }
 
 .improvement-plan-card {
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(30, 41, 59, 0.3);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.25rem;
   transition: transform 0.2s, border-color 0.2s;
   text-align: left;
 }
 
 .improvement-plan-card:hover {
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: rgba(99, 102, 241, 0.3);
   transform: translateY(-2px);
 }
 
 .improvement-plan-card-balanced {
-  background: rgba(59, 130, 246, 0.04);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.08);
 }
 
 .improvement-plan-card-balanced:hover {
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+@media (min-width: 768px) {
+  .improvement-plan-card-balanced {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    grid-template-rows: auto auto;
+    gap: 1.25rem;
+  }
+
+  .improvement-plan-card-balanced .improvement-plan-card-main-content {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .improvement-plan-card-balanced .improvement-plan-card-kpi-block {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+  }
+
+  .improvement-plan-card-balanced .improvement-plan-card-apply-btn {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 0;
+  }
 }
 
 .improvement-plan-card-header {
@@ -1200,63 +1226,85 @@
 }
 
 .improvement-plan-card-title {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-}
-
-.improvement-plan-card-badge {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  font-weight: 800;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  letter-spacing: 0.05em;
-}
-
-.improvement-plan-card-badge-recommended {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--primary);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  gap: 0.5rem;
+  margin: 0;
 }
 
 .improvement-plan-card-details {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  margin: 0.25rem 0;
+  margin-top: 0.5rem;
 }
 
-.improvement-plan-card-details ul {
-  margin: 0.25rem 0 0.25rem 1rem;
+.improvement-plan-card-description {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+  margin: 0 0 0.5rem 0;
+}
+
+.improvement-plan-card-bullets {
+  margin: 0.5rem 0 0.5rem 1.2rem;
   padding: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.35rem;
 }
 
-.improvement-plan-card-outcome {
-  margin-top: auto;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.improvement-plan-card-extra {
+  font-style: italic;
   font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0.5rem 0 0 0;
+  line-height: 1.4;
 }
 
-.improvement-plan-card-outcome-value {
+/* KPI block styling */
+.improvement-plan-card-kpi-block {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.improvement-plan-kpi-item {
+  flex: 1;
+  background: rgba(10, 15, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.75rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.kpi-item-label {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.kpi-item-value {
+  font-size: 1.35rem;
   font-weight: 800;
   color: var(--accent-emerald);
+  font-family: var(--font-heading);
+  line-height: 1.2;
 }
 
-.improvement-plan-card-gain {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-  font-weight: 600;
+.kpi-item-value.gain-value {
+  color: var(--primary);
+  font-size: 1.15rem;
 }
 
 /* Improvement Alert Banner */
@@ -1402,27 +1450,30 @@
 
 /* Improvement Plan Card Apply button */
 .improvement-plan-card-apply-btn {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   color: var(--primary);
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
   cursor: pointer;
   width: 100%;
   text-align: center;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
   transition: all 0.2s ease;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .improvement-plan-card-apply-btn:hover {
   background: var(--primary);
   color: #ffffff;
   border-color: var(--primary);
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  box-shadow: var(--shadow-glow);
 }
 
 .improvement-plan-card-balanced .improvement-plan-card-apply-btn {
@@ -1435,5 +1486,5 @@
   background: var(--accent-emerald);
   color: #ffffff;
   border-color: var(--accent-emerald);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
 }
