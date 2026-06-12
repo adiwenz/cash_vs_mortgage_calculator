@@ -497,6 +497,300 @@ export default function FireSimulator() {
     return validateFireInputs(inputs);
   }, [inputs]);
 
+  // Suggestion engine for Retirement Improvement Plan
+  const improvementPlan = useMemo(() => {
+    const currentReadyAge = activeResults.retirementReadyAge;
+    const isSustainable = inputs.readinessCriteria === 'lastsLifeExp';
+    const isComfortable = inputs.readinessCriteria === 'lastsComfortable';
+    
+    const showImprovementPlan = 
+      !currentReadyAge || 
+      currentReadyAge > inputs.lifeExpectancy || 
+      !activeResults.moneyLasts || 
+      activeResults.runOutAge !== null || 
+      inputs.targetRetirementAge < currentReadyAge;
+
+    if (!showImprovementPlan) return null;
+
+    const list = [];
+
+    const currentIncome = Number(inputs.simpleIncome) || 0;
+    const currentExpenses = Number(inputs.simpleExpenses) || 0;
+    const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
+
+    // Helper to simulate a test savings rate increase
+    const getTestSavingsResult = (deltaRate) => {
+      const annualSavingsDelta = (deltaRate * currentIncome) / 100;
+      const testInputs = {
+        ...inputs,
+        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta)
+      };
+      if (inputs.isAdvanced) {
+        testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
+          if (idx === 0) {
+            const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
+            return {
+              ...phase,
+              amount: Math.max(0, currentAmt - annualSavingsDelta)
+            };
+          }
+          return phase;
+        });
+      }
+      return runFireSimulation(testInputs);
+    };
+
+    let bestDeltaRate = 5; // fallback
+    let bestNewReadyAge = null;
+    let foundSavingsImprovement = false;
+
+    // Search from +1% to +15% savings rate
+    for (let d = 1; d <= 15; d++) {
+      if (currentSavingsRate + d > 70) break; // Avoid extreme suggestions
+      const testRes = getTestSavingsResult(d);
+      const testReadyAge = testRes.retirementReadyAge;
+      
+      if (testReadyAge) {
+        if (!currentReadyAge || testReadyAge < currentReadyAge || (currentReadyAge > inputs.lifeExpectancy && testReadyAge <= inputs.lifeExpectancy)) {
+          bestDeltaRate = d;
+          bestNewReadyAge = testReadyAge;
+          foundSavingsImprovement = true;
+          if (testReadyAge <= inputs.lifeExpectancy) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (foundSavingsImprovement && bestNewReadyAge) {
+      const extraMonthly = Math.round((bestDeltaRate * currentIncome) / 1200);
+      const yearsImprovement = currentReadyAge ? (currentReadyAge - bestNewReadyAge) : null;
+
+      list.push({
+        type: 'savings',
+        icon: '📈',
+        title: 'Increase Savings',
+        details: `Increase savings rate by +${bestDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + bestDeltaRate}%).`,
+        bulletPoints: [
+          `Save an additional ${formatCurrency(extraMonthly)}/month.`,
+          `New retirement ready age: Age ${bestNewReadyAge}.`
+        ],
+        extraAction: `E.g., set up an automatic monthly transfer of ${formatCurrency(extraMonthly)} to your investment account.`,
+        readyAge: bestNewReadyAge,
+        yearsImprovement,
+        disruption: 2
+      });
+
+      list.push({
+        type: 'spending',
+        icon: '💵',
+        title: 'Reduce Spending',
+        details: `Reduce your pre-retirement living expenses by ${formatCurrency(extraMonthly)}/month.`,
+        bulletPoints: [
+          `Cut monthly discretionary spending by ${formatCurrency(extraMonthly)}.`,
+          `New retirement ready age: Age ${bestNewReadyAge}.`
+        ],
+        extraAction: `E.g., review subscriptions, travel plans, or dining out to find ${formatCurrency(extraMonthly)} in monthly savings.`,
+        readyAge: bestNewReadyAge,
+        yearsImprovement,
+        disruption: 2
+      });
+    }
+
+    // Helper to simulate delaying retirement
+    const getTestWorkLongerResult = (yearsDelay) => {
+      const testInputs = {
+        ...inputs,
+        targetRetirementAge: inputs.targetRetirementAge + yearsDelay
+      };
+      if (inputs.isAdvanced) {
+        testInputs.incomeList = inputs.incomeList.map(inc => {
+          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+            return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
+          }
+          return inc;
+        });
+      }
+      return runFireSimulation(testInputs);
+    };
+
+    let bestDelay = 3;
+    let workLongerNewReadyAge = null;
+    let foundWorkImprovement = false;
+
+    const delayOptions = [2, 3, 5];
+    for (const delay of delayOptions) {
+      if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
+      const testRes = getTestWorkLongerResult(delay);
+      const testReadyAge = testRes.retirementReadyAge;
+      if (testReadyAge && testReadyAge <= inputs.lifeExpectancy) {
+        bestDelay = delay;
+        workLongerNewReadyAge = testReadyAge;
+        foundWorkImprovement = true;
+        break;
+      }
+    }
+
+    if (!foundWorkImprovement) {
+      for (const delay of delayOptions) {
+        if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
+        const testRes = getTestWorkLongerResult(delay);
+        const testReadyAge = testRes.retirementReadyAge;
+        if (testReadyAge && (!currentReadyAge || testReadyAge < currentReadyAge)) {
+          bestDelay = delay;
+          workLongerNewReadyAge = testReadyAge;
+          foundWorkImprovement = true;
+        }
+      }
+    }
+
+    if (foundWorkImprovement && workLongerNewReadyAge) {
+      const yearsImprovement = currentReadyAge ? (currentReadyAge - workLongerNewReadyAge) : null;
+      list.push({
+        type: 'workLonger',
+        icon: '💼',
+        title: 'Work Longer',
+        details: `Work ${bestDelay} additional years, retiring at Age ${inputs.targetRetirementAge + bestDelay} instead of Age ${inputs.targetRetirementAge}.`,
+        bulletPoints: [
+          `Gives your investments ${bestDelay} more years of compound growth before drawing down.`,
+          `Decreases the number of retirement years your portfolio needs to fund.`,
+          `New retirement ready age: Age ${workLongerNewReadyAge}.`
+        ],
+        readyAge: workLongerNewReadyAge,
+        yearsImprovement,
+        disruption: 3
+      });
+    }
+
+    // Helper to simulate increasing income
+    const getTestIncomeResult = (extraIncome) => {
+      const testInputs = {
+        ...inputs,
+        simpleIncome: inputs.simpleIncome + extraIncome
+      };
+      if (inputs.isAdvanced) {
+        testInputs.incomeList = inputs.incomeList.map(inc => {
+          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+            return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
+          }
+          return inc;
+        });
+      }
+      return runFireSimulation(testInputs);
+    };
+
+    let bestExtraIncome = 10000;
+    let incomeNewReadyAge = null;
+    let foundIncomeImprovement = false;
+
+    const incomeIncrements = [5000, 10000, 20000];
+    for (const incAmt of incomeIncrements) {
+      const testRes = getTestIncomeResult(incAmt);
+      const testReadyAge = testRes.retirementReadyAge;
+      if (testReadyAge && (testReadyAge <= inputs.lifeExpectancy || !currentReadyAge || testReadyAge < currentReadyAge)) {
+        bestExtraIncome = incAmt;
+        incomeNewReadyAge = testReadyAge;
+        foundIncomeImprovement = true;
+        if (testReadyAge <= inputs.lifeExpectancy) {
+          break;
+        }
+      }
+    }
+
+    if (foundIncomeImprovement && incomeNewReadyAge) {
+      const yearsImprovement = currentReadyAge ? (currentReadyAge - incomeNewReadyAge) : null;
+      list.push({
+        type: 'income',
+        icon: '📈',
+        title: 'Increase Income',
+        details: `Increase your gross annual earnings by ${formatCurrency(bestExtraIncome)}/year and save the difference.`,
+        bulletPoints: [
+          `Save an additional ${formatCurrency(Math.round(bestExtraIncome / 12))}/month.`,
+          `Keeps your current lifestyle spending flat while boosting savings rate.`,
+          `New retirement ready age: Age ${incomeNewReadyAge}.`
+        ],
+        readyAge: incomeNewReadyAge,
+        yearsImprovement,
+        disruption: 1
+      });
+    }
+
+    // Balanced Combined Plan
+    const getCombinedPlanResult = () => {
+      const savingsDelta = (0.03 * currentIncome) + 1200;
+      const testInputs = {
+        ...inputs,
+        targetRetirementAge: inputs.targetRetirementAge + 2,
+        simpleExpenses: Math.max(0, currentExpenses - savingsDelta)
+      };
+      if (inputs.isAdvanced) {
+        testInputs.incomeList = inputs.incomeList.map(inc => {
+          if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+            return { ...inc, endAge: inputs.targetRetirementAge + 2 };
+          }
+          return inc;
+        });
+        testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
+          if (idx === 0) {
+            const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
+            return {
+              ...phase,
+              amount: Math.max(0, currentAmt - savingsDelta)
+            };
+          }
+          return phase;
+        });
+      }
+      return runFireSimulation(testInputs);
+    };
+
+    const combinedRes = getCombinedPlanResult();
+    const combinedNewReadyAge = combinedRes.retirementReadyAge;
+
+    if (combinedNewReadyAge) {
+      const yearsImprovement = currentReadyAge ? (currentReadyAge - combinedNewReadyAge) : null;
+      const extraSavingsFrom3Percent = Math.round((0.03 * currentIncome) / 12);
+      
+      list.push({
+        type: 'combined',
+        icon: '⚖️',
+        title: 'Balanced Plan',
+        badge: 'Recommended',
+        details: 'A balanced combination of small, realistic adjustments that yields a massive improvement:',
+        bulletPoints: [
+          `Save 3% more (approx. ${formatCurrency(extraSavingsFrom3Percent)}/month)`,
+          `Reduce monthly spending by ${formatCurrency(100)}/month`,
+          `Work 2 additional years (delaying retirement to Age ${inputs.targetRetirementAge + 2})`
+        ],
+        readyAge: combinedNewReadyAge,
+        yearsImprovement,
+        disruption: 1
+      });
+    }
+
+    const balancedItem = list.find(item => item.type === 'combined');
+    const otherItems = list.filter(item => item.type !== 'combined');
+
+    otherItems.sort((a, b) => {
+      const aImprove = a.yearsImprovement || 0;
+      const bImprove = b.yearsImprovement || 0;
+      if (aImprove !== bImprove) {
+        return bImprove - aImprove;
+      }
+      return a.disruption - b.disruption;
+    });
+
+    const rankedPlan = [];
+    if (balancedItem) rankedPlan.push(balancedItem);
+    rankedPlan.push(...otherItems);
+
+    return {
+      showImprovementPlan: true,
+      rankedPlan,
+      currentReadyAge
+    };
+  }, [inputs, activeResults]);
+
   // Income Phases handlers
   const addIncomeItem = () => {
     const newItem = {
@@ -2619,8 +2913,8 @@ export default function FireSimulator() {
                       <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                         🏆 Retirement Plan Summary
                       </h3>
-                      <div className="segmented-control-container" style={{ margin: 0, minWidth: '340px' }}>
-                        <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex' }}>
+                      <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
+                        <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
                           <button
                             type="button"
                             className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
@@ -2638,18 +2932,37 @@ export default function FireSimulator() {
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
                           >
-                            Sustainable Retirement
+                            Sustainable
                           </button>
                           <button
                             type="button"
-                            className={`segmented-control-btn ${inputs.readinessCriteria !== 'lastsLifeExp' ? 'active' : ''}`}
+                            className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
                             style={{ 
                               flex: 1, 
                               fontSize: '0.7rem', 
                               padding: '0.35rem 0.5rem', 
                               borderRadius: '6px', 
-                              background: inputs.readinessCriteria !== 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
-                              color: inputs.readinessCriteria !== 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
+                              background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
+                              color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
+                          >
+                            Comfortable
+                          </button>
+                          <button
+                            type="button"
+                            className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
+                            style={{ 
+                              flex: 1, 
+                              fontSize: '0.7rem', 
+                              padding: '0.35rem 0.5rem', 
+                              borderRadius: '6px', 
+                              background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
+                              color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
                               border: 'none',
                               cursor: 'pointer',
                               fontWeight: '600',
@@ -2657,7 +2970,7 @@ export default function FireSimulator() {
                             }}
                             onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
                           >
-                            Comfortable Retirement
+                            Indefinite
                           </button>
                         </div>
                       </div>
@@ -2677,10 +2990,13 @@ export default function FireSimulator() {
                       lineHeight: '1.45'
                     }}>
                       <div>
-                        <strong style={{ color: 'var(--primary)', fontWeight: '700' }}>Sustainable Retirement:</strong> Money is projected to last through your planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), but you may draw down the portfolio to $0. Requires less starting capital but leaves no buffer if you live longer.
+                        <strong style={{ color: 'var(--primary)', fontWeight: '700' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
                       </div>
                       <div>
-                        <strong style={{ color: '#10b981', fontWeight: '700' }}>Comfortable Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely. Requires more starting capital but eliminates longevity risk.
+                        <strong style={{ color: '#fbbf24', fontWeight: '700' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
+                      </div>
+                      <div>
+                        <strong style={{ color: '#10b981', fontWeight: '700' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
                       </div>
                     </div>
                     
@@ -2731,7 +3047,11 @@ export default function FireSimulator() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
                       <div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
-                          {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Target' : 'Comfortable Target'}
+                          {inputs.readinessCriteria === 'lastsLifeExp' 
+                            ? 'Sustainable Target' 
+                            : inputs.readinessCriteria === 'lastsComfortable' 
+                              ? 'Comfortable Target' 
+                              : 'Indefinite Target'}
                         </span>
                         <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
                           {formatCurrency(activeResults.retirementReadyTarget)}
@@ -2750,6 +3070,73 @@ export default function FireSimulator() {
                         </strong>
                       </div>
                     </div>
+
+                    {/* Retirement Improvement Plan Section */}
+                    {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                      <div className="improvement-plan-container">
+                        <div className="improvement-plan-header">
+                          💡 Retirement Improvement Plan
+                        </div>
+                        <p className="improvement-plan-subtitle">
+                          Your current path may not fully support retirement, but small changes can have a meaningful impact. Here are the adjustments with the biggest payoff:
+                        </p>
+                        <div className="improvement-plan-grid">
+                          {improvementPlan.rankedPlan.map((scenario) => {
+                            const isBalanced = scenario.type === 'combined';
+                            return (
+                              <div 
+                                key={scenario.type} 
+                                className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
+                              >
+                                <div className="improvement-plan-card-header">
+                                  <span className="improvement-plan-card-title">
+                                    <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
+                                    <span>{scenario.title}</span>
+                                  </span>
+                                  {isBalanced && (
+                                    <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended">
+                                      {scenario.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="improvement-plan-card-details">
+                                  <p style={{ margin: '0 0 0.4rem 0', fontWeight: '600', color: 'var(--text-primary)' }}>
+                                    {scenario.details}
+                                  </p>
+                                  {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                                    <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-secondary)' }}>
+                                      {scenario.bulletPoints.map((pt, i) => (
+                                        <li key={i} style={{ marginBottom: '0.2rem' }}>{pt}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  {scenario.extraAction && (
+                                    <p style={{ margin: '0.4rem 0 0 0', fontStyle: 'italic', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                                      {scenario.extraAction}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="improvement-plan-card-outcome">
+                                  <span>Estimated Ready Age:</span>
+                                  <span className="improvement-plan-card-outcome-value">
+                                    Age {scenario.readyAge}
+                                  </span>
+                                </div>
+                                {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
+                                  <div className="improvement-plan-card-gain">
+                                    ⚡ Move retirement {scenario.yearsImprovement} {scenario.yearsImprovement === 1 ? 'year' : 'years'} earlier
+                                  </div>
+                                ) : improvementPlan.currentReadyAge === null ? (
+                                  <div className="improvement-plan-card-gain" style={{ color: 'var(--primary)' }}>
+                                    ✨ Achieves sustainable retirement!
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}

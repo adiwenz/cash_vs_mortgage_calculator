@@ -198,7 +198,9 @@ export function runFireSimulation(inputs) {
     return labels[key] || key;
   }
 
-  const executeSimulation = (targetRetirementAge) => {
+  const executeSimulation = (targetRetirementAge, customLifeExpectancy = null) => {
+    const simLifeExpectancy = customLifeExpectancy || lifeExpectancy;
+    const simYearsToCompute = Math.max(1, simLifeExpectancy - currentAge);
     let balances = {
       cash: Number(assets.cash) || 0,
       emergencyFund: Number(assets.emergencyFund) || 0,
@@ -352,7 +354,7 @@ export function runFireSimulation(inputs) {
   };
 
   // Run simulation year-by-year
-  for (let year = 0; year <= yearsToCompute; year++) {
+  for (let year = 0; year <= simYearsToCompute; year++) {
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
 
@@ -1062,7 +1064,7 @@ export function runFireSimulation(inputs) {
       retirementReadyAge = age;
     }
 
-    if (age === lifeExpectancy) {
+    if (age === simLifeExpectancy) {
       endingSurplusShortfall = hasRunOut ? -shortfall : liquidNW;
     }
 
@@ -1148,7 +1150,7 @@ export function runFireSimulation(inputs) {
     };
   });
 
-  // Search for the earliest retirement ready age (SWR-based)
+  // Search for the earliest retirement ready age (SWR-based / Indefinite)
   let retirementReadyAgeSWR = null;
   for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
     const testRes = executeSimulation(testAge);
@@ -1161,7 +1163,17 @@ export function runFireSimulation(inputs) {
     }
   }
 
-  // Search for the earliest retirement ready age (Survival-based)
+  // Search for the earliest retirement ready age (Comfortable: survives to lifeExpectancy + 10)
+  let retirementReadyAgeComfortable = null;
+  for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
+    const testRes = executeSimulation(testAge, lifeExpectancy + 10);
+    if (testRes.moneyLasts) {
+      retirementReadyAgeComfortable = testAge;
+      break;
+    }
+  }
+
+  // Search for the earliest retirement ready age (Survival-based / Sustainable)
   let retirementReadyAgeSurvival = null;
   for (let testAge = currentAge; testAge <= lifeExpectancy; testAge++) {
     const testRes = executeSimulation(testAge);
@@ -1172,7 +1184,13 @@ export function runFireSimulation(inputs) {
   }
 
   const readinessCriteria = inputs.readinessCriteria || 'lastsIndefinitely';
-  retirementReadyAge = readinessCriteria === 'lastsLifeExp' ? retirementReadyAgeSurvival : retirementReadyAgeSWR;
+  if (readinessCriteria === 'lastsLifeExp') {
+    retirementReadyAge = retirementReadyAgeSurvival;
+  } else if (readinessCriteria === 'lastsComfortable') {
+    retirementReadyAge = retirementReadyAgeComfortable;
+  } else {
+    retirementReadyAge = retirementReadyAgeSWR;
+  }
 
   let retirementReadyTarget = 0;
   if (retirementReadyAge !== null) {

@@ -1123,3 +1123,138 @@
   flex-direction: column;
   gap: 1.25rem;
 }
+
+/* Suggestions / Improvement Plan Container */
+.improvement-plan-container {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.improvement-plan-header {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.improvement-plan-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.improvement-plan-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 600px) {
+  .improvement-plan-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .improvement-plan-grid-balanced {
+    grid-column: span 2;
+  }
+}
+
+.improvement-plan-card {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s, border-color 0.2s;
+  text-align: left;
+}
+
+.improvement-plan-card:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.improvement-plan-card-balanced {
+  background: rgba(59, 130, 246, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);
+}
+
+.improvement-plan-card-balanced:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.improvement-plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.improvement-plan-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.improvement-plan-card-badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.improvement-plan-card-badge-recommended {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.improvement-plan-card-details {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0.25rem 0;
+}
+
+.improvement-plan-card-details ul {
+  margin: 0.25rem 0 0.25rem 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.improvement-plan-card-outcome {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.improvement-plan-card-outcome-value {
+  font-weight: 800;
+  color: var(--accent-emerald);
+}
+
+.improvement-plan-card-gain {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
