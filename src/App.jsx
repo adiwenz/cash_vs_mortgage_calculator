@@ -8,6 +8,7 @@ import MortgageComparer from './components/MortgageComparer';
 import SimpleCalculator from './components/SimpleCalculator';
 import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
 import FireSimulator from './components/FireSimulator';
+import SavingsAllocator from './components/SavingsAllocator';
 import logoImg from './assets/logo.png';
 
 // Initial default inputs
@@ -44,6 +45,7 @@ export default function App() {
     if (tool === 'advanced') return 'cashVsMortgage';
     if (tool === 'compare') return 'mortgageComparer';
     if (tool === 'fire') return 'fireSimulator';
+    if (tool === 'allocator') return 'savingsAllocator';
     return 'cashVsMortgageSimple';
   });
 
@@ -114,6 +116,8 @@ export default function App() {
         setActiveTool('mortgageComparer');
       } else if (tool === 'fire') {
         setActiveTool('fireSimulator');
+      } else if (tool === 'allocator') {
+        setActiveTool('savingsAllocator');
       } else {
         setActiveTool('cashVsMortgageSimple');
       }
@@ -156,6 +160,8 @@ export default function App() {
       params.set('tool', 'advanced');
     } else if (tool === 'fireSimulator') {
       params.set('tool', 'fire');
+    } else if (tool === 'savingsAllocator') {
+      params.set('tool', 'allocator');
     } else {
       params.set('tool', 'compare');
     }
@@ -254,6 +260,11 @@ export default function App() {
                 <h1>FIRE & Life Simulator</h1>
                 <p>Interactive compounding life-planning and financial independence simulator</p>
               </>
+            ) : activeTool === 'savingsAllocator' ? (
+              <>
+                <h1>Savings Allocator</h1>
+                <p>Optimize your monthly savings across different accounts and taxes</p>
+              </>
             ) : (
               <>
                 <h1>Compare Mortgages</h1>
@@ -282,7 +293,8 @@ export default function App() {
                     { tool: 'cashVsMortgageSimple', label: 'Cash v. Mortgage' },
                     { tool: 'cashVsMortgage', label: 'Tax-Aware Cash v. Mortgage' },
                     { tool: 'mortgageComparer', label: 'Compare Mortgages' },
-                    { tool: 'fireSimulator', label: 'FIRE & Life Simulator' }
+                    { tool: 'fireSimulator', label: 'FIRE & Life Simulator' },
+                    { tool: 'savingsAllocator', label: 'Savings Allocator' }
                   ].map((item) => (
                     <button
                       key={item.tool}
@@ -666,6 +678,10 @@ export default function App() {
       ) : activeTool === 'fireSimulator' ? (
         <main style={{ marginTop: '1.5rem', width: '100%' }}>
           <FireSimulator />
+        </main>
+      ) : activeTool === 'savingsAllocator' ? (
+        <main style={{ marginTop: '1.5rem', width: '100%' }}>
+          <SavingsAllocator />
         </main>
       ) : (
         <main style={{ marginTop: '1.5rem' }}>

@@ -49,6 +49,29 @@ const DEFAULT_FIRE_INPUTS = {
     other: 0,
     debts: 0
   },
+  budgetDetails: {
+    savings: {
+      trad401k: 100,
+      rothIra: 50,
+      tradIra: 0,
+      hsa: 50,
+      brokerage: 0,
+      checking: 50,
+      hysa: 50,
+      emergency: 26,
+      debt: 0,
+      other: 0
+    },
+    expenses: {
+      housing: 1500,
+      utilities: 300,
+      food: 600,
+      transportation: 400,
+      healthcare: 300,
+      leisure: 300,
+      misc: 141
+    }
+  },
   incomeList: [
     {
       id: 'inc-1',
@@ -119,6 +142,53 @@ const formatCurrency = (val) => {
     maximumFractionDigits: 0
   }).format(val);
 };
+
+// U.S. Federal Tax Data (2026 guidelines) for the Budget Modal
+const MODAL_TAX_DATA = {
+  single: {
+    standardDeduction: 16100,
+    brackets: [
+      { limit: 12400, rate: 0.10 },
+      { limit: 50400, rate: 0.12 },
+      { limit: 105700, rate: 0.22 },
+      { limit: 201775, rate: 0.24 },
+      { limit: 256225, rate: 0.32 },
+      { limit: 640600, rate: 0.35 },
+      { limit: Infinity, rate: 0.37 }
+    ]
+  },
+  married: {
+    standardDeduction: 32200,
+    brackets: [
+      { limit: 24800, rate: 0.10 },
+      { limit: 100800, rate: 0.12 },
+      { limit: 211400, rate: 0.22 },
+      { limit: 403550, rate: 0.24 },
+      { limit: 512450, rate: 0.32 },
+      { limit: 768700, rate: 0.35 },
+      { limit: Infinity, rate: 0.37 }
+    ]
+  }
+};
+
+const calculateUSTaxForModal = (grossIncome, preTaxDeductions, filingStatus) => {
+  const taxConfig = MODAL_TAX_DATA[filingStatus] || MODAL_TAX_DATA.single;
+  const taxable = Math.max(0, grossIncome - taxConfig.standardDeduction - preTaxDeductions);
+  
+  let tax = 0;
+  let prevLimit = 0;
+  for (const bracket of taxConfig.brackets) {
+    if (taxable > bracket.limit) {
+      tax += (bracket.limit - prevLimit) * bracket.rate;
+      prevLimit = bracket.limit;
+    } else {
+      tax += (taxable - prevLimit) * bracket.rate;
+      break;
+    }
+  }
+  return tax;
+};
+
 
 const calculateLoanPayoff = (debt, currentAge) => {
   const balance = Number(debt.balance) || 0;
@@ -457,12 +527,43 @@ export default function FireSimulator() {
 
   // 2-Step Wizard Navigation states
   const [activeStep, setActiveStep] = useState(1);
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [budgetGrossIncome, setBudgetGrossIncome] = useState(50000);
+  const [budgetFilingStatus, setBudgetFilingStatus] = useState('single');
+  const [budgetHsaCoverage, setBudgetHsaCoverage] = useState('single');
+  const [budgetSavings, setBudgetSavings] = useState({
+    trad401k: 100,
+    rothIra: 50,
+    tradIra: 0,
+    hsa: 50,
+    brokerage: 0,
+    checking: 50,
+    hysa: 50,
+    emergency: 26,
+    debt: 0,
+    other: 0
+  });
+  const [budgetExpenses, setBudgetExpenses] = useState({
+    housing: 1500,
+    utilities: 300,
+    food: 600,
+    transportation: 400,
+    healthcare: 300,
+    leisure: 300,
+    misc: 141
+  });
   const [editingEvent, setEditingEvent] = useState(null);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [showImprovementModal, setShowImprovementModal] = useState(false);
   const [hasAutoPopped, setHasAutoPopped] = useState(false);
+  const [pendingImprovement, setPendingImprovement] = useState(null);
+
+  const handleCloseBudgetModal = () => {
+    setIsBudgetModalOpen(false);
+    setPendingImprovement(null);
+  };
   const dragOccurredRef = useRef(false);
   const lastNonZeroSavingsRateRef = useRef(15); // default to 15% pre-tax savings rate
 
@@ -536,6 +637,18 @@ export default function FireSimulator() {
     }
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
 
+  // Prevent body scroll when modal overlays are active
+  useEffect(() => {
+    if (isBudgetModalOpen || showImprovementModal || editingEvent) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isBudgetModalOpen, showImprovementModal, editingEvent]);
+
   // Sync state helpers
   const updateInput = (key, value) => {
     setScenarios(prev => prev.map(scen => {
@@ -608,79 +721,84 @@ export default function FireSimulator() {
             });
           }
 
+          const baseInputsUpdate = {
+            ...scen.inputs,
+            lifeEvents: updatedEvents
+          };
+
+          if (!scen.inputs.budgetDetails) {
+            baseInputsUpdate.assets = {
+              ...scen.inputs.assets,
+              cash: 0,
+              brokerage: simpleInvestmentsVal,
+              emergencyFund: 0,
+              trad401k: 0,
+              tradIra: 0,
+              rothIra: 0,
+              hsa: 0,
+              realEstate: 0,
+              other: 0,
+              debts: 0
+            };
+            baseInputsUpdate.debtList = [];
+            baseInputsUpdate.incomeList = [
+              {
+                id: 'simple-inc',
+                name: 'Salary / Main Income',
+                amount: simpleIncVal,
+                frequency: 'yearly',
+                startAge: currentAgeVal,
+                endAge: targetRetAgeVal,
+                growthRate: 0.03,
+                isTaxable: true
+              }
+            ];
+            baseInputsUpdate.spendingPhases = [
+              {
+                id: 'simple-spend',
+                name: 'Base Lifestyle Spending',
+                startAge: currentAgeVal,
+                endAge: lifeExpVal,
+                amount: simpleExpVal,
+                frequency: 'yearly',
+                annualSpending: simpleExpVal,
+                inflationOverride: null,
+                notes: 'Simple Mode lifestyle cost'
+              }
+            ];
+            baseInputsUpdate.allocationRules = [
+              {
+                id: 'simple-alloc-pretax',
+                destination: 'trad401k',
+                type: 'percentIncome',
+                value: simpleSavingsRateVal,
+                frequency: 'yearly',
+                priority: 1,
+                smartRule: {
+                  enabled: false,
+                  targetValue: 0,
+                  redirectDestination: 'brokerage'
+                }
+              },
+              {
+                id: 'simple-alloc-surplus',
+                destination: 'brokerage',
+                type: 'percentSurplus',
+                value: 100,
+                frequency: 'yearly',
+                priority: 2,
+                smartRule: {
+                  enabled: false,
+                  targetValue: 0,
+                  redirectDestination: 'brokerage'
+                }
+              }
+            ];
+          }
+
           return {
             ...scen,
-            inputs: {
-              ...scen.inputs,
-              assets: {
-                ...scen.inputs.assets,
-                cash: 0,
-                brokerage: simpleInvestmentsVal,
-                emergencyFund: 0,
-                trad401k: 0,
-                tradIra: 0,
-                rothIra: 0,
-                hsa: 0,
-                realEstate: 0,
-                other: 0,
-                debts: 0
-              },
-              debtList: [],
-              incomeList: [
-                {
-                  id: 'simple-inc',
-                  name: 'Salary / Main Income',
-                  amount: simpleIncVal,
-                  frequency: 'yearly',
-                  startAge: currentAgeVal,
-                  endAge: targetRetAgeVal,
-                  growthRate: 0.03,
-                  isTaxable: true
-                }
-              ],
-              spendingPhases: [
-                {
-                  id: 'simple-spend',
-                  name: 'Base Lifestyle Spending',
-                  startAge: currentAgeVal,
-                  endAge: lifeExpVal,
-                  amount: simpleExpVal,
-                  frequency: 'yearly',
-                  annualSpending: simpleExpVal,
-                  inflationOverride: null,
-                  notes: 'Simple Mode lifestyle cost'
-                }
-              ],
-              allocationRules: [
-                {
-                  id: 'simple-alloc-pretax',
-                  destination: 'trad401k',
-                  type: 'percentIncome',
-                  value: simpleSavingsRateVal,
-                  frequency: 'yearly',
-                  priority: 1,
-                  smartRule: {
-                    enabled: false,
-                    targetValue: 0,
-                    redirectDestination: 'brokerage'
-                  }
-                },
-                {
-                  id: 'simple-alloc-surplus',
-                  destination: 'brokerage',
-                  type: 'percentSurplus',
-                  value: 100,
-                  frequency: 'yearly',
-                  priority: 2,
-                  smartRule: {
-                    enabled: false,
-                    targetValue: 0,
-                    redirectDestination: 'brokerage'
-                  }
-                }
-              ],
-              lifeEvents: updatedEvents
-            }
+            inputs: baseInputsUpdate
           };
         }
         return scen;
@@ -973,8 +1091,7 @@ export default function FireSimulator() {
       const testInputs = {
         ...inputs,
         targetRetirementAge: target65Age,
-        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta),
-        skipReadyAgeSearch: true
+        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta)
       };
       testInputs.incomeList = inputs.incomeList.map(inc => {
         if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
@@ -1025,15 +1142,14 @@ export default function FireSimulator() {
       const mid = Math.floor((low65 + high65) / 2);
       const testRes = getTestRetire65Result(mid);
       const testReadyAge = testRes.retirementReadyAge;
-      const goesBroke = !testRes.moneyLasts;
 
-      if (!goesBroke && testReadyAge && testReadyAge <= target65Age) {
+      if (testReadyAge && testReadyAge <= target65Age) {
         retire65DeltaRate = mid;
         retire65NewReadyAge = testReadyAge;
         foundRetire65Plan = true;
         high65 = mid - 1; // Try to find a smaller delta
       } else {
-        low65 = mid + 1; // Need a higher savings rate to prevent going broke
+        low65 = mid + 1; // Need a higher savings rate to achieve readiness by target65Age
       }
     }
 
@@ -1044,7 +1160,11 @@ export default function FireSimulator() {
       foundRetire65Plan = true;
     }
 
-    if (foundRetire65Plan && retire65NewReadyAge !== null) {
+    // Only show Retire 65 card if it offers a lower savings rate increase than the standard Savings card
+    const showRetire65 = foundRetire65Plan && retire65NewReadyAge !== null && 
+      (!foundSavingsImprovement || retire65DeltaRate < bestDeltaRate);
+
+    if (showRetire65) {
       const extraMonthly = Math.round((retire65DeltaRate * currentIncome) / 1200);
       const bulletPoints = [];
       if (retire65DeltaRate > 0) {
@@ -1084,8 +1204,8 @@ export default function FireSimulator() {
         title: titleLabel,
         details: detailsLabel,
         bulletPoints,
-        readyAge: target65Age,
-        yearsImprovement: currentReadyAge ? (currentReadyAge - target65Age) : null,
+        readyAge: retire65NewReadyAge,
+        yearsImprovement: currentReadyAge ? (currentReadyAge - retire65NewReadyAge) : null,
         value: retire65DeltaRate,
         disruption: retire65DeltaRate,
         savingsFocus: retire65PaceLabel,
@@ -1100,8 +1220,7 @@ export default function FireSimulator() {
       const testInputs = {
         ...inputs,
         targetRetirementAge: inputs.targetRetirementAge + yearsDelay,
-        simpleExpenses: Math.max(0, currentExpenses - savingsDelta),
-        skipReadyAgeSearch: true
+        simpleExpenses: Math.max(0, currentExpenses - savingsDelta)
       };
       testInputs.incomeList = inputs.incomeList.map(inc => {
         if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
@@ -1234,16 +1353,211 @@ export default function FireSimulator() {
   }, [activeStep, improvementPlan, hasAutoPopped]);
 
   const handleApplyImprovementScenario = (scenario) => {
-    setScenarios(prev => prev.map(scen => {
-      if (scen.id === currentScenarioId) {
-        return {
-          ...scen,
-          inputs: applyScenarioToInputs(scen.inputs, scenario.type, scenario.value)
+    const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+    const inp = scen.inputs;
+
+    let targetIncome = Number(inp.simpleIncome) || 50000;
+    const targetFilingStatus = inp.filingStatus || 'single';
+    const targetHsaCoverage = inp.budgetDetails?.hsaCoverage || 'single';
+
+    let targetExpensesMap = {};
+    let targetSavingsMap = {};
+
+    const currentIncome = Number(inp.simpleIncome) || 0;
+    const currentExpenses = Number(inp.simpleExpenses) || 0;
+    const simMonthlyExpenses = currentExpenses / 12;
+    const simMonthlySavings = Math.max(0, currentIncome - currentExpenses) / 12;
+
+    const monthlyGross = Math.round(currentIncome / 12);
+
+    if (inp.budgetDetails) {
+      targetSavingsMap = { ...inp.budgetDetails.savings };
+      targetExpensesMap = { ...inp.budgetDetails.expenses };
+
+      const totalSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+
+      // Scale savings map to align with simulation totals first
+      if (totalSavingsInModal > 0 && Math.abs(totalSavingsInModal - simMonthlySavings) > 1) {
+        const savingsScale = simMonthlySavings / totalSavingsInModal;
+        Object.keys(targetSavingsMap).forEach(key => {
+          targetSavingsMap[key] = Math.round(targetSavingsMap[key] * savingsScale);
+        });
+      } else if (totalSavingsInModal === 0 && simMonthlySavings > 0) {
+        targetSavingsMap.brokerage = Math.round(simMonthlySavings);
+      }
+
+      // Adjust savings rounding error
+      const scaledSavingsSum = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const targetSavingsTotal = Math.round(simMonthlySavings);
+      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
+      if (savingsDiff !== 0) {
+        let maxKey = 'brokerage';
+        if (targetSavingsMap[maxKey] === undefined) {
+          maxKey = Object.keys(targetSavingsMap)[0];
+        }
+        Object.keys(targetSavingsMap).forEach(key => {
+          if ((targetSavingsMap[key] || 0) > (targetSavingsMap[maxKey] || 0)) {
+            maxKey = key;
+          }
+        });
+        targetSavingsMap[maxKey] = Math.max(0, (targetSavingsMap[maxKey] || 0) + savingsDiff);
+      }
+
+      // Calculate taxes to find available net income for expenses
+      const capped401k = Math.min(23500, (targetSavingsMap.trad401k || 0) * 12);
+      const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
+      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
+      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const monthlyTax = Math.round(annualTax / 12);
+
+      const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+      const totalExpensesInModal = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
+
+      // Scale expenses map to align with simulation net income first
+      if (totalExpensesInModal > 0 && Math.abs(totalExpensesInModal - availableMonthlyExpenses) > 1) {
+        const expensesScale = availableMonthlyExpenses / totalExpensesInModal;
+        Object.keys(targetExpensesMap).forEach(key => {
+          targetExpensesMap[key] = Math.round(targetExpensesMap[key] * expensesScale);
+        });
+      } else if (totalExpensesInModal === 0 && availableMonthlyExpenses > 0) {
+        targetExpensesMap = {
+          housing: Math.round(availableMonthlyExpenses * 0.40),
+          utilities: Math.round(availableMonthlyExpenses * 0.10),
+          food: Math.round(availableMonthlyExpenses * 0.15),
+          transportation: Math.round(availableMonthlyExpenses * 0.10),
+          healthcare: Math.round(availableMonthlyExpenses * 0.10),
+          leisure: Math.round(availableMonthlyExpenses * 0.10),
+          misc: Math.round(availableMonthlyExpenses * 0.05)
         };
       }
-      return scen;
-    }));
+
+      // Adjust expenses rounding error
+      const scaledExpensesSum = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
+      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
+      if (expenseDiff !== 0 && Object.keys(targetExpensesMap).length > 0) {
+        let maxKey = Object.keys(targetExpensesMap)[0];
+        Object.keys(targetExpensesMap).forEach(key => {
+          if (targetExpensesMap[key] > targetExpensesMap[maxKey]) {
+            maxKey = key;
+          }
+        });
+        targetExpensesMap[maxKey] = Math.max(0, targetExpensesMap[maxKey] + expenseDiff);
+      }
+    } else {
+      const defaultSavings = {
+        trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+        checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+      };
+      if (inp.allocationRules && inp.allocationRules.length > 0) {
+        inp.allocationRules.forEach(r => {
+          const key = r.destination === 'cash' ? 'checking' :
+                      r.destination === 'other' ? 'hysa' :
+                      r.destination === 'emergencyFund' ? 'emergency' :
+                      r.destination === 'debtPaydown' ? 'debt' : r.destination;
+          if (defaultSavings[key] !== undefined) {
+            if (r.type === 'fixed') {
+              defaultSavings[key] = r.frequency === 'monthly' ? r.value : Math.round(r.value / 12);
+            } else {
+              const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
+              defaultSavings[key] = Math.round(pool * (r.value / 100));
+            }
+          }
+        });
+      } else {
+        defaultSavings.brokerage = Math.round(simMonthlySavings);
+      }
+      targetSavingsMap = defaultSavings;
+
+      // Adjust savings rounding error
+      const scaledSavingsSum = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const targetSavingsTotal = Math.round(simMonthlySavings);
+      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
+      if (savingsDiff !== 0) {
+        let maxKey = 'brokerage';
+        if (targetSavingsMap[maxKey] === undefined) {
+          maxKey = Object.keys(targetSavingsMap)[0];
+        }
+        Object.keys(targetSavingsMap).forEach(key => {
+          if ((targetSavingsMap[key] || 0) > (targetSavingsMap[maxKey] || 0)) {
+            maxKey = key;
+          }
+        });
+        targetSavingsMap[maxKey] = Math.max(0, (targetSavingsMap[maxKey] || 0) + savingsDiff);
+      }
+
+      const capped401k = Math.min(23500, (targetSavingsMap.trad401k || 0) * 12);
+      const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
+      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
+      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const monthlyTax = Math.round(annualTax / 12);
+
+      const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+
+      targetExpensesMap = {
+        housing: Math.round(availableMonthlyExpenses * 0.40),
+        utilities: Math.round(availableMonthlyExpenses * 0.10),
+        food: Math.round(availableMonthlyExpenses * 0.15),
+        transportation: Math.round(availableMonthlyExpenses * 0.10),
+        healthcare: Math.round(availableMonthlyExpenses * 0.10),
+        leisure: Math.round(availableMonthlyExpenses * 0.10),
+        misc: Math.round(availableMonthlyExpenses * 0.05)
+      };
+
+      // Adjust targetExpensesMap rounding error
+      const scaledExpensesSum = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
+      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
+      if (expenseDiff !== 0) {
+        targetExpensesMap.housing = Math.max(0, targetExpensesMap.housing + expenseDiff);
+      }
+    }
+
+    // Calculate baseline savings rate
+    const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
+
+    // Adjust target values based on the suggestion to give the user a starting point
+    if (scenario.type === 'savings' || scenario.type === 'retire65') {
+      const deltaRate = scenario.value;
+      const targetSavingsRate = currentSavingsRate + deltaRate;
+      const targetSavingsMonthly = Math.round((targetSavingsRate * targetIncome) / 1200);
+      const currentSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const savingsDiff = targetSavingsMonthly - currentSavingsInModal;
+      if (savingsDiff > 0) {
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + savingsDiff;
+      }
+    } else if (scenario.type === 'income') {
+      const extraIncome = scenario.value;
+      targetIncome = targetIncome + extraIncome;
+      // In the income scenario, the engine assumes you save 100% of the extra income
+      const monthlyExtraSavings = Math.round(extraIncome / 12);
+      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyExtraSavings;
+    } else if (scenario.type === 'combined') {
+      const savingsPercent = scenario.value && typeof scenario.value === 'object' ? scenario.value.savings : 3;
+      const targetSavingsRate = currentSavingsRate + savingsPercent;
+      const targetSavingsMonthly = Math.round((targetSavingsRate * targetIncome) / 1200);
+      const currentSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const savingsDiff = targetSavingsMonthly - currentSavingsInModal;
+      if (savingsDiff > 0) {
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + savingsDiff;
+      }
+    }
+
+    setBudgetGrossIncome(targetIncome);
+    setBudgetFilingStatus(targetFilingStatus);
+    setBudgetHsaCoverage(targetHsaCoverage);
+    setBudgetSavings(targetSavingsMap);
+    setBudgetExpenses(targetExpensesMap);
+
+    setPendingImprovement({
+      scenario,
+      originalInputs: inp
+    });
+
     setShowImprovementModal(false);
+    setIsBudgetModalOpen(true);
   };
 
   // Income Phases handlers
@@ -1603,6 +1917,292 @@ export default function FireSimulator() {
     ]);
     setCurrentScenarioId('baseline');
     setActiveStep(1);
+  };
+
+  const handleSetBudgetClick = () => {
+    const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+    const inp = scen.inputs;
+    
+    setBudgetGrossIncome(Number(inp.simpleIncome) || 50000);
+    setBudgetFilingStatus(inp.filingStatus || 'single');
+    setBudgetHsaCoverage(inp.budgetDetails?.hsaCoverage || 'single');
+    
+    const currentIncome = Number(inp.simpleIncome) || 0;
+    const currentExpenses = Number(inp.simpleExpenses) || 0;
+    const simMonthlyExpenses = currentExpenses / 12;
+    const simMonthlySavings = Math.max(0, currentIncome - currentExpenses) / 12;
+
+    const monthlyGross = Math.round(currentIncome / 12);
+
+    if (inp.budgetDetails) {
+      let targetSavingsMap = { ...inp.budgetDetails.savings };
+      let targetExpensesMap = { ...inp.budgetDetails.expenses };
+
+      const totalSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+
+      // Scale savings if out of sync
+      if (totalSavingsInModal > 0 && Math.abs(totalSavingsInModal - simMonthlySavings) > 1) {
+        const savingsScale = simMonthlySavings / totalSavingsInModal;
+        Object.keys(targetSavingsMap).forEach(key => {
+          targetSavingsMap[key] = Math.round(targetSavingsMap[key] * savingsScale);
+        });
+      } else if (totalSavingsInModal === 0 && simMonthlySavings > 0) {
+        targetSavingsMap.brokerage = Math.round(simMonthlySavings);
+      }
+
+      // Adjust savings rounding error
+      const scaledSavingsSum = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const targetSavingsTotal = Math.round(simMonthlySavings);
+      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
+      if (savingsDiff !== 0) {
+        let maxKey = 'brokerage';
+        if (targetSavingsMap[maxKey] === undefined) {
+          maxKey = Object.keys(targetSavingsMap)[0];
+        }
+        Object.keys(targetSavingsMap).forEach(key => {
+          if ((targetSavingsMap[key] || 0) > (targetSavingsMap[maxKey] || 0)) {
+            maxKey = key;
+          }
+        });
+        targetSavingsMap[maxKey] = Math.max(0, (targetSavingsMap[maxKey] || 0) + savingsDiff);
+      }
+
+      // Compute tax-aware available expenses
+      const targetFilingStatus = inp.filingStatus || 'single';
+      const targetHsaCoverage = inp.budgetDetails?.hsaCoverage || 'single';
+      const capped401k = Math.min(23500, (targetSavingsMap.trad401k || 0) * 12);
+      const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
+      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
+      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const monthlyTax = Math.round(annualTax / 12);
+
+      const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+
+      const totalExpensesInModal = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
+
+      // Scale expenses if out of sync
+      if (totalExpensesInModal > 0 && Math.abs(totalExpensesInModal - availableMonthlyExpenses) > 1) {
+        const expensesScale = availableMonthlyExpenses / totalExpensesInModal;
+        Object.keys(targetExpensesMap).forEach(key => {
+          targetExpensesMap[key] = Math.round(targetExpensesMap[key] * expensesScale);
+        });
+      } else if (totalExpensesInModal === 0 && availableMonthlyExpenses > 0) {
+        targetExpensesMap = {
+          housing: Math.round(availableMonthlyExpenses * 0.40),
+          utilities: Math.round(availableMonthlyExpenses * 0.10),
+          food: Math.round(availableMonthlyExpenses * 0.15),
+          transportation: Math.round(availableMonthlyExpenses * 0.10),
+          healthcare: Math.round(availableMonthlyExpenses * 0.10),
+          leisure: Math.round(availableMonthlyExpenses * 0.10),
+          misc: Math.round(availableMonthlyExpenses * 0.05)
+        };
+      }
+
+      // Adjust expenses rounding error
+      const scaledExpensesSum = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
+      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
+      if (expenseDiff !== 0 && Object.keys(targetExpensesMap).length > 0) {
+        let maxKey = Object.keys(targetExpensesMap)[0];
+        Object.keys(targetExpensesMap).forEach(key => {
+          if (targetExpensesMap[key] > targetExpensesMap[maxKey]) {
+            maxKey = key;
+          }
+        });
+        targetExpensesMap[maxKey] = Math.max(0, targetExpensesMap[maxKey] + expenseDiff);
+      }
+
+      setBudgetSavings(targetSavingsMap);
+      setBudgetExpenses(targetExpensesMap);
+    } else {
+      const targetFilingStatus = inp.filingStatus || 'single';
+      const targetHsaCoverage = 'single';
+
+      const defaultSavings = {
+        trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+        checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+      };
+      if (inp.allocationRules && inp.allocationRules.length > 0) {
+        inp.allocationRules.forEach(r => {
+          const key = r.destination === 'cash' ? 'checking' :
+                      r.destination === 'other' ? 'hysa' :
+                      r.destination === 'emergencyFund' ? 'emergency' :
+                      r.destination === 'debtPaydown' ? 'debt' : r.destination;
+          if (defaultSavings[key] !== undefined) {
+            if (r.type === 'fixed') {
+              defaultSavings[key] = r.frequency === 'monthly' ? r.value : Math.round(r.value / 12);
+            } else {
+              const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
+              defaultSavings[key] = Math.round(pool * (r.value / 100));
+            }
+          }
+        });
+      } else {
+        defaultSavings.brokerage = Math.round(simMonthlySavings);
+      }
+
+      // Adjust savings rounding error
+      const scaledSavingsSum = Object.values(defaultSavings).reduce((sum, val) => sum + val, 0);
+      const targetSavingsTotal = Math.round(simMonthlySavings);
+      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
+      if (savingsDiff !== 0) {
+        let maxKey = 'brokerage';
+        if (defaultSavings[maxKey] === undefined) {
+          maxKey = Object.keys(defaultSavings)[0];
+        }
+        Object.keys(defaultSavings).forEach(key => {
+          if ((defaultSavings[key] || 0) > (defaultSavings[maxKey] || 0)) {
+            maxKey = key;
+          }
+        });
+        defaultSavings[maxKey] = Math.max(0, (defaultSavings[maxKey] || 0) + savingsDiff);
+      }
+
+      // Compute tax-aware available expenses
+      const capped401k = Math.min(23500, (defaultSavings.trad401k || 0) * 12);
+      const cappedTradIra = Math.min(7000, (defaultSavings.tradIra || 0) * 12);
+      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (defaultSavings.hsa || 0) * 12);
+      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const monthlyTax = Math.round(annualTax / 12);
+
+      const actualSavingsMonthly = Object.values(defaultSavings).reduce((sum, val) => sum + val, 0);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+
+      const defaultExpenses = {
+        housing: Math.round(availableMonthlyExpenses * 0.40),
+        utilities: Math.round(availableMonthlyExpenses * 0.10),
+        food: Math.round(availableMonthlyExpenses * 0.15),
+        transportation: Math.round(availableMonthlyExpenses * 0.10),
+        healthcare: Math.round(availableMonthlyExpenses * 0.10),
+        leisure: Math.round(availableMonthlyExpenses * 0.10),
+        misc: Math.round(availableMonthlyExpenses * 0.05)
+      };
+
+      // Adjust defaultExpenses rounding error
+      const scaledExpensesSum = Object.values(defaultExpenses).reduce((sum, val) => sum + val, 0);
+      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
+      if (expenseDiff !== 0) {
+        defaultExpenses.housing = Math.max(0, defaultExpenses.housing + expenseDiff);
+      }
+
+      setBudgetExpenses(defaultExpenses);
+      setBudgetSavings(defaultSavings);
+    }
+    
+    setIsBudgetModalOpen(true);
+  };
+
+  const handleSaveBudget = () => {
+    const totalExp = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+    const totalSavings = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const annualExpenses = totalExp * 12;
+    const annualSavings = totalSavings * 12;
+
+    setScenarios(prev => prev.map(scen => {
+      if (scen.id !== currentScenarioId) return scen;
+
+      let newInputs = { ...scen.inputs };
+      
+      newInputs.simpleIncome = budgetGrossIncome;
+      newInputs.simpleExpenses = Math.max(0, budgetGrossIncome - annualSavings);
+      newInputs.filingStatus = budgetFilingStatus;
+
+      newInputs.spendingPhases = newInputs.spendingPhases.map((phase, idx) => {
+        if (idx === 0) {
+          return {
+            ...phase,
+            amount: annualExpenses,
+            annualSpending: annualExpenses
+          };
+        }
+        return phase;
+      });
+
+      newInputs.incomeList = newInputs.incomeList.map((inc, idx) => {
+        if (idx === 0 || inc.id === 'simple-inc') {
+          return {
+            ...inc,
+            amount: budgetGrossIncome
+          };
+        }
+        return inc;
+      });
+
+      // Merge targetRetirementAge changes if a pending scenario recommendation requires it
+      if (pendingImprovement) {
+        const { scenario } = pendingImprovement;
+        if (scenario.type === 'workLonger') {
+          const yearsDelay = scenario.value;
+          newInputs.targetRetirementAge = newInputs.targetRetirementAge + yearsDelay;
+        } else if (scenario.type === 'retire65') {
+          const target65Age = newInputs.currentAge < 65 ? 65 : newInputs.currentAge;
+          newInputs.targetRetirementAge = target65Age;
+        } else if (scenario.type === 'combined') {
+          const yearsDelay = scenario.value && typeof scenario.value === 'object' ? scenario.value.delay : 2;
+          newInputs.targetRetirementAge = newInputs.targetRetirementAge + yearsDelay;
+        }
+
+        // Keep income lists and retirement life events in sync with the new targetRetirementAge
+        const targetRetAge = newInputs.targetRetirementAge;
+        newInputs.incomeList = newInputs.incomeList.map(inc => {
+          if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+            return { ...inc, endAge: targetRetAge };
+          }
+          return inc;
+        });
+        newInputs.lifeEvents = newInputs.lifeEvents.map(ev => {
+          if (ev.type === 'retire') {
+            return { ...ev, age: targetRetAge };
+          }
+          return ev;
+        });
+      }
+
+      newInputs.budgetDetails = {
+        hsaCoverage: budgetHsaCoverage,
+        savings: { ...budgetSavings },
+        expenses: { ...budgetExpenses }
+      };
+
+      const nextRules = [];
+      let ruleIndex = 1;
+
+      Object.keys(budgetSavings).forEach(key => {
+        const val = budgetSavings[key] || 0;
+        if (val > 0) {
+          let dest = key;
+          if (key === 'checking') dest = 'cash';
+          else if (key === 'hysa') dest = 'other';
+          else if (key === 'emergency') dest = 'emergencyFund';
+          else if (key === 'debt') dest = 'debtPaydown';
+
+          nextRules.push({
+            id: `budget-alloc-${key}-${Date.now()}`,
+            destination: dest,
+            type: 'fixed',
+            value: val,
+            frequency: 'monthly',
+            priority: ruleIndex++,
+            smartRule: {
+              enabled: false,
+              targetValue: 0,
+              redirectDestination: 'brokerage'
+            }
+          });
+        }
+      });
+
+      newInputs.allocationRules = nextRules;
+
+      return {
+        ...scen,
+        inputs: newInputs
+      };
+    }));
+
+    handleCloseBudgetModal();
   };
 
   const handleCreateEvent = (type) => {
@@ -3008,6 +3608,352 @@ export default function FireSimulator() {
     </div>
   );
   };
+  
+  const renderBudgetModal = () => {
+    const capped401k = Math.min(23500, (budgetSavings.trad401k || 0) * 12);
+    const cappedTradIra = Math.min(7000, (budgetSavings.tradIra || 0) * 12);
+    const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, (budgetSavings.hsa || 0) * 12);
+    const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+    
+    const annualTax = calculateUSTaxForModal(budgetGrossIncome, preTaxDeductionsAnnual, budgetFilingStatus);
+    const monthlyTax = Math.round(annualTax / 12);
+    const monthlyGross = Math.round(budgetGrossIncome / 12);
+    
+    const totalSavingsMonthly = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+    const totalOutflowsMonthly = totalSavingsMonthly + totalExpensesMonthly + monthlyTax;
+    const remainingMonthly = monthlyGross - totalOutflowsMonthly;
+    
+    const handleAllocateRemaining = (categoryKey) => {
+      setBudgetSavings(prev => ({
+        ...prev,
+        [categoryKey]: Math.max(0, (prev[categoryKey] || 0) + remainingMonthly)
+      }));
+    };
+    
+    const handleAdjustGrossIncome = () => {
+      let gross = budgetGrossIncome;
+      for (let iter = 0; iter < 10; iter++) {
+        const tax = calculateUSTaxForModal(gross, preTaxDeductionsAnnual, budgetFilingStatus);
+        gross = (totalSavingsMonthly + totalExpensesMonthly) * 12 + tax;
+      }
+      setBudgetGrossIncome(Math.round(gross));
+    };
+
+    let targetSavingsRate = null;
+    if (pendingImprovement) {
+      const { scenario, originalInputs } = pendingImprovement;
+      const currentIncome = Number(originalInputs.simpleIncome) || 0;
+      const currentExpenses = Number(originalInputs.simpleExpenses) || 0;
+      const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
+      
+      if (scenario.type === 'savings' || scenario.type === 'retire65') {
+        targetSavingsRate = currentSavingsRate + scenario.value;
+      } else if (scenario.type === 'combined') {
+        const savingsPercent = scenario.value && typeof scenario.value === 'object' ? scenario.value.savings : 3;
+        targetSavingsRate = currentSavingsRate + savingsPercent;
+      } else if (scenario.type === 'income') {
+        const extraIncome = scenario.value;
+        const newIncome = currentIncome + extraIncome;
+        const newSavings = Math.max(0, currentIncome - currentExpenses) + extraIncome;
+        targetSavingsRate = newIncome > 0 ? Math.round((newSavings / newIncome) * 100) : 0;
+      }
+    }
+
+    const activeSavingsRate = budgetGrossIncome > 0 ? Math.round((totalSavingsMonthly * 12 / budgetGrossIncome) * 100) : 0;
+
+    return (
+      <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
+        <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', display: 'flex', flexDirection: 'column' }}>
+          <div className="budget-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
+              🎯 Set Detailed Budget
+            </h3>
+            <button 
+              type="button" 
+              onClick={handleCloseBudgetModal}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
+            >
+              ✖
+            </button>
+          </div>
+          
+          {pendingImprovement && (
+            <div style={{
+              background: 'rgba(124, 58, 237, 0.08)',
+              border: '1px solid rgba(124, 58, 237, 0.25)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.25rem'
+            }}>
+              <span style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                💡 Applying Recommendation: {pendingImprovement.scenario.title}
+              </span>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                This scenario changes your monthly budget targets (recommended adjustment: <strong>{pendingImprovement.scenario.savingsFocus}</strong>). 
+                We have updated the gross salary and target savings, but your detailed allocations need to be aligned. Please review and adjust the categories below, then click <strong>Save Budget</strong> to apply the scenario.
+              </p>
+            </div>
+          )}
+          
+          {/* Top Parameters */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+            <div className="input-wrapper">
+              <span className="input-name">Gross Annual Salary ($)</span>
+              <input
+                type="number"
+                className="input-number-box"
+                style={{ width: '100%' }}
+                value={budgetGrossIncome}
+                onChange={(e) => setBudgetGrossIncome(Math.max(0, parseFloat(e.target.value) || 0))}
+              />
+            </div>
+            <div className="input-wrapper">
+              <span className="input-name">Filing Status</span>
+              <select
+                className="input-number-box"
+                style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                value={budgetFilingStatus}
+                onChange={(e) => setBudgetFilingStatus(e.target.value)}
+              >
+                <option value="single">Single Filer</option>
+                <option value="married">Married Jointly</option>
+              </select>
+            </div>
+            <div className="input-wrapper">
+              <span className="input-name">HSA Coverage Type</span>
+              <select
+                className="input-number-box"
+                style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                value={budgetHsaCoverage}
+                onChange={(e) => setBudgetHsaCoverage(e.target.value)}
+              >
+                <option value="single">Individual ($4,150 limit)</option>
+                <option value="family">Family ($8,300 limit)</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Savings Rate</span>
+              <strong style={{ fontSize: '1.25rem', color: '#c084fc', marginTop: '0.15rem' }}>
+                {activeSavingsRate}%
+              </strong>
+              {targetSavingsRate !== null && (
+                <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.1rem' }}>
+                  Target: {targetSavingsRate}%
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Sections Container */}
+          <div className="budget-sections-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.25rem' }}>
+            
+            {/* Savings Allocation Column */}
+            <div className="budget-section-col">
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>💰 Monthly Savings Allocation</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{formatCurrency(totalSavingsMonthly)}/mo</span>
+              </h4>
+              <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {[
+                  { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                  { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
+                  { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr combined' },
+                  { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                  { key: 'brokerage', label: 'Taxable Brokerage' },
+                  { key: 'checking', label: 'Checking Account' },
+                  { key: 'hysa', label: 'High-Yield Savings' },
+                  { key: 'emergency', label: 'Emergency Fund' },
+                  { key: 'debt', label: 'Debt Payoff' },
+                  { key: 'other', label: 'Other Savings' }
+                ].map(item => (
+                  <div key={item.key} className="budget-input-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                      {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                    </div>
+                    <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                      <span className="currency-symbol">$</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                        value={budgetSavings[item.key] || 0}
+                        onChange={(e) => setBudgetSavings({
+                          ...budgetSavings,
+                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                        })}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Expenses Column */}
+            <div className="budget-section-col">
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>🏠 Monthly Expenses</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
+              </h4>
+              <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {[
+                  { key: 'housing', label: 'Housing (Rent/Mortgage)' },
+                  { key: 'utilities', label: 'Utilities & Subscriptions' },
+                  { key: 'food', label: 'Food & Dining Out' },
+                  { key: 'transportation', label: 'Transportation / Gas / Car' },
+                  { key: 'healthcare', label: 'Healthcare & Insurance' },
+                  { key: 'leisure', label: 'Leisure & Leisure Travel' },
+                  { key: 'misc', label: 'Miscellaneous Expenses' }
+                ].map(item => (
+                  <div key={item.key} className="budget-input-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                    <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                      <span className="currency-symbol">$</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                        value={budgetExpenses[item.key] || 0}
+                        onChange={(e) => setBudgetExpenses({
+                          ...budgetExpenses,
+                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                        })}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+          </div>
+          
+          {/* Live Reconciliation Panel */}
+          <div className="budget-reconciliation-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Gross Income</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(monthlyGross)}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Savings</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>-{formatCurrency(totalSavingsMonthly)}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Expenses</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(totalExpensesMonthly)}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Est. Monthly Taxes</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>-{formatCurrency(monthlyTax)}</strong>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                {remainingMonthly > 0 ? (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
+                    🟢 Leftover: {formatCurrency(remainingMonthly)}/mo unallocated
+                  </span>
+                ) : remainingMonthly < 0 ? (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
+                    🔴 Deficit: {formatCurrency(Math.abs(remainingMonthly))}/mo over-allocated
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
+                    ✅ Perfectly balanced! $0 leftover
+                  </span>
+                )}
+              </div>
+              
+              {remainingMonthly !== 0 && (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {remainingMonthly > 0 && (
+                    <>
+                      <button 
+                        type="button" 
+                        className="list-builder-edit-btn" 
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                        onClick={() => handleAllocateRemaining('hysa')}
+                      >
+                        📥 Put in HYSA
+                      </button>
+                      <button 
+                        type="button" 
+                        className="list-builder-edit-btn" 
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                        onClick={() => handleAllocateRemaining('brokerage')}
+                      >
+                        📥 Put in Brokerage
+                      </button>
+                    </>
+                  )}
+                  <button 
+                    type="button" 
+                    className="list-builder-edit-btn" 
+                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                    onClick={handleAdjustGrossIncome}
+                  >
+                    ⚖️ Adjust Income to Match
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Warnings & Guardrails */}
+          {(() => {
+            const warnings = [];
+            if (capped401k >= 23500 && (budgetSavings.trad401k || 0) * 12 > 23500) {
+              warnings.push(`401(k) exceeds employee limit ($23,500/yr). Capping tax deduction.`);
+            }
+            if ((budgetSavings.tradIra || 0) * 12 + (budgetSavings.rothIra || 0) * 12 > 7000) {
+              warnings.push(`Combined IRA contributions exceed the $7,000/yr limit.`);
+            }
+            if (cappedHsa >= (budgetHsaCoverage === 'family' ? 8300 : 4150) && (budgetSavings.hsa || 0) * 12 > (budgetHsaCoverage === 'family' ? 8300 : 4150)) {
+              warnings.push(`HSA exceeds IRS limit ($${budgetHsaCoverage === 'family' ? '8,300' : '4,150'}/yr). Capping tax deduction.`);
+            }
+            
+            if (warnings.length === 0) return null;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
+                {warnings.map((w, i) => (
+                  <div key={i} style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '0.35rem 0.5rem', borderRadius: '4px' }}>
+                    ⚠️ {w}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          
+          {/* Footer Controls */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn-icon"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+              onClick={handleCloseBudgetModal}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+              onClick={handleSaveBudget}
+            >
+              Save Budget
+            </button>
+          </div>
+          
+        </div>
+      </div>
+    );
+  };
+
   const simpleSavingsRate = useMemo(() => {
     const income = Number(inputs.simpleIncome) || 0;
     const expenses = Number(inputs.simpleExpenses) || 0;
@@ -3460,34 +4406,56 @@ export default function FireSimulator() {
                 <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Interactive Roadmap</h3>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
               </div>
-              <div style={{ width: '100%', maxWidth: '280px' }}>
-                <select
-                  className="add-event-dropdown"
-                  style={{ width: '100%' }}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleCreateEvent(e.target.value);
-                      e.target.value = ''; // reset selection
-                    }
-                  }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>➕ Add Life Decision...</option>
-                  <option value="buyHouse">🏠 Buy a House</option>
-                  <option value="haveChild">👶 Have a Child</option>
-                  <option value="careerChange">💼 Career Change</option>
-                  <option value="move">📍 Move / Relocate</option>
-                  <option value="retire">🏖 Retire</option>
-                  <option value="socialSecurity">💰 Social Security</option>
-                  <option value="pension">📜 Pension</option>
-                  <option value="rentalIncome">🏢 Rental Income</option>
-                  <option value="annuity">📈 Annuity</option>
-                  <option value="otherRetirementIncome">💵 Other Income</option>
-                  <option value="windfall">💰 Windfall</option>
-                  <option value="college">🎓 College Costs</option>
-                  <option value="debtPayoff">💸 Debt Payoff</option>
-                  <option value="custom">➕ Custom Event</option>
-                </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ width: '100%', minWidth: '180px', maxWidth: '240px' }}>
+                  <button
+                    type="button"
+                    className="add-event-dropdown"
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundImage: 'none',
+                      paddingRight: '1.25rem',
+                      paddingLeft: '1.25rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={handleSetBudgetClick}
+                  >
+                    Set Budget
+                  </button>
+                </div>
+                <div style={{ width: '100%', minWidth: '180px', maxWidth: '240px' }}>
+                  <select
+                    className="add-event-dropdown"
+                    style={{ width: '100%', height: '38px' }}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleCreateEvent(e.target.value);
+                        e.target.value = ''; // reset selection
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>➕ Add Life Decision...</option>
+                    <option value="buyHouse">🏠 Buy a House</option>
+                    <option value="haveChild">👶 Have a Child</option>
+                    <option value="careerChange">💼 Career Change</option>
+                    <option value="move">📍 Move / Relocate</option>
+                    <option value="retire">🏖 Retire</option>
+                    <option value="socialSecurity">💰 Social Security</option>
+                    <option value="pension">📜 Pension</option>
+                    <option value="rentalIncome">🏢 Rental Income</option>
+                    <option value="annuity">📈 Annuity</option>
+                    <option value="otherRetirementIncome">💵 Other Income</option>
+                    <option value="windfall">💰 Windfall</option>
+                    <option value="college">🎓 College Costs</option>
+                    <option value="debtPayoff">💸 Debt Payoff</option>
+                    <option value="custom">➕ Custom Event</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -3522,7 +4490,7 @@ export default function FireSimulator() {
                       return (
                         <div key={idx} className="timeline-tick" style={{ position: 'absolute', left: leftOffset, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <div className="timeline-tick-mark" style={{ width: '2px', height: '6px', background: 'var(--border-color)', opacity: 0.8 }} />
-                          <span className="timeline-tick-label" style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-tertiary)', marginTop: '4px' }}>{age}</span>
+                          <span className="timeline-tick-label" style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-tertiary)', marginTop: '4px' }}>{age}</span>
                         </div>
                       );
                     });
@@ -3547,7 +4515,7 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${93 - (evt.stackIndex * 24)}px`, 
+                          top: `${89 - (evt.stackIndex * 32)}px`, 
                           transform: 'translateX(-50%)',
                           cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
                         }}
@@ -4203,8 +5171,9 @@ export default function FireSimulator() {
 
           </div>
 
-          {/* Render the modal at the step root, outside any glass-card */}
           {editingEvent && renderEventForm(editingEvent)}
+
+          {isBudgetModalOpen && renderBudgetModal()}
 
           {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
             <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
