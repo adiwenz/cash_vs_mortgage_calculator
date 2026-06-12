@@ -1492,6 +1492,7 @@ export default function FireSimulator() {
   };
 
   const handleDeleteRoadmapEvent = (evt) => {
+    if (!evt || evt.isMilestone) return;
     const matchEvent = inputs.lifeEvents.find(e => e.id === evt.originalId || (e.type === evt.type && (e.purchaseAge === evt.age || e.birthAge === evt.age || e.startAge === evt.age || e.claimingAge === evt.age || e.ageReceived === evt.age || e.age === evt.age)));
     if (matchEvent) {
       setScenarios(prev => prev.map(scen => {
@@ -3356,17 +3357,19 @@ export default function FireSimulator() {
                           ✏️ Edit Event
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="list-builder-remove-btn"
-                        style={{ padding: '0.2rem 0.5rem', alignSelf: 'flex-start' }}
-                        onClick={() => {
-                          handleDeleteRoadmapEvent(selectedTimelineEvent);
-                          setSelectedTimelineEvent(null);
-                        }}
-                      >
-                        🗑️ Remove Event
-                      </button>
+                      {!selectedTimelineEvent.isMilestone && (
+                        <button
+                          type="button"
+                          className="list-builder-remove-btn"
+                          style={{ padding: '0.2rem 0.5rem', alignSelf: 'flex-start' }}
+                          onClick={() => {
+                            handleDeleteRoadmapEvent(selectedTimelineEvent);
+                            setSelectedTimelineEvent(null);
+                          }}
+                        >
+                          🗑️ Remove Event
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3399,17 +3402,19 @@ export default function FireSimulator() {
                                 ✏️
                               </button>
                             )}
-                            <button
-                              type="button"
-                              style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteRoadmapEvent(evt);
-                                setSelectedTimelineEvent(null);
-                              }}
-                            >
-                              🗑️
-                            </button>
+                            {!evt.isMilestone && (
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRoadmapEvent(evt);
+                                  setSelectedTimelineEvent(null);
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            )}
                           </div>
                         </div>
                         <span className="vertical-timeline-label">{evt.description}</span>
