@@ -27,6 +27,26 @@ const formatCurrency = (val) => {
   }).format(val);
 };
 
+const getReasonableSavingsAllocation = (total) => {
+  const cash = Math.round(total * 0.10);
+  const emergencyFund = Math.round(total * 0.15);
+  const trad401k = Math.round(total * 0.35);
+  const tradIra = Math.round(total * 0.10);
+  const rothIra = Math.round(total * 0.15);
+  const hsa = Math.round(total * 0.05);
+  const brokerage = Math.max(0, total - (cash + emergencyFund + trad401k + tradIra + rothIra + hsa));
+  return {
+    cash,
+    emergencyFund,
+    trad401k,
+    tradIra,
+    rothIra,
+    hsa,
+    brokerage,
+    other: 0
+  };
+};
+
 // U.S. Federal Tax Data (2026 guidelines) for the Budget Modal
 const MODAL_TAX_DATA = {
   single: {
@@ -411,6 +431,18 @@ export default function FireSimulator() {
 
   // 2-Step Wizard Navigation states
   const [activeStep, setActiveStep] = useState(1);
+  const [isSavingsDetailsOpen, setIsSavingsDetailsOpen] = useState(false);
+  const [savingsDetails, setSavingsDetails] = useState({
+    cash: 0,
+    emergencyFund: 0,
+    brokerage: 0,
+    trad401k: 0,
+    tradIra: 0,
+    rothIra: 0,
+    hsa: 0,
+    other: 0
+  });
+
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [budgetGrossIncome, setBudgetGrossIncome] = useState(50000);
   const [budgetFilingStatus, setBudgetFilingStatus] = useState('single');
@@ -437,6 +469,10 @@ export default function FireSimulator() {
     misc: 141
   });
   const [editingEvent, setEditingEvent] = useState(null);
+  const [editingCondition, setEditingCondition] = useState(null);
+  const [budgetMonthlyIncome, setBudgetMonthlyIncome] = useState(4167);
+  const [budgetMonthlySpending, setBudgetMonthlySpending] = useState(3542);
+  const [budgetMonthlySavings, setBudgetMonthlySavings] = useState(625);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
@@ -523,7 +559,7 @@ export default function FireSimulator() {
 
   // Prevent body scroll when modal overlays are active
   useEffect(() => {
-    if (isBudgetModalOpen || showImprovementModal || editingEvent) {
+    if (isBudgetModalOpen || showImprovementModal || editingEvent || editingCondition) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -531,7 +567,7 @@ export default function FireSimulator() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isBudgetModalOpen, showImprovementModal, editingEvent]);
+  }, [isBudgetModalOpen, showImprovementModal, editingEvent, editingCondition]);
 
   // Sync state helpers
   const updateInput = (key, value) => {
@@ -1801,18 +1837,12 @@ export default function FireSimulator() {
   const handleStep1Change = (field, val) => {
     updateInput(field, val);
     if (field === 'simpleInvestments') {
+      const allocated = getReasonableSavingsAllocation(val);
       updateInput('assets', {
         ...inputs.assets,
-        brokerage: val,
-        cash: 0,
-        emergencyFund: 0,
-        trad401k: 0,
-        tradIra: 0,
-        rothIra: 0,
-        hsa: 0,
-        realEstate: 0,
-        other: 0,
-        debts: 0
+        ...allocated,
+        realEstate: inputs.assets?.realEstate || 0,
+        debts: inputs.assets?.debts || 0
       });
     } else if (field === 'simpleIncome') {
       setScenarios(prev => prev.map(scen => {
@@ -1921,6 +1951,14 @@ export default function FireSimulator() {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
     
+    const initMonthlyIncome = Math.round((Number(inp.simpleIncome) || 50000) / 12);
+    const initMonthlySpending = Math.round((Number(inp.simpleExpenses) || 42500) / 12);
+    const initMonthlySavings = Math.max(0, initMonthlyIncome - initMonthlySpending);
+
+    setBudgetMonthlyIncome(initMonthlyIncome);
+    setBudgetMonthlySpending(initMonthlySpending);
+    setBudgetMonthlySavings(initMonthlySavings);
+    
     setBudgetGrossIncome(Number(inp.simpleIncome) || 50000);
     setBudgetFilingStatus(inp.filingStatus || 'single');
     setBudgetHsaCoverage(inp.budgetDetails?.hsaCoverage || 'single');
@@ -1965,18 +2003,8 @@ export default function FireSimulator() {
         targetSavingsMap[maxKey] = Math.max(0, (targetSavingsMap[maxKey] || 0) + savingsDiff);
       }
 
-      // Compute tax-aware available expenses
-      const targetFilingStatus = inp.filingStatus || 'single';
-      const targetHsaCoverage = inp.budgetDetails?.hsaCoverage || 'single';
-      const capped401k = Math.min(23500, (targetSavingsMap.trad401k || 0) * 12);
-      const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
-      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
-      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
-      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
-      const monthlyTax = Math.round(annualTax / 12);
-
       const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
 
       const totalExpensesInModal = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
 
@@ -2057,16 +2085,8 @@ export default function FireSimulator() {
         defaultSavings[maxKey] = Math.max(0, (defaultSavings[maxKey] || 0) + savingsDiff);
       }
 
-      // Compute tax-aware available expenses
-      const capped401k = Math.min(23500, (defaultSavings.trad401k || 0) * 12);
-      const cappedTradIra = Math.min(7000, (defaultSavings.tradIra || 0) * 12);
-      const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (defaultSavings.hsa || 0) * 12);
-      const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
-      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
-      const monthlyTax = Math.round(annualTax / 12);
-
       const actualSavingsMonthly = Object.values(defaultSavings).reduce((sum, val) => sum + val, 0);
-      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly - monthlyTax);
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
 
       const defaultExpenses = {
         housing: Math.round(availableMonthlyExpenses * 0.40),
@@ -2093,18 +2113,25 @@ export default function FireSimulator() {
   };
 
   const handleSaveBudget = () => {
-    const totalExp = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
-    const totalSavings = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
-    const annualExpenses = totalExp * 12;
-    const annualSavings = totalSavings * 12;
+    // If savings allocations are entered, total all savings-related allocations and use that number as Monthly savings.
+    const totalSavingsAllocations = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const finalMonthlySavings = totalSavingsAllocations > 0 ? totalSavingsAllocations : budgetMonthlySavings;
+    const finalMonthlyIncome = budgetMonthlyIncome;
+    
+    const annualIncome = finalMonthlyIncome * 12;
+    const annualSavings = finalMonthlySavings * 12;
+    const annualExpenses = Math.max(0, annualIncome - annualSavings);
+
+    // Form final savings map
+    const finalSavingsMap = totalSavingsAllocations > 0 ? { ...budgetSavings } : { ...budgetSavings, brokerage: finalMonthlySavings };
 
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
 
       let newInputs = { ...scen.inputs };
       
-      newInputs.simpleIncome = budgetGrossIncome;
-      newInputs.simpleExpenses = Math.max(0, budgetGrossIncome - annualSavings);
+      newInputs.simpleIncome = annualIncome;
+      newInputs.simpleExpenses = annualExpenses;
       newInputs.filingStatus = budgetFilingStatus;
 
       newInputs.spendingPhases = newInputs.spendingPhases.map((phase, idx) => {
@@ -2122,7 +2149,7 @@ export default function FireSimulator() {
         if (idx === 0 || inc.id === 'simple-inc') {
           return {
             ...inc,
-            amount: budgetGrossIncome
+            amount: annualIncome
           };
         }
         return inc;
@@ -2160,15 +2187,15 @@ export default function FireSimulator() {
 
       newInputs.budgetDetails = {
         hsaCoverage: budgetHsaCoverage,
-        savings: { ...budgetSavings },
+        savings: finalSavingsMap,
         expenses: { ...budgetExpenses }
       };
 
       const nextRules = [];
       let ruleIndex = 1;
 
-      Object.keys(budgetSavings).forEach(key => {
-        const val = budgetSavings[key] || 0;
+      Object.keys(finalSavingsMap).forEach(key => {
+        const val = finalSavingsMap[key] || 0;
         if (val > 0) {
           let dest = key;
           if (key === 'checking') dest = 'cash';
@@ -2201,6 +2228,133 @@ export default function FireSimulator() {
     }));
 
     handleCloseBudgetModal();
+  };
+
+  const handleOpenSavingsDetails = () => {
+    setSavingsDetails({
+      cash: inputs.assets?.cash || 0,
+      emergencyFund: inputs.assets?.emergencyFund || 0,
+      brokerage: inputs.assets?.brokerage || 0,
+      trad401k: inputs.assets?.trad401k || 0,
+      tradIra: inputs.assets?.tradIra || 0,
+      rothIra: inputs.assets?.rothIra || 0,
+      hsa: inputs.assets?.hsa || 0,
+      other: inputs.assets?.other || 0
+    });
+    setIsSavingsDetailsOpen(true);
+  };
+
+  const handleSaveSavingsDetails = () => {
+    const total = Object.values(savingsDetails).reduce((sum, val) => sum + val, 0);
+    
+    // Save to inputs.assets
+    updateInput('assets', {
+      ...inputs.assets,
+      ...savingsDetails
+    });
+    // Update simpleInvestments
+    updateInput('simpleInvestments', total);
+    
+    setIsSavingsDetailsOpen(false);
+  };
+
+  const getDefaultValuesForType = (type, currentAge) => {
+    switch (type) {
+      case 'asset':
+        return {
+          name: 'Other Asset',
+          value: 5000,
+          monthlyAmount: 100,
+          rate: 5,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'debt':
+        return {
+          name: 'Car Loan',
+          value: 15000,
+          monthlyAmount: 350,
+          rate: 5.5,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'house':
+        return {
+          name: 'Primary Home',
+          value: 350000,
+          monthlyAmount: 2000,
+          rate: 3,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'child':
+        return {
+          name: 'Child Expense',
+          value: 0,
+          monthlyAmount: 800,
+          rate: 3,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'obligation':
+        return {
+          name: 'Monthly Obligation',
+          value: 0,
+          monthlyAmount: 150,
+          rate: 3,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      default:
+        return {
+          name: '',
+          value: 0,
+          monthlyAmount: 0,
+          rate: 0,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+    }
+  };
+
+  const handleCreateCurrentCondition = () => {
+    const currentAge = inputs.currentAge || 35;
+    setEditingCondition({
+      type: 'debt',
+      ...getDefaultValuesForType('debt', currentAge)
+    });
+  };
+
+  const handleSaveCurrentCondition = () => {
+    if (!editingCondition) return;
+    
+    let nextList = [...(inputs.currentConditions || [])];
+    
+    if (editingCondition.id) {
+      // Update existing
+      nextList = nextList.map(c => c.id === editingCondition.id ? editingCondition : c);
+    } else {
+      // Create new
+      const newItem = {
+        ...editingCondition,
+        id: `cond-${Date.now()}`
+      };
+      nextList.push(newItem);
+    }
+    
+    updateInput('currentConditions', nextList);
+    setEditingCondition(null);
+  };
+
+  const handleRemoveCurrentCondition = (id) => {
+    const nextList = (inputs.currentConditions || []).filter(c => c.id !== id);
+    updateInput('currentConditions', nextList);
   };
 
   const handleCreateEvent = (type) => {
@@ -3607,20 +3761,417 @@ export default function FireSimulator() {
   );
   };
   
+  const renderCurrentConditionsList = () => {
+    const list = inputs.currentConditions || [];
+    if (list.length === 0) {
+      return (
+        <div style={{ padding: '1rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+          No current conditions added yet. Start by adding items that are already true today.
+        </div>
+      );
+    }
+
+    const getTypeIcon = (type) => {
+      switch (type) {
+        case 'checkingSavings': return '💰';
+        case 'brokerage': return '📈';
+        case 'retirement': return '🛡️';
+        case 'asset': return '💎';
+        case 'debt': return '💳';
+        case 'house': return '🏠';
+        case 'child': return '👶';
+        case 'obligation': return '📄';
+        default: return '❓';
+      }
+    };
+
+    const getTypeLabel = (c) => {
+      if (c.type === 'retirement') {
+        const subLabels = {
+          trad401k: 'Pre-tax 401k',
+          tradIra: 'Traditional IRA',
+          rothIra: 'Roth IRA',
+          hsa: 'HSA'
+        };
+        return subLabels[c.subtype] || 'Retirement';
+      }
+      const labels = {
+        checkingSavings: 'Checking/Savings',
+        brokerage: 'Brokerage',
+        asset: 'Asset',
+        debt: 'Debt',
+        house: 'House',
+        child: 'Child',
+        obligation: 'Obligation'
+      };
+      return labels[c.type] || c.type;
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+        {list.map(c => (
+          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <span style={{ fontSize: '1.1rem' }}>{getTypeIcon(c.type)}</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{c.name || getTypeLabel(c)}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{getTypeLabel(c)}</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.8rem' }}>
+                {c.type !== 'child' && c.type !== 'obligation' && (
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {formatCurrency(c.value)}
+                  </strong>
+                )}
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  {c.monthlyAmount > 0 ? (
+                    ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type) ? (
+                      <span style={{ color: 'var(--primary-light)' }}>+{formatCurrency(c.monthlyAmount)}/mo</span>
+                    ) : (
+                      <span style={{ color: 'var(--accent-rose)' }}>-{formatCurrency(c.monthlyAmount)}/mo</span>
+                    )
+                  ) : null}
+                  {c.rate > 0 && ` (${c.rate}% ${c.type === 'debt' ? 'interest' : c.type === 'house' ? 'appr.' : 'growth'})`}
+                </span>
+                {c.endAge && (
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                    Ends at age {c.endAge}
+                  </span>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button
+                  type="button"
+                  className="list-builder-edit-btn"
+                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                  onClick={() => setEditingCondition(c)}
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  className="list-builder-edit-btn"
+                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', color: 'var(--accent-rose)' }}
+                  onClick={() => handleRemoveCurrentCondition(c.id)}
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderCurrentConditionModal = () => {
+    if (!editingCondition) return null;
+    const type = editingCondition.type;
+    const isAssetType = ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(type);
+    
+    // Choose labels and descriptions based on type
+    let valueLabel = "Current Balance / Value ($)";
+    let amountLabel = "Monthly Contribution ($/mo)";
+    let amountDesc = "How much you save/invest into this account each month.";
+    let rateLabel = "Annual Growth Rate (%)";
+    let rateDesc = "Expected annual growth rate (before inflation).";
+
+    if (type === 'checkingSavings') {
+      amountLabel = "Monthly Savings ($/mo)";
+      amountDesc = "Additional monthly savings added to this account.";
+      rateLabel = "Interest Rate (%)";
+      rateDesc = "Annual interest rate earned.";
+    } else if (type === 'retirement') {
+      amountLabel = "Monthly Contribution ($/mo)";
+      amountDesc = "Pre-tax or post-tax contribution to this account.";
+    } else if (type === 'debt') {
+      valueLabel = "Current Outstanding Balance ($)";
+      amountLabel = "Monthly Payment ($/mo)";
+      amountDesc = "Minimum or standard monthly payment.";
+      rateLabel = "Interest Rate (%)";
+      rateDesc = "Annual interest rate on the debt.";
+    } else if (type === 'house') {
+      valueLabel = "Current Home Value ($)";
+      amountLabel = "Monthly Cost ($/mo)";
+      amountDesc = "Mortgage, taxes, maintenance, and insurance monthly total.";
+      rateLabel = "Annual Appreciation Rate (%)";
+      rateDesc = "Expected annual appreciation rate.";
+    } else if (type === 'child') {
+      valueLabel = "Not Applicable";
+      amountLabel = "Monthly Cost ($/mo)";
+      amountDesc = "Childcare, schooling, and general monthly expenses.";
+      rateLabel = "Annual Cost Inflation (%)";
+      rateDesc = "Optional: custom inflation rate for child costs.";
+    } else if (type === 'obligation') {
+      valueLabel = "Not Applicable";
+      amountLabel = "Monthly Cost ($/mo)";
+      amountDesc = "Monthly cost for this obligation.";
+      rateLabel = "Annual Cost Inflation (%)";
+      rateDesc = "Optional: custom inflation rate for this obligation.";
+    }
+
+    return (
+      <div className="modal-backdrop" onClick={() => setEditingCondition(null)}>
+        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', width: '90%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
+              {editingCondition.id ? '✏️ Edit Current Condition' : '📋 Add Current Condition'}
+            </h3>
+            <button 
+              type="button" 
+              onClick={() => setEditingCondition(null)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
+            >
+              ✖
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {/* Type Selector */}
+            <div className="input-wrapper">
+              <span className="input-name">Category Type</span>
+              <select
+                className="input-number-box"
+                style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                value={editingCondition.type}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  const currentAge = inputs.currentAge || 35;
+                  const defaults = getDefaultValuesForType(newType, currentAge);
+                  setEditingCondition({
+                    ...editingCondition,
+                    type: newType,
+                    subtype: '',
+                    name: defaults.name,
+                    value: defaults.value,
+                    monthlyAmount: defaults.monthlyAmount,
+                    rate: defaults.rate,
+                    notes: defaults.notes,
+                    startAge: defaults.startAge,
+                    endAge: defaults.endAge
+                  });
+                }}
+              >
+                <option value="debt">💳 Debt / Loan</option>
+                <option value="house">🏠 House (Real Estate)</option>
+                <option value="child">👶 Child / Dependent</option>
+              </select>
+            </div>
+
+            {/* Name */}
+            <div className="input-wrapper">
+              <span className="input-name">Name</span>
+              <input
+                type="text"
+                className="input-number-box"
+                style={{ width: '100%', textAlign: 'left' }}
+                placeholder="e.g. Chase HYSA, Car Payment, Leo, etc."
+                value={editingCondition.name}
+                onChange={(e) => setEditingCondition({ ...editingCondition, name: e.target.value })}
+              />
+            </div>
+
+            {/* Value/Balance (if applicable) */}
+            {type !== 'child' && type !== 'obligation' && (
+              <div className="input-wrapper">
+                <span className="input-name">{valueLabel}</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ width: '100%' }}
+                  value={editingCondition.value || 0}
+                  onChange={(e) => setEditingCondition({ ...editingCondition, value: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+            )}
+
+            {/* Monthly Cost/Contribution */}
+            <div className="input-wrapper">
+              <span className="input-name">{amountLabel}</span>
+              <input
+                type="number"
+                className="input-number-box"
+                style={{ width: '100%' }}
+                value={editingCondition.monthlyAmount || 0}
+                onChange={(e) => setEditingCondition({ ...editingCondition, monthlyAmount: parseFloat(e.target.value) || 0 })}
+              />
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{amountDesc}</span>
+            </div>
+
+            {/* Growth Rate / Interest Rate */}
+            <div className="input-wrapper">
+              <span className="input-name">{rateLabel}</span>
+              <input
+                type="number"
+                className="input-number-box"
+                style={{ width: '100%' }}
+                value={editingCondition.rate || 0}
+                onChange={(e) => setEditingCondition({ ...editingCondition, rate: parseFloat(e.target.value) || 0 })}
+              />
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{rateDesc}</span>
+            </div>
+
+            {/* Start Age (Readonly) */}
+            <div className="input-wrapper">
+              <span className="input-name">Starts at Age (Current Age)</span>
+              <input
+                type="number"
+                className="input-number-box"
+                style={{ width: '100%', background: 'rgba(255,255,255,0.02)', color: 'var(--text-tertiary)' }}
+                value={inputs.currentAge || 35}
+                disabled
+              />
+            </div>
+
+            {/* End Age (Optional) */}
+            <div className="input-wrapper">
+              <span className="input-name">End Age (Optional)</span>
+              <input
+                type="number"
+                className="input-number-box"
+                style={{ width: '100%' }}
+                placeholder="e.g. 50 (lasts until age 50, empty if lifetime)"
+                value={editingCondition.endAge || ''}
+                onChange={(e) => setEditingCondition({ ...editingCondition, endAge: e.target.value ? parseInt(e.target.value) || null : '' })}
+              />
+            </div>
+
+            {/* Notes/Assumptions */}
+            <div className="input-wrapper">
+              <span className="input-name">Notes / Assumptions</span>
+              <textarea
+                className="input-number-box"
+                style={{ width: '100%', minHeight: '60px', textAlign: 'left', padding: '0.45rem' }}
+                placeholder="Any special notes or assumptions for this condition."
+                value={editingCondition.notes || ''}
+                onChange={(e) => setEditingCondition({ ...editingCondition, notes: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="list-builder-edit-btn"
+              style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
+              onClick={() => setEditingCondition(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleSaveCurrentCondition}
+            >
+              Save Condition
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSavingsDetailsModal = () => {
+    const totalDetails = Object.values(savingsDetails).reduce((sum, val) => sum + val, 0);
+
+    return (
+      <div className="modal-backdrop" onClick={() => setIsSavingsDetailsOpen(false)}>
+        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
+              🎯 Current Savings Breakdown
+            </h3>
+            <button 
+              type="button" 
+              onClick={() => setIsSavingsDetailsOpen(false)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
+            >
+              ✖
+            </button>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '1rem', lineHeight: '1.45', textAlign: 'left' }}>
+            Specify the starting balances for each of your savings and investment accounts below.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {[
+              { key: 'cash', label: 'Cash / Checking Balance' },
+              { key: 'emergencyFund', label: 'HYSA / Emergency Fund' },
+              { key: 'brokerage', label: 'Taxable Brokerage' },
+              { key: 'trad401k', label: 'Pre-Tax 401(k) / 403(b)' },
+              { key: 'tradIra', label: 'Traditional IRA' },
+              { key: 'rothIra', label: 'Roth IRA / Roth 401(k)' },
+              { key: 'hsa', label: 'Health Savings Account (HSA)' },
+              { key: 'other', label: 'Other Assets / Accounts' }
+            ].map(item => (
+              <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="input-name" style={{ fontSize: '0.85rem' }}>{item.label}</span>
+                <div className="input-prefix-wrapper" style={{ width: '130px' }}>
+                  <span className="currency-symbol">$</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%', textAlign: 'right', padding: '0.3rem 0.5rem', fontSize: '0.9rem' }}
+                    value={savingsDetails[item.key] || 0}
+                    onChange={(e) => setSavingsDetails({
+                      ...savingsDetails,
+                      [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                    })}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Total Savings:</span>
+              <strong style={{ fontSize: '1rem', color: 'var(--primary)', marginLeft: '0.35rem' }}>
+                {formatCurrency(totalDetails)}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                onClick={() => setIsSavingsDetailsOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                onClick={handleSaveSavingsDetails}
+              >
+                Save Details
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   const renderBudgetModal = () => {
     const capped401k = Math.min(23500, (budgetSavings.trad401k || 0) * 12);
     const cappedTradIra = Math.min(7000, (budgetSavings.tradIra || 0) * 12);
     const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, (budgetSavings.hsa || 0) * 12);
     const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
     
-    const annualTax = calculateUSTaxForModal(budgetGrossIncome, preTaxDeductionsAnnual, budgetFilingStatus);
-    const monthlyTax = Math.round(annualTax / 12);
-    const monthlyGross = Math.round(budgetGrossIncome / 12);
-    
     const totalSavingsMonthly = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
     const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
-    const totalOutflowsMonthly = totalSavingsMonthly + totalExpensesMonthly + monthlyTax;
-    const remainingMonthly = monthlyGross - totalOutflowsMonthly;
+    
+    const activeSavings = totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings;
+    const activeSpending = totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending;
+    const remainingMonthly = budgetMonthlyIncome - activeSavings - activeSpending;
     
     const handleAllocateRemaining = (categoryKey) => {
       setBudgetSavings(prev => ({
@@ -3630,12 +4181,46 @@ export default function FireSimulator() {
     };
     
     const handleAdjustGrossIncome = () => {
-      let gross = budgetGrossIncome;
-      for (let iter = 0; iter < 10; iter++) {
-        const tax = calculateUSTaxForModal(gross, preTaxDeductionsAnnual, budgetFilingStatus);
-        gross = (totalSavingsMonthly + totalExpensesMonthly) * 12 + tax;
+      setBudgetMonthlyIncome(activeSavings + activeSpending);
+    };
+
+    const handleClearDetailedSavings = () => {
+      setBudgetSavings({
+        trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+        checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+      });
+    };
+
+    const handleClearDetailedExpenses = () => {
+      setBudgetExpenses({
+        housing: 0, utilities: 0, food: 0, transportation: 0, healthcare: 0, leisure: 0, misc: 0
+      });
+    };
+
+    const handleMonthlyIncomeChange = (val) => {
+      const newIncome = Math.max(0, val);
+      setBudgetMonthlyIncome(newIncome);
+      if (totalSavingsMonthly === 0) {
+        setBudgetMonthlySavings(Math.max(0, newIncome - activeSpending));
+      } else if (totalExpensesMonthly === 0) {
+        setBudgetMonthlySpending(Math.max(0, newIncome - totalSavingsMonthly));
       }
-      setBudgetGrossIncome(Math.round(gross));
+    };
+
+    const handleMonthlySpendingChange = (val) => {
+      const newSpending = Math.max(0, val);
+      setBudgetMonthlySpending(newSpending);
+      if (totalSavingsMonthly === 0) {
+        setBudgetMonthlySavings(Math.max(0, budgetMonthlyIncome - newSpending));
+      }
+    };
+
+    const handleMonthlySavingsChange = (val) => {
+      const newSavings = Math.max(0, val);
+      setBudgetMonthlySavings(newSavings);
+      if (totalExpensesMonthly === 0) {
+        setBudgetMonthlySpending(Math.max(0, budgetMonthlyIncome - newSavings));
+      }
     };
 
     let targetSavingsRate = null;
@@ -3658,14 +4243,16 @@ export default function FireSimulator() {
       }
     }
 
-    const activeSavingsRate = budgetGrossIncome > 0 ? Math.round((totalSavingsMonthly * 12 / budgetGrossIncome) * 100) : 0;
+    const activeSavingsRate = budgetMonthlyIncome > 0 
+      ? Math.round((activeSavings / budgetMonthlyIncome) * 100) 
+      : 0;
 
     return (
       <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
         <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', display: 'flex', flexDirection: 'column' }}>
           <div className="budget-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
-              🎯 Set Detailed Budget
+              🎯 Set Monthly Budget
             </h3>
             <button 
               type="button" 
@@ -3698,41 +4285,59 @@ export default function FireSimulator() {
           )}
           
           {/* Top Parameters */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+            
+            {/* Monthly Take-home Income */}
             <div className="input-wrapper">
-              <span className="input-name">Gross Annual Salary ($)</span>
+              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Take-home Income ($)</span>
               <input
                 type="number"
                 className="input-number-box"
-                style={{ width: '100%' }}
-                value={budgetGrossIncome}
-                onChange={(e) => setBudgetGrossIncome(Math.max(0, parseFloat(e.target.value) || 0))}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.35rem 0.5rem' }}
+                value={budgetMonthlyIncome}
+                onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
               />
             </div>
+
+            {/* Monthly Spending */}
             <div className="input-wrapper">
-              <span className="input-name">Filing Status</span>
-              <select
+              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Spending ($)</span>
+              <input
+                type="number"
                 className="input-number-box"
-                style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                value={budgetFilingStatus}
-                onChange={(e) => setBudgetFilingStatus(e.target.value)}
-              >
-                <option value="single">Single Filer</option>
-                <option value="married">Married Jointly</option>
-              </select>
+                style={{ 
+                  width: '100%', 
+                  fontSize: '0.9rem', 
+                  padding: '0.35rem 0.5rem',
+                  opacity: totalExpensesMonthly > 0 ? 0.6 : 1,
+                  cursor: totalExpensesMonthly > 0 ? 'not-allowed' : 'auto'
+                }}
+                disabled={totalExpensesMonthly > 0}
+                value={totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending}
+                onChange={(e) => handleMonthlySpendingChange(parseFloat(e.target.value) || 0)}
+              />
             </div>
+
+            {/* Monthly Savings */}
             <div className="input-wrapper">
-              <span className="input-name">HSA Coverage Type</span>
-              <select
+              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Savings ($)</span>
+              <input
+                type="number"
                 className="input-number-box"
-                style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                value={budgetHsaCoverage}
-                onChange={(e) => setBudgetHsaCoverage(e.target.value)}
-              >
-                <option value="single">Individual ($4,150 limit)</option>
-                <option value="family">Family ($8,300 limit)</option>
-              </select>
+                style={{ 
+                  width: '100%', 
+                  fontSize: '0.9rem', 
+                  padding: '0.35rem 0.5rem',
+                  opacity: totalSavingsMonthly > 0 ? 0.6 : 1,
+                  cursor: totalSavingsMonthly > 0 ? 'not-allowed' : 'auto'
+                }}
+                disabled={totalSavingsMonthly > 0}
+                value={totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings}
+                onChange={(e) => handleMonthlySavingsChange(parseFloat(e.target.value) || 0)}
+              />
             </div>
+
+            {/* Savings Rate Card */}
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Savings Rate</span>
               <strong style={{ fontSize: '1.25rem', color: '#c084fc', marginTop: '0.15rem' }}>
@@ -3744,6 +4349,7 @@ export default function FireSimulator() {
                 </span>
               )}
             </div>
+
           </div>
           
           {/* Sections Container */}
@@ -3751,9 +4357,20 @@ export default function FireSimulator() {
             
             {/* Savings Allocation Column */}
             <div className="budget-section-col">
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>💰 Monthly Savings Allocation</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{formatCurrency(totalSavingsMonthly)}/mo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{formatCurrency(totalSavingsMonthly)}/mo</span>
+                  {totalSavingsMonthly > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearDetailedSavings}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                    >
+                      (Clear)
+                    </button>
+                  )}
+                </div>
               </h4>
               <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {[
@@ -3793,9 +4410,20 @@ export default function FireSimulator() {
             
             {/* Expenses Column */}
             <div className="budget-section-col">
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>🏠 Monthly Expenses</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
+                  {totalExpensesMonthly > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearDetailedExpenses}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                    >
+                      (Clear)
+                    </button>
+                  )}
+                </div>
               </h4>
               <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {[
@@ -3833,20 +4461,26 @@ export default function FireSimulator() {
           <div className="budget-reconciliation-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Gross Income</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(monthlyGross)}</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Take-home Income</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(budgetMonthlyIncome)}</strong>
               </div>
               <div>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Savings</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>-{formatCurrency(totalSavingsMonthly)}</strong>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>-{formatCurrency(activeSavings)}</strong>
               </div>
               <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Expenses</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(totalExpensesMonthly)}</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Spending</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(activeSpending)}</strong>
               </div>
               <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Est. Monthly Taxes</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>-{formatCurrency(monthlyTax)}</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Status</span>
+                {remainingMonthly > 0 ? (
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>{formatCurrency(remainingMonthly)} Leftover</strong>
+                ) : remainingMonthly < 0 ? (
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-rose)' }}>{formatCurrency(Math.abs(remainingMonthly))} Deficit</strong>
+                ) : (
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>Balanced</strong>
+                )}
               </div>
             </div>
             
@@ -3931,8 +4565,8 @@ export default function FireSimulator() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
             <button
               type="button"
-              className="btn-icon"
-              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+              className="btn-secondary"
+              style={{ padding: '0.45rem 1.25rem', fontSize: '0.8rem' }}
               onClick={handleCloseBudgetModal}
             >
               Cancel
@@ -3989,10 +4623,11 @@ export default function FireSimulator() {
           {/* Inputs Grid */}
           <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column' }}>
             <h2 className="card-title" style={{ fontSize: '1.3rem', marginBottom: '0.25rem' }}>Your Life Today</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.45' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.0rem', lineHeight: '1.45' }}>
               Let's estimate your path to financial independence. Fill in your current numbers to see your baseline projection instantly.
             </p>
             
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
@@ -4047,7 +4682,17 @@ export default function FireSimulator() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
+                    <button
+                      type="button"
+                      onClick={handleSetBudgetClick}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      📊 Calculate from budget
+                    </button>
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -4073,7 +4718,17 @@ export default function FireSimulator() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
+                    <button
+                      type="button"
+                      onClick={handleOpenSavingsDetails}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      ✏️ Details
+                    </button>
+                  </div>
                   <input
                     type="number"
                     className="input-number-box"
@@ -4089,7 +4744,7 @@ export default function FireSimulator() {
               </div>
             </div>
 
-          </div>
+           </div>
 
           {/* Immediate Value Display Progress Board */}
           <div className="progress-board-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', padding: '1.25rem 1.5rem', height: 'auto' }}>
@@ -5170,9 +5825,6 @@ export default function FireSimulator() {
 
           </div>
 
-          {editingEvent && renderEventForm(editingEvent)}
-
-          {isBudgetModalOpen && renderBudgetModal()}
 
           {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
             <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
@@ -5378,6 +6030,10 @@ export default function FireSimulator() {
           )}
         </div>
       )}
+
+      {editingEvent && renderEventForm(editingEvent)}
+      {isBudgetModalOpen && renderBudgetModal()}
+      {isSavingsDetailsOpen && renderSavingsDetailsModal()}
 
     </div>
   );

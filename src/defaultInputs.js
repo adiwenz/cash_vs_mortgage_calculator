@@ -20,13 +20,13 @@ export const DEFAULT_FIRE_INPUTS = {
   simpleExpenses: 42500,
   simpleInvestments: 5000,
   assets: {
-    cash: 0,
-    emergencyFund: 0,
-    brokerage: 5000,
-    trad401k: 0,
-    tradIra: 0,
-    rothIra: 0,
-    hsa: 0,
+    cash: 500,
+    emergencyFund: 750,
+    brokerage: 500,
+    trad401k: 1750,
+    tradIra: 500,
+    rothIra: 750,
+    hsa: 250,
     realEstate: 0,
     other: 0,
     debts: 0
@@ -113,5 +113,6 @@ export const DEFAULT_FIRE_INPUTS = {
       spendingPercent: 70
     }
   ],
-  debtList: []
+  debtList: [],
+  currentConditions: []
 };

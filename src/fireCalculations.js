@@ -154,8 +154,17 @@ export function runFireSimulation(inputs) {
   }
 
   const assets = inputs.assets || {};
+  const currentConditions = inputs.currentConditions || [];
   
-  let homeEquityBaseline = Number(assets.realEstate) || 0;
+  const customHousesStartingValue = currentConditions
+    .filter(c => c.type === 'house')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+
+  const customAssetsStartingValue = currentConditions
+    .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    
+  let homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
   let debtBalance = 0; // Removed from starting assets, tracked dynamically via debtList
 
   const incomeList = inputs.incomeList || [];
@@ -165,8 +174,23 @@ export function runFireSimulation(inputs) {
 
   const yearsToCompute = Math.max(1, lifeExpectancy - currentAge);
 
-  // Initialize Debts & Loans Schedule
-  let activeLoans = debtList.map(d => ({
+  // Initialize Debts & Loans Schedule (including custom debts)
+  const customDebts = currentConditions
+    .filter(c => c.type === 'debt')
+    .map(c => ({
+      id: c.id || `custom-debt-${Date.now()}`,
+      name: c.name || 'Debt',
+      balance: Number(c.value) || 0,
+      interestRate: (Number(c.rate) || 0) / 100,
+      payment: Number(c.monthlyAmount || 0) * 12,
+      extraPayment: 0,
+      frequency: 'monthly',
+      paydownPlanEnabled: false,
+      startAge: currentAge,
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let baseActiveLoans = debtList.map(d => ({
     id: d.id,
     name: d.name || 'Loan',
     balance: Number(d.balance) || 0,
@@ -178,8 +202,10 @@ export function runFireSimulation(inputs) {
     startAge: d.startAge !== undefined ? Number(d.startAge) : currentAge
   }));
 
+  const startingLoans = [...baseActiveLoans, ...customDebts];
+
   // Initial sum of loan balances
-  let initialDebtSum = activeLoans.reduce((sum, l) => sum + l.balance, 0);
+  let initialDebtSum = startingLoans.reduce((sum, l) => sum + l.balance, 0);
 
   // Track Milestones state
   let retirementIncomeSourcesInTodayDollars = 0;
@@ -231,17 +257,70 @@ export function runFireSimulation(inputs) {
       other: Number(assets.other) || 0
     };
 
-    let activeLoans = debtList.map(d => ({
-      id: d.id,
-      name: d.name || 'Loan',
-      balance: Number(d.balance) || 0,
-      interestRate: (Number(d.interestRate) || 0) / 100,
-      payment: d.frequency === 'monthly' ? (Number(d.payment) || 0) * 12 : (Number(d.payment) || 0),
-      extraPayment: d.frequency === 'monthly' ? (Number(d.extraPayment) || 0) * 12 : (Number(d.extraPayment) || 0),
-      frequency: d.frequency || 'monthly',
-      paydownPlanEnabled: !!d.paydownPlanEnabled,
-      startAge: d.startAge !== undefined ? Number(d.startAge) : currentAge
-    }));
+    // Add starting balances from currentConditions
+    currentConditions.forEach(cond => {
+      const val = Number(cond.value) || 0;
+      if (val <= 0) return;
+      if (cond.type === 'checkingSavings') {
+        balances.cash += val;
+      } else if (cond.type === 'brokerage') {
+        balances.brokerage += val;
+      } else if (cond.type === 'retirement') {
+        const sub = cond.subtype || 'trad401k';
+        if (balances[sub] !== undefined) {
+          balances[sub] += val;
+        }
+      } else if (cond.type === 'asset') {
+        balances.other += val;
+      }
+    });
+
+    let activeLoans = startingLoans.map(l => ({ ...l }));
+
+    // Set up custom conditions lists
+    let customAssets = currentConditions
+      .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+      .map(c => ({
+        id: c.id,
+        type: c.type,
+        subtype: c.subtype,
+        name: c.name,
+        balance: Number(c.value) || 0,
+        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : null,
+        monthlyContribution: Number(c.monthlyAmount) || 0,
+        endAge: c.endAge ? Number(c.endAge) : null
+      }));
+
+    let customHouses = currentConditions
+      .filter(c => c.type === 'house')
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        value: Number(c.value) || 0,
+        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : 0.03, // 3% default appreciation
+        monthlyCost: Number(c.monthlyAmount) || 0,
+        endAge: c.endAge ? Number(c.endAge) : null
+      }));
+
+    let customChildren = currentConditions
+      .filter(c => c.type === 'child')
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        monthlyCost: Number(c.monthlyAmount) || 0,
+        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate,
+        endAge: c.endAge ? Number(c.endAge) : null
+      }));
+
+    let customObligations = currentConditions
+      .filter(c => c.type === 'obligation')
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        monthlyCost: Number(c.monthlyAmount) || 0,
+        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate,
+        endAge: c.endAge ? Number(c.endAge) : null
+      }));
 
     let hasRunOut = false;
     let runOutAge = null;
@@ -286,6 +365,42 @@ export function runFireSimulation(inputs) {
     let taxableIncome = 0;
     let annualEarlyWithdrawalPenalties = 0;
 
+    const withdrawFromCategory = (category, amountNeeded) => {
+      let remaining = amountNeeded;
+      
+      const matchingCustoms = customAssets.filter(ca => {
+        if (category === 'cash') return ca.type === 'checkingSavings';
+        if (category === 'emergencyFund') return ca.type === 'emergencyFund';
+        if (category === 'brokerage') return ca.type === 'brokerage';
+        if (category === 'other') return ca.type === 'asset';
+        if (ca.type === 'retirement') return ca.subtype === category;
+        return false;
+      });
+
+      const baseBal = balances[category] || 0;
+      const customSum = matchingCustoms.reduce((sum, ca) => sum + ca.balance, 0);
+      const totalCategoryVal = baseBal + customSum;
+
+      if (totalCategoryVal <= 0) return 0;
+
+      const totalToWithdraw = Math.min(totalCategoryVal, remaining);
+
+      // Proportional deduction
+      const baseRatio = totalCategoryVal > 0 ? (baseBal / totalCategoryVal) : 0;
+      const withdrawnBase = totalToWithdraw * baseRatio;
+      if (balances[category] !== undefined) {
+        balances[category] = Math.max(0, balances[category] - withdrawnBase);
+      }
+
+      matchingCustoms.forEach(ca => {
+        const caRatio = totalCategoryVal > 0 ? (ca.balance / totalCategoryVal) : 0;
+        ca.balance = Math.max(0, ca.balance - (totalToWithdraw * caRatio));
+      });
+
+      remaining -= totalToWithdraw;
+      return totalToWithdraw;
+    };
+
     // Drawdowns / Shortfall coverage order
     const coverShortfall = (amountToDeduct, age) => {
       let remaining = amountToDeduct;
@@ -294,17 +409,17 @@ export function runFireSimulation(inputs) {
       const drawdownSequence = ['cash', 'emergencyFund', 'brokerage'];
     
       for (const key of drawdownSequence) {
-        if (balances[key] > 0) {
-          const withdraw = Math.min(balances[key], remaining);
-          balances[key] -= withdraw;
-          remaining -= withdraw;
-          if (remaining <= 0) return 0;
-        }
+        const withdrawn = withdrawFromCategory(key, remaining);
+        remaining -= withdrawn;
+        if (remaining <= 0) return 0;
       }
 
       // Pre-tax accounts (Traditional 401k & IRA) withdrawals are taxable post-retirement
       if (includeTaxes) {
-        const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0);
+        const customPreTaxSum = customAssets
+          .filter(ca => ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra'))
+          .reduce((sum, ca) => sum + ca.balance, 0);
+        const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0) + customPreTaxSum;
         if (maxPreTaxAvailable > 0 && remaining > 0) {
           const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
           const totalGrossPreTaxWithdrawal = solveTraditionalWithdrawal(
@@ -325,11 +440,8 @@ export function runFireSimulation(inputs) {
           let withdrawalRemaining = totalGrossPreTaxWithdrawal;
           const preTaxSequence = ['trad401k', 'tradIra'];
           for (const key of preTaxSequence) {
-            if (balances[key] > 0) {
-              const withdraw = Math.min(balances[key], withdrawalRemaining);
-              balances[key] -= withdraw;
-              withdrawalRemaining -= withdraw;
-            }
+            const withdrawn = withdrawFromCategory(key, withdrawalRemaining);
+            withdrawalRemaining -= withdrawn;
           }
 
           remaining -= actualNetProceeds;
@@ -338,13 +450,16 @@ export function runFireSimulation(inputs) {
       } else {
         const preTaxSequence = ['trad401k', 'tradIra'];
         for (const key of preTaxSequence) {
-          if (balances[key] > 0) {
+          const customPreTaxSum = customAssets
+            .filter(ca => ca.type === 'retirement' && ca.subtype === key)
+            .reduce((sum, ca) => sum + ca.balance, 0);
+          const totalAvail = (balances[key] || 0) + customPreTaxSum;
+          if (totalAvail > 0) {
             const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
             const grossNeeded = remaining / (1 - pRate);
-            const withdraw = Math.min(balances[key], grossNeeded);
-            const penalty = withdraw * pRate;
-            const netProceeds = withdraw - penalty;
-            balances[key] -= withdraw;
+            const withdrawn = withdrawFromCategory(key, grossNeeded);
+            const penalty = withdrawn * pRate;
+            const netProceeds = withdrawn - penalty;
             remaining -= netProceeds;
             annualEarlyWithdrawalPenalties += penalty;
             if (remaining <= 0.01) return 0;
@@ -355,12 +470,9 @@ export function runFireSimulation(inputs) {
       // Roth IRA, HSA, Other
       const taxFreeSequence = ['rothIra', 'hsa', 'other'];
       for (const key of taxFreeSequence) {
-        if (balances[key] > 0) {
-          const withdraw = Math.min(balances[key], remaining);
-          balances[key] -= withdraw;
-          remaining -= withdraw;
-          if (remaining <= 0) return 0;
-        }
+        const withdrawn = withdrawFromCategory(key, remaining);
+        remaining -= withdrawn;
+        if (remaining <= 0) return 0;
       }
 
       return remaining; // Leftover shortfall
@@ -372,21 +484,22 @@ export function runFireSimulation(inputs) {
       // Prefer cash / emergency fund / brokerage / other for large capital expenditures
       const order = ['cash', 'emergencyFund', 'brokerage', 'other', 'rothIra', 'tradIra', 'trad401k', 'hsa'];
       for (const assetKey of order) {
-        if (balances[assetKey] > 0) {
-          let withdraw;
+        const customPreTaxSum = customAssets
+          .filter(ca => ca.type === 'retirement' && ca.subtype === assetKey)
+          .reduce((sum, ca) => sum + ca.balance, 0);
+        const totalAvail = (balances[assetKey] || 0) + customPreTaxSum;
+        if (totalAvail > 0) {
           if (assetKey === 'tradIra' || assetKey === 'trad401k') {
             const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
             const grossNeeded = remaining / (1 - pRate);
-            withdraw = Math.min(balances[assetKey], grossNeeded);
-            const penalty = withdraw * pRate;
-            const netProceeds = withdraw - penalty;
-            balances[assetKey] -= withdraw;
+            const withdrawn = withdrawFromCategory(assetKey, grossNeeded);
+            const penalty = withdrawn * pRate;
+            const netProceeds = withdrawn - penalty;
             remaining -= netProceeds;
             annualEarlyWithdrawalPenalties += penalty;
           } else {
-            withdraw = Math.min(balances[assetKey], remaining);
-            balances[assetKey] -= withdraw;
-            remaining -= withdraw;
+            const withdrawn = withdrawFromCategory(assetKey, remaining);
+            remaining -= withdrawn;
           }
           if (remaining <= 0.01) break;
         }
@@ -421,6 +534,31 @@ export function runFireSimulation(inputs) {
       balances.other *= (1 + activeReturnRate);
       balances.cash *= (1 + cashReturnRate);
       balances.emergencyFund *= (1 + cashReturnRate);
+
+      // Compound custom assets
+      customAssets.forEach(ca => {
+        if (ca.balance <= 0) return;
+        if (ca.endAge !== null && age > ca.endAge) {
+          ca.balance = 0;
+          return;
+        }
+        let rateToApply = ca.growthRate;
+        if (rateToApply === null) {
+          if (ca.type === 'checkingSavings') rateToApply = cashReturnRate;
+          else rateToApply = activeReturnRate;
+        }
+        ca.balance *= (1 + rateToApply);
+      });
+
+      // Compound custom houses
+      customHouses.forEach(h => {
+        if (h.value <= 0) return;
+        if (h.endAge !== null && age > h.endAge) {
+          h.value = 0;
+          return;
+        }
+        h.value *= (1 + h.growthRate);
+      });
     }
 
     // ----------------------------------------------------
@@ -649,6 +787,32 @@ export function runFireSimulation(inputs) {
       }
     });
 
+    // Add custom children expenses
+    customChildren.forEach(c => {
+      if (age >= currentAge && (c.endAge === null || age < c.endAge)) {
+        const yearsElapsed = age - currentAge;
+        const costForYear = (c.monthlyCost * 12) * Math.pow(1 + c.growthRate, yearsElapsed);
+        annualExpenses += costForYear;
+      }
+    });
+
+    // Add custom obligations expenses
+    customObligations.forEach(o => {
+      if (age >= currentAge && (o.endAge === null || age < o.endAge)) {
+        const yearsElapsed = age - currentAge;
+        const costForYear = (o.monthlyCost * 12) * Math.pow(1 + o.growthRate, yearsElapsed);
+        annualExpenses += costForYear;
+      }
+    });
+
+    // Add custom houses expenses
+    customHouses.forEach(h => {
+      if (age >= currentAge && (h.endAge === null || age < h.endAge)) {
+        const costForYear = h.monthlyCost * 12;
+        annualExpenses += costForYear;
+      }
+    });
+
     // Resolve property buying events down payments
     enabledEvents.forEach(ev => {
       if (ev.type === 'buyHouse' && age === Number(ev.purchaseAge)) {
@@ -723,6 +887,11 @@ export function runFireSimulation(inputs) {
 
     // Appreciate home values and compile mortgage payments / property costs
     let totalHomeValue = homeEquityBaseline * nominalFactor;
+    customHouses.forEach(h => {
+      if (age >= currentAge && (h.endAge === null || age < h.endAge)) {
+        totalHomeValue += h.value;
+      }
+    });
     let totalMortgageBalance = 0;
 
     purchasedProperties.forEach(prop => {
@@ -866,8 +1035,22 @@ export function runFireSimulation(inputs) {
     const isSavingPeriod = !isCoasting && age < targetRetirementAge;
 
     // Step 1: Pre-Tax allocations dry run
+    let customPreTaxAllocationsThisYear = 0;
     if (isSavingPeriod && grossSurplus > 0) {
-      let tempGrossSurplus = grossSurplus;
+      customAssets.forEach(ca => {
+        if (ca.endAge !== null && age >= ca.endAge) return;
+        if (ca.monthlyContribution > 0) {
+          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+          if (isPreTax) {
+            const annualContribution = ca.monthlyContribution * 12;
+            customPreTaxAllocationsThisYear += annualContribution;
+          }
+        }
+      });
+      customPreTaxAllocationsThisYear = Math.min(grossSurplus, customPreTaxAllocationsThisYear);
+      totalPreTaxAllocations += customPreTaxAllocationsThisYear;
+
+      let tempGrossSurplus = grossSurplus - customPreTaxAllocationsThisYear;
 
       sortedAllocations.forEach(rule => {
         const dest = rule.destination;
@@ -915,6 +1098,19 @@ export function runFireSimulation(inputs) {
     let netCashFlow = netSurplus; // Tracker for total cash flow this year
 
     if (isSavingPeriod) {
+      // Run custom pre-tax allocations for real
+      customAssets.forEach(ca => {
+        if (ca.endAge !== null && age >= ca.endAge) return;
+        if (ca.monthlyContribution > 0) {
+          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+          if (isPreTax) {
+            const annualContribution = ca.monthlyContribution * 12;
+            ca.balance += annualContribution;
+            savingsContribution += annualContribution;
+          }
+        }
+      });
+
       // Run pre-tax allocations for real
       sortedAllocations.forEach(rule => {
         const dest = rule.destination;
@@ -933,6 +1129,23 @@ export function runFireSimulation(inputs) {
           }
         }
       });
+
+      // Run custom post-tax allocations
+      if (netSurplus > 0) {
+        customAssets.forEach(ca => {
+          if (ca.endAge !== null && age >= ca.endAge) return;
+          if (ca.monthlyContribution > 0) {
+            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+            if (!isPreTax) {
+              const annualContribution = ca.monthlyContribution * 12;
+              const actualContributed = Math.min(netSurplus, annualContribution);
+              ca.balance += actualContributed;
+              netSurplus -= actualContributed;
+              savingsContribution += actualContributed;
+            }
+          }
+        });
+      }
 
       // Run post-tax allocations
       sortedAllocations.forEach(rule => {
@@ -1080,7 +1293,8 @@ export function runFireSimulation(inputs) {
     // 6. Net Worth & FI Targets
     // ----------------------------------------------------
     // Net Worth = Liquid Assets + Real Estate Value - Mortgage Balances - Debt balances
-    const liquidNW = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other;
+    const customAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
+    const liquidNW = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
     const netWorth = liquidNW + totalHomeValue - totalMortgageBalance - currentDebtSum;
 
     // Apply FIRE Mode Multipliers for retirement spending target
@@ -1172,7 +1386,7 @@ export function runFireSimulation(inputs) {
       endingSurplusShortfall = hasRunOut ? -shortfall : liquidNW;
     }
 
-    const totalPortfolio = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other;
+    const totalPortfolio = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
 
     logs.push({
       year,
@@ -1196,14 +1410,14 @@ export function runFireSimulation(inputs) {
       coastFireNumber,
       isCoastAchieved,
       // Record detailed asset allocations for breakdowns
-      cashBalance: balances.cash,
+      cashBalance: balances.cash + customAssets.filter(ca => ca.type === 'checkingSavings').reduce((sum, ca) => sum + ca.balance, 0),
       emergencyFundBalance: balances.emergencyFund,
-      brokerageBalance: balances.brokerage,
-      trad401kBalance: balances.trad401k,
-      tradIraBalance: balances.tradIra,
-      rothIraBalance: balances.rothIra,
-      hsaBalance: balances.hsa,
-      otherBalance: balances.other
+      brokerageBalance: balances.brokerage + customAssets.filter(ca => ca.type === 'brokerage').reduce((sum, ca) => sum + ca.balance, 0),
+      trad401kBalance: balances.trad401k + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'trad401k').reduce((sum, ca) => sum + ca.balance, 0),
+      tradIraBalance: balances.tradIra + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'tradIra').reduce((sum, ca) => sum + ca.balance, 0),
+      rothIraBalance: balances.rothIra + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'rothIra').reduce((sum, ca) => sum + ca.balance, 0),
+      hsaBalance: balances.hsa + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'hsa').reduce((sum, ca) => sum + ca.balance, 0),
+      otherBalance: balances.other + customAssets.filter(ca => ca.type === 'asset').reduce((sum, ca) => sum + ca.balance, 0)
     });
   }
 
@@ -1422,6 +1636,7 @@ export function runFireSimulation(inputs) {
                      (Number(assets.rothIra) || 0) +
                      (Number(assets.hsa) || 0) +
                      (Number(assets.other) || 0) +
+                     customAssetsStartingValue +
                      homeEquityBaseline -
                      initialDebtSum -
                      plannedResults.logs[plannedResults.logs.length - 1].debtBalance,
