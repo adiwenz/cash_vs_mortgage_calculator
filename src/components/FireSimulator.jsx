@@ -78,7 +78,7 @@ const DEFAULT_FIRE_INPUTS = {
       name: 'Salary / Main Income',
       amount: 50000,
       frequency: 'yearly',
-      startAge: 30,
+      startAge: 35,
       endAge: 65,
       growthRate: 0.03,
       isTaxable: true
@@ -88,7 +88,7 @@ const DEFAULT_FIRE_INPUTS = {
     {
       id: 'spend-1',
       name: 'Base Lifestyle Spending',
-      startAge: 30,
+      startAge: 35,
       endAge: 85,
       amount: 42500,
       frequency: 'yearly',
@@ -726,7 +726,38 @@ export default function FireSimulator() {
             lifeEvents: updatedEvents
           };
 
-          if (!scen.inputs.budgetDetails) {
+          if (scen.inputs.budgetDetails) {
+            baseInputsUpdate.incomeList = (scen.inputs.incomeList || []).map(inc => {
+              if (
+                inc.id === 'simple-inc' ||
+                inc.id === 'inc-1' ||
+                inc.name.toLowerCase().includes('salary') ||
+                inc.name.toLowerCase().includes('main income')
+              ) {
+                return {
+                  ...inc,
+                  startAge: currentAgeVal,
+                  endAge: targetRetAgeVal
+                };
+              }
+              return inc;
+            });
+            baseInputsUpdate.spendingPhases = (scen.inputs.spendingPhases || []).map(phase => {
+              if (
+                phase.id === 'simple-spend' ||
+                phase.id === 'spend-1' ||
+                phase.name.toLowerCase().includes('lifestyle') ||
+                phase.name.toLowerCase().includes('spending')
+              ) {
+                return {
+                  ...phase,
+                  startAge: currentAgeVal,
+                  endAge: lifeExpVal
+                };
+              }
+              return phase;
+            });
+          } else {
             baseInputsUpdate.assets = {
               ...scen.inputs.assets,
               cash: 0,
