@@ -4429,7 +4429,7 @@ export default function FireSimulator() {
                 <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
                   <select
                     className="add-event-dropdown"
-                    style={{ width: '100%', height: '32px', fontSize: '0.78rem' }}
+                    style={{ width: '100%', height: '32px', padding: '0 2rem 0 1rem', fontSize: '0.78rem', lineHeight: '30px' }}
                     onChange={(e) => {
                       if (e.target.value) {
                         handleCreateEvent(e.target.value);
