@@ -4208,8 +4208,8 @@ export default function FireSimulator() {
               inputs.lifeExpectancy
             );
             return (
-              <div className="glass-card" style={{ padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                     🏆 Retirement Plan Summary
                   </h3>
@@ -4308,17 +4308,17 @@ export default function FireSimulator() {
                   background: details.bg, 
                   border: `1px solid ${details.color}44`, 
                   borderRadius: '6px', 
-                  padding: '0.5rem 0.85rem',
-                  marginBottom: '1rem',
+                  padding: '0.35rem 0.75rem',
+                  marginBottom: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.75rem',
+                  gap: '0.5rem',
                   flexWrap: 'wrap'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', fontWeight: '800', color: details.color }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
                     {details.badge}
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', flex: 1, minWidth: '250px' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.35', flex: 1, minWidth: '250px' }}>
                     {details.desc}
                   </p>
                 </div>
@@ -4327,50 +4327,50 @@ export default function FireSimulator() {
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
-                  gap: '1rem', 
-                  paddingTop: '0.25rem' 
+                  gap: '0.5rem', 
+                  paddingTop: '0' 
                 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Planned Retirement</span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Planned Retirement</span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
                       {inputs.readinessCriteria === 'lastsLifeExp' 
                         ? 'Sustainable Age' 
                         : inputs.readinessCriteria === 'lastsComfortable' 
                         ? 'Comfortable Age' 
                         : 'Indefinite Age'}
                     </span>
-                    <strong style={{ fontSize: '1.15rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', fontWeight: '800' }}>
+                    <strong style={{ fontSize: '1.05rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', fontWeight: '800' }}>
                       {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
                       {inputs.readinessCriteria === 'lastsLifeExp' 
                         ? 'Sustainable Target' 
                         : inputs.readinessCriteria === 'lastsComfortable' 
                           ? 'Comfortable Target' 
                           : 'Indefinite Target'}
                     </span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
                       {formatCurrency(activeResults.retirementReadyTarget)}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
                       {activeResults.targetRetirementAge === inputs.lifeExpectancy ? 'N/A' : formatCurrency(activeResults.portfolioAtRetirement)}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Retirement Income</span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(activeResults.retirementIncomeSources)} / yr</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Retirement Income</span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(activeResults.retirementIncomeSources)} / yr</strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Annual Spending</span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Annual Spending</span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
                       {formatCurrency(activeResults.annualRetirementSpending)} / yr
                     </strong>
                   </div>
@@ -4378,15 +4378,15 @@ export default function FireSimulator() {
 
                 {/* Retirement Improvement Plan Banner (Compact) */}
                 {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                  <div className="improvement-banner-container" style={{ marginTop: '1rem', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', borderRadius: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
+                  <div className="improvement-banner-container" style={{ marginTop: '0.65rem', padding: '0.35rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
                     </div>
                     <button
                       type="button"
                       className="improvement-banner-btn"
-                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', margin: 0 }}
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
                       onClick={() => setShowImprovementModal(true)}
                     >
                       View Action Plan
@@ -4398,26 +4398,27 @@ export default function FireSimulator() {
           })()}
           
           {/* Centerpiece Timeline */}
-          <div className="glass-card timeline-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Interactive Roadmap</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
+          <div className="glass-card timeline-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Interactive Roadmap</h3>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <div style={{ width: '100%', minWidth: '180px', maxWidth: '240px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
                   <button
                     type="button"
                     className="add-event-dropdown"
                     style={{
                       width: '100%',
-                      height: '38px',
+                      height: '32px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundImage: 'none',
-                      paddingRight: '1.25rem',
-                      paddingLeft: '1.25rem',
+                      paddingRight: '1rem',
+                      paddingLeft: '1rem',
+                      fontSize: '0.78rem',
                       whiteSpace: 'nowrap'
                     }}
                     onClick={handleSetBudgetClick}
@@ -4425,10 +4426,10 @@ export default function FireSimulator() {
                     Set Budget
                   </button>
                 </div>
-                <div style={{ width: '100%', minWidth: '180px', maxWidth: '240px' }}>
+                <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
                   <select
                     className="add-event-dropdown"
-                    style={{ width: '100%', height: '38px' }}
+                    style={{ width: '100%', height: '32px', fontSize: '0.78rem' }}
                     onChange={(e) => {
                       if (e.target.value) {
                         handleCreateEvent(e.target.value);
@@ -4459,12 +4460,12 @@ export default function FireSimulator() {
 
             {/* Horizontal Timeline (Desktop) */}
             <div className="timeline-wrapper">
-              <div className="timeline-track-container" style={{ height: '145px' }}>
-                <div className="timeline-line-axis" style={{ top: '120px' }} />
+              <div className="timeline-track-container" style={{ height: '125px' }}>
+                <div className="timeline-line-axis" style={{ top: '100px' }} />
                 <div
                   className="timeline-progress-line"
                   style={{
-                    top: '120px',
+                    top: '100px',
                     width: activeResults.targetRetirementAge 
                       ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
                       : '0px'
@@ -4472,7 +4473,7 @@ export default function FireSimulator() {
                 />
 
                 {/* Chronological Axis Number Line Ticks */}
-                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '120px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '100px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const ticks = [];
@@ -4513,7 +4514,7 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${83 - (evt.stackIndex * 36)}px`, 
+                          top: `${63 - (evt.stackIndex * 36)}px`, 
                           transform: 'translateX(-50%)',
                           cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
                         }}

@@ -125,16 +125,16 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
 }
 
 @media (max-width: 480px) {
   .app-container {
-    padding: 1rem 0.75rem;
-    gap: 1.25rem;
+    padding: 0.75rem;
+    gap: 1rem;
   }
 }
 
@@ -143,7 +143,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-color);
 }
 
