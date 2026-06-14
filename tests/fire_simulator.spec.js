@@ -430,6 +430,9 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     const milestoneNode57 = page.locator('.timeline-node:has-text("Support for Liam Ends")');
     await expect(milestoneNode57).toBeVisible();
     await expect(milestoneNode57).toContainText('Age 57');
+
+    // Assert that no auto-generated "Standard Work Phase" milestones exist on the timeline
+    await expect(page.locator('.timeline-node:has-text("Standard Work")')).toHaveCount(0);
   });
 
 });

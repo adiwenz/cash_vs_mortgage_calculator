@@ -4261,6 +4261,9 @@ export default function FireSimulator() {
 
     // 1. Income Phases
     inp.incomeList.forEach(inc => {
+      if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc')) {
+        return;
+      }
       if (inc.startAge > inp.currentAge && inc.startAge <= inp.lifeExpectancy) {
         events.push({
           originalId: inc.id,
@@ -4276,6 +4279,9 @@ export default function FireSimulator() {
 
     // 2. Spending Phases
     inp.spendingPhases.forEach(phase => {
+      if (phase.id && typeof phase.id === 'string' && phase.id.startsWith('simple-spend')) {
+        return;
+      }
       if (phase.startAge > inp.currentAge && phase.startAge <= inp.lifeExpectancy) {
         let emoji = '🏡';
         if (phase.name.toLowerCase().includes('dominican') || phase.name.toLowerCase().includes('dr')) {
