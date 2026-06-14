@@ -312,6 +312,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: '✏️ Edit Event' }).click();
     await page.locator('div.input-wrapper:has-text("Parent\'s Age when Born") input').fill('53');
     await page.getByRole('button', { name: 'Save Event', exact: true }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click(); // Close child welcome modal
 
     // 5. Open Budget Builder Modal
     await page.getByRole('button', { name: 'Set Budget', exact: true }).click();
@@ -385,6 +386,40 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
 
     // Cancel modal
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  });
+
+  test('10. Edit child to include college and verify modal triggers', async ({ page }) => {
+    await page.goto('/?tool=fire');
+
+    // Go to Step 2
+    await page.getByRole('button', { name: 'Build My Life Plan →' }).click();
+
+    // 1. Add first child (Liam, born at age 35) without college
+    await page.locator('select.add-event-dropdown').selectOption('haveChild');
+    await page.getByPlaceholder('e.g. Liam').fill('Liam');
+    await page.getByRole('button', { name: 'Save Event', exact: true }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click(); // Close child welcome modal
+
+    // 2. Click on the child node to edit
+    const liamNode = page.locator('.timeline-node:has-text("Have Child: Liam")');
+    await liamNode.click();
+    await page.getByRole('button', { name: '✏️ Edit Event' }).click();
+
+    // 3. Verify college cost text is visible under the checkbox
+    await expect(page.getByText('Adds an additional $15,000/yr per child')).toBeVisible();
+
+    // 4. Check the Include College checkbox
+    await page.locator('input#include-college').check();
+
+    // 5. Save the event
+    await page.getByRole('button', { name: 'Save Event', exact: true }).click();
+
+    // 6. Verify that the Child Welcome/Impact modal is displayed (since the edit impacted the ready age/shortfall)
+    await expect(page.getByRole('heading', { name: 'Welcome, Liam!' })).toBeVisible();
+    await expect(page.getByText('Estimated Child Costs:')).toBeVisible();
+
+    // Close the welcome modal
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
   });
 
 });

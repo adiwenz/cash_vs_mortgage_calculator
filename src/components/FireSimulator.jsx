@@ -3757,15 +3757,21 @@ export default function FireSimulator() {
 
     setScenarios(nextScenarios);
 
-    if (type === 'haveChild' && savedEvent && !editingEvent.id) {
+    if (type === 'haveChild' && savedEvent) {
       const diff = (afterReadyAge && beforeReadyAge) ? (afterReadyAge - beforeReadyAge) : 0;
-      setChildImpactSummary({
-        beforeAge: beforeReadyAge,
-        afterAge: afterReadyAge,
-        diffYears: diff,
-        annualSpending: avgAnnualChildCost,
-        event: savedEvent
-      });
+      const currentScenObj = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+      const targetRetAge = Number(currentScenObj?.inputs?.targetRetirementAge) || 65;
+      const isStillReady = afterReadyAge !== null && (diff <= 0 || afterReadyAge <= targetRetAge);
+
+      if (!editingEvent.id || !isStillReady) {
+        setChildImpactSummary({
+          beforeAge: beforeReadyAge,
+          afterAge: afterReadyAge,
+          diffYears: diff,
+          annualSpending: avgAnnualChildCost,
+          event: savedEvent
+        });
+      }
     }
     
     setEditingEvent(null);
@@ -4893,7 +4899,10 @@ export default function FireSimulator() {
                 <div style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                   <div style={{ fontWeight: '700', marginBottom: '0.35rem', color: 'var(--text-primary)' }}>Default Estimate:</div>
                   <ul style={{ paddingLeft: '1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <li>All Child-Rearing Years: {formatCurrency(15000)}/yr</li>
+                    <li>Child-Rearing Years (Ages 0–18): {formatCurrency(15000)}/yr</li>
+                    {editingEvent.includeCollege && (
+                      <li>College / Young Adult Support (Ages 19–22): {formatCurrency(15000)}/yr</li>
+                    )}
                   </ul>
                 </div>
               )}
@@ -4926,17 +4935,22 @@ export default function FireSimulator() {
                 </div>
               )}
 
-              <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <input
-                  type="checkbox"
-                  id="include-college"
-                  checked={!!editingEvent.includeCollege}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, includeCollege: e.target.checked })}
-                  style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
-                />
-                <label htmlFor="include-college" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
-                  Include College / Young Adult Support (Ages 19–22)
-                </label>
+              <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="include-college"
+                    checked={!!editingEvent.includeCollege}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, includeCollege: e.target.checked })}
+                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="include-college" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                    Include College / Young Adult Support (Ages 19–22)
+                  </label>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', paddingLeft: '1.55rem', display: 'block' }}>
+                  Adds an additional <strong>{formatCurrency(editingEvent.costMethod === 'custom' ? (editingEvent.customAges19to22 !== undefined ? Number(editingEvent.customAges19to22) : 15000) : 15000)}/yr</strong> per child from age 19 to 22.
+                </span>
               </div>
             </>
           )}
