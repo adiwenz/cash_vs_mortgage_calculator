@@ -9,6 +9,7 @@ import SimpleCalculator from './components/SimpleCalculator';
 import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
 import FireSimulator from './components/FireSimulator';
 import SavingsAllocator from './components/SavingsAllocator';
+import CreditCardBehavior from './components/CreditCardBehavior';
 import logoImg from './assets/logo.png';
 
 // Initial default inputs
@@ -46,6 +47,7 @@ export default function App() {
     if (tool === 'compare') return 'mortgageComparer';
     if (tool === 'fire') return 'fireSimulator';
     if (tool === 'allocator') return 'savingsAllocator';
+    if (tool === 'creditcard') return 'creditCardBehavior';
     return 'cashVsMortgageSimple';
   });
 
@@ -118,6 +120,8 @@ export default function App() {
         setActiveTool('fireSimulator');
       } else if (tool === 'allocator') {
         setActiveTool('savingsAllocator');
+      } else if (tool === 'creditcard') {
+        setActiveTool('creditCardBehavior');
       } else {
         setActiveTool('cashVsMortgageSimple');
       }
@@ -162,6 +166,8 @@ export default function App() {
       params.set('tool', 'fire');
     } else if (tool === 'savingsAllocator') {
       params.set('tool', 'allocator');
+    } else if (tool === 'creditCardBehavior') {
+      params.set('tool', 'creditcard');
     } else {
       params.set('tool', 'compare');
     }
@@ -265,6 +271,11 @@ export default function App() {
                 <h1>Savings Allocator</h1>
                 <p>Optimize your monthly savings across different accounts and taxes</p>
               </>
+            ) : activeTool === 'creditCardBehavior' ? (
+              <>
+                <h1>Credit Card Behavior</h1>
+                <p>Educational debt compounding and payment behavior simulator</p>
+              </>
             ) : (
               <>
                 <h1>Compare Mortgages</h1>
@@ -294,7 +305,8 @@ export default function App() {
                     { tool: 'cashVsMortgage', label: 'Tax-Aware Cash v. Mortgage' },
                     { tool: 'mortgageComparer', label: 'Compare Mortgages' },
                     { tool: 'fireSimulator', label: 'FIRE & Life Simulator' },
-                    { tool: 'savingsAllocator', label: 'Savings Allocator' }
+                    { tool: 'savingsAllocator', label: 'Savings Allocator' },
+                    { tool: 'creditCardBehavior', label: 'Credit Card Behavior' }
                   ].map((item) => (
                     <button
                       key={item.tool}
@@ -682,6 +694,10 @@ export default function App() {
       ) : activeTool === 'savingsAllocator' ? (
         <main style={{ marginTop: '1.5rem', width: '100%' }}>
           <SavingsAllocator />
+        </main>
+      ) : activeTool === 'creditCardBehavior' ? (
+        <main style={{ marginTop: '1.5rem', width: '100%' }}>
+          <CreditCardBehavior />
         </main>
       ) : (
         <main style={{ marginTop: '1.5rem' }}>

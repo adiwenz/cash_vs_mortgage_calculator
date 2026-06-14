@@ -14,6 +14,11 @@ import {
   Area
 } from 'recharts';
 import { runFireSimulation, validateFireInputs, getSocialSecurityFactor } from '../fireCalculations';
+import { 
+  calculateRetireAt65Recommendation, 
+  calculateSaveMoreRecommendation, 
+  calculateEarnMoreRecommendation 
+} from '../recommendations';
 import './FireSimulator.css';
 
 import { DEFAULT_FIRE_INPUTS } from '../defaultInputs';
@@ -25,6 +30,15 @@ const formatCurrency = (val) => {
     currency: 'USD',
     maximumFractionDigits: 0
   }).format(val);
+};
+
+const estimateAdditionalMonthlySavings = (gap, years, annualRate) => {
+  if (years <= 0 || gap <= 0) return 0;
+  const r = (annualRate || 7) / 100 / 12;
+  const n = years * 12;
+  if (r === 0) return gap / n;
+  const fvFactor = (Math.pow(1 + r, n) - 1) / r;
+  return gap / fvFactor;
 };
 
 const getReasonableSavingsAllocation = (total) => {
@@ -179,23 +193,11 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
   switch (outcome) {
     case 'comfortable':
       return {
-        label: readinessCriteria === 'lastsIndefinitely' 
-          ? 'Indefinite Retirement' 
-          : readinessCriteria === 'lastsComfortable' 
-          ? 'Comfortable Retirement' 
-          : 'Sustainable Retirement',
-        badge: readinessCriteria === 'lastsIndefinitely'
-          ? '🟢 Indefinite'
-          : readinessCriteria === 'lastsComfortable'
-          ? '🟢 Comfortable'
-          : '🟢 Sustainable',
+        label: 'Comfortable Retirement',
+        badge: '🟢 Comfortable',
         color: 'var(--accent-emerald)',
         bg: 'rgba(16, 185, 129, 0.1)',
-        desc: readinessCriteria === 'lastsIndefinitely'
-          ? `Your projected assets meet the safe perpetual withdrawal target, ensuring your portfolio lasts indefinitely (beyond Age ${lifeExpectancy || 85}).`
-          : readinessCriteria === 'lastsComfortable'
-          ? `Your projected assets remain positive through your life expectancy plus 10 years safety buffer (Age ${Number(lifeExpectancy || 85) + 10}).`
-          : 'Your projected assets remain positive through life expectancy and you maintain a substantial portfolio cushion.'
+        desc: `Your projected assets remain positive through your life expectancy plus 10 years safety buffer (Age ${Number(lifeExpectancy || 85) + 10}).`
       };
     case 'sustainable':
       return {
@@ -203,11 +205,7 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
         badge: '🟡 Sustainable',
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
-        desc: readinessCriteria === 'lastsIndefinitely'
-          ? `Your portfolio is projected to last through your life expectancy, but does not meet the safety margin to last indefinitely. Consider working until your Indefinite Retire Age (Age ${retirementReadyAge || 'N/A'}) to ensure your money lasts forever.`
-          : readinessCriteria === 'lastsComfortable'
-          ? `Your portfolio is projected to last through your life expectancy, but does not meet the 10-year safety buffer. Consider working until your Comfortable Retire Age (Age ${retirementReadyAge || 'N/A'}).`
-          : 'Your projected assets remain positive through life expectancy. Your portfolio gradually declines but is projected to last.'
+        desc: `Your projected assets remain positive through life expectancy (Age ${lifeExpectancy || 85}), but do not meet the 10-year safety buffer.`
       };
     case 'retirementGap':
       return {
@@ -223,7 +221,7 @@ const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirementRead
         badge: '🟡 Sustainable',
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
-        desc: 'Your projected assets remain positive through life expectancy.'
+        desc: 'Your projected assets remain positive through life expectancy. Your portfolio gradually declines but is projected to last.'
       };
   }
 };
@@ -261,7 +259,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       targetRetirementAge: newRetirementAge,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
         return inc;
@@ -283,7 +282,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       simpleIncome: newIncome,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
         }
         return inc;
@@ -314,7 +314,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
         return inc;
@@ -349,7 +350,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: target65Age };
         }
         return inc;
@@ -380,7 +382,7 @@ const getPaceBadgeStyles = (savingsFocus) => {
       border: '1px solid rgba(16, 185, 129, 0.3)'
     };
   }
-  if (focusLower.includes('gentle')) {
+  if (focusLower.includes('gentle') || focusLower.includes('work')) {
     return {
       color: '#3b82f6',
       background: 'rgba(59, 130, 246, 0.12)',
@@ -394,14 +396,14 @@ const getPaceBadgeStyles = (savingsFocus) => {
       border: '1px solid rgba(99, 102, 241, 0.3)'
     };
   }
-  if (focusLower.includes('moderate')) {
+  if (focusLower.includes('moderate') || focusLower.includes('save')) {
     return {
       color: '#f59e0b',
       background: 'rgba(245, 158, 11, 0.12)',
       border: '1px solid rgba(245, 158, 11, 0.3)'
     };
   }
-  if (focusLower.includes('earnings') || focusLower.includes('active')) {
+  if (focusLower.includes('earnings') || focusLower.includes('active') || focusLower.includes('earn')) {
     return {
       color: '#8b5cf6',
       background: 'rgba(139, 92, 246, 0.12)',
@@ -422,12 +424,308 @@ const getPaceBadgeStyles = (savingsFocus) => {
   };
 };
 
+const calculatePeakChildCosts = (inp) => {
+  const childEvents = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  if (childEvents.length === 0) return 0;
+  
+  let minChildParentAge = Infinity;
+  let maxChildParentAge = -Infinity;
+  childEvents.forEach(ev => {
+    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+    const maxAge = includeCollege ? 22 : 18;
+    if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+    if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+  });
+  
+  const currentAge = inp.currentAge !== undefined ? Number(inp.currentAge) : 30;
+  const targetRetirementAge = inp.targetRetirementAge !== undefined ? Number(inp.targetRetirementAge) : 60;
+  const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+  if (!hasChildcarePhase) return 0;
+  
+  let maxChildCostsAnnual = 0;
+  for (let age = currentAge; age < targetRetirementAge; age++) {
+    let yearCost = 0;
+    childEvents.forEach(ev => {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+      const childAge = age - birthAge;
+      if (childAge >= childStartAge) {
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (childAge < maxAge) {
+          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inp.childCosts?.ages0to4 !== undefined ? Number(inp.childCosts.ages0to4) : 15000);
+          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inp.childCosts?.ages5to12 !== undefined ? Number(inp.childCosts.ages5to12) : 15000);
+          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inp.childCosts?.ages13to18 !== undefined ? Number(inp.childCosts.ages13to18) : 15000);
+          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inp.childCosts?.ages19to22 !== undefined ? Number(inp.childCosts.ages19to22) : 15000);
+
+          let annualCost = 0;
+          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+          
+          yearCost += annualCost;
+        }
+      }
+    });
+    if (yearCost > maxChildCostsAnnual) {
+      maxChildCostsAnnual = yearCost;
+    }
+  }
+  return maxChildCostsAnnual;
+};
+
+const getActiveChildrenCountAtAge = (age, lifeEvents) => {
+  let count = 0;
+  const childEvents = (lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  childEvents.forEach(ev => {
+    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+    const childAge = age - birthAge;
+    if (childAge >= startAge) {
+      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+      const maxAge = includeCollege ? 22 : 18;
+      if (childAge < maxAge) {
+        count++;
+      }
+    }
+  });
+  return count;
+};
+
+const getChildCountIntervals = (startAge, endAge, lifeEvents) => {
+  const intervals = [];
+  if (startAge >= endAge) return intervals;
+  
+  let currentStart = startAge;
+  let currentCount = getActiveChildrenCountAtAge(startAge, lifeEvents);
+  
+  for (let age = startAge + 1; age < endAge; age++) {
+    const count = getActiveChildrenCountAtAge(age, lifeEvents);
+    if (count !== currentCount) {
+      intervals.push({ startAge: currentStart, endAge: age, childCount: currentCount });
+      currentStart = age;
+      currentCount = count;
+    }
+  }
+  intervals.push({ startAge: currentStart, endAge: endAge, childCount: currentCount });
+  return intervals;
+};
+
+const getChildCostsForInterval = (interval, inputs) => {
+  if (!interval || interval.childCount === 0) return 0;
+  
+  let totalAnnualCost = 0;
+  const refAge = interval.startAge;
+  const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  
+  childEvents.forEach(ev => {
+    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+    const childAge = refAge - birthAge;
+    
+    if (childAge >= startAge) {
+      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+      const maxAge = includeCollege ? 22 : 18;
+      if (childAge < maxAge) {
+        const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+        const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+        const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+        const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+        let annualCost = 0;
+        if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+        else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+        else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+        else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+        
+        totalAnnualCost += annualCost;
+      }
+    }
+  });
+  
+  return Math.round(totalAnnualCost / 12);
+};
+
+const syncChildcarePhasesAndRules = (newInputs) => {
+  const currentAge = Number(newInputs.currentAge) || 30;
+  const targetRetirementAge = Number(newInputs.targetRetirementAge) || 65;
+  const lifeExpectancy = Number(newInputs.lifeExpectancy) || 85;
+
+  const childEvents = (newInputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  let minChildParentAge = Infinity;
+  let maxChildParentAge = -Infinity;
+  childEvents.forEach(ev => {
+    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+    const maxAge = includeCollege ? 22 : 18;
+    if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+    if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+  });
+
+  const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+  const childEndAge = Math.min(lifeExpectancy, Math.max(currentAge, maxChildParentAge));
+
+  // 1. Sync Income List
+  const cleanIncomeList = (newInputs.incomeList || []).filter(inc => inc.id !== 'inc-1' && inc.id !== 'simple-inc' && inc.id !== 'simple-inc-childcare' && inc.id !== 'simple-inc-worksave');
+  const wsIncomeAnnual = (Number(newInputs.budgetDetails?.income) || (Number(newInputs.simpleIncome) / 12) || 4167) * 12;
+  
+  const finalChildcareBudgets = newInputs.budgetDetails?.childcareBudgets || {};
+  let childcareIncome = newInputs.budgetDetails?.childcareIncome;
+  if (Object.keys(finalChildcareBudgets).length > 0) {
+    childcareIncome = finalChildcareBudgets[Math.min(...Object.keys(finalChildcareBudgets).map(Number))].income;
+  }
+  const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12) + 1250) * 12;
+
+  if (hasChildcarePhase) {
+    if (childEndAge > currentAge) {
+      cleanIncomeList.push({
+        id: 'simple-inc-childcare',
+        name: 'Salary / Main Income (Childcare Phase)',
+        amount: ccIncomeAnnual,
+        frequency: 'yearly',
+        startAge: currentAge,
+        endAge: Math.min(targetRetirementAge, childEndAge),
+        growthRate: 0.03,
+        isTaxable: true
+      });
+    }
+    if (childEndAge < targetRetirementAge) {
+      cleanIncomeList.push({
+        id: 'simple-inc-worksave',
+        name: 'Salary / Main Income (Standard Work Phase)',
+        amount: wsIncomeAnnual,
+        frequency: 'yearly',
+        startAge: Math.max(currentAge, childEndAge),
+        endAge: targetRetirementAge,
+        growthRate: 0.03,
+        isTaxable: true
+      });
+    }
+  } else {
+    cleanIncomeList.push({
+      id: 'simple-inc',
+      name: 'Salary / Main Income',
+      amount: wsIncomeAnnual,
+      frequency: 'yearly',
+      startAge: currentAge,
+      endAge: targetRetirementAge,
+      growthRate: 0.03,
+      isTaxable: true
+    });
+  }
+  newInputs.incomeList = cleanIncomeList;
+
+  // 2. Sync Spending Phases
+  const cleanSpendingPhases = (newInputs.spendingPhases || []).filter(p => p.id !== 'spend-1' && p.id !== 'simple-spend' && p.id !== 'simple-spend-childcare' && p.id !== 'simple-spend-worksave');
+  const wsExpensesAnnual = (Number(newInputs.budgetDetails?.expenses ? Object.values(newInputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(newInputs.simpleExpenses) / 12) || 3542) * 12;
+  
+  let childcareExpenses = newInputs.budgetDetails?.childcareExpenses;
+  if (Object.keys(finalChildcareBudgets).length > 0) {
+    childcareExpenses = finalChildcareBudgets[Math.min(...Object.keys(finalChildcareBudgets).map(Number))].expenses;
+  }
+  const ccExpensesAnnual = (Number(childcareExpenses ? Object.values(childcareExpenses).reduce((sum, val) => sum + val, 0) : 0) || (wsExpensesAnnual / 12)) * 12;
+
+  if (hasChildcarePhase) {
+    if (childEndAge > currentAge) {
+      cleanSpendingPhases.push({
+        id: 'simple-spend-childcare',
+        name: 'Lifestyle Spending (Childcare Phase)',
+        amount: ccExpensesAnnual,
+        frequency: 'yearly',
+        startAge: currentAge,
+        endAge: childEndAge,
+        annualSpending: ccExpensesAnnual
+      });
+    }
+    if (childEndAge < lifeExpectancy) {
+      cleanSpendingPhases.push({
+        id: 'simple-spend-worksave',
+        name: 'Lifestyle Spending (Standard Work Phase)',
+        amount: wsExpensesAnnual,
+        frequency: 'yearly',
+        startAge: Math.max(currentAge, childEndAge),
+        endAge: lifeExpectancy,
+        annualSpending: wsExpensesAnnual
+      });
+    }
+  } else {
+    cleanSpendingPhases.push({
+      id: 'simple-spend',
+      name: 'Base Lifestyle Spending',
+      amount: wsExpensesAnnual,
+      frequency: 'yearly',
+      startAge: currentAge,
+      endAge: lifeExpectancy,
+      annualSpending: wsExpensesAnnual
+    });
+  }
+  newInputs.spendingPhases = cleanSpendingPhases;
+
+  // 3. Sync Allocation Rules
+  const nextRules = [];
+  let ruleIndex = 1;
+
+  const finalWorkSaveSavings = newInputs.budgetDetails?.savings || {};
+  const finalWorkSaveAllocMode = newInputs.budgetDetails?.savingsAllocMode || 'percentSurplus';
+  const finalChildcareSavings = newInputs.budgetDetails?.childcareSavings || {};
+  const finalChildcareAllocMode = newInputs.budgetDetails?.childcareSavingsAllocMode || 'percentSurplus';
+
+  const savingIntervals = getChildCountIntervals(currentAge, targetRetirementAge, newInputs.lifeEvents);
+  savingIntervals.forEach(interval => {
+    const C = interval.childCount;
+    const start = interval.startAge;
+    const end = interval.endAge;
+    if (start >= end) return;
+
+    let budgetSavingsMap = {};
+    let budgetAllocMode = 'fixed';
+    if (C === 0) {
+      budgetSavingsMap = finalWorkSaveSavings;
+      budgetAllocMode = finalWorkSaveAllocMode;
+    } else {
+      const ccBudget = finalChildcareBudgets[C] || {};
+      budgetSavingsMap = ccBudget.savings || finalChildcareSavings;
+      budgetAllocMode = ccBudget.allocMode || finalChildcareAllocMode;
+    }
+
+    Object.keys(budgetSavingsMap).forEach(key => {
+      const val = budgetSavingsMap[key] || 0;
+      if (val > 0) {
+        let dest = key;
+        if (key === 'checking') dest = 'cash';
+        else if (key === 'hysa') dest = 'other';
+        else if (key === 'emergency') dest = 'emergencyFund';
+        else if (key === 'debt') dest = 'debtPaydown';
+
+        nextRules.push({
+          id: `budget-alloc-${C > 0 ? 'cc-' + C : 'ws'}-${key}-${start}-${Date.now()}`,
+          destination: dest,
+          type: budgetAllocMode === 'percentSurplus' ? 'percentSurplus' : 'fixed',
+          value: val,
+          frequency: budgetAllocMode === 'percentSurplus' ? 'yearly' : 'monthly',
+          priority: ruleIndex++,
+          startAge: start,
+          endAge: end,
+          smartRule: { enabled: false, targetValue: 0, redirectDestination: 'brokerage' }
+        });
+      }
+    });
+  });
+
+  newInputs.allocationRules = nextRules;
+};
+
 export default function FireSimulator() {
   const [colorBlindMode, setColorBlindMode] = useState(false);
   const [currentScenarioId, setCurrentScenarioId] = useState('baseline');
   const [newEventSelectorType, setNewEventSelectorType] = useState('buyHouse');
   const [selectedTimelineEvent, setSelectedTimelineEvent] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
+  const [showAssets, setShowAssets] = useState(true);
+  const [showDebt, setShowDebt] = useState(true);
+  const [showNetWorth, setShowNetWorth] = useState(true);
 
   // 2-Step Wizard Navigation states
   const [activeStep, setActiveStep] = useState(1);
@@ -444,9 +742,25 @@ export default function FireSimulator() {
   });
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [activeBudgetPhase, setActiveBudgetPhase] = useState('workSave'); // 'workSave' | 'childcare'
+  
+  // Storage for standard work phase budget details
+  const [workSaveIncome, setWorkSaveIncome] = useState(4167);
+  const [workSaveSavings, setWorkSaveSavings] = useState({});
+  const [workSaveExpenses, setWorkSaveExpenses] = useState({});
+  const [workSaveAllocMode, setWorkSaveAllocMode] = useState('fixed');
+
+  // Storage for childcare phase budget details
+  const [childcareIncome, setChildcareIncome] = useState(4167);
+  const [childcareSavings, setChildcareSavings] = useState({});
+  const [childcareExpenses, setChildcareExpenses] = useState({});
+  const [childcareAllocMode, setChildcareAllocMode] = useState('fixed');
+  const [childcareBudgets, setChildcareBudgets] = useState({});
+
   const [budgetGrossIncome, setBudgetGrossIncome] = useState(50000);
   const [budgetFilingStatus, setBudgetFilingStatus] = useState('single');
   const [budgetHsaCoverage, setBudgetHsaCoverage] = useState('single');
+  const [savingsAllocMode, setSavingsAllocMode] = useState('fixed'); // 'fixed' | 'percentSurplus'
   const [budgetSavings, setBudgetSavings] = useState({
     trad401k: 100,
     rothIra: 50,
@@ -469,6 +783,7 @@ export default function FireSimulator() {
     misc: 141
   });
   const [editingEvent, setEditingEvent] = useState(null);
+  const [childImpactSummary, setChildImpactSummary] = useState(null);
   const [editingCondition, setEditingCondition] = useState(null);
   const [budgetMonthlyIncome, setBudgetMonthlyIncome] = useState(4167);
   const [budgetMonthlySpending, setBudgetMonthlySpending] = useState(3542);
@@ -477,12 +792,15 @@ export default function FireSimulator() {
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [showImprovementModal, setShowImprovementModal] = useState(false);
-  const [hasAutoPopped, setHasAutoPopped] = useState(false);
+  const [wasShortfall, setWasShortfall] = useState(false);
   const [pendingImprovement, setPendingImprovement] = useState(null);
+  const [budgetDiffs, setBudgetDiffs] = useState(null);
+  const [displayMode, setDisplayMode] = useState('future'); // 'future' | 'today'
 
   const handleCloseBudgetModal = () => {
     setIsBudgetModalOpen(false);
     setPendingImprovement(null);
+    setBudgetDiffs(null);
   };
   const dragOccurredRef = useRef(false);
   const lastNonZeroSavingsRateRef = useRef(15); // default to 15% pre-tax savings rate
@@ -649,10 +967,12 @@ export default function FireSimulator() {
           if (scen.inputs.budgetDetails) {
             baseInputsUpdate.incomeList = (scen.inputs.incomeList || []).map(inc => {
               if (
-                inc.id === 'simple-inc' ||
+                (inc.id === 'simple-inc' ||
                 inc.id === 'inc-1' ||
                 inc.name.toLowerCase().includes('salary') ||
-                inc.name.toLowerCase().includes('main income')
+                inc.name.toLowerCase().includes('main income')) &&
+                inc.id !== 'simple-inc-childcare' &&
+                inc.id !== 'simple-inc-worksave'
               ) {
                 return {
                   ...inc,
@@ -664,10 +984,12 @@ export default function FireSimulator() {
             });
             baseInputsUpdate.spendingPhases = (scen.inputs.spendingPhases || []).map(phase => {
               if (
-                phase.id === 'simple-spend' ||
+                (phase.id === 'simple-spend' ||
                 phase.id === 'spend-1' ||
                 phase.name.toLowerCase().includes('lifestyle') ||
-                phase.name.toLowerCase().includes('spending')
+                phase.name.toLowerCase().includes('spending')) &&
+                phase.id !== 'simple-spend-childcare' &&
+                phase.id !== 'simple-spend-worksave'
               ) {
                 return {
                   ...phase,
@@ -773,8 +1095,57 @@ export default function FireSimulator() {
   }, [scenarios]);
 
   const activeResults = useMemo(() => {
-    return runFireSimulation(inputs);
+    const res = runFireSimulation(inputs);
+    console.log('[FIRE Debug] RAW INPUTS:', inputs);
+    const inf = (Number(inputs.inflationRate) || 3) / 100;
+    const curAge = Number(inputs.currentAge) || 35;
+    const logLines = [];
+    res.data.forEach(d => {
+      const factor = Math.pow(1 + inf, d.age - curAge);
+      logLines.push(
+        `Age ${d.age}: ` +
+        `Income=${Math.round(d.income * factor)}, ` +
+        `ChildCosts=${Math.round(d.childCosts * factor)}, ` +
+        `Expenses=${Math.round(d.expenses * factor)}, ` +
+        `Savings=${Math.round(d.savings * factor)}, ` +
+        `Taxes=${Math.round(d.taxes * factor)}, ` +
+        `Portfolio=${Math.round(d.portfolio * factor)}, ` +
+        `NetWorth=${Math.round(d.netWorth * factor)}`
+      );
+    });
+    console.log('[FIRE Debug] YEAR-BY-YEAR LOGS:\n' + logLines.join('\n'));
+    return res;
   }, [inputs]);
+
+  const displayedResults = useMemo(() => {
+    const isNominal = displayMode === 'future';
+    return {
+      ...activeResults,
+      data: isNominal ? activeResults.nominalData : activeResults.deflatedData,
+      retirementReadyTarget: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
+      portfolioAtRetirement: isNominal ? activeResults.nominalPortfolioAtRetirement : activeResults.deflatedPortfolioAtRetirement,
+      netWorthAtRetirement: isNominal ? activeResults.nominalNetWorthAtRetirement : activeResults.deflatedNetWorthAtRetirement,
+      annualRetirementSpending: isNominal ? activeResults.nominalAnnualRetirementSpending : activeResults.deflatedAnnualRetirementSpending,
+      endingSurplusShortfall: isNominal ? activeResults.nominalEndingSurplusShortfall : activeResults.deflatedEndingSurplusShortfall,
+      retirementIncomeSources: isNominal ? activeResults.nominalRetirementIncomeSources : activeResults.deflatedRetirementIncomeSources,
+      fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget
+    };
+  }, [activeResults, displayMode]);
+
+  const displayedBaselineResults = useMemo(() => {
+    const isNominal = displayMode === 'future';
+    return {
+      ...baselineResults,
+      data: isNominal ? baselineResults.nominalData : baselineResults.deflatedData,
+      retirementReadyTarget: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget,
+      portfolioAtRetirement: isNominal ? baselineResults.nominalPortfolioAtRetirement : baselineResults.deflatedPortfolioAtRetirement,
+      netWorthAtRetirement: isNominal ? baselineResults.nominalNetWorthAtRetirement : baselineResults.deflatedNetWorthAtRetirement,
+      annualRetirementSpending: isNominal ? baselineResults.nominalAnnualRetirementSpending : baselineResults.deflatedAnnualRetirementSpending,
+      endingSurplusShortfall: isNominal ? baselineResults.nominalEndingSurplusShortfall : baselineResults.deflatedEndingSurplusShortfall,
+      retirementIncomeSources: isNominal ? baselineResults.nominalRetirementIncomeSources : baselineResults.deflatedRetirementIncomeSources,
+      fiNumber: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget
+    };
+  }, [baselineResults, displayMode]);
 
   // Validate inputs
   const validation = useMemo(() => {
@@ -782,585 +1153,283 @@ export default function FireSimulator() {
   }, [inputs]);
 
   // Suggestion engine for Retirement Improvement Plan
+  // Suggestion engine for Retirement Improvement Plan
   const improvementPlan = useMemo(() => {
-    if (activeStep !== 2) return null;
-    const currentReadyAge = activeResults.retirementReadyAge;
-    const isSustainable = inputs.readinessCriteria === 'lastsLifeExp';
-    const isComfortable = inputs.readinessCriteria === 'lastsComfortable';
-    
-    const showImprovementPlan = 
-      !currentReadyAge || 
-      currentReadyAge > inputs.lifeExpectancy || 
-      !activeResults.moneyLasts || 
-      activeResults.runOutAge !== null || 
-      inputs.targetRetirementAge < currentReadyAge;
+    const currentAge = Number(inputs.currentAge) || 30;
+    const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+    const yearsUntilRetirement = Math.max(0, targetRetirementAge - currentAge);
+    const rateOfReturn = (Number(inputs.expectedReturn) || 7) / 100;
+    const swr = (Number(inputs.swr) || 4) / 100;
+    const retirementExpenses = activeResults.annualRetirementSpending || 40000;
+    const shortfall = activeResults.endingSurplusShortfall < 0 ? -activeResults.endingSurplusShortfall : 0;
+    const marginalTaxRate = inputs.includeTaxes ? 0.25 : 0.0;
 
-    if (!showImprovementPlan) return null;
+    // Determine childcare phase and peak monthly child cost
+    const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    let hasChildcarePhase = false;
+    let maxChildCostsAnnual = 0;
+    if (childEvents.length > 0) {
+      let minChildParentAge = Infinity;
+      let maxChildParentAge = -Infinity;
+      childEvents.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+      });
+      hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+
+      if (hasChildcarePhase) {
+        // Find the maximum child cost in today's dollars for any year from currentAge to targetRetirementAge
+        for (let age = currentAge; age < targetRetirementAge; age++) {
+          let yearCost = 0;
+          childEvents.forEach(ev => {
+            const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+            const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+            const childAge = age - birthAge;
+            if (childAge >= childStartAge) {
+              const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+              const maxAge = includeCollege ? 22 : 18;
+              if (childAge < maxAge) {
+                const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+                const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+                const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+                const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+                let annualCost = 0;
+                if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+                else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+                else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+                else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+                
+                yearCost += annualCost;
+              }
+            }
+          });
+          if (yearCost > maxChildCostsAnnual) {
+            maxChildCostsAnnual = yearCost;
+          }
+        }
+      }
+    }
+    const maxChildCostsMonthly = Math.round(maxChildCostsAnnual / 12);
+
+    let peakCount = 0;
+    const currentAgeVal = Number(inputs.currentAge) || 30;
+    const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+      const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+      if (count > peakCount) {
+        peakCount = count;
+      }
+    }
+    let ccIncomeVal = (Number(inputs.simpleIncome) || 50000) / 12;
+    if (inputs.budgetDetails) {
+      if (inputs.budgetDetails.childcareBudgets && inputs.budgetDetails.childcareBudgets[peakCount]) {
+        ccIncomeVal = Number(inputs.budgetDetails.childcareBudgets[peakCount].income);
+      } else if (inputs.budgetDetails.childcareIncome !== undefined) {
+        ccIncomeVal = Number(inputs.budgetDetails.childcareIncome);
+      }
+    }
+    const wsIncomeVal = inputs.budgetDetails && inputs.budgetDetails.income !== undefined
+      ? Number(inputs.budgetDetails.income)
+      : (Number(inputs.simpleIncome) || 50000) / 12;
+    const currentChildcareIncomeBoostMonthly = Math.max(0, ccIncomeVal - wsIncomeVal);
+
+    const unfundedMaxChildCostsMonthly = Math.max(0, maxChildCostsMonthly - currentChildcareIncomeBoostMonthly);
+
+    const currentReadyAge = activeResults.retirementReadyAge;
+    const hasShortfall = activeResults.endingSurplusShortfall < 0 || 
+                         !activeResults.moneyLasts ||
+                         (activeResults.retirementReadyAge && inputs.targetRetirementAge < activeResults.retirementReadyAge);
+
+    if (!hasShortfall) return null;
+
+    // Calculate sum of current liquid assets
+    const currentAssets = (Number(inputs.assets?.cash) || 0) +
+                          (Number(inputs.assets?.emergencyFund) || 0) +
+                          (Number(inputs.assets?.brokerage) || 0) +
+                          (Number(inputs.assets?.trad401k) || 0) +
+                          (Number(inputs.assets?.tradIra) || 0) +
+                          (Number(inputs.assets?.rothIra) || 0) +
+                          (Number(inputs.assets?.hsa) || 0) +
+                          (Number(inputs.assets?.other) || 0);
+
+    const annualSavings = (Number(inputs.simpleIncome) || 0) - (Number(inputs.simpleExpenses) || 0);
+    const standardMonthlySavings = Math.round(annualSavings / 12);
+    const childcarePeakGrossBoost = Math.round(unfundedMaxChildCostsMonthly / (1 - marginalTaxRate));
+    const childcarePeakGrossBoostZeroSavings = Math.round(Math.max(0, unfundedMaxChildCostsMonthly - standardMonthlySavings) / (1 - marginalTaxRate));
 
     const list = [];
 
-    const currentIncome = Number(inputs.simpleIncome) || 0;
-    const currentExpenses = Number(inputs.simpleExpenses) || 0;
-    const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
+    // 1. Retire at 65 Recommendation
+    const retire65Rec = calculateRetireAt65Recommendation(
+      currentAge,
+      targetRetirementAge,
+      currentAssets,
+      annualSavings,
+      rateOfReturn,
+      swr,
+      retirementExpenses
+    );
 
-    // Helper to simulate a test savings rate increase
-    const getTestSavingsResult = (deltaRate) => {
-      const annualSavingsDelta = (deltaRate * currentIncome) / 100;
-      const testInputs = {
-        ...inputs,
-        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta)
-      };
-      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
-        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
-          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
-          return {
-            ...phase,
-            amount: Math.max(0, currentAmt - annualSavingsDelta),
-            annualSpending: Math.max(0, currentAmt - annualSavingsDelta)
-          };
-        }
-        return phase;
-      });
-
-      // Synchronize allocationRules in test inputs to match test savings rate
-      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
-      testInputs.allocationRules = inputs.allocationRules.map(rule => {
-        if (rule.id === 'simple-alloc-pretax') {
-          return { ...rule, value: testSavingsRate };
-        }
-        return rule;
-      });
-
-      return runFireSimulation(testInputs);
-    };
-
-    // 1. Savings Scenario (Binary Search)
-    let bestDeltaRate = null;
-    let bestNewReadyAge = null;
-    let foundSavingsImprovement = false;
-
-    const maxSavingsDelta = Math.min(30, Math.max(0, 95 - currentSavingsRate));
-    let lowSavings = 1;
-    let highSavings = maxSavingsDelta;
-
-    while (lowSavings <= highSavings) {
-      const mid = Math.floor((lowSavings + highSavings) / 2);
-      const testRes = getTestSavingsResult(mid);
-      const testReadyAge = testRes.retirementReadyAge;
-      const goesBroke = !testRes.moneyLasts;
-
-      if (!goesBroke && testReadyAge && (!currentReadyAge || testReadyAge < currentReadyAge || (currentReadyAge > inputs.lifeExpectancy && testReadyAge <= inputs.lifeExpectancy))) {
-        bestDeltaRate = mid;
-        bestNewReadyAge = testReadyAge;
-        foundSavingsImprovement = true;
-        highSavings = mid - 1; // Try to find a smaller savings rate increase
-      } else {
-        lowSavings = mid + 1; // Need a higher savings rate increase
-      }
-    }
-
-    if (!foundSavingsImprovement) {
-      bestDeltaRate = 5; // fallback
-    }
-
-    if (foundSavingsImprovement && bestNewReadyAge) {
-      const extraMonthly = Math.round((bestDeltaRate * currentIncome) / 1200);
-      const yearsImprovement = currentReadyAge ? (currentReadyAge - bestNewReadyAge) : null;
-      const savingsPaceLabel = bestDeltaRate <= 5 
-        ? `Moderate Savings Pace (+${bestDeltaRate}%)` 
-        : bestDeltaRate <= 12 
-          ? `Active Savings Pace (+${bestDeltaRate}%)` 
-          : `Accelerated Savings Pace (+${bestDeltaRate}%)`;
-
-      list.push({
-        type: 'savings',
-        icon: '📈',
-        title: 'Increase Savings Rate',
-        details: `Boost your savings rate by +${bestDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + bestDeltaRate}%).`,
-        bulletPoints: [
-          `Save and invest an additional ${formatCurrency(extraMonthly)}/month.`,
-          `This can be achieved by increasing pre-tax retirement contributions or trimming discretionary costs (which mathematically has the same positive impact on your cash flow surplus).`
-        ],
-        extraAction: `E.g., increase paycheck 401(k) contributions, automate transfer of ${formatCurrency(extraMonthly)}/mo to brokerage, or trim subscription/dining budgets.`,
-        readyAge: bestNewReadyAge,
-        yearsImprovement,
-        value: bestDeltaRate,
-        disruption: bestDeltaRate,
-        savingsFocus: savingsPaceLabel,
-        savingsEffortScore: bestDeltaRate
-      });
-    }
-
-    // 1b. Retire at Target Age (always included if baseline is not successful at target age)
-    let targetAgeDeltaRate = null;
-    let targetAgeNewReadyAge = null;
-    let foundTargetAgePlan = false;
-
-    const maxDeltaTarget = Math.max(0, 95 - currentSavingsRate);
-    let lowTarget = 0;
-    let highTarget = maxDeltaTarget;
-
-    while (lowTarget <= highTarget) {
-      const mid = Math.floor((lowTarget + highTarget) / 2);
-      const testRes = getTestSavingsResult(mid);
-      const testReadyAge = testRes.retirementReadyAge;
-      const moneyLasts = testRes.moneyLasts;
-
-      if (moneyLasts && testReadyAge && testReadyAge <= inputs.targetRetirementAge) {
-        targetAgeDeltaRate = mid;
-        targetAgeNewReadyAge = testReadyAge;
-        foundTargetAgePlan = true;
-        highTarget = mid - 1;
-      } else {
-        lowTarget = mid + 1;
-      }
-    }
-
-    // Force-generate fallback if not found
-    let targetAgeGoesBroke = false;
-    let targetAgeRunOutAge = null;
-    if (!foundTargetAgePlan) {
-      targetAgeDeltaRate = Math.max(0, 90 - currentSavingsRate);
-      targetAgeNewReadyAge = inputs.targetRetirementAge;
-      foundTargetAgePlan = true;
-      
-      const finalTestRes = getTestSavingsResult(targetAgeDeltaRate);
-      targetAgeGoesBroke = !finalTestRes.moneyLasts;
-      targetAgeRunOutAge = finalTestRes.runOutAge;
-    } else {
-      const finalTestRes = getTestSavingsResult(targetAgeDeltaRate);
-      targetAgeGoesBroke = !finalTestRes.moneyLasts;
-      targetAgeRunOutAge = finalTestRes.runOutAge;
-    }
-
-    if (foundTargetAgePlan && targetAgeDeltaRate !== null) {
-      const extraMonthly = Math.round((targetAgeDeltaRate * currentIncome) / 1200);
-      const targetAgePaceLabel = targetAgeDeltaRate === 0 
-        ? 'Steady Savings Pace' 
-        : targetAgeDeltaRate <= 5 
-          ? `Gentle Savings Pace (+${targetAgeDeltaRate}%)` 
-          : targetAgeDeltaRate <= 12 
-            ? `Moderate Savings Pace (+${targetAgeDeltaRate}%)` 
-            : `Active Savings Pace (+${targetAgeDeltaRate}%)`;
-
-      const bulletPoints = [];
-      if (targetAgeDeltaRate > 0) {
-        bulletPoints.push(`Boost your savings rate by +${targetAgeDeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + targetAgeDeltaRate}%).`);
-        bulletPoints.push(`Save and invest an additional ${formatCurrency(extraMonthly)}/month.`);
-      } else {
-        bulletPoints.push(`Retire at Age ${inputs.targetRetirementAge} under your current budget (no extra savings required).`);
-      }
-
-      if (targetAgeGoesBroke) {
-        const runOut = targetAgeRunOutAge !== null ? targetAgeRunOutAge : 95;
-        bulletPoints.push(`Note: Even with high savings, assets may run out around Age ${runOut} (additional adjustments needed).`);
-      } else {
-        bulletPoints.push(`Enables a successful, positive net worth trajectory through age 95.`);
-      }
-
-      list.push({
-        type: 'savings',
-        icon: '🎯',
-        title: `Retire at Age ${inputs.targetRetirementAge} (Target Age)`,
-        details: targetAgeDeltaRate > 0
-          ? `Retire successfully at your set target age of ${inputs.targetRetirementAge} by adjusting your savings rate by +${targetAgeDeltaRate}%.`
-          : `Retire successfully at your set target age of ${inputs.targetRetirementAge} under your current budget.`,
-        bulletPoints,
-        readyAge: targetAgeNewReadyAge,
-        yearsImprovement: null,
-        value: targetAgeDeltaRate,
-        disruption: targetAgeDeltaRate,
-        savingsFocus: targetAgePaceLabel,
-        savingsEffortScore: targetAgeDeltaRate
-      });
-    }
-
-    // Helper to simulate delaying retirement
-    const getTestWorkLongerResult = (yearsDelay) => {
-      const testInputs = {
-        ...inputs,
-        targetRetirementAge: inputs.targetRetirementAge + yearsDelay
-      };
-      testInputs.incomeList = inputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-          return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
-        }
-        return inc;
-      });
-      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
-        if (ev.type === 'retire') {
-          return { ...ev, age: inputs.targetRetirementAge + yearsDelay };
-        }
-        return ev;
-      });
-      return runFireSimulation(testInputs);
-    };
-
-    // 2. Work Longer Scenario
-    let bestDelay = 3;
-    let workLongerNewReadyAge = null;
-    let foundWorkImprovement = false;
-
-    const delayOptions = [2, 3, 5];
-    for (const delay of delayOptions) {
-      if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
-      const testRes = getTestWorkLongerResult(delay);
-      const testReadyAge = testRes.retirementReadyAge;
-      
-      const goesBroke = !testRes.moneyLasts;
-      if (goesBroke) continue;
-
-      if (testReadyAge && testReadyAge <= inputs.lifeExpectancy) {
-        bestDelay = delay;
-        workLongerNewReadyAge = testReadyAge;
-        foundWorkImprovement = true;
-        break;
-      }
-    }
-
-    if (!foundWorkImprovement) {
-      for (const delay of delayOptions) {
-        if (inputs.targetRetirementAge + delay > inputs.lifeExpectancy) continue;
-        const testRes = getTestWorkLongerResult(delay);
-        const testReadyAge = testRes.retirementReadyAge;
-        
-        const goesBroke = !testRes.moneyLasts;
-        if (goesBroke) continue;
-
-        if (testReadyAge && (!currentReadyAge || testReadyAge < currentReadyAge)) {
-          bestDelay = delay;
-          workLongerNewReadyAge = testReadyAge;
-          foundWorkImprovement = true;
-        }
-      }
-    }
-
-    if (foundWorkImprovement && workLongerNewReadyAge) {
-      const yearsImprovement = currentReadyAge ? (currentReadyAge - workLongerNewReadyAge) : null;
-      list.push({
-        type: 'workLonger',
-        icon: '💼',
-        title: 'Work Longer',
-        details: `Work ${bestDelay} additional years, retiring at Age ${inputs.targetRetirementAge + bestDelay} instead of Age ${inputs.targetRetirementAge}.`,
-        bulletPoints: [
-          `Gives your investments ${bestDelay} more years of compound growth before drawing down.`,
-          `Decreases the number of retirement years your portfolio needs to fund.`,
-          `New retirement ready age: Age ${workLongerNewReadyAge}.`
-        ],
-        readyAge: workLongerNewReadyAge,
-        yearsImprovement,
-        value: bestDelay,
-        disruption: 0,
-        savingsFocus: 'Steady Savings Pace',
-        savingsEffortScore: 0
-      });
-    }
-
-    // Helper to simulate increasing income
-    const getTestIncomeResult = (extraIncome) => {
-      const testInputs = {
-        ...inputs,
-        simpleIncome: inputs.simpleIncome + extraIncome
-      };
-      testInputs.incomeList = inputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-          return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
-        }
-        return inc;
-      });
-      return runFireSimulation(testInputs);
-    };
-
-    // 3. Increase Income Scenario
-    let bestExtraIncome = 10000;
-    let incomeNewReadyAge = null;
-    let foundIncomeImprovement = false;
-
-    const incomeIncrements = [5000, 10000, 20000];
-    for (const incAmt of incomeIncrements) {
-      const testRes = getTestIncomeResult(incAmt);
-      const testReadyAge = testRes.retirementReadyAge;
-      
-      const goesBroke = !testRes.moneyLasts;
-      if (goesBroke) continue;
-
-      if (testReadyAge && (testReadyAge <= inputs.lifeExpectancy || !currentReadyAge || testReadyAge < currentReadyAge)) {
-        bestExtraIncome = incAmt;
-        incomeNewReadyAge = testReadyAge;
-        foundIncomeImprovement = true;
-        if (testReadyAge <= inputs.lifeExpectancy) {
-          break;
-        }
-      }
-    }
-
-    if (foundIncomeImprovement && incomeNewReadyAge) {
-      const yearsImprovement = currentReadyAge ? (currentReadyAge - incomeNewReadyAge) : null;
-      const equivDelta = currentIncome > 0 ? Math.round((bestExtraIncome / currentIncome) * 100) : 5;
-      const incomePaceLabel = `Earnings-Backed Pace (+${equivDelta}%)`;
-
-      list.push({
-        type: 'income',
-        icon: '💵',
-        title: 'Increase Income',
-        details: `Increase your gross annual earnings by ${formatCurrency(bestExtraIncome)}/year and save the difference.`,
-        bulletPoints: [
-          `Save an additional ${formatCurrency(Math.round(bestExtraIncome / 12))}/month.`,
-          `Keeps your current lifestyle spending flat while boosting savings rate.`,
-          `New retirement ready age: Age ${incomeNewReadyAge}.`
-        ],
-        readyAge: incomeNewReadyAge,
-        yearsImprovement,
-        value: bestExtraIncome,
-        disruption: equivDelta,
-        savingsFocus: incomePaceLabel,
-        savingsEffortScore: equivDelta
-      });
-    }
-
-    // 4. Retire at Age 65 (always included)
-    const target65Age = inputs.currentAge < 65 ? 65 : inputs.currentAge;
-    
-    const getTestRetire65Result = (deltaRate) => {
-      const annualSavingsDelta = (deltaRate * currentIncome) / 100;
-      const testInputs = {
-        ...inputs,
-        targetRetirementAge: target65Age,
-        simpleExpenses: Math.max(0, currentExpenses - annualSavingsDelta)
-      };
-      testInputs.incomeList = inputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-          return { ...inc, endAge: target65Age };
-        }
-        return inc;
-      });
-      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
-        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
-          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
-          return {
-            ...phase,
-            amount: Math.max(0, currentAmt - annualSavingsDelta),
-            annualSpending: Math.max(0, currentAmt - annualSavingsDelta)
-          };
-        }
-        return phase;
-      });
-      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
-        if (ev.type === 'retire') {
-          return { ...ev, age: target65Age };
-        }
-        return ev;
-      });
-
-      // Synchronize allocationRules in test inputs to match test savings rate
-      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
-      testInputs.allocationRules = inputs.allocationRules.map(rule => {
-        if (rule.id === 'simple-alloc-pretax') {
-          return { ...rule, value: testSavingsRate };
-        }
-        return rule;
-      });
-
-      return runFireSimulation(testInputs);
-    };
-
-    let retire65DeltaRate = null;
-    let retire65NewReadyAge = null;
-    let foundRetire65Plan = false;
-
-    // Search delta rate up to 95% total savings rate (Binary Search)
-    const maxDelta65 = Math.max(0, 95 - currentSavingsRate);
-    let low65 = 0;
-    let high65 = maxDelta65;
-
-    while (low65 <= high65) {
-      const mid = Math.floor((low65 + high65) / 2);
-      const testRes = getTestRetire65Result(mid);
-      const testReadyAge = testRes.retirementReadyAge;
-
-      if (testReadyAge && testReadyAge <= target65Age) {
-        retire65DeltaRate = mid;
-        retire65NewReadyAge = testReadyAge;
-        foundRetire65Plan = true;
-        high65 = mid - 1; // Try to find a smaller delta
-      } else {
-        low65 = mid + 1; // Need a higher savings rate to achieve readiness by target65Age
-      }
-    }
-
-    // Force-generate if not found
-    if (!foundRetire65Plan) {
-      retire65DeltaRate = Math.max(0, 90 - currentSavingsRate);
-      retire65NewReadyAge = target65Age;
-      foundRetire65Plan = true;
-    }
-
-    // Always show Retire 65 card if target65Age is different from targetRetirementAge
-    const showRetire65 = foundRetire65Plan && retire65NewReadyAge !== null && target65Age !== inputs.targetRetirementAge;
-
-    if (showRetire65) {
-      const extraMonthly = Math.round((retire65DeltaRate * currentIncome) / 1200);
-      const bulletPoints = [];
-      if (retire65DeltaRate > 0) {
-        bulletPoints.push(`Boost your savings rate by +${retire65DeltaRate}% (from ${currentSavingsRate}% to ${currentSavingsRate + retire65DeltaRate}%).`);
-        bulletPoints.push(`Save and invest an additional ${formatCurrency(extraMonthly)}/month.`);
-      } else {
-        bulletPoints.push(`Retire at ${target65Age === 65 ? 'Age 65' : `Age ${target65Age}`} under your current budget (no extra savings required).`);
-      }
-
-      // Check if they go broke on this path
-      const finalTestRes = getTestRetire65Result(retire65DeltaRate);
-      const goesBroke = !finalTestRes.moneyLasts;
-
-      if (goesBroke) {
-        const runOutAgeVal = finalTestRes.runOutAge !== null ? finalTestRes.runOutAge : 95;
-        bulletPoints.push(`Note: Even with high savings, assets may run out around Age ${runOutAgeVal} (additional adjustments needed).`);
-      } else {
-        bulletPoints.push(`Enables a successful, positive net worth trajectory through age 95.`);
-      }
-
-      const titleLabel = target65Age === 65 ? 'Retire at Age 65' : `Retire at Age ${target65Age}`;
-      const detailsLabel = retire65DeltaRate > 0
-        ? `Lock in your retirement age at ${target65Age === 65 ? '65' : target65Age} by adjusting your savings rate by +${retire65DeltaRate}%.`
-        : `Lock in your retirement age at ${target65Age === 65 ? '65' : target65Age} under your current budget.`;
-
-      const retire65PaceLabel = retire65DeltaRate === 0 
-        ? 'Steady Savings Pace' 
-        : retire65DeltaRate <= 5 
-          ? `Gentle Savings Pace (+${retire65DeltaRate}%)` 
-          : retire65DeltaRate <= 12 
-            ? `Moderate Savings Pace (+${retire65DeltaRate}%)` 
-            : `Active Savings Pace (+${retire65DeltaRate}%)`;
-
+    if (retire65Rec.applicable) {
       list.push({
         type: 'retire65',
         icon: '📅',
-        title: titleLabel,
-        details: detailsLabel,
-        bulletPoints,
-        readyAge: retire65NewReadyAge,
-        yearsImprovement: currentReadyAge ? (currentReadyAge - retire65NewReadyAge) : null,
-        value: retire65DeltaRate,
-        disruption: retire65DeltaRate,
-        savingsFocus: retire65PaceLabel,
-        savingsEffortScore: retire65DeltaRate
+        title: 'Retire at Age 65',
+        details: 'Delay your retirement to Age 65 to allow your assets to compound longer and reduce the number of retirement years your portfolio needs to fund.',
+        bulletPoints: [
+          `Working until 65 adds ${65 - targetRetirementAge} more working/saving years to your plan.`,
+          retire65Rec.resolvesShortfall
+            ? 'This completely resolves your projected retirement shortfall!'
+            : `This reduces your projected shortfall at 65 to ${formatCurrency(retire65Rec.newShortfall)}.`
+        ],
+        readyAge: 65,
+        yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - 65) : null,
+        value: 65,
+        savingsFocus: 'Work Extension',
+        savingsEffortScore: 1
       });
     }
 
-    // Helper for combined plan
-    const getCombinedPlanResult = (savingsPercent, yearsDelay) => {
-      const extraSavings = Math.round((savingsPercent * currentIncome) / 100 / 12);
-      const savingsDelta = extraSavings * 12;
-      const testInputs = {
-        ...inputs,
-        targetRetirementAge: inputs.targetRetirementAge + yearsDelay,
-        simpleExpenses: Math.max(0, currentExpenses - savingsDelta)
-      };
-      testInputs.incomeList = inputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-          return { ...inc, endAge: inputs.targetRetirementAge + yearsDelay };
-        }
-        return inc;
-      });
-      testInputs.spendingPhases = inputs.spendingPhases.map((phase, idx) => {
-        if (idx === 0 || phase.id === 'simple-spend' || phase.name === 'Base Lifestyle Spending') {
-          const currentAmt = Number(phase.amount) || Number(phase.annualSpending) || 42500;
-          return {
-            ...phase,
-            amount: Math.max(0, currentAmt - savingsDelta),
-            annualSpending: Math.max(0, currentAmt - savingsDelta)
-          };
-        }
-        return phase;
-      });
-      testInputs.lifeEvents = inputs.lifeEvents.map(ev => {
-        if (ev.type === 'retire') {
-          return { ...ev, age: inputs.targetRetirementAge + yearsDelay };
-        }
-        return ev;
-      });
+    // 2. Save More (100%) Recommendation
+    const saveMoreAmt100 = calculateSaveMoreRecommendation(
+      shortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      1.0
+    );
 
-      // Synchronize allocationRules in test inputs to match test savings rate
-      const testSavingsRate = currentIncome > 0 ? Math.round(((currentIncome - testInputs.simpleExpenses) / currentIncome) * 100) : 15;
-      testInputs.allocationRules = inputs.allocationRules.map(rule => {
-        if (rule.id === 'simple-alloc-pretax') {
-          return { ...rule, value: testSavingsRate };
-        }
-        return rule;
+    if (saveMoreAmt100 > 0) {
+      list.push({
+        type: 'savings',
+        icon: '📈',
+        title: 'Save More (100%)',
+        details: `Boost your savings rate to bridge 100% of your projected shortfall.`,
+        bulletPoints: [
+          `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before retirement.`,
+          `This will compound over your remaining ${yearsUntilRetirement} working years at an assumed ${(rateOfReturn * 100).toFixed(0)}% annual rate of return.`,
+          `This completely bridges your projected retirement gap.`
+        ],
+        readyAge: targetRetirementAge,
+        yearsImprovement: null,
+        value: saveMoreAmt100,
+        savingsFocus: 'Save More (100%)',
+        savingsEffortScore: 2
       });
+    }
 
-      return runFireSimulation(testInputs);
+    // Calculate baseline shortfall (retirement shortfall excluding child-related timeline deficit)
+    const inputsWithoutChild = {
+      ...inputs,
+      lifeEvents: (inputs.lifeEvents || []).map(e => e.type === 'haveChild' ? { ...e, enabled: false } : e)
     };
+    const resultsWithoutChild = runFireSimulation(inputsWithoutChild);
+    const baselineShortfall = resultsWithoutChild.endingSurplusShortfall < 0 ? -resultsWithoutChild.endingSurplusShortfall : 0;
 
-    // 5. Combined Plan Scenario
-    const combinedCombos = [];
-    for (let s = 3; s <= 6; s++) {
-      for (let w = 2; w <= 5; w++) {
-        combinedCombos.push({ savings: s, delay: w });
-      }
+    // 3. Earn More (100%) Recommendation
+    const earnMoreAmt100 = calculateEarnMoreRecommendation(
+      baselineShortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      marginalTaxRate,
+      1.0
+    );
+    const netSavingsAmt100 = calculateSaveMoreRecommendation(
+      baselineShortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      1.0
+    );
+
+    if (earnMoreAmt100 > 0 || (hasChildcarePhase && childcarePeakGrossBoost > 0)) {
+      list.push({
+        type: 'income',
+        icon: '💵',
+        title: 'Earn More (100%)',
+        details: baselineShortfall > 0
+          ? `Increase your gross income to bridge 100% of your projected shortfall.`
+          : `Increase your gross income during childcare years to cover the child costs.`,
+        bulletPoints: [
+          ...(hasChildcarePhase && maxChildCostsMonthly > 0 ? [
+            `Increase your gross annual salary:`,
+            `  • Childcare Years: Earn an additional ${formatCurrency(earnMoreAmt100 + childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12) + childcarePeakGrossBoost)}/month) to cover childcare and maintain standard savings.`,
+            ...(earnMoreAmt100 > 0 ? [
+              `  • Standard Work Years: Earn an additional ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month) after childcare ends.`,
+              `💡 Why is the childcare target higher? Earning ${formatCurrency(earnMoreAmt100 + childcarePeakGrossBoost * 12)}/year consists of ${formatCurrency(childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoost)}/month) to cover the child costs, plus ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month) to fund the extra savings needed for retirement.`
+            ] : [
+              `  • Standard Work Years: Earn an additional $0/year (approx. $0/month) after childcare ends, since your standard retirement plan is already fully on track!`
+            ]),
+            `  • If you temporarily reduce savings to $0/month during those years (freeing up ${formatCurrency(standardMonthlySavings)}/month in cash flow), you only need to earn an additional ${formatCurrency(childcarePeakGrossBoostZeroSavings * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoostZeroSavings)}/month) to cover the childcare deficit.`
+          ] : [
+            `Increase your gross annual salary by ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month).`
+          ]),
+          ...(earnMoreAmt100 > 0 ? [
+            `Assuming a marginal tax rate of ${(marginalTaxRate * 100).toFixed(0)}%, this leaves a net savings increase of ${formatCurrency(netSavingsAmt100)}/year.`,
+            `This completely bridges your projected retirement gap.`
+          ] : [
+            `This completely covers your childcare costs and keeps your retirement plan on track.`
+          ])
+        ],
+        readyAge: targetRetirementAge,
+        yearsImprovement: null,
+        value: earnMoreAmt100,
+        netSavingsValue: netSavingsAmt100,
+        savingsFocus: 'Earn More (100%)',
+        savingsEffortScore: 3
+      });
     }
-    combinedCombos.sort((a, b) => {
-      const sumA = a.savings + a.delay;
-      const sumB = b.savings + b.delay;
-      if (sumA !== sumB) return sumA - sumB;
-      return a.savings - b.savings;
-    });
 
-    let bestCombinedSavings = null;
-    let bestCombinedDelay = null;
-    let combinedNewReadyAge = null;
+    // 4. Balanced Plan (50/50) Recommendation
+    const saveMoreAmt50 = calculateSaveMoreRecommendation(
+      baselineShortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      0.5
+    );
+    const earnMoreAmt50 = calculateEarnMoreRecommendation(
+      baselineShortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      marginalTaxRate,
+      0.5
+    );
 
-    for (const combo of combinedCombos) {
-      if (currentSavingsRate + combo.savings > 70) continue;
-      if (inputs.targetRetirementAge + combo.delay > inputs.lifeExpectancy) continue;
-
-      const testRes = getCombinedPlanResult(combo.savings, combo.delay);
-      const testReadyAge = testRes.retirementReadyAge;
-
-      if (testReadyAge) {
-        const goesBroke = !testRes.moneyLasts;
-
-        if (!goesBroke) {
-          bestCombinedSavings = combo.savings;
-          bestCombinedDelay = combo.delay;
-          combinedNewReadyAge = testReadyAge;
-          break;
-        }
-      }
-    }
-
-    if (combinedNewReadyAge && bestCombinedSavings !== null && bestCombinedDelay !== null) {
-      const yearsImprovement = currentReadyAge ? (currentReadyAge - combinedNewReadyAge) : null;
-      const extraSavingsMonthly = Math.round((bestCombinedSavings * currentIncome) / 1200);
-      
+    if (saveMoreAmt50 > 0 && earnMoreAmt50 > 0) {
       list.push({
         type: 'combined',
         icon: '⚖️',
-        title: 'Balanced Plan',
-        badge: 'Recommended',
-        details: 'A balanced combination of small, realistic adjustments that yields a massive improvement:',
+        title: 'Balanced Plan (50/50)',
+        details: `A combination of adjustments that splits the gap: bridge 50% through savings and 50% through earnings.`,
         bulletPoints: [
-          `Save ${bestCombinedSavings}% more (approx. ${formatCurrency(extraSavingsMonthly)}/month) or reduce monthly spending by ${formatCurrency(extraSavingsMonthly)}/month.`,
-          `Work ${bestCombinedDelay} additional years (delaying retirement to Age ${inputs.targetRetirementAge + bestCombinedDelay}).`
+          `Save and invest an additional ${formatCurrency(saveMoreAmt50)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt50 / 12))}/month).`,
+          ...(hasChildcarePhase && maxChildCostsMonthly > 0 ? [
+            `Increase your gross annual salary:`,
+            `  • Childcare Years: Earn an additional ${formatCurrency(earnMoreAmt50 + childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12) + childcarePeakGrossBoost)}/month) to cover childcare and maintain savings.`,
+            `  • Standard Work Years: Earn an additional ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month) after childcare ends.`,
+            `💡 Why is the childcare target higher? Earning ${formatCurrency(earnMoreAmt50 + childcarePeakGrossBoost * 12)}/year consists of ${formatCurrency(childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoost)}/month) to cover the child costs, plus ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month) to fund the extra savings needed for retirement.`,
+            `  • If you temporarily reduce savings to $0/month during those years (freeing up both your base savings of ${formatCurrency(standardMonthlySavings)}/month and the additional ${formatCurrency(Math.round(saveMoreAmt50 / 12))}/month), you only need to earn an additional ${formatCurrency(childcarePeakGrossBoostZeroSavings * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoostZeroSavings)}/month) to cover the childcare deficit.`
+          ] : [
+            `Increase your gross annual salary by ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month).`
+          ]),
+          `Combined, these adjustments completely resolve your projected retirement gap.`
         ],
-        readyAge: combinedNewReadyAge,
-        yearsImprovement,
-        value: { savings: bestCombinedSavings, delay: bestCombinedDelay },
-        disruption: bestCombinedSavings,
-        savingsFocus: `Balanced Pace (+${bestCombinedSavings}%)`,
-        savingsEffortScore: bestCombinedSavings
+        readyAge: targetRetirementAge,
+        yearsImprovement: null,
+        value: {
+          savings: saveMoreAmt50,
+          income: earnMoreAmt50,
+          netSavings: saveMoreAmt50
+        },
+        savingsFocus: 'Balanced (50/50)',
+        savingsEffortScore: 4
       });
     }
 
-    // Sort all scenarios strictly by savingsEffortScore (aggressiveness) ascending, then by readyAge ascending
-    list.sort((a, b) => {
-      const scoreA = a.savingsEffortScore !== undefined ? a.savingsEffortScore : 5;
-      const scoreB = b.savingsEffortScore !== undefined ? b.savingsEffortScore : 5;
-      if (scoreA !== scoreB) {
-        return scoreA - scoreB;
-      }
-      return a.readyAge - b.readyAge;
-    });
+    // Sort all scenarios strictly by savingsEffortScore (aggressiveness) ascending
+    list.sort((a, b) => a.savingsEffortScore - b.savingsEffortScore);
 
     return {
       showImprovementPlan: true,
@@ -1369,22 +1438,26 @@ export default function FireSimulator() {
     };
   }, [inputs, activeResults, activeStep]);
 
-  // Reset auto-pop when switching scenarios or active step
+  // Reset wasShortfall when switching scenarios or active step
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasAutoPopped(false);
+    setWasShortfall(false);
   }, [currentScenarioId, activeStep]);
 
-  // Auto-pop the improvement plan modal when a plan becomes available (Screen 2 only)
+  // Auto-pop the improvement plan modal when a plan becomes available or transitions to shortfall
   useEffect(() => {
-    if (activeStep === 2 && improvementPlan) {
-      if (!hasAutoPopped) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setShowImprovementModal(true);
-        setHasAutoPopped(true);
-      }
+    const hasShortfall = activeStep === 2 && (
+      !activeResults.moneyLasts || 
+      activeResults.runOutAge !== null || 
+      (activeResults.retirementReadyAge && inputs.targetRetirementAge < activeResults.retirementReadyAge)
+    );
+    const hasImprovementPlan = !!(improvementPlan && improvementPlan.rankedPlan && improvementPlan.rankedPlan.length > 0);
+    if (hasShortfall && hasImprovementPlan && !wasShortfall && !childImpactSummary && !draggingInfo) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowImprovementModal(true);
     }
-  }, [activeStep, improvementPlan, hasAutoPopped]);
+    setWasShortfall(hasShortfall);
+  }, [activeResults.moneyLasts, activeResults.runOutAge, activeResults.retirementReadyAge, inputs.targetRetirementAge, activeStep, wasShortfall, childImpactSummary, draggingInfo, improvementPlan]);
 
   const handleApplyImprovementScenario = (scenario) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
@@ -1442,7 +1515,9 @@ export default function FireSimulator() {
       const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
       const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
       const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
-      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const annualTax = inp.includeTaxes
+        ? calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus)
+        : 0;
       const monthlyTax = Math.round(annualTax / 12);
 
       const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
@@ -1525,7 +1600,9 @@ export default function FireSimulator() {
       const cappedTradIra = Math.min(7000, (targetSavingsMap.tradIra || 0) * 12);
       const cappedHsa = Math.min(targetHsaCoverage === 'family' ? 8300 : 4150, (targetSavingsMap.hsa || 0) * 12);
       const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
-      const annualTax = calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus);
+      const annualTax = inp.includeTaxes
+        ? calculateUSTaxForModal(currentIncome, preTaxDeductionsAnnual, targetFilingStatus)
+        : 0;
       const monthlyTax = Math.round(annualTax / 12);
 
       const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
@@ -1548,42 +1625,290 @@ export default function FireSimulator() {
         targetExpensesMap.housing = Math.max(0, targetExpensesMap.housing + expenseDiff);
       }
     }
-
     // Calculate baseline savings rate
     const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
 
-    // Adjust target values based on the suggestion to give the user a starting point
-    if (scenario.type === 'savings' || scenario.type === 'retire65') {
-      const deltaRate = scenario.value;
-      const targetSavingsRate = currentSavingsRate + deltaRate;
-      const targetSavingsMonthly = Math.round((targetSavingsRate * targetIncome) / 1200);
-      const currentSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-      const savingsDiff = targetSavingsMonthly - currentSavingsInModal;
-      if (savingsDiff > 0) {
-        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + savingsDiff;
+    // Save baseline scaled maps to compute clean visual differences
+    const baselineSavingsMap = { ...targetSavingsMap };
+    const baselineExpensesMap = { ...targetExpensesMap };
+
+    // Adjust target values based on our new recommendation types
+    if (scenario.type === 'savings') {
+      // Save More: increase monthly savings by saveMoreAmt / 12
+      const additionalSavingsAnnual = scenario.value;
+      const additionalSavingsMonthly = Math.round(additionalSavingsAnnual / 12);
+      
+      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + additionalSavingsMonthly;
+      
+      // Reduce monthly expenses by the same amount to keep it balanced
+      if (targetExpensesMap && Object.keys(targetExpensesMap).length > 0) {
+        let remainingReduction = additionalSavingsMonthly;
+        const keysToReduce = ['leisure', 'misc', 'housing', 'food', 'utilities', 'transportation'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
       }
     } else if (scenario.type === 'income') {
-      const extraIncome = scenario.value;
-      targetIncome = targetIncome + extraIncome;
-      // In the income scenario, the engine assumes you save 100% of the extra income
-      const monthlyExtraSavings = Math.round(extraIncome / 12);
-      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyExtraSavings;
+      // Earn More: increase gross income by gross salary increase
+      const grossIncreaseAnnual = scenario.value;
+      const netSavingsAnnual = scenario.netSavingsValue || 0;
+      
+      targetIncome = targetIncome + grossIncreaseAnnual;
+      const monthlyNetSavings = Math.round(netSavingsAnnual / 12);
+      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyNetSavings;
     } else if (scenario.type === 'combined') {
-      const savingsPercent = scenario.value && typeof scenario.value === 'object' ? scenario.value.savings : 3;
-      const targetSavingsRate = currentSavingsRate + savingsPercent;
-      const targetSavingsMonthly = Math.round((targetSavingsRate * targetIncome) / 1200);
-      const currentSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-      const savingsDiff = targetSavingsMonthly - currentSavingsInModal;
-      if (savingsDiff > 0) {
-        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + savingsDiff;
+      // Balanced Plan (50/50): Apply BOTH 50% savings reduction and 50% earnings increase
+      const additionalSavingsAnnual = scenario.value.savings;
+      const additionalSavingsMonthly = Math.round(additionalSavingsAnnual / 12);
+      
+      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + additionalSavingsMonthly;
+      
+      // Reduce monthly expenses by the savings portion
+      if (targetExpensesMap && Object.keys(targetExpensesMap).length > 0) {
+        let remainingReduction = additionalSavingsMonthly;
+        const keysToReduce = ['leisure', 'misc', 'housing', 'food', 'utilities', 'transportation'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
       }
+
+      // Apply the income increase portion
+      const grossIncreaseAnnual = scenario.value.income;
+      const netSavingsAnnual = scenario.value.netSavings || 0;
+      
+      targetIncome = targetIncome + grossIncreaseAnnual;
+      const monthlyNetSavings = Math.round(netSavingsAnnual / 12);
+      targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyNetSavings;
+    } else if (scenario.type === 'retire65') {
+      // Retire at 65 doesn't change current income/expenses
     }
+
+    // Calculate differences for glow effect
+    const diffs = { savings: {}, expenses: {} };
+
+    Object.keys(targetSavingsMap).forEach(key => {
+      const oldVal = baselineSavingsMap[key] || 0;
+      const newVal = targetSavingsMap[key] || 0;
+      if (newVal !== oldVal) {
+        diffs.savings[key] = newVal - oldVal;
+      }
+    });
+
+    Object.keys(targetExpensesMap).forEach(key => {
+      const oldVal = baselineExpensesMap[key] || 0;
+      const newVal = targetExpensesMap[key] || 0;
+      if (newVal !== oldVal) {
+        diffs.expenses[key] = newVal - oldVal;
+      }
+    });
+
+    setBudgetDiffs(diffs);
 
     setBudgetGrossIncome(targetIncome);
     setBudgetFilingStatus(targetFilingStatus);
     setBudgetHsaCoverage(targetHsaCoverage);
     setBudgetSavings(targetSavingsMap);
     setBudgetExpenses(targetExpensesMap);
+
+    // Initialize phase states to prevent unallocated toggles
+    const appliedWsIncome = Math.round(targetIncome / 12);
+    setWorkSaveIncome(appliedWsIncome);
+    setWorkSaveSavings(targetSavingsMap);
+    setWorkSaveExpenses(targetExpensesMap);
+    setWorkSaveAllocMode(inp.budgetDetails?.savingsAllocMode || 'fixed');
+
+    // Calculate childcare costs
+    let currentChildCostsAnnual = 0;
+    const currentAgeForApplied = Number(inp.currentAge) || 30;
+    const childEventsForApplied = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    childEventsForApplied.forEach(ev => {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+      const childAge = currentAgeForApplied - birthAge;
+      if (childAge >= startAge) {
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (childAge < maxAge) {
+          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inp.childCosts?.ages0to4 !== undefined ? Number(inp.childCosts.ages0to4) : 15000);
+          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inp.childCosts?.ages5to12 !== undefined ? Number(inp.childCosts.ages5to12) : 15000);
+          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inp.childCosts?.ages13to18 !== undefined ? Number(inp.childCosts.ages13to18) : 15000);
+          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inp.childCosts?.ages19to22 !== undefined ? Number(inp.childCosts.ages19to22) : 15000);
+
+          let annualCost = 0;
+          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+          
+          currentChildCostsAnnual += annualCost;
+        }
+      }
+    });
+    const currentChildCostsMonthlyForApplied = Math.round(currentChildCostsAnnual / 12);
+
+    // Calculate peak childcare costs to determine recommended income boost
+    let maxChildCostsAnnualForApplied = 0;
+    if (childEventsForApplied.length > 0) {
+      let minChildParentAge = Infinity;
+      let maxChildParentAge = -Infinity;
+      childEventsForApplied.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+      });
+      const hasChildcarePhaseForApplied = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAgeForApplied;
+
+      if (hasChildcarePhaseForApplied) {
+        for (let age = currentAgeForApplied; age < (Number(inp.targetRetirementAge) || 65); age++) {
+          let yearCost = 0;
+          childEventsForApplied.forEach(ev => {
+            const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+            const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+            const childAge = age - birthAge;
+            if (childAge >= childStartAge) {
+              const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+              const maxAge = includeCollege ? 22 : 18;
+              if (childAge < maxAge) {
+                const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inp.childCosts?.ages0to4 !== undefined ? Number(inp.childCosts.ages0to4) : 15000);
+                const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inp.childCosts?.ages5to12 !== undefined ? Number(inp.childCosts.ages5to12) : 15000);
+                const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inp.childCosts?.ages13to18 !== undefined ? Number(inp.childCosts.ages13to18) : 15000);
+                const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inp.childCosts?.ages19to22 !== undefined ? Number(inp.childCosts.ages19to22) : 15000);
+
+                let annualCost = 0;
+                if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+                else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+                else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+                else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+                yearCost += annualCost;
+              }
+            }
+          });
+          if (yearCost > maxChildCostsAnnualForApplied) {
+            maxChildCostsAnnualForApplied = yearCost;
+          }
+        }
+      }
+    }
+    const maxChildCostsMonthlyForApplied = Math.round(maxChildCostsAnnualForApplied / 12);
+    const marginalTaxRateForApplied = inp.includeTaxes ? 0.25 : 0.0;
+    const childcarePeakGrossBoostForApplied = Math.round(maxChildCostsMonthlyForApplied / (1 - marginalTaxRateForApplied));
+
+    let ccIncome = appliedWsIncome;
+    if (scenario.type === 'income' || scenario.type === 'combined') {
+      ccIncome = appliedWsIncome + childcarePeakGrossBoostForApplied;
+    } else if (inp.budgetDetails && inp.budgetDetails.childcareIncome !== undefined) {
+      ccIncome = inp.budgetDetails.childcareIncome;
+    }
+    let ccSavingsAllocMode = inp.budgetDetails?.savingsAllocMode || 'fixed';
+    let ccSavingsMap = { ...targetSavingsMap };
+    let ccExpensesMap = { ...targetExpensesMap };
+
+    if (inp.budgetDetails && inp.budgetDetails.childcareSavings) {
+      ccSavingsAllocMode = inp.budgetDetails.childcareSavingsAllocMode || ccSavingsAllocMode;
+      ccSavingsMap = { ...inp.budgetDetails.childcareSavings };
+      ccExpensesMap = { ...inp.budgetDetails.childcareExpenses };
+    }
+
+    setChildcareIncome(ccIncome);
+    setChildcareSavings(ccSavingsMap);
+    setChildcareExpenses(ccExpensesMap);
+    setChildcareAllocMode(ccSavingsAllocMode);
+
+    const occurringCounts = [];
+    const currentAgeVal = Number(inp.currentAge) || 30;
+    const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
+    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+      const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
+      if (count > 0 && !occurringCounts.includes(count)) {
+        occurringCounts.push(count);
+      }
+    }
+    occurringCounts.sort((a, b) => a - b);
+    const C_peak = occurringCounts.length > 0 ? Math.max(...occurringCounts) : 1;
+
+    const initialBudgets = {};
+    occurringCounts.forEach(c => {
+      let derivedIncome = ccIncome;
+      if (scenario.type === 'income' || scenario.type === 'combined') {
+        derivedIncome = appliedWsIncome + Math.round(childcarePeakGrossBoostForApplied * (c / C_peak));
+      } else {
+        const existing = inp.budgetDetails?.childcareBudgets?.[c];
+        if (existing) {
+          derivedIncome = existing.income;
+        } else {
+          derivedIncome = appliedWsIncome + 1250 * c;
+        }
+      }
+
+      initialBudgets[c] = {
+        income: derivedIncome,
+        expenses: ccExpensesMap ? { ...ccExpensesMap } : { ...targetExpensesMap },
+        savings: ccSavingsMap ? { ...ccSavingsMap } : { ...targetSavingsMap },
+        allocMode: ccSavingsAllocMode
+      };
+    });
+    setChildcareBudgets(initialBudgets);
+
+    let startPhase = 'workSave';
+    if (occurringCounts.length > 0) {
+      const initialCount = getActiveChildrenCountAtAge(currentAgeVal, inp.lifeEvents);
+      if (initialCount > 0) {
+        startPhase = `childcare_${initialCount}`;
+      } else {
+        let firstCcAge = Infinity;
+        let firstCcCount = 1;
+        for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+          const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
+          if (count > 0) {
+            firstCcAge = age;
+            firstCcCount = count;
+            break;
+          }
+        }
+        if (firstCcAge < Infinity) {
+          startPhase = `childcare_${firstCcCount}`;
+        }
+      }
+    }
+    setActiveBudgetPhase(startPhase);
+
+    if (startPhase.startsWith('childcare_')) {
+      const c = Number(startPhase.split('_')[1]);
+      const targetCc = initialBudgets[c];
+      setBudgetMonthlyIncome(targetCc.income);
+      setBudgetSavings(targetCc.savings);
+      setBudgetExpenses(targetCc.expenses);
+      setSavingsAllocMode(targetCc.allocMode);
+      setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
+      
+      const totalSavings = targetCc.allocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
+      setBudgetMonthlySavings(totalSavings);
+    } else {
+      setBudgetMonthlyIncome(appliedWsIncome);
+      setBudgetSavings(targetSavingsMap);
+      setBudgetExpenses(targetExpensesMap);
+      const allocMode = inp.budgetDetails?.savingsAllocMode || 'fixed';
+      setSavingsAllocMode(allocMode);
+      setBudgetMonthlySpending(Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0));
+      const totalSavings = allocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, appliedWsIncome - Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      setBudgetMonthlySavings(totalSavings);
+    }
 
     setPendingImprovement({
       scenario,
@@ -1835,6 +2160,29 @@ export default function FireSimulator() {
   };
 
   const handleStep1Change = (field, val) => {
+    const scaleBudgetMap = (map, scale, targetTotal, defaultKeyForSurplus = 'brokerage') => {
+      if (!map || Object.keys(map).length === 0) return {};
+      const newMap = {};
+      Object.keys(map).forEach(key => {
+        newMap[key] = Math.round((map[key] || 0) * scale);
+      });
+      const sum = Object.values(newMap).reduce((acc, v) => acc + v, 0);
+      const diff = targetTotal - sum;
+      if (diff !== 0) {
+        let maxKey = defaultKeyForSurplus;
+        if (newMap[maxKey] === undefined) {
+          maxKey = Object.keys(newMap)[0];
+        }
+        Object.keys(newMap).forEach(key => {
+          if ((newMap[key] || 0) > (newMap[maxKey] || 0)) {
+            maxKey = key;
+          }
+        });
+        newMap[maxKey] = Math.max(0, (newMap[maxKey] || 0) + diff);
+      }
+      return newMap;
+    };
+
     updateInput(field, val);
     if (field === 'simpleInvestments') {
       const allocated = getReasonableSavingsAllocation(val);
@@ -1865,6 +2213,136 @@ export default function FireSimulator() {
             return phase;
           });
 
+          // Scale budget details and allocation rules
+          let updatedBudgetDetails = scen.inputs.budgetDetails ? { ...scen.inputs.budgetDetails } : null;
+          let updatedRules = scen.inputs.allocationRules ? [...scen.inputs.allocationRules] : [];
+
+          if (updatedBudgetDetails) {
+            const oldIncome = Number(scen.inputs.simpleIncome) || 50000;
+            const incomeScale = oldIncome > 0 ? (val / oldIncome) : 1;
+
+            if (incomeScale > 0 && isFinite(incomeScale)) {
+              // 1. Scale standard work phase expenses
+              const newMonthlyExpenses = newExpenses / 12;
+              updatedBudgetDetails.expenses = scaleBudgetMap(
+                scen.inputs.budgetDetails.expenses,
+                incomeScale,
+                Math.round(newMonthlyExpenses),
+                'housing'
+              );
+
+              // 2. Scale standard work phase savings
+              const newMonthlySavings = (val - newExpenses) / 12;
+              updatedBudgetDetails.savings = scaleBudgetMap(
+                scen.inputs.budgetDetails.savings,
+                incomeScale,
+                Math.round(newMonthlySavings),
+                'brokerage'
+              );
+
+              // 3. Scale childcare phase expenses if they exist
+              if (scen.inputs.budgetDetails.childcareExpenses) {
+                const oldCCExpensesTotal = Object.values(scen.inputs.budgetDetails.childcareExpenses).reduce((sum, v) => sum + v, 0);
+                const targetCCExpensesTotal = Math.round(oldCCExpensesTotal * incomeScale);
+                updatedBudgetDetails.childcareExpenses = scaleBudgetMap(
+                  scen.inputs.budgetDetails.childcareExpenses,
+                  incomeScale,
+                  targetCCExpensesTotal,
+                  'housing'
+                );
+              }
+
+              // 4. Scale childcare phase savings if they exist
+              if (scen.inputs.budgetDetails.childcareSavings) {
+                const oldCCSavingsTotal = Object.values(scen.inputs.budgetDetails.childcareSavings).reduce((sum, v) => sum + v, 0);
+                const targetCCSavingsTotal = Math.round(oldCCSavingsTotal * incomeScale);
+                updatedBudgetDetails.childcareSavings = scaleBudgetMap(
+                  scen.inputs.budgetDetails.childcareSavings,
+                  incomeScale,
+                  targetCCSavingsTotal,
+                  'brokerage'
+                );
+              }
+
+              // 5. Update income fields
+              updatedBudgetDetails.income = Math.round(val / 12);
+              if (updatedBudgetDetails.childcareIncome !== undefined) {
+                updatedBudgetDetails.childcareIncome = Math.round(updatedBudgetDetails.childcareIncome * incomeScale);
+              }
+              if (updatedBudgetDetails.childcareBudgets) {
+                const nextChildcareBudgets = { ...updatedBudgetDetails.childcareBudgets };
+                Object.keys(nextChildcareBudgets).forEach(cKey => {
+                  const c = Number(cKey);
+                  const budget = { ...nextChildcareBudgets[c] };
+                  budget.income = Math.round(budget.income * incomeScale);
+                  const oldCCExpensesTotal = Object.values(budget.expenses || {}).reduce((sum, v) => sum + v, 0);
+                  const targetCCExpensesTotal = Math.round(oldCCExpensesTotal * incomeScale);
+                  budget.expenses = scaleBudgetMap(
+                    budget.expenses || {},
+                    incomeScale,
+                    targetCCExpensesTotal,
+                    'housing'
+                  );
+                  const oldCCSavingsTotal = Object.values(budget.savings || {}).reduce((sum, v) => sum + v, 0);
+                  const targetCCSavingsTotal = Math.round(oldCCSavingsTotal * incomeScale);
+                  budget.savings = scaleBudgetMap(
+                    budget.savings || {},
+                    incomeScale,
+                    targetCCSavingsTotal,
+                    'brokerage'
+                  );
+                  nextChildcareBudgets[c] = budget;
+                });
+                updatedBudgetDetails.childcareBudgets = nextChildcareBudgets;
+              }
+            }
+          }
+
+          // Sync allocation rules values
+          if (updatedBudgetDetails && updatedRules.length > 0) {
+            const childEvents = (scen.inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+            let maxChildParentAge = -Infinity;
+            childEvents.forEach(ev => {
+              const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+              const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+              const maxAge = includeCollege ? 22 : 18;
+              if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+            });
+            const childEndAge = Math.min(scen.inputs.lifeExpectancy || 85, Math.max(scen.inputs.currentAge, maxChildParentAge));
+
+            updatedRules = updatedRules.map(rule => {
+              if (rule.type === 'fixed') {
+                let savingsMap = updatedBudgetDetails.savings;
+                if (rule.id.includes('budget-alloc-cc-')) {
+                  const parts = rule.id.split('-');
+                  const ccIdx = parts.indexOf('cc');
+                  if (ccIdx !== -1 && parts[ccIdx + 1]) {
+                    const c = Number(parts[ccIdx + 1]);
+                    if (updatedBudgetDetails.childcareBudgets?.[c]) {
+                      savingsMap = updatedBudgetDetails.childcareBudgets[c].savings;
+                    } else {
+                      savingsMap = updatedBudgetDetails.childcareSavings;
+                    }
+                  } else {
+                    savingsMap = updatedBudgetDetails.childcareSavings;
+                  }
+                } else if (rule.id.includes('-cc-') || (rule.endAge && rule.endAge === childEndAge)) {
+                  savingsMap = updatedBudgetDetails.childcareSavings;
+                }
+
+                const key = rule.destination === 'cash' ? 'checking' :
+                            rule.destination === 'other' ? 'hysa' :
+                            rule.destination === 'emergencyFund' ? 'emergency' :
+                            rule.destination === 'debtPaydown' ? 'debt' : rule.destination;
+
+                if (savingsMap && savingsMap[key] !== undefined) {
+                  return { ...rule, value: savingsMap[key] };
+                }
+              }
+              return rule;
+            });
+          }
+
           return {
             ...scen,
             inputs: {
@@ -1872,7 +2350,9 @@ export default function FireSimulator() {
               incomeList: updatedIncomeList,
               spendingPhases: updatedSpendingPhases,
               simpleIncome: val,
-              simpleExpenses: newExpenses
+              simpleExpenses: newExpenses,
+              budgetDetails: updatedBudgetDetails,
+              allocationRules: updatedRules
             }
           };
         }
@@ -1887,9 +2367,191 @@ export default function FireSimulator() {
             }
             return phase;
           });
+
+          // Scale budget details and allocation rules
+          let updatedBudgetDetails = scen.inputs.budgetDetails ? { ...scen.inputs.budgetDetails } : null;
+          let updatedRules = scen.inputs.allocationRules ? [...scen.inputs.allocationRules] : [];
+
+          if (updatedBudgetDetails) {
+            const oldExpenses = Number(scen.inputs.simpleExpenses) || 42500;
+            const currentIncome = Number(scen.inputs.simpleIncome) || 50000;
+            const expenseScale = oldExpenses > 0 ? (val / oldExpenses) : 1;
+
+            // 1. Scale expenses (standard and childcare)
+            if (expenseScale > 0 && isFinite(expenseScale)) {
+              const newMonthlyExpenses = val / 12;
+              updatedBudgetDetails.expenses = scaleBudgetMap(
+                scen.inputs.budgetDetails.expenses,
+                expenseScale,
+                Math.round(newMonthlyExpenses),
+                'housing'
+              );
+
+              if (scen.inputs.budgetDetails.childcareExpenses) {
+                const oldCCExpensesTotal = Object.values(scen.inputs.budgetDetails.childcareExpenses).reduce((sum, v) => sum + v, 0);
+                const targetCCExpensesTotal = Math.round(oldCCExpensesTotal * expenseScale);
+                updatedBudgetDetails.childcareExpenses = scaleBudgetMap(
+                  scen.inputs.budgetDetails.childcareExpenses,
+                  expenseScale,
+                  targetCCExpensesTotal,
+                  'housing'
+                );
+              }
+            }
+
+            // 2. Scale savings (standard and childcare)
+            const oldSavings = Math.max(0, currentIncome - oldExpenses);
+            const newSavings = Math.max(0, currentIncome - val);
+
+            const oldMonthlySavings = oldSavings / 12;
+            const newMonthlySavings = newSavings / 12;
+
+            if (oldMonthlySavings <= 0 && newMonthlySavings > 0) {
+              // Transition from 0 to positive savings: allocate entirely to brokerage
+              const defaultSavings = {
+                trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+                checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+              };
+              defaultSavings.brokerage = Math.round(newMonthlySavings);
+              updatedBudgetDetails.savings = defaultSavings;
+
+              if (updatedBudgetDetails.childcareSavings) {
+                const defaultCC = { ...defaultSavings };
+                const ccIncome = updatedBudgetDetails.childcareIncome || Math.round(currentIncome / 12);
+                const ccExpenses = Object.values(updatedBudgetDetails.childcareExpenses || {}).reduce((sum, v) => sum + v, 0);
+                defaultCC.brokerage = Math.round(Math.max(0, ccIncome - ccExpenses));
+                updatedBudgetDetails.childcareSavings = defaultCC;
+              }
+            } else if (newMonthlySavings <= 0) {
+              const zeroSavings = {
+                trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+                checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+              };
+              updatedBudgetDetails.savings = zeroSavings;
+              if (updatedBudgetDetails.childcareSavings) {
+                updatedBudgetDetails.childcareSavings = { ...zeroSavings };
+              }
+            } else {
+              const savingsScale = newMonthlySavings / oldMonthlySavings;
+              if (isFinite(savingsScale)) {
+                updatedBudgetDetails.savings = scaleBudgetMap(
+                  scen.inputs.budgetDetails.savings,
+                  savingsScale,
+                  Math.round(newMonthlySavings),
+                  'brokerage'
+                );
+
+                if (updatedBudgetDetails.childcareSavings) {
+                  const oldCCSavingsTotal = Object.values(scen.inputs.childcareSavings).reduce((sum, v) => sum + v, 0);
+                  const targetCCSavingsTotal = Math.round(oldCCSavingsTotal * savingsScale);
+                  updatedBudgetDetails.childcareSavings = scaleBudgetMap(
+                    scen.inputs.childcareSavings,
+                    savingsScale,
+                    targetCCSavingsTotal,
+                    'brokerage'
+                  );
+                }
+              }
+              if (updatedBudgetDetails.childcareBudgets) {
+                const nextChildcareBudgets = { ...updatedBudgetDetails.childcareBudgets };
+                Object.keys(nextChildcareBudgets).forEach(cKey => {
+                  const c = Number(cKey);
+                  const budget = { ...nextChildcareBudgets[c] };
+                  const oldCCExpensesTotal = Object.values(budget.expenses || {}).reduce((sum, v) => sum + v, 0);
+                  const targetCCExpensesTotal = Math.round(oldCCExpensesTotal * expenseScale);
+                  budget.expenses = scaleBudgetMap(
+                    budget.expenses || {},
+                    expenseScale,
+                    targetCCExpensesTotal,
+                    'housing'
+                  );
+                  const oldCCSavings = Math.max(0, budget.income - oldCCExpensesTotal);
+                  const newCCSavings = Math.max(0, budget.income - targetCCExpensesTotal);
+                  if (oldCCSavings <= 0 && newCCSavings > 0) {
+                    const defaultSavings = {
+                      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+                      checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+                    };
+                    defaultSavings.brokerage = newCCSavings;
+                    budget.savings = defaultSavings;
+                  } else if (newCCSavings <= 0) {
+                    const zeroSavings = {
+                      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+                      checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+                    };
+                    budget.savings = zeroSavings;
+                  } else {
+                    const cSavingsScale = newCCSavings / oldCCSavings;
+                    if (isFinite(cSavingsScale)) {
+                      budget.savings = scaleBudgetMap(
+                        budget.savings || {},
+                        cSavingsScale,
+                        newCCSavings,
+                        'brokerage'
+                      );
+                    }
+                  }
+                  nextChildcareBudgets[c] = budget;
+                });
+                updatedBudgetDetails.childcareBudgets = nextChildcareBudgets;
+              }
+            }
+          }
+
+          // Sync allocation rules values
+          if (updatedBudgetDetails && updatedRules.length > 0) {
+            const childEvents = (scen.inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+            let maxChildParentAge = -Infinity;
+            childEvents.forEach(ev => {
+              const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+              const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+              const maxAge = includeCollege ? 22 : 18;
+              if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+            });
+            const childEndAge = Math.min(scen.inputs.lifeExpectancy || 85, Math.max(scen.inputs.currentAge, maxChildParentAge));
+
+            updatedRules = updatedRules.map(rule => {
+              if (rule.type === 'fixed') {
+                let savingsMap = updatedBudgetDetails.savings;
+                if (rule.id.includes('budget-alloc-cc-')) {
+                  const parts = rule.id.split('-');
+                  const ccIdx = parts.indexOf('cc');
+                  if (ccIdx !== -1 && parts[ccIdx + 1]) {
+                    const c = Number(parts[ccIdx + 1]);
+                    if (updatedBudgetDetails.childcareBudgets?.[c]) {
+                      savingsMap = updatedBudgetDetails.childcareBudgets[c].savings;
+                    } else {
+                      savingsMap = updatedBudgetDetails.childcareSavings;
+                    }
+                  } else {
+                    savingsMap = updatedBudgetDetails.childcareSavings;
+                  }
+                } else if (rule.id.includes('-cc-') || (rule.endAge && rule.endAge === childEndAge)) {
+                  savingsMap = updatedBudgetDetails.childcareSavings;
+                }
+
+                const key = rule.destination === 'cash' ? 'checking' :
+                            rule.destination === 'other' ? 'hysa' :
+                            rule.destination === 'emergencyFund' ? 'emergency' :
+                            rule.destination === 'debtPaydown' ? 'debt' : rule.destination;
+
+                if (savingsMap && savingsMap[key] !== undefined) {
+                  return { ...rule, value: savingsMap[key] };
+                }
+              }
+              return rule;
+            });
+          }
+
           return {
             ...scen,
-            inputs: { ...scen.inputs, spendingPhases: updatedSpendingPhases }
+            inputs: {
+              ...scen.inputs,
+              spendingPhases: updatedSpendingPhases,
+              budgetDetails: updatedBudgetDetails,
+              allocationRules: updatedRules,
+              simpleExpenses: val
+            }
           };
         }
         return scen;
@@ -1947,108 +2609,58 @@ export default function FireSimulator() {
     setActiveStep(1);
   };
 
-  const handleSetBudgetClick = () => {
+  const handleSetBudgetClick = (initialPhase = 'workSave') => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
     
-    const initMonthlyIncome = Math.round((Number(inp.simpleIncome) || 50000) / 12);
-    const initMonthlySpending = Math.round((Number(inp.simpleExpenses) || 42500) / 12);
-    const initMonthlySavings = Math.max(0, initMonthlyIncome - initMonthlySpending);
+    // Determine childcare ages
+    const childEvents = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    let minChildParentAge = Infinity;
+    let maxChildParentAge = -Infinity;
+    childEvents.forEach(ev => {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+      const maxAge = includeCollege ? 22 : 18;
+      if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+      if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+    });
+    const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > inp.currentAge;
+    
 
-    setBudgetMonthlyIncome(initMonthlyIncome);
-    setBudgetMonthlySpending(initMonthlySpending);
-    setBudgetMonthlySavings(initMonthlySavings);
-    
-    setBudgetGrossIncome(Number(inp.simpleIncome) || 50000);
-    setBudgetFilingStatus(inp.filingStatus || 'single');
-    setBudgetHsaCoverage(inp.budgetDetails?.hsaCoverage || 'single');
-    
+
+    // 1. Initialize Standard Work Budget
+    let wsIncome = Math.round((Number(inp.simpleIncome) || 50000) / 12);
+    let wsSavingsAllocMode = 'fixed';
+    let wsSavingsMap = {};
+    let wsExpensesMap = {};
+
     const currentIncome = Number(inp.simpleIncome) || 0;
     const currentExpenses = Number(inp.simpleExpenses) || 0;
-    const simMonthlyExpenses = currentExpenses / 12;
     const simMonthlySavings = Math.max(0, currentIncome - currentExpenses) / 12;
-
     const monthlyGross = Math.round(currentIncome / 12);
 
+    let detectedAllocMode = 'fixed';
+    if (inp.budgetDetails?.savingsAllocMode) {
+      detectedAllocMode = inp.budgetDetails.savingsAllocMode;
+    } else if (inp.allocationRules && inp.allocationRules.length > 0) {
+      const hasPercentSurplus = inp.allocationRules.some(r => r.type === 'percentSurplus');
+      if (hasPercentSurplus) {
+        detectedAllocMode = 'percentSurplus';
+      }
+    }
+    wsSavingsAllocMode = detectedAllocMode;
+
     if (inp.budgetDetails) {
-      let targetSavingsMap = { ...inp.budgetDetails.savings };
-      let targetExpensesMap = { ...inp.budgetDetails.expenses };
-
-      const totalSavingsInModal = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-
-      // Scale savings if out of sync
-      if (totalSavingsInModal > 0 && Math.abs(totalSavingsInModal - simMonthlySavings) > 1) {
-        const savingsScale = simMonthlySavings / totalSavingsInModal;
-        Object.keys(targetSavingsMap).forEach(key => {
-          targetSavingsMap[key] = Math.round(targetSavingsMap[key] * savingsScale);
-        });
-      } else if (totalSavingsInModal === 0 && simMonthlySavings > 0) {
-        targetSavingsMap.brokerage = Math.round(simMonthlySavings);
-      }
-
-      // Adjust savings rounding error
-      const scaledSavingsSum = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-      const targetSavingsTotal = Math.round(simMonthlySavings);
-      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
-      if (savingsDiff !== 0) {
-        let maxKey = 'brokerage';
-        if (targetSavingsMap[maxKey] === undefined) {
-          maxKey = Object.keys(targetSavingsMap)[0];
-        }
-        Object.keys(targetSavingsMap).forEach(key => {
-          if ((targetSavingsMap[key] || 0) > (targetSavingsMap[maxKey] || 0)) {
-            maxKey = key;
-          }
-        });
-        targetSavingsMap[maxKey] = Math.max(0, (targetSavingsMap[maxKey] || 0) + savingsDiff);
-      }
-
-      const actualSavingsMonthly = Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
-      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
-
-      const totalExpensesInModal = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
-
-      // Scale expenses if out of sync
-      if (totalExpensesInModal > 0 && Math.abs(totalExpensesInModal - availableMonthlyExpenses) > 1) {
-        const expensesScale = availableMonthlyExpenses / totalExpensesInModal;
-        Object.keys(targetExpensesMap).forEach(key => {
-          targetExpensesMap[key] = Math.round(targetExpensesMap[key] * expensesScale);
-        });
-      } else if (totalExpensesInModal === 0 && availableMonthlyExpenses > 0) {
-        targetExpensesMap = {
-          housing: Math.round(availableMonthlyExpenses * 0.40),
-          utilities: Math.round(availableMonthlyExpenses * 0.10),
-          food: Math.round(availableMonthlyExpenses * 0.15),
-          transportation: Math.round(availableMonthlyExpenses * 0.10),
-          healthcare: Math.round(availableMonthlyExpenses * 0.10),
-          leisure: Math.round(availableMonthlyExpenses * 0.10),
-          misc: Math.round(availableMonthlyExpenses * 0.05)
-        };
-      }
-
-      // Adjust expenses rounding error
-      const scaledExpensesSum = Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0);
-      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
-      if (expenseDiff !== 0 && Object.keys(targetExpensesMap).length > 0) {
-        let maxKey = Object.keys(targetExpensesMap)[0];
-        Object.keys(targetExpensesMap).forEach(key => {
-          if (targetExpensesMap[key] > targetExpensesMap[maxKey]) {
-            maxKey = key;
-          }
-        });
-        targetExpensesMap[maxKey] = Math.max(0, targetExpensesMap[maxKey] + expenseDiff);
-      }
-
-      setBudgetSavings(targetSavingsMap);
-      setBudgetExpenses(targetExpensesMap);
+      wsIncome = inp.budgetDetails.income !== undefined ? inp.budgetDetails.income : Math.round(Number(inp.simpleIncome) / 12);
+      wsSavingsAllocMode = inp.budgetDetails.savingsAllocMode || 'fixed';
+      wsSavingsMap = { ...inp.budgetDetails.savings };
+      wsExpensesMap = { ...inp.budgetDetails.expenses };
     } else {
-      const targetFilingStatus = inp.filingStatus || 'single';
-      const targetHsaCoverage = 'single';
-
       const defaultSavings = {
         trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
         checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
       };
+      
       if (inp.allocationRules && inp.allocationRules.length > 0) {
         inp.allocationRules.forEach(r => {
           const key = r.destination === 'cash' ? 'checking' :
@@ -2056,39 +2668,34 @@ export default function FireSimulator() {
                       r.destination === 'emergencyFund' ? 'emergency' :
                       r.destination === 'debtPaydown' ? 'debt' : r.destination;
           if (defaultSavings[key] !== undefined) {
-            if (r.type === 'fixed') {
-              defaultSavings[key] = r.frequency === 'monthly' ? r.value : Math.round(r.value / 12);
+            if (detectedAllocMode === 'percentSurplus') {
+              if (r.type === 'percentSurplus') {
+                defaultSavings[key] = Number(r.value);
+              } else {
+                const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
+                defaultSavings[key] = pool > 0 ? Math.round((Number(r.value) / pool) * 100) : 0;
+              }
             } else {
-              const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
-              defaultSavings[key] = Math.round(pool * (r.value / 100));
+              if (r.type === 'fixed') {
+                defaultSavings[key] = r.frequency === 'monthly' ? r.value : Math.round(r.value / 12);
+              } else {
+                const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
+                defaultSavings[key] = Math.round(pool * (Number(r.value) / 100));
+              }
             }
           }
         });
       } else {
-        defaultSavings.brokerage = Math.round(simMonthlySavings);
-      }
-
-      // Adjust savings rounding error
-      const scaledSavingsSum = Object.values(defaultSavings).reduce((sum, val) => sum + val, 0);
-      const targetSavingsTotal = Math.round(simMonthlySavings);
-      const savingsDiff = targetSavingsTotal - scaledSavingsSum;
-      if (savingsDiff !== 0) {
-        let maxKey = 'brokerage';
-        if (defaultSavings[maxKey] === undefined) {
-          maxKey = Object.keys(defaultSavings)[0];
+        if (detectedAllocMode === 'percentSurplus') {
+          defaultSavings.brokerage = 100;
+        } else {
+          defaultSavings.brokerage = Math.round(simMonthlySavings);
         }
-        Object.keys(defaultSavings).forEach(key => {
-          if ((defaultSavings[key] || 0) > (defaultSavings[maxKey] || 0)) {
-            maxKey = key;
-          }
-        });
-        defaultSavings[maxKey] = Math.max(0, (defaultSavings[maxKey] || 0) + savingsDiff);
       }
-
-      const actualSavingsMonthly = Object.values(defaultSavings).reduce((sum, val) => sum + val, 0);
-      const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
-
-      const defaultExpenses = {
+      wsSavingsMap = defaultSavings;
+      
+      const availableMonthlyExpenses = Math.max(0, monthlyGross - (detectedAllocMode === 'percentSurplus' ? simMonthlySavings : Object.values(defaultSavings).reduce((sum, val) => sum + val, 0)));
+      wsExpensesMap = {
         housing: Math.round(availableMonthlyExpenses * 0.40),
         utilities: Math.round(availableMonthlyExpenses * 0.10),
         food: Math.round(availableMonthlyExpenses * 0.15),
@@ -2097,65 +2704,535 @@ export default function FireSimulator() {
         leisure: Math.round(availableMonthlyExpenses * 0.10),
         misc: Math.round(availableMonthlyExpenses * 0.05)
       };
-
-      // Adjust defaultExpenses rounding error
-      const scaledExpensesSum = Object.values(defaultExpenses).reduce((sum, val) => sum + val, 0);
+      const scaledExpensesSum = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
       const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
       if (expenseDiff !== 0) {
-        defaultExpenses.housing = Math.max(0, defaultExpenses.housing + expenseDiff);
+        wsExpensesMap.housing = Math.max(0, wsExpensesMap.housing + expenseDiff);
       }
-
-      setBudgetExpenses(defaultExpenses);
-      setBudgetSavings(defaultSavings);
     }
+
+    const totalExpensesInModal = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
+    const actualSavingsMonthly = wsSavingsAllocMode === 'percentSurplus' 
+      ? Math.round(simMonthlySavings) 
+      : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
+    const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
+
+    if (totalExpensesInModal > 0 && Math.abs(totalExpensesInModal - availableMonthlyExpenses) > 1) {
+      const expensesScale = availableMonthlyExpenses / totalExpensesInModal;
+      Object.keys(wsExpensesMap).forEach(key => {
+        wsExpensesMap[key] = Math.round(wsExpensesMap[key] * expensesScale);
+      });
+    } else if (totalExpensesInModal === 0 && availableMonthlyExpenses > 0) {
+      wsExpensesMap = {
+        housing: Math.round(availableMonthlyExpenses * 0.40),
+        utilities: Math.round(availableMonthlyExpenses * 0.10),
+        food: Math.round(availableMonthlyExpenses * 0.15),
+        transportation: Math.round(availableMonthlyExpenses * 0.10),
+        healthcare: Math.round(availableMonthlyExpenses * 0.10),
+        leisure: Math.round(availableMonthlyExpenses * 0.10),
+        misc: Math.round(availableMonthlyExpenses * 0.05)
+      };
+    }
+
+    const scaledExpensesSum = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
+    const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
+    if (expenseDiff !== 0 && Object.keys(wsExpensesMap).length > 0) {
+      let maxKey = Object.keys(wsExpensesMap)[0];
+      Object.keys(wsExpensesMap).forEach(key => {
+        if (wsExpensesMap[key] > wsExpensesMap[maxKey]) {
+          maxKey = key;
+        }
+      });
+      wsExpensesMap[maxKey] = Math.max(0, wsExpensesMap[maxKey] + expenseDiff);
+    }
+
+    setWorkSaveIncome(wsIncome);
+    setWorkSaveSavings(wsSavingsMap);
+    setWorkSaveExpenses(wsExpensesMap);
+    setWorkSaveAllocMode(wsSavingsAllocMode);
+
+    // Calculate current childcare cost (from roadmap haveChild events)
+    let currentChildCostsAnnual = 0;
+    const currentAge = Number(inp.currentAge) || 30;
+    const childEventsForCosts = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    childEventsForCosts.forEach(ev => {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+      const childAge = currentAge - birthAge;
+      if (childAge >= startAge) {
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (childAge < maxAge) {
+          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inp.childCosts?.ages0to4 !== undefined ? Number(inp.childCosts.ages0to4) : 15000);
+          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inp.childCosts?.ages5to12 !== undefined ? Number(inp.childCosts.ages5to12) : 15000);
+          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inp.childCosts?.ages13to18 !== undefined ? Number(inp.childCosts.ages13to18) : 15000);
+          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inp.childCosts?.ages19to22 !== undefined ? Number(inp.childCosts.ages19to22) : 15000);
+
+          let annualCost = 0;
+          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+          
+          currentChildCostsAnnual += annualCost;
+        }
+      }
+    });
+    const currentChildCostsMonthly = Math.round(currentChildCostsAnnual / 12);
+
+    // 2. Initialize Childcare Budget
+    let ccIncome = wsIncome;
+    let ccSavingsAllocMode = wsSavingsAllocMode;
+    let ccSavingsMap = { ...wsSavingsMap };
+    let ccExpensesMap = { ...wsExpensesMap };
+
+    if (inp.budgetDetails && inp.budgetDetails.childcareSavings) {
+      ccIncome = inp.budgetDetails.childcareIncome !== undefined ? inp.budgetDetails.childcareIncome : wsIncome;
+      ccSavingsAllocMode = inp.budgetDetails.childcareSavingsAllocMode || wsSavingsAllocMode;
+      ccSavingsMap = { ...inp.budgetDetails.childcareSavings };
+      ccExpensesMap = { ...inp.budgetDetails.childcareExpenses };
+    }
+
+    setChildcareIncome(ccIncome);
+    setChildcareSavings(ccSavingsMap);
+    setChildcareExpenses(ccExpensesMap);
+    setChildcareAllocMode(ccSavingsAllocMode);
+
+    // Determine occurring child counts and populate childcareBudgets
+    const occurringCounts = [];
+    const currentAgeVal = Number(inp.currentAge) || 30;
+    const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
+    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+      const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
+      if (count > 0 && !occurringCounts.includes(count)) {
+        occurringCounts.push(count);
+      }
+    }
+    occurringCounts.sort((a, b) => a - b);
+
+    const initialBudgets = {};
+    occurringCounts.forEach(c => {
+      if (inp.budgetDetails?.childcareBudgets?.[c]) {
+        initialBudgets[c] = { ...inp.budgetDetails.childcareBudgets[c] };
+      } else {
+        // Fallback/initialization
+        const oldCcIncome = inp.budgetDetails?.childcareIncome;
+        let boostForOne = 1250;
+        if (oldCcIncome !== undefined) {
+          const wsInc = inp.budgetDetails?.income !== undefined ? inp.budgetDetails.income : Math.round(Number(inp.simpleIncome) / 12);
+          if (oldCcIncome > wsInc) {
+            let peakCount = 0;
+            for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+              const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
+              if (count > peakCount) {
+                peakCount = count;
+              }
+            }
+            if (peakCount > 0) {
+              boostForOne = (oldCcIncome - wsInc) / peakCount;
+            } else {
+              boostForOne = oldCcIncome - wsInc;
+            }
+          }
+        }
+        const derivedIncome = wsIncome + boostForOne * c;
+        initialBudgets[c] = {
+          income: derivedIncome,
+          expenses: ccExpensesMap ? { ...ccExpensesMap } : { ...wsExpensesMap },
+          savings: ccSavingsMap ? { ...ccSavingsMap } : { ...wsSavingsMap },
+          allocMode: ccSavingsAllocMode || wsSavingsAllocMode
+        };
+      }
+    });
+    setChildcareBudgets(initialBudgets);
+
+    // Set initial active phase
+    let startPhase = 'workSave';
+    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inp.lifeEvents);
+    
+    if (initialPhase && typeof initialPhase === 'string' && (initialPhase.startsWith('interval_') || initialPhase.startsWith('childcare_') || initialPhase === 'workSave')) {
+      startPhase = initialPhase;
+    } else {
+      if (savingIntervals.length > 0) {
+        // Find the interval corresponding to the parent's current age
+        const currentAgeIntIdx = savingIntervals.findIndex(item => currentAgeVal >= item.startAge && currentAgeVal < item.endAge);
+        if (currentAgeIntIdx !== -1) {
+          startPhase = `interval_${currentAgeIntIdx}`;
+        } else {
+          // Fallback to first childcare interval if initialPhase === 'childcare'
+          const firstCcIdx = savingIntervals.findIndex(item => item.childCount > 0);
+          if (firstCcIdx !== -1 && typeof initialPhase === 'string' && initialPhase === 'childcare') {
+            startPhase = `interval_${firstCcIdx}`;
+          } else {
+            startPhase = 'workSave';
+          }
+        }
+      }
+    }
+    setActiveBudgetPhase(startPhase);
+
+    // 3. Load Active Phase into modal inputs
+    if (startPhase.startsWith('interval_') || startPhase.startsWith('childcare_')) {
+      let c = 0;
+      if (startPhase.startsWith('interval_')) {
+        const idx = Number(startPhase.split('_')[1]);
+        c = savingIntervals[idx]?.childCount || 0;
+      } else {
+        c = Number(startPhase.split('_')[1]);
+      }
+      
+      if (c > 0) {
+        const targetCc = initialBudgets[c];
+        setBudgetMonthlyIncome(targetCc.income);
+        setBudgetSavings(targetCc.savings);
+        setBudgetExpenses(targetCc.expenses);
+        setSavingsAllocMode(targetCc.allocMode);
+        setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
+        
+        const totalSavings = targetCc.allocMode === 'percentSurplus'
+          ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
+          : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
+        setBudgetMonthlySavings(totalSavings);
+      } else {
+        setBudgetMonthlyIncome(wsIncome);
+        setBudgetSavings(wsSavingsMap);
+        setBudgetExpenses(wsExpensesMap);
+        setSavingsAllocMode(wsSavingsAllocMode);
+        setBudgetMonthlySpending(Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0));
+        
+        const totalSavings = wsSavingsAllocMode === 'percentSurplus'
+          ? Math.round(Math.max(0, wsIncome - Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
+          : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
+        setBudgetMonthlySavings(totalSavings);
+      }
+    } else {
+      setBudgetMonthlyIncome(wsIncome);
+      setBudgetSavings(wsSavingsMap);
+      setBudgetExpenses(wsExpensesMap);
+      setSavingsAllocMode(wsSavingsAllocMode);
+      setBudgetMonthlySpending(Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0));
+      
+      const totalSavings = wsSavingsAllocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, wsIncome - Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
+      setBudgetMonthlySavings(totalSavings);
+    }
+
+    setBudgetGrossIncome(Number(inp.simpleIncome) || 50000);
+    setBudgetFilingStatus(inp.filingStatus || 'single');
+    setBudgetHsaCoverage(inp.budgetDetails?.hsaCoverage || 'single');
     
     setIsBudgetModalOpen(true);
   };
 
-  const handleSaveBudget = () => {
-    // If savings allocations are entered, total all savings-related allocations and use that number as Monthly savings.
-    const totalSavingsAllocations = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
-    const finalMonthlySavings = totalSavingsAllocations > 0 ? totalSavingsAllocations : budgetMonthlySavings;
-    const finalMonthlyIncome = budgetMonthlyIncome;
-    
-    const annualIncome = finalMonthlyIncome * 12;
-    const annualSavings = finalMonthlySavings * 12;
-    const annualExpenses = Math.max(0, annualIncome - annualSavings);
+  const handleSwitchBudgetPhase = (newPhase) => {
+    if (newPhase === activeBudgetPhase) return;
 
-    // Form final savings map
-    const finalSavingsMap = totalSavingsAllocations > 0 ? { ...budgetSavings } : { ...budgetSavings, brokerage: finalMonthlySavings };
+    // Save current modal inputs to the old phase's state
+    if (activeBudgetPhase === 'workSave') {
+      setWorkSaveIncome(budgetMonthlyIncome);
+      setWorkSaveSavings(budgetSavings);
+      setWorkSaveExpenses(budgetExpenses);
+      setWorkSaveAllocMode(savingsAllocMode);
+    } else {
+      let c = 0;
+      if (activeBudgetPhase.startsWith('interval_')) {
+        const idx = Number(activeBudgetPhase.split('_')[1]);
+        const currentAgeVal = Number(inputs.currentAge) || 30;
+        const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+        const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
+        c = savingIntervals[idx]?.childCount || 0;
+      } else if (activeBudgetPhase.startsWith('childcare_')) {
+        c = Number(activeBudgetPhase.split('_')[1]);
+      }
+      
+      if (c > 0) {
+        setChildcareBudgets(prev => ({
+          ...prev,
+          [c]: {
+            income: budgetMonthlyIncome,
+            expenses: { ...budgetExpenses },
+            savings: { ...budgetSavings },
+            allocMode: savingsAllocMode
+          }
+        }));
+      }
+    }
+
+    // Load new phase inputs
+    if (newPhase === 'workSave') {
+      setBudgetMonthlyIncome(workSaveIncome);
+      setBudgetSavings(workSaveSavings);
+      setBudgetExpenses(workSaveExpenses);
+      setSavingsAllocMode(workSaveAllocMode);
+      setBudgetMonthlySpending(Object.values(workSaveExpenses).reduce((sum, val) => sum + val, 0));
+      
+      const totalSavings = workSaveAllocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, workSaveIncome - Object.values(workSaveExpenses).reduce((sum, val) => sum + val, 0)) * (Object.values(workSaveSavings).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(workSaveSavings).reduce((sum, val) => sum + val, 0);
+      setBudgetMonthlySavings(totalSavings);
+    } else {
+      let c = 0;
+      if (newPhase.startsWith('interval_')) {
+        const idx = Number(newPhase.split('_')[1]);
+        const currentAgeVal = Number(inputs.currentAge) || 30;
+        const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+        const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
+        c = savingIntervals[idx]?.childCount || 0;
+      } else if (newPhase.startsWith('childcare_')) {
+        c = Number(newPhase.split('_')[1]);
+      }
+      
+      if (c > 0) {
+        let targetCc = childcareBudgets[c];
+        if (!targetCc) {
+          const wsIncome = activeBudgetPhase === 'workSave' ? budgetMonthlyIncome : workSaveIncome;
+          const wsExpenses = activeBudgetPhase === 'workSave' ? { ...budgetExpenses } : { ...workSaveExpenses };
+          const wsSavings = activeBudgetPhase === 'workSave' ? { ...budgetSavings } : { ...workSaveSavings };
+          const wsAllocMode = activeBudgetPhase === 'workSave' ? savingsAllocMode : workSaveAllocMode;
+          
+          targetCc = {
+            income: wsIncome + 1250 * c,
+            expenses: wsExpenses,
+            savings: wsSavings,
+            allocMode: wsAllocMode
+          };
+          setChildcareBudgets(prev => ({
+            ...prev,
+            [c]: targetCc
+          }));
+        }
+
+        setBudgetMonthlyIncome(targetCc.income);
+        setBudgetSavings(targetCc.savings);
+        setBudgetExpenses(targetCc.expenses);
+        setSavingsAllocMode(targetCc.allocMode);
+        setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
+        
+        const totalSavings = targetCc.allocMode === 'percentSurplus'
+          ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
+          : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
+        setBudgetMonthlySavings(totalSavings);
+      }
+    }
+
+    setActiveBudgetPhase(newPhase);
+  };
+
+  const handleToggleSavingsAllocMode = (newMode) => {
+    if (newMode === savingsAllocMode) return;
+    
+    if (newMode === 'percentSurplus') {
+      const totalSavings = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+      const newSavings = {};
+      Object.keys(budgetSavings).forEach(key => {
+        const val = budgetSavings[key] || 0;
+        newSavings[key] = totalSavings > 0 ? Math.round((val / totalSavings) * 100) : 0;
+      });
+      
+      if (totalSavings > 0) {
+        const newSum = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
+        const diff = 100 - newSum;
+        if (diff !== 0) {
+          const keys = Object.keys(newSavings);
+          let maxKey = 'brokerage';
+          keys.forEach(k => {
+            if (newSavings[k] > (newSavings[maxKey] || 0)) {
+              maxKey = k;
+            }
+          });
+          newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
+        }
+      } else {
+        newSavings.brokerage = 100;
+      }
+      setBudgetSavings(newSavings);
+    } else {
+      const totalExpenses = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+      const estimatedSurplus = Math.max(0, budgetMonthlyIncome - totalExpenses);
+      
+      const newSavings = {};
+      Object.keys(budgetSavings).forEach(key => {
+        const val = budgetSavings[key] || 0;
+        newSavings[key] = Math.round(estimatedSurplus * (val / 100));
+      });
+      
+      const newSum = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
+      const diff = estimatedSurplus - newSum;
+      if (diff !== 0) {
+        const keys = Object.keys(newSavings);
+        let maxKey = 'brokerage';
+        keys.forEach(k => {
+          if (newSavings[k] > (newSavings[maxKey] || 0)) {
+            maxKey = k;
+          }
+        });
+        newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
+      }
+      setBudgetSavings(newSavings);
+    }
+    
+    setSavingsAllocMode(newMode);
+  };
+
+  const handleSaveBudget = () => {
+    // First, capture the current edits for the active phase
+    const finalWorkSaveIncome = activeBudgetPhase === 'workSave' ? budgetMonthlyIncome : workSaveIncome;
+    const finalWorkSaveSavings = activeBudgetPhase === 'workSave' ? { ...budgetSavings } : { ...workSaveSavings };
+    const finalWorkSaveExpenses = activeBudgetPhase === 'workSave' ? { ...budgetExpenses } : { ...workSaveExpenses };
+    const finalWorkSaveAllocMode = activeBudgetPhase === 'workSave' ? savingsAllocMode : workSaveAllocMode;
+
+    let finalChildcareBudgets = { ...childcareBudgets };
+    let activeC = 0;
+    if (activeBudgetPhase.startsWith('interval_')) {
+      const idx = Number(activeBudgetPhase.split('_')[1]);
+      const currentAgeVal = Number(inputs.currentAge) || 30;
+      const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+      const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
+      activeC = savingIntervals[idx]?.childCount || 0;
+    } else if (activeBudgetPhase.startsWith('childcare_')) {
+      activeC = Number(activeBudgetPhase.split('_')[1]);
+    }
+    
+    if (activeC > 0) {
+      finalChildcareBudgets[activeC] = {
+        income: budgetMonthlyIncome,
+        expenses: { ...budgetExpenses },
+        savings: { ...budgetSavings },
+        allocMode: savingsAllocMode
+      };
+    }
+
+    const firstCcKey = Object.keys(finalChildcareBudgets).length > 0 ? Math.min(...Object.keys(finalChildcareBudgets).map(Number)) : null;
+    const firstCc = firstCcKey ? finalChildcareBudgets[firstCcKey] : null;
+
+    const finalChildcareIncome = firstCc ? firstCc.income : (activeC > 0 ? budgetMonthlyIncome : childcareIncome);
+    const finalChildcareSavings = firstCc ? { ...firstCc.savings } : (activeC > 0 ? { ...budgetSavings } : { ...childcareSavings });
+    const finalChildcareExpenses = firstCc ? { ...firstCc.expenses } : (activeC > 0 ? { ...budgetExpenses } : { ...childcareExpenses });
+    const finalChildcareAllocMode = firstCc ? firstCc.allocMode : (activeC > 0 ? savingsAllocMode : childcareAllocMode);
+
+    const totalWorkSaveExpenses = Object.values(finalWorkSaveExpenses).reduce((sum, val) => sum + val, 0);
+    const totalWorkSaveSavings = finalWorkSaveAllocMode === 'percentSurplus'
+      ? Math.round(Math.max(0, finalWorkSaveIncome - totalWorkSaveExpenses) * (Object.values(finalWorkSaveSavings).reduce((sum, val) => sum + val, 0) / 100))
+      : Object.values(finalWorkSaveSavings).reduce((sum, val) => sum + val, 0);
+
+    const totalChildcareExpenses = Object.values(finalChildcareExpenses).reduce((sum, val) => sum + val, 0);
+    const totalChildcareSavings = finalChildcareAllocMode === 'percentSurplus'
+      ? Math.round(Math.max(0, finalChildcareIncome - totalChildcareExpenses) * (Object.values(finalChildcareSavings).reduce((sum, val) => sum + val, 0) / 100))
+      : Object.values(finalChildcareSavings).reduce((sum, val) => sum + val, 0);
+
+    const annualWorkSaveIncome = finalWorkSaveIncome * 12;
+    const annualWorkSaveExpenses = totalWorkSaveExpenses * 12;
+
+    const annualChildcareIncome = finalChildcareIncome * 12;
+    const annualChildcareExpenses = totalChildcareExpenses * 12;
 
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
 
       let newInputs = { ...scen.inputs };
       
-      newInputs.simpleIncome = annualIncome;
-      newInputs.simpleExpenses = annualExpenses;
+      // Set simple mode properties to standard work phase
+      newInputs.simpleIncome = annualWorkSaveIncome;
+      newInputs.simpleExpenses = annualWorkSaveExpenses;
       newInputs.filingStatus = budgetFilingStatus;
 
-      newInputs.spendingPhases = newInputs.spendingPhases.map((phase, idx) => {
-        if (idx === 0) {
-          return {
-            ...phase,
-            amount: annualExpenses,
-            annualSpending: annualExpenses
-          };
-        }
-        return phase;
+      // Determine childcare ages range
+      const childEvents = (newInputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+      let minChildParentAge = Infinity;
+      let maxChildParentAge = -Infinity;
+      childEvents.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
       });
+      
+      const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > newInputs.currentAge;
+      const childEndAge = Math.min(newInputs.lifeExpectancy, Math.max(newInputs.currentAge, maxChildParentAge));
 
-      newInputs.incomeList = newInputs.incomeList.map((inc, idx) => {
-        if (idx === 0 || inc.id === 'simple-inc') {
-          return {
-            ...inc,
-            amount: annualIncome
-          };
+      // Build Income List
+      const cleanIncomeList = (newInputs.incomeList || []).filter(inc => inc.id !== 'inc-1' && inc.id !== 'simple-inc' && inc.id !== 'simple-inc-childcare' && inc.id !== 'simple-inc-worksave');
+      
+      if (hasChildcarePhase) {
+        if (childEndAge > newInputs.currentAge) {
+          cleanIncomeList.push({
+            id: 'simple-inc-childcare',
+            name: 'Salary / Main Income (Childcare Phase)',
+            amount: annualChildcareIncome,
+            frequency: 'yearly',
+            startAge: newInputs.currentAge,
+            endAge: Math.min(newInputs.targetRetirementAge, childEndAge),
+            growthRate: 0.03,
+            isTaxable: true
+          });
         }
-        return inc;
-      });
+        if (childEndAge < newInputs.targetRetirementAge) {
+          cleanIncomeList.push({
+            id: 'simple-inc-worksave',
+            name: 'Salary / Main Income (Standard Work Phase)',
+            amount: annualWorkSaveIncome,
+            frequency: 'yearly',
+            startAge: Math.max(newInputs.currentAge, childEndAge),
+            endAge: newInputs.targetRetirementAge,
+            growthRate: 0.03,
+            isTaxable: true
+          });
+        }
+      } else {
+        cleanIncomeList.push({
+          id: 'simple-inc',
+          name: 'Salary / Main Income',
+          amount: annualWorkSaveIncome,
+          frequency: 'yearly',
+          startAge: newInputs.currentAge,
+          endAge: newInputs.targetRetirementAge,
+          growthRate: 0.03,
+          isTaxable: true
+        });
+      }
+      newInputs.incomeList = cleanIncomeList;
 
-      // Merge targetRetirementAge changes if a pending scenario recommendation requires it
+      // Build Spending Phases
+      const cleanSpendingPhases = (newInputs.spendingPhases || []).filter(p => p.id !== 'spend-1' && p.id !== 'simple-spend' && p.id !== 'simple-spend-childcare' && p.id !== 'simple-spend-worksave');
+      
+      if (hasChildcarePhase) {
+        if (childEndAge > newInputs.currentAge) {
+          cleanSpendingPhases.push({
+            id: 'simple-spend-childcare',
+            name: 'Lifestyle Spending (Childcare Phase)',
+            amount: annualChildcareExpenses,
+            frequency: 'yearly',
+            startAge: newInputs.currentAge,
+            endAge: childEndAge,
+            annualSpending: annualChildcareExpenses
+          });
+        }
+        if (childEndAge < newInputs.lifeExpectancy) {
+          cleanSpendingPhases.push({
+            id: 'simple-spend-worksave',
+            name: 'Lifestyle Spending (Standard Work Phase)',
+            amount: annualWorkSaveExpenses,
+            frequency: 'yearly',
+            startAge: Math.max(newInputs.currentAge, childEndAge),
+            endAge: newInputs.lifeExpectancy,
+            annualSpending: annualWorkSaveExpenses
+          });
+        }
+      } else {
+        cleanSpendingPhases.push({
+          id: 'simple-spend',
+          name: 'Base Lifestyle Spending',
+          amount: annualWorkSaveExpenses,
+          frequency: 'yearly',
+          startAge: newInputs.currentAge,
+          endAge: newInputs.lifeExpectancy,
+          annualSpending: annualWorkSaveExpenses
+        });
+      }
+      newInputs.spendingPhases = cleanSpendingPhases;
+
       if (pendingImprovement) {
         const { scenario } = pendingImprovement;
         if (scenario.type === 'workLonger') {
@@ -2165,14 +3242,14 @@ export default function FireSimulator() {
           const target65Age = newInputs.currentAge < 65 ? 65 : newInputs.currentAge;
           newInputs.targetRetirementAge = target65Age;
         } else if (scenario.type === 'combined') {
-          const yearsDelay = scenario.value && typeof scenario.value === 'object' ? scenario.value.delay : 2;
+          const yearsDelay = scenario.value && typeof scenario.value === 'object' ? (scenario.value.delay || 0) : 0;
           newInputs.targetRetirementAge = newInputs.targetRetirementAge + yearsDelay;
         }
 
-        // Keep income lists and retirement life events in sync with the new targetRetirementAge
         const targetRetAge = newInputs.targetRetirementAge;
         newInputs.incomeList = newInputs.incomeList.map(inc => {
-          if (inc.id === 'simple-inc' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+          if (inc.id === 'simple-inc-childcare') return inc;
+          if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('salary')) {
             return { ...inc, endAge: targetRetAge };
           }
           return inc;
@@ -2187,36 +3264,64 @@ export default function FireSimulator() {
 
       newInputs.budgetDetails = {
         hsaCoverage: budgetHsaCoverage,
-        savings: finalSavingsMap,
-        expenses: { ...budgetExpenses }
+        
+        // Standard work phase
+        savings: finalWorkSaveSavings,
+        expenses: finalWorkSaveExpenses,
+        savingsAllocMode: finalWorkSaveAllocMode,
+        income: finalWorkSaveIncome,
+        
+        // Childcare budgets
+        childcareBudgets: finalChildcareBudgets,
+        childcareSavings: finalChildcareSavings,
+        childcareExpenses: finalChildcareExpenses,
+        childcareSavingsAllocMode: finalChildcareAllocMode,
+        childcareIncome: finalChildcareIncome
       };
 
       const nextRules = [];
       let ruleIndex = 1;
 
-      Object.keys(finalSavingsMap).forEach(key => {
-        const val = finalSavingsMap[key] || 0;
-        if (val > 0) {
-          let dest = key;
-          if (key === 'checking') dest = 'cash';
-          else if (key === 'hysa') dest = 'other';
-          else if (key === 'emergency') dest = 'emergencyFund';
-          else if (key === 'debt') dest = 'debtPaydown';
+      const savingIntervals = getChildCountIntervals(newInputs.currentAge, newInputs.targetRetirementAge, newInputs.lifeEvents);
+      savingIntervals.forEach(interval => {
+        const C = interval.childCount;
+        const start = interval.startAge;
+        const end = interval.endAge;
+        if (start >= end) return;
 
-          nextRules.push({
-            id: `budget-alloc-${key}-${Date.now()}`,
-            destination: dest,
-            type: 'fixed',
-            value: val,
-            frequency: 'monthly',
-            priority: ruleIndex++,
-            smartRule: {
-              enabled: false,
-              targetValue: 0,
-              redirectDestination: 'brokerage'
-            }
-          });
+        let budgetSavingsMap = {};
+        let budgetAllocMode = 'fixed';
+        if (C === 0) {
+          budgetSavingsMap = finalWorkSaveSavings;
+          budgetAllocMode = finalWorkSaveAllocMode;
+        } else {
+          const ccBudget = finalChildcareBudgets[C] || {};
+          budgetSavingsMap = ccBudget.savings || finalChildcareSavings;
+          budgetAllocMode = ccBudget.allocMode || finalChildcareAllocMode;
         }
+
+        Object.keys(budgetSavingsMap).forEach(key => {
+          const val = budgetSavingsMap[key] || 0;
+          if (val > 0) {
+            let dest = key;
+            if (key === 'checking') dest = 'cash';
+            else if (key === 'hysa') dest = 'other';
+            else if (key === 'emergency') dest = 'emergencyFund';
+            else if (key === 'debt') dest = 'debtPaydown';
+
+            nextRules.push({
+              id: `budget-alloc-${C > 0 ? 'cc-' + C : 'ws'}-${key}-${start}-${Date.now()}`,
+              destination: dest,
+              type: budgetAllocMode === 'percentSurplus' ? 'percentSurplus' : 'fixed',
+              value: val,
+              frequency: budgetAllocMode === 'percentSurplus' ? 'yearly' : 'monthly',
+              priority: ruleIndex++,
+              startAge: start,
+              endAge: end,
+              smartRule: { enabled: false, targetValue: 0, redirectDestination: 'brokerage' }
+            });
+          }
+        });
       });
 
       newInputs.allocationRules = nextRules;
@@ -2260,22 +3365,22 @@ export default function FireSimulator() {
 
   const getDefaultValuesForType = (type, currentAge) => {
     switch (type) {
-      case 'asset':
+      case 'checkingSavings':
         return {
-          name: 'Other Asset',
-          value: 5000,
-          monthlyAmount: 100,
-          rate: 5,
+          name: 'Cash / Savings',
+          value: 10000,
+          monthlyAmount: 200,
+          rate: 4,
           notes: '',
           startAge: currentAge,
           endAge: ''
         };
-      case 'debt':
+      case 'brokerage':
         return {
-          name: 'Car Loan',
-          value: 15000,
-          monthlyAmount: 350,
-          rate: 5.5,
+          name: 'Investment Account',
+          value: 50000,
+          monthlyAmount: 500,
+          rate: 7,
           notes: '',
           startAge: currentAge,
           endAge: ''
@@ -2292,7 +3397,7 @@ export default function FireSimulator() {
         };
       case 'child':
         return {
-          name: 'Child Expense',
+          name: 'Child 1',
           value: 0,
           monthlyAmount: 800,
           rate: 3,
@@ -2300,12 +3405,32 @@ export default function FireSimulator() {
           startAge: currentAge,
           endAge: ''
         };
-      case 'obligation':
+      case 'studentLoan':
         return {
-          name: 'Monthly Obligation',
-          value: 0,
+          name: 'Student Loan',
+          value: 20000,
+          monthlyAmount: 250,
+          rate: 4.5,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'creditCard':
+        return {
+          name: 'Credit Card',
+          value: 5000,
           monthlyAmount: 150,
-          rate: 3,
+          rate: 18,
+          notes: '',
+          startAge: currentAge,
+          endAge: ''
+        };
+      case 'carLoan':
+        return {
+          name: 'Car Loan',
+          value: 15000,
+          monthlyAmount: 350,
+          rate: 5.5,
           notes: '',
           startAge: currentAge,
           endAge: ''
@@ -2327,7 +3452,8 @@ export default function FireSimulator() {
     const currentAge = inputs.currentAge || 35;
     setEditingCondition({
       type: 'debt',
-      ...getDefaultValuesForType('debt', currentAge)
+      subtype: 'studentLoan',
+      ...getDefaultValuesForType('studentLoan', currentAge)
     });
   };
 
@@ -2364,7 +3490,18 @@ export default function FireSimulator() {
     if (type === 'buyHouse') {
       defaults = { ...defaults, purchaseAge: 40, homePrice: 500000, downPayment: 100000 };
     } else if (type === 'haveChild') {
-      defaults = { ...defaults, birthAge: 38, childcareCost: 12000, supportEndAge: 18 };
+      defaults = {
+        ...defaults,
+        childName: '',
+        childStartAge: 0,
+        birthAge: inputs.currentAge || 35,
+        costMethod: 'default',
+        customAges0to4: 15000,
+        customAges5to12: 9000,
+        customAges13to18: 12000,
+        customAges19to22: 20000,
+        includeCollege: false
+      };
     } else if (type === 'careerChange') {
       defaults = { ...defaults, name: 'Senior Manager', startAge: 40, amount: 150000, growthRate: 3.5 };
     } else if (type === 'move') {
@@ -2398,7 +3535,42 @@ export default function FireSimulator() {
     if (!editingEvent) return;
     const type = editingEvent.type;
     
-    setScenarios(prev => prev.map(scen => {
+    let beforeReadyAge = null;
+    let afterReadyAge = null;
+    let avgAnnualChildCost = 0;
+
+    if (type === 'haveChild') {
+      const currentScenObj = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+      const beforeRes = runFireSimulation(currentScenObj.inputs);
+      beforeReadyAge = beforeRes.retirementReadyAge;
+
+      const startAge = editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0;
+      const includeCollege = !!editingEvent.includeCollege;
+      const maxAge = includeCollege ? 22 : 18;
+      let totalCost = 0;
+      let activeYears = 0;
+      for (let childAge = startAge; childAge < maxAge; childAge++) {
+        const ages0to4 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges0to4 !== undefined ? Number(editingEvent.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+        const ages5to12 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges5to12 !== undefined ? Number(editingEvent.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+        const ages13to18 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges13to18 !== undefined ? Number(editingEvent.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+        const ages19to22 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges19to22 !== undefined ? Number(editingEvent.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+        if (childAge >= 0 && childAge <= 4) {
+          totalCost += ages0to4;
+        } else if (childAge >= 5 && childAge <= 12) {
+          totalCost += ages5to12;
+        } else if (childAge >= 13 && childAge <= 18) {
+          totalCost += ages13to18;
+        } else if (childAge >= 19 && childAge <= 22) {
+          totalCost += ages19to22;
+        }
+        activeYears++;
+      }
+      avgAnnualChildCost = activeYears > 0 ? Math.round(totalCost / activeYears) : 0;
+    }
+
+    let savedEvent = null;
+    const nextScenarios = scenarios.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
       
       let newInputs = { ...scen.inputs };
@@ -2435,7 +3607,6 @@ export default function FireSimulator() {
       // 2. Perform save/insert logic
       if (type === 'retire') {
         newInputs.targetRetirementAge = editingEvent.age;
-        // Filter out any existing retirement event to avoid duplicates
         newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.type !== 'retire');
         let newEventObj = {
           id: editingEvent.id && editingEvent.id !== 'retire' ? editingEvent.id : `retire-${Date.now()}`,
@@ -2517,12 +3688,15 @@ export default function FireSimulator() {
         } else if (type === 'haveChild') {
           newEventObj = {
             ...newEventObj,
-            birthAge: editingEvent.birthAge,
-            oneTimeBirthCost: 10000,
-            annualChildcareCost: editingEvent.childcareCost,
-            annualChildExpense: 6000,
-            childcareEndAge: 5,
-            supportEndAge: editingEvent.supportEndAge
+            childName: editingEvent.childName || '',
+            childStartAge: editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0,
+            birthAge: editingEvent.birthAge !== undefined ? editingEvent.birthAge : newInputs.currentAge,
+            costMethod: editingEvent.costMethod || 'default',
+            customAges0to4: editingEvent.customAges0to4 !== undefined ? editingEvent.customAges0to4 : 15000,
+            customAges5to12: editingEvent.customAges5to12 !== undefined ? editingEvent.customAges5to12 : 9000,
+            customAges13to18: editingEvent.customAges13to18 !== undefined ? editingEvent.customAges13to18 : 12000,
+            customAges19to22: editingEvent.customAges19to22 !== undefined ? editingEvent.customAges19to22 : 20000,
+            includeCollege: !!editingEvent.includeCollege
           };
         } else if (type === 'college') {
           newEventObj = {
@@ -2565,14 +3739,34 @@ export default function FireSimulator() {
           };
         }
         
+        savedEvent = newEventObj;
         newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+      }
+
+      if (type === 'haveChild') {
+        syncChildcarePhasesAndRules(newInputs);
+        const afterRes = runFireSimulation(newInputs);
+        afterReadyAge = afterRes.retirementReadyAge;
       }
       
       return {
         ...scen,
         inputs: newInputs
       };
-    }));
+    });
+
+    setScenarios(nextScenarios);
+
+    if (type === 'haveChild' && savedEvent && !editingEvent.id) {
+      const diff = (afterReadyAge && beforeReadyAge) ? (afterReadyAge - beforeReadyAge) : 0;
+      setChildImpactSummary({
+        beforeAge: beforeReadyAge,
+        afterAge: afterReadyAge,
+        diffYears: diff,
+        annualSpending: avgAnnualChildCost,
+        event: savedEvent
+      });
+    }
     
     setEditingEvent(null);
   };
@@ -2590,6 +3784,10 @@ export default function FireSimulator() {
         if (evt.type === 'retire') {
           newInputs.targetRetirementAge = scen.inputs.lifeExpectancy;
         }
+        if (matchEvent.type === 'haveChild') {
+          syncChildcarePhasesAndRules(newInputs);
+        }
+
         return {
           ...scen,
           inputs: newInputs
@@ -2703,6 +3901,10 @@ export default function FireSimulator() {
           }
           return e;
         });
+      }
+
+      if (evt.type === 'haveChild') {
+        syncChildcarePhasesAndRules(newInputs);
       }
 
       return {
@@ -2834,9 +4036,15 @@ export default function FireSimulator() {
       } else if (matchEvent.type === 'haveChild') {
         defaults = {
           ...defaults,
+          childName: matchEvent.childName || '',
+          childStartAge: matchEvent.childStartAge !== undefined ? matchEvent.childStartAge : 0,
           birthAge: matchEvent.birthAge,
-          childcareCost: matchEvent.annualChildcareCost,
-          supportEndAge: matchEvent.supportEndAge
+          costMethod: matchEvent.costMethod || 'default',
+          customAges0to4: matchEvent.customAges0to4 !== undefined ? matchEvent.customAges0to4 : 15000,
+          customAges5to12: matchEvent.customAges5to12 !== undefined ? matchEvent.customAges5to12 : 9000,
+          customAges13to18: matchEvent.customAges13to18 !== undefined ? matchEvent.customAges13to18 : 12000,
+          customAges19to22: matchEvent.customAges19to22 !== undefined ? matchEvent.customAges19to22 : 20000,
+          includeCollege: !!matchEvent.includeCollege
         };
       } else if (matchEvent.type === 'college') {
         defaults = {
@@ -2936,9 +4144,14 @@ export default function FireSimulator() {
             text: `Buy a home for ${formatCurrency(ev.homePrice)} (${ev.purchaseType === 'cash' ? 'in cash' : 'with mortgage'})`
           });
         } else if (ev.type === 'haveChild') {
+          const supportEndParentAge = Number(ev.birthAge) + (ev.includeCollege ? 22 : 18);
+          const childCurrentAge = Math.max(0, curAge - Number(ev.birthAge));
+          const bornText = Number(ev.birthAge) < curAge 
+            ? `(already born, current age ${childCurrentAge}, support ends at parent age ${supportEndParentAge})` 
+            : `(support ends at parent age ${supportEndParentAge})`;
           list.push({
             age: Number(ev.birthAge),
-            text: `Have a child (childcare/support starts)`
+            text: `Have a child${ev.childName ? ` "${ev.childName}"` : ''} ${bornText}`
           });
         } else if (ev.type === 'college') {
           list.push({
@@ -2966,9 +4179,22 @@ export default function FireSimulator() {
             text: `Receive ${label} benefits (${formatCurrency(monthlyBenefit)}/mo${ev.type === 'socialSecurity' && claimingAge !== 67 ? ' - claiming age adjusted' : ''})`
           });
         } else {
+          const age = Number(ev.age || ev.startAge || ev.payoffAge || ev.purchaseAge || ev.birthAge || ev.ageReceived || ev.claimingAge || ev.transferAge || 0);
+          let desc = `Event: ${ev.name || 'Custom'}`;
+          if (ev.type === 'debtPayoff') {
+            desc = `Pay off debt: "${ev.name || 'Debt Payoff'}" costing ${formatCurrency(ev.amount)}`;
+          } else if (ev.type === 'sabbatical') {
+            desc = `Take sabbatical "${ev.name || 'Sabbatical'}" until age ${ev.endAge}`;
+          } else if (ev.type === 'baristaFire') {
+            desc = `Transition to Barista FIRE (expenses: ${formatCurrency(ev.annualExpenses)}/yr)`;
+          } else if (ev.type === 'coastFire') {
+            desc = `Transition to Coast FIRE`;
+          } else if (ev.type === 'assetTransfer') {
+            desc = `Transfer ${formatCurrency(ev.amount)} from ${ev.fromAsset || 'portfolio'} to ${ev.toAsset || 'portfolio'}`;
+          }
           list.push({
-            age: Number(ev.age || ev.startAge),
-            text: `Event: ${ev.name || 'Custom'}`
+            age,
+            text: desc
           });
         }
       }
@@ -3025,7 +4251,7 @@ export default function FireSimulator() {
   const timelineEvents = useMemo(() => {
     const events = [];
     const inp = activeScenario.inputs;
-    const calc = activeResults;
+    const calc = displayedResults;
 
     // 1. Income Phases
     inp.incomeList.forEach(inc => {
@@ -3098,23 +4324,27 @@ export default function FireSimulator() {
             events.push({
               originalId: ev.id,
               age,
-              title: `Have Child`,
-              label: `Have Child`,
+              title: ev.childName ? `Have Child: ${ev.childName}` : `Have Child`,
+              label: ev.childName ? `Have Child: ${ev.childName}` : `Have Child`,
               icon: '👶',
               type: 'haveChild',
-              description: `Welcomed a child! Childcare/support runs until support ends at age ${ev.supportEndAge || 18}.`
+              description: ev.childName 
+                ? `Welcomed ${ev.childName}! Childcare/support runs until support ends at age ${ev.supportEndAge || 18}.`
+                : `Welcomed a child! Childcare/support runs until support ends at age ${ev.supportEndAge || 18}.`
             });
             const supportEndAge = Number(ev.supportEndAge) || 18;
             const parentAgeAtEnd = age + supportEndAge;
             if (parentAgeAtEnd <= inp.lifeExpectancy) {
               events.push({
                 age: parentAgeAtEnd,
-                title: `Child Expenses End`,
-                label: `Child Support Ends`,
+                title: ev.childName ? `Support for ${ev.childName} Ends` : `Child Expenses End`,
+                label: ev.childName ? `Support for ${ev.childName} Ends` : `Child Support Ends`,
                 icon: '👶',
                 type: 'childSupportEnds',
                 isMilestone: true,
-                description: `General support and childcare expenses for child born when you were Age ${age} have ended (support term: ${supportEndAge} years).`
+                description: ev.childName 
+                  ? `General support and childcare expenses for ${ev.childName} born when you were Age ${age} have ended (support term: ${supportEndAge} years).`
+                  : `General support and childcare expenses for child born when you were Age ${age} have ended (support term: ${supportEndAge} years).`
               });
             }
           } else if (ev.type === 'college') {
@@ -3264,17 +4494,7 @@ export default function FireSimulator() {
       }
     }
 
-    if (calc.runOutAge) {
-      events.push({
-        age: calc.runOutAge,
-        title: `Assets Depleted`,
-        label: `Assets Depleted`,
-        icon: '⚠️',
-        type: 'assetsDepleted',
-        isMilestone: true,
-        description: `Your investable assets are projected to reach zero at Age ${calc.runOutAge} under current assumptions.`
-      });
-    }
+
 
     if (calc.coastAge) {
       events.push({
@@ -3319,7 +4539,7 @@ export default function FireSimulator() {
       ageCounts[ageKey] = stackIndex + 1;
       return { ...evt, stackIndex };
     });
-  }, [activeScenario.inputs, activeResults]);
+  }, [activeScenario.inputs, displayedResults]);
 
   function getAssetLabel(key) {
     const labels = {
@@ -3338,8 +4558,8 @@ export default function FireSimulator() {
 
 
   // Summary statistics
-  const totalNetWorth = activeResults.currentNetWorth;
-  const targetGoal = activeResults.fiNumber || 0;
+  const totalNetWorth = displayedResults.currentNetWorth;
+  const targetGoal = displayedResults.fiNumber || 0;
   const rawPercent = targetGoal > 0 ? Math.round((totalNetWorth / targetGoal) * 100) : 0;
   const gaugePercent = rawPercent;
   const clampedPercentForGauge = Math.max(0, Math.min(100, rawPercent));
@@ -3349,6 +4569,203 @@ export default function FireSimulator() {
   const viewBox = `0 0 ${sqSize} ${sqSize}`;
   const dashArray = radius * Math.PI * 2;
   const dashOffset = dashArray - (dashArray * clampedPercentForGauge) / 100;
+
+  const getLifestyleGaps = (logs) => {
+    if (!logs) return [];
+    const gaps = [];
+    let currentGap = null;
+    
+    logs.forEach(log => {
+      if (log.lifestyleGap && log.lifestyleGap > 0) {
+        if (currentGap && currentGap.endAge === log.age - 1) {
+          currentGap.endAge = log.age;
+          currentGap.maxGap = Math.max(currentGap.maxGap, log.lifestyleGap);
+          currentGap.totalGap += log.lifestyleGap;
+          currentGap.yearsCount++;
+        } else {
+          if (currentGap) {
+            gaps.push(currentGap);
+          }
+          currentGap = {
+            startAge: log.age,
+            endAge: log.age,
+            maxGap: log.lifestyleGap,
+            totalGap: log.lifestyleGap,
+            yearsCount: 1
+          };
+        }
+      } else {
+        if (currentGap) {
+          gaps.push(currentGap);
+          currentGap = null;
+        }
+      }
+    });
+    if (currentGap) {
+      gaps.push(currentGap);
+    }
+    return gaps;
+  };
+
+  const renderChildImpactModal = () => {
+    if (!childImpactSummary) return null;
+    const { beforeAge, afterAge, diffYears, annualSpending, event } = childImpactSummary;
+
+    const isStillReady = afterAge !== null && (diffYears <= 0 || afterAge <= inputs.targetRetirementAge);
+
+    return (
+      <div className="modal-backdrop" onClick={() => setChildImpactSummary(null)}>
+        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            👶 {event.childName ? `Welcome, ${event.childName}!` : 'Child Event Added'}
+          </h3>
+          
+          <p style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            {isStillReady 
+              ? "Congratulations! Your retirement plan remains fully on track and sustainable with this child event. No further adjustments are needed."
+              : "Adding child-related costs changes the timeline and may require adjustments to savings, spending, or retirement assumptions. Raising a child is a beautiful journey, and these figures help you plan with confidence. You can refine child spending details in your budget at any time."
+            }
+          </p>
+
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Before Child:</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: beforeAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
+                {beforeAge ? `✓ Retirement Ready at Age ${beforeAge}` : '⚠ Current Plan Needs Adjustment'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>After Child:</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: afterAge ? 'var(--primary)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
+                {afterAge ? `✓ Retirement Ready at Age ${afterAge}` : '⚠ Current Plan Needs Adjustment'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estimated Child Costs:</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+                {formatCurrency(annualSpending)}/year
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              className="btn-secondary" 
+              onClick={() => {
+                setChildImpactSummary(null);
+                setEditingEvent(event);
+              }}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              Refine Child Costs
+            </button>
+            <button 
+              type="button"
+              className={isStillReady ? "btn-primary" : "btn-secondary"} 
+              onClick={() => {
+                setChildImpactSummary(null);
+              }}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              Done
+            </button>
+            {!isStillReady && (
+              <button 
+                type="button"
+                className="btn-primary" 
+                onClick={() => {
+                  setChildImpactSummary(null);
+                  setShowImprovementModal(true);
+                }}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              >
+                Adjust Plan
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderChildCostsBuckets = () => {
+    const childEvents = inputs.lifeEvents.filter(e => e.type === 'haveChild');
+    if (childEvents.length === 0) return null;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
+        {childEvents.map((ev, idx) => {
+          const startAge = ev.childStartAge !== undefined ? ev.childStartAge : 0;
+          const birthAge = ev.birthAge !== undefined ? ev.birthAge : inputs.currentAge;
+          const childName = ev.childName || `Child #${idx + 1}`;
+          
+          const maxAge = ev.includeCollege ? 22 : 18;
+          const parentStartAge = birthAge + startAge;
+          const parentEndAge = birthAge + maxAge;
+          
+          const currentChildAge = Math.max(0, inputs.currentAge - birthAge);
+          
+          let currentAnnualCost = 0;
+          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+          if (currentChildAge >= 0 && currentChildAge <= 4) currentAnnualCost = ages0to4;
+          else if (currentChildAge >= 5 && currentChildAge <= 12) currentAnnualCost = ages5to12;
+          else if (currentChildAge >= 13 && currentChildAge <= 18) currentAnnualCost = ages13to18;
+          else if (currentChildAge >= 19 && currentChildAge <= 22) currentAnnualCost = ages19to22;
+
+          const monthlyCost = Math.round(currentAnnualCost / 12);
+
+          return (
+            <div className="glass-card" key={ev.id || idx} style={{ padding: '1.25rem 1.5rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  👶 {childName} Spending Bucket
+                </h4>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
+                  onClick={() => handleEditRoadmapEvent({
+                    ...ev,
+                    age: birthAge
+                  })}
+                >
+                  Adjust
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Current Monthly Cost</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{formatCurrency(monthlyCost)}/mo</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Current Annual Cost</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{formatCurrency(currentAnnualCost)}/yr</strong>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <div>
+                  Active Years: <strong>Parent Age {parentStartAge} to {parentEndAge}</strong> (Child Age {startAge} to {maxAge})
+                </div>
+                <div>
+                  College Support: <strong>{ev.includeCollege ? 'Enabled (Ages 19-22)' : 'Disabled'}</strong>
+                </div>
+                <div>
+                  Cost Method: <strong>{ev.costMethod === 'custom' ? 'Custom Brackets' : ev.costMethod === 'budget' ? 'Budget Builder' : 'Default Assumptions'}</strong>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderEventForm = (event) => {
     const type = event.type;
@@ -3409,38 +4826,117 @@ export default function FireSimulator() {
             </>
           )}
 
-          {/* HAVE CHILD FIELDS */}
           {type === 'haveChild' && (
             <>
-              <div className="input-wrapper">
-                <span className="input-name">Birth Age</span>
+              <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                <span className="input-name">Child's Name (Optional)</span>
                 <input
-                  type="number"
+                  type="text"
                   className="input-number-box"
-                  style={{ width: '100%' }}
-                  value={editingEvent.birthAge}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, birthAge: parseInt(e.target.value) || 30 })}
+                  style={{ width: '100%', textAlign: 'left' }}
+                  value={editingEvent.childName || ''}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, childName: e.target.value })}
+                  placeholder="e.g. Liam"
                 />
               </div>
               <div className="input-wrapper">
-                <span className="input-name">Annual Childcare Cost ($)</span>
+                <span className="input-name">Child's Current Age</span>
                 <input
                   type="number"
                   className="input-number-box"
                   style={{ width: '100%' }}
-                  value={editingEvent.childcareCost}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, childcareCost: parseFloat(e.target.value) || 0 })}
+                  value={editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0}
+                  onChange={(e) => {
+                    const startAge = Math.max(0, Math.min(22, parseInt(e.target.value) || 0));
+                    const birthAge = Math.max(0, (inputs.currentAge || 35) - startAge);
+                    setEditingEvent({
+                      ...editingEvent,
+                      childStartAge: startAge,
+                      birthAge: birthAge
+                    });
+                  }}
                 />
               </div>
               <div className="input-wrapper">
-                <span className="input-name">Support Ends at Child Age</span>
+                <span className="input-name">Parent's Age when Born</span>
                 <input
                   type="number"
                   className="input-number-box"
                   style={{ width: '100%' }}
-                  value={editingEvent.supportEndAge}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, supportEndAge: parseInt(e.target.value) || 18 })}
+                  value={editingEvent.birthAge !== undefined ? editingEvent.birthAge : inputs.currentAge}
+                  onChange={(e) => {
+                    const birthAge = Math.max(0, parseInt(e.target.value) || 0);
+                    const startAge = Math.max(0, (inputs.currentAge || 35) - birthAge);
+                    setEditingEvent({
+                      ...editingEvent,
+                      birthAge: birthAge,
+                      childStartAge: startAge
+                    });
+                  }}
                 />
+              </div>
+              <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                <span className="input-name">Cost Estimate Method</span>
+                <select
+                  className="input-number-box"
+                  style={{ width: '100%', textAlign: 'left', padding: '0 0.5rem' }}
+                  value={editingEvent.costMethod || 'default'}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, costMethod: e.target.value })}
+                >
+                  <option value="default">Use default estimate</option>
+                  <option value="custom">Enter my own estimate</option>
+                  <option value="budget">Refine in Budget Builder</option>
+                </select>
+              </div>
+
+              {(editingEvent.costMethod === 'default' || !editingEvent.costMethod) && (
+                <div style={{ gridColumn: 'span 2', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontWeight: '700', marginBottom: '0.35rem', color: 'var(--text-primary)' }}>Default Estimate:</div>
+                  <ul style={{ paddingLeft: '1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <li>All Child-Rearing Years: {formatCurrency(15000)}/yr</li>
+                  </ul>
+                </div>
+              )}
+
+              {editingEvent.costMethod === 'custom' && (
+                <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                  <span className="input-name">Custom Annual Child Cost ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.customAges0to4 !== undefined ? editingEvent.customAges0to4 : 15000}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setEditingEvent({
+                        ...editingEvent,
+                        customAges0to4: val,
+                        customAges5to12: val,
+                        customAges13to18: val,
+                        customAges19to22: val
+                      });
+                    }}
+                  />
+                </div>
+              )}
+
+              {editingEvent.costMethod === 'budget' && (
+                <div style={{ gridColumn: 'span 2', background: 'rgba(124, 58, 237, 0.05)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.15)', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  ℹ️ This will save the child event with default estimates. You can then click <strong>Refine Child Costs</strong> or use the <strong>Set Budget</strong> button on your Life Plan dashboard to distribute child costs across specific categories (housing, food, childcare, etc.).
+                </div>
+              )}
+
+              <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <input
+                  type="checkbox"
+                  id="include-college"
+                  checked={!!editingEvent.includeCollege}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, includeCollege: e.target.checked })}
+                  style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                />
+                <label htmlFor="include-college" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                  Include College / Young Adult Support (Ages 19–22)
+                </label>
               </div>
             </>
           )}
@@ -3771,13 +5267,18 @@ export default function FireSimulator() {
       );
     }
 
-    const getTypeIcon = (type) => {
-      switch (type) {
+    const getTypeIcon = (c) => {
+      if (c.type === 'debt') {
+        if (c.subtype === 'studentLoan') return '🎓';
+        if (c.subtype === 'creditCard') return '💳';
+        if (c.subtype === 'carLoan') return '🚗';
+        return '💳';
+      }
+      switch (c.type) {
         case 'checkingSavings': return '💰';
         case 'brokerage': return '📈';
         case 'retirement': return '🛡️';
         case 'asset': return '💎';
-        case 'debt': return '💳';
         case 'house': return '🏠';
         case 'child': return '👶';
         case 'obligation': return '📄';
@@ -3786,23 +5287,20 @@ export default function FireSimulator() {
     };
 
     const getTypeLabel = (c) => {
-      if (c.type === 'retirement') {
-        const subLabels = {
-          trad401k: 'Pre-tax 401k',
-          tradIra: 'Traditional IRA',
-          rothIra: 'Roth IRA',
-          hsa: 'HSA'
-        };
-        return subLabels[c.subtype] || 'Retirement';
+      if (c.type === 'debt') {
+        if (c.subtype === 'studentLoan') return 'Student Loan';
+        if (c.subtype === 'creditCard') return 'Credit Card';
+        if (c.subtype === 'carLoan') return 'Car Loan';
+        return 'Debt';
       }
+      if (c.type === 'checkingSavings') return 'Cash';
+      if (c.type === 'brokerage') return 'Investment Account';
       const labels = {
-        checkingSavings: 'Checking/Savings',
-        brokerage: 'Brokerage',
-        asset: 'Asset',
-        debt: 'Debt',
         house: 'House',
         child: 'Child',
-        obligation: 'Obligation'
+        obligation: 'Obligation',
+        retirement: 'Retirement Account',
+        asset: 'Asset'
       };
       return labels[c.type] || c.type;
     };
@@ -3812,7 +5310,7 @@ export default function FireSimulator() {
         {list.map(c => (
           <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <span style={{ fontSize: '1.1rem' }}>{getTypeIcon(c.type)}</span>
+              <span style={{ fontSize: '1.1rem' }}>{getTypeIcon(c)}</span>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{c.name || getTypeLabel(c)}</span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{getTypeLabel(c)}</span>
@@ -3937,15 +5435,31 @@ export default function FireSimulator() {
               <select
                 className="input-number-box"
                 style={{ width: '100%', padding: '0.35rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                value={editingCondition.type}
+                value={(() => {
+                  if (editingCondition.type === 'debt') {
+                    if (editingCondition.subtype) return editingCondition.subtype;
+                    const nameLower = (editingCondition.name || '').toLowerCase();
+                    if (nameLower.includes('student')) return 'studentLoan';
+                    if (nameLower.includes('credit')) return 'creditCard';
+                    if (nameLower.includes('car')) return 'carLoan';
+                    return 'studentLoan';
+                  }
+                  return editingCondition.type;
+                })()}
                 onChange={(e) => {
-                  const newType = e.target.value;
+                  const val = e.target.value;
+                  let type = val;
+                  let subtype = '';
+                  if (['studentLoan', 'creditCard', 'carLoan'].includes(val)) {
+                    type = 'debt';
+                    subtype = val;
+                  }
                   const currentAge = inputs.currentAge || 35;
-                  const defaults = getDefaultValuesForType(newType, currentAge);
+                  const defaults = getDefaultValuesForType(val, currentAge);
                   setEditingCondition({
                     ...editingCondition,
-                    type: newType,
-                    subtype: '',
+                    type,
+                    subtype,
                     name: defaults.name,
                     value: defaults.value,
                     monthlyAmount: defaults.monthlyAmount,
@@ -3956,9 +5470,11 @@ export default function FireSimulator() {
                   });
                 }}
               >
-                <option value="debt">💳 Debt / Loan</option>
-                <option value="house">🏠 House (Real Estate)</option>
-                <option value="child">👶 Child / Dependent</option>
+                <option value="house">🏠 House</option>
+                <option value="child">👶 Child</option>
+                <option value="studentLoan">🎓 Student Loan</option>
+                <option value="creditCard">💳 Credit Card</option>
+                <option value="carLoan">🚗 Car Loan</option>
               </select>
             </div>
 
@@ -4161,17 +5677,98 @@ export default function FireSimulator() {
   };
 
   const renderBudgetModal = () => {
-    const capped401k = Math.min(23500, (budgetSavings.trad401k || 0) * 12);
-    const cappedTradIra = Math.min(7000, (budgetSavings.tradIra || 0) * 12);
-    const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, (budgetSavings.hsa || 0) * 12);
-    const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
-    
-    const totalSavingsMonthly = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
     const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+    const surplusMonthly = Math.max(0, budgetMonthlyIncome - totalExpensesMonthly);
+    const totalAllocationPct = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const currentAgeVal = Number(inputs.currentAge) || 30;
+    const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
     
-    const activeSavings = totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings;
+    let activeC = 0;
+    let activeInterval = null;
+    if (activeBudgetPhase.startsWith('interval_')) {
+      const idx = Number(activeBudgetPhase.split('_')[1]);
+      activeInterval = savingIntervals[idx];
+      activeC = activeInterval ? activeInterval.childCount : 0;
+    } else if (activeBudgetPhase.startsWith('childcare_')) {
+      activeC = Number(activeBudgetPhase.split('_')[1]);
+      activeInterval = savingIntervals.find(item => item.childCount === activeC);
+    } else if (activeBudgetPhase === 'workSave') {
+      activeC = 0;
+    }
+
+    const activeChildBoost = activeC > 0 ? Math.max(0, budgetMonthlyIncome - workSaveIncome) : 0;
+
+    const occurringCounts = [];
+    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+      const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+      if (count > 0 && !occurringCounts.includes(count)) {
+        occurringCounts.push(count);
+      }
+    }
+    occurringCounts.sort((a, b) => a - b);
+
+    const childEventsForPhase = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    let minChildParentAge = Infinity;
+    let maxChildParentAge = -Infinity;
+    childEventsForPhase.forEach(ev => {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+      const maxAge = includeCollege ? 22 : 18;
+      if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+      if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+    });
+    const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > inputs.currentAge;
+    
+    let currentChildCostsMonthly = 0;
+    if (activeC > 0) {
+      if (activeInterval) {
+        currentChildCostsMonthly = getChildCostsForInterval(activeInterval, inputs);
+      } else {
+        currentChildCostsMonthly = activeC * 1250;
+      }
+    }
+    const surplusWithChild = Math.max(0, budgetMonthlyIncome - totalExpensesMonthly - currentChildCostsMonthly);
+
+    const est401kMonthly = savingsAllocMode === 'percentSurplus' 
+      ? Math.round(surplusMonthly * ((budgetSavings.trad401k || 0) / 100)) 
+      : (budgetSavings.trad401k || 0);
+    const estTradIraMonthly = savingsAllocMode === 'percentSurplus' 
+      ? Math.round(surplusMonthly * ((budgetSavings.tradIra || 0) / 100)) 
+      : (budgetSavings.tradIra || 0);
+    const estRothIraMonthly = savingsAllocMode === 'percentSurplus' 
+      ? Math.round(surplusMonthly * ((budgetSavings.rothIra || 0) / 100)) 
+      : (budgetSavings.rothIra || 0);
+    const estHsaMonthly = savingsAllocMode === 'percentSurplus' 
+      ? Math.round(surplusMonthly * ((budgetSavings.hsa || 0) / 100)) 
+      : (budgetSavings.hsa || 0);
+
+    const capped401k = Math.min(23500, est401kMonthly * 12);
+    const cappedTradIra = Math.min(7000, estTradIraMonthly * 12);
+    const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, estHsaMonthly * 12);
+    const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+    const annualTax = inputs.includeTaxes
+      ? calculateUSTaxForModal(budgetMonthlyIncome * 12, preTaxDeductionsAnnual, budgetFilingStatus)
+      : 0;
+    const monthlyTax = Math.round(annualTax / 12);
+    
+    const totalSavingsMonthly = savingsAllocMode === 'percentSurplus'
+      ? Math.round(surplusMonthly * (totalAllocationPct / 100))
+      : Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    
+    const activeSavings = savingsAllocMode === 'percentSurplus'
+      ? totalSavingsMonthly
+      : (Object.values(budgetSavings).reduce((sum, val) => sum + val, 0) > 0 ? Object.values(budgetSavings).reduce((sum, val) => sum + val, 0) : budgetMonthlySavings);
     const activeSpending = totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending;
-    const remainingMonthly = budgetMonthlyIncome - activeSavings - activeSpending;
+    
+    const remainingMonthly = savingsAllocMode === 'percentSurplus'
+      ? 100 - totalAllocationPct
+      : budgetMonthlyIncome - activeSavings - activeSpending - monthlyTax;
+    
+    const childAdjustedSavings = savingsAllocMode === 'percentSurplus'
+      ? Math.round(surplusWithChild * (totalAllocationPct / 100))
+      : activeSavings;
+    const netRemaining = budgetMonthlyIncome - childAdjustedSavings - activeSpending - currentChildCostsMonthly - monthlyTax;
     
     const handleAllocateRemaining = (categoryKey) => {
       setBudgetSavings(prev => ({
@@ -4181,7 +5778,54 @@ export default function FireSimulator() {
     };
     
     const handleAdjustGrossIncome = () => {
-      setBudgetMonthlyIncome(activeSavings + activeSpending);
+      if (savingsAllocMode === 'percentSurplus') {
+        setBudgetMonthlyIncome(activeSpending + currentChildCostsMonthly);
+      } else {
+        setBudgetMonthlyIncome(activeSavings + activeSpending + currentChildCostsMonthly);
+      }
+    };
+
+    const handleAutoReduceSavingsToBalance = () => {
+      const priority = ['brokerage', 'other', 'checking', 'hysa', 'emergency', 'rothIra', 'tradIra', 'hsa', 'trad401k', 'debt'];
+      const newSavings = { ...budgetSavings };
+
+      if (savingsAllocMode === 'percentSurplus') {
+        let pctDeficit = totalAllocationPct - 100;
+        if (pctDeficit <= 0) return;
+        
+        for (const key of priority) {
+          const currentVal = newSavings[key] || 0;
+          if (currentVal > 0) {
+            const reduceAmount = Math.min(currentVal, pctDeficit);
+            newSavings[key] = Math.max(0, parseFloat((currentVal - reduceAmount).toFixed(4)));
+            pctDeficit -= reduceAmount;
+            if (pctDeficit <= 0) break;
+          }
+        }
+        setBudgetSavings(newSavings);
+      } else {
+        let deficitAmount = Math.abs(netRemaining);
+        if (deficitAmount <= 0) return;
+
+        const totalSaved = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
+        if (totalSaved > 0) {
+          for (const key of priority) {
+            const currentVal = newSavings[key] || 0;
+            if (currentVal > 0) {
+              const reduceAmount = Math.min(currentVal, deficitAmount);
+              newSavings[key] = Math.max(0, Math.round(currentVal - reduceAmount));
+              deficitAmount -= reduceAmount;
+              if (deficitAmount <= 0) break;
+            }
+          }
+          setBudgetSavings(newSavings);
+          const newTotalSaved = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
+          setBudgetMonthlySavings(newTotalSaved);
+        } else {
+          // If no detailed savings are allocated, reduce the simple monthly savings target
+          setBudgetMonthlySavings(prev => Math.max(0, Math.round(prev - deficitAmount)));
+        }
+      }
     };
 
     const handleClearDetailedSavings = () => {
@@ -4189,6 +5833,7 @@ export default function FireSimulator() {
         trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
         checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
       });
+      setBudgetMonthlySavings(0);
     };
 
     const handleClearDetailedExpenses = () => {
@@ -4200,6 +5845,27 @@ export default function FireSimulator() {
     const handleMonthlyIncomeChange = (val) => {
       const newIncome = Math.max(0, val);
       setBudgetMonthlyIncome(newIncome);
+
+      if (activeBudgetPhase === 'workSave') {
+        const oldIncome = budgetMonthlyIncome;
+        const factor = oldIncome > 0 ? (newIncome / oldIncome) : 1;
+        if (factor > 0 && isFinite(factor)) {
+          setChildcareBudgets(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(cKey => {
+              const c = Number(cKey);
+              next[c] = {
+                ...next[c],
+                income: Math.round(next[c].income * factor)
+              };
+            });
+            return next;
+          });
+        }
+        const boost = Math.max(0, childcareIncome - workSaveIncome);
+        setChildcareIncome(newIncome + boost);
+      }
+
       if (totalSavingsMonthly === 0) {
         setBudgetMonthlySavings(Math.max(0, newIncome - activeSpending));
       } else if (totalExpensesMonthly === 0) {
@@ -4230,15 +5896,21 @@ export default function FireSimulator() {
       const currentExpenses = Number(originalInputs.simpleExpenses) || 0;
       const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
       
-      if (scenario.type === 'savings' || scenario.type === 'retire65') {
-        targetSavingsRate = currentSavingsRate + scenario.value;
+      if (scenario.type === 'savings') {
+        const savingsPercent = currentIncome > 0 ? (scenario.value / currentIncome) * 100 : 0;
+        targetSavingsRate = currentSavingsRate + savingsPercent;
+      } else if (scenario.type === 'retire65') {
+        targetSavingsRate = currentSavingsRate;
       } else if (scenario.type === 'combined') {
-        const savingsPercent = scenario.value && typeof scenario.value === 'object' ? scenario.value.savings : 3;
+        const savingsPercent = scenario.value && typeof scenario.value === 'object' 
+          ? (currentIncome > 0 ? (scenario.value.savings / currentIncome) * 100 : 0) 
+          : 0;
         targetSavingsRate = currentSavingsRate + savingsPercent;
       } else if (scenario.type === 'income') {
-        const extraIncome = scenario.value;
-        const newIncome = currentIncome + extraIncome;
-        const newSavings = Math.max(0, currentIncome - currentExpenses) + extraIncome;
+        const grossIncrease = scenario.value;
+        const netSavingsIncrease = scenario.netSavingsValue || 0;
+        const newIncome = currentIncome + grossIncrease;
+        const newSavings = Math.max(0, currentIncome - currentExpenses) + netSavingsIncrease;
         targetSavingsRate = newIncome > 0 ? Math.round((newSavings / newIncome) * 100) : 0;
       }
     }
@@ -4249,10 +5921,20 @@ export default function FireSimulator() {
 
     return (
       <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
+        <style>{`
+          @keyframes budgetGlow {
+            0% { background: rgba(124, 58, 237, 0); box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+            50% { background: rgba(124, 58, 237, 0.08); box-shadow: 0 0 8px 1px rgba(124, 58, 237, 0.25); }
+            100% { background: rgba(124, 58, 237, 0); box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+          }
+          .budget-row-glow {
+            animation: budgetGlow 2.5s infinite ease-in-out;
+          }
+        `}</style>
         <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', display: 'flex', flexDirection: 'column' }}>
           <div className="budget-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
-              🎯 Set Monthly Budget
+              🎯 Set Monthly Budget {hasChildcarePhase && (activeC > 0 ? `— Childcare (${activeC} Child${activeC === 1 ? '' : 'ren'}) Phase 👶` : '— Standard Work Phase 💼')}
             </h3>
             <button 
               type="button" 
@@ -4283,17 +5965,109 @@ export default function FireSimulator() {
               </p>
             </div>
           )}
+
+          {hasChildcarePhase && (
+            <div className="segmented-control-container" style={{ margin: '0 0 1.25rem 0', width: '100%' }}>
+              <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%', overflowX: 'auto' }}>
+                {savingIntervals.map((interval, idx) => {
+                  if (interval.childCount === 0) return null;
+                  const c = interval.childCount;
+                  const isActive = activeBudgetPhase === `interval_${idx}` || (activeBudgetPhase === `childcare_${c}` && idx === savingIntervals.findIndex(item => item.childCount === c));
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`segmented-control-btn ${isActive ? 'active' : ''}`}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.8rem',
+                        padding: '0.5rem',
+                        borderRadius: '6px',
+                        background: isActive ? 'var(--primary)' : 'transparent',
+                        color: isActive ? '#fff' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        minWidth: '90px'
+                      }}
+                      onClick={() => handleSwitchBudgetPhase(`interval_${idx}`)}
+                    >
+                      👶 {c === 1 ? '1 Child' : `${c} Kids`}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className={`segmented-control-btn ${activeBudgetPhase === 'workSave' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    fontSize: '0.8rem',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    background: activeBudgetPhase === 'workSave' ? 'var(--primary)' : 'transparent',
+                    color: activeBudgetPhase === 'workSave' ? '#fff' : 'var(--text-secondary)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                    minWidth: '150px'
+                  }}
+                  onClick={() => handleSwitchBudgetPhase('workSave')}
+                >
+                  💼 Standard Work Phase
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* Top Parameters */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
             
             {/* Monthly Take-home Income */}
-            <div className="input-wrapper">
-              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Take-home Income ($)</span>
+            <div className="input-wrapper" style={{ position: 'relative' }}>
+              <span className="input-name" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', width: '100%' }}>
+                Monthly Take-home Income ($)
+                {activeC > 0 && activeChildBoost > 0 && (
+                  <span style={{ 
+                    marginLeft: 'auto', 
+                    fontSize: '0.65rem', 
+                    padding: '0.1rem 0.35rem', 
+                    background: 'rgba(245, 158, 11, 0.15)', 
+                    border: '1px solid rgba(245, 158, 11, 0.35)', 
+                    borderRadius: '4px', 
+                    color: '#f59e0b',
+                    fontWeight: '700'
+                  }}>
+                    +{formatCurrency(activeChildBoost)}/mo child boost
+                  </span>
+                )}
+              </span>
               <input
                 type="number"
                 className="input-number-box"
-                style={{ width: '100%', fontSize: '0.9rem', padding: '0.35rem 0.5rem' }}
+                disabled={activeC > 0 && currentChildCostsMonthly > 0}
+                style={{ 
+                  width: '100%', 
+                  fontSize: '0.9rem', 
+                  padding: '0.35rem 0.5rem',
+                  ...(activeC > 0 && currentChildCostsMonthly > 0 ? {
+                    border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                    boxShadow: 'none',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'not-allowed',
+                    opacity: 0.7
+                  } : {})
+                }}
                 value={budgetMonthlyIncome}
                 onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
               />
@@ -4328,17 +6102,17 @@ export default function FireSimulator() {
                   width: '100%', 
                   fontSize: '0.9rem', 
                   padding: '0.35rem 0.5rem',
-                  opacity: totalSavingsMonthly > 0 ? 0.6 : 1,
-                  cursor: totalSavingsMonthly > 0 ? 'not-allowed' : 'auto'
+                  opacity: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0) ? 0.6 : 1,
+                  cursor: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0) ? 'not-allowed' : 'auto'
                 }}
-                disabled={totalSavingsMonthly > 0}
-                value={totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings}
+                disabled={savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0}
+                value={savingsAllocMode === 'percentSurplus' ? totalSavingsMonthly : (totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings)}
                 onChange={(e) => handleMonthlySavingsChange(parseFloat(e.target.value) || 0)}
               />
             </div>
 
             {/* Savings Rate Card */}
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifycontent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Savings Rate</span>
               <strong style={{ fontSize: '1.25rem', color: '#c084fc', marginTop: '0.15rem' }}>
                 {activeSavingsRate}%
@@ -4359,8 +6133,47 @@ export default function FireSimulator() {
             <div className="budget-section-col">
               <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>💰 Monthly Savings Allocation</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{formatCurrency(totalSavingsMonthly)}/mo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
+                    {savingsAllocMode === 'percentSurplus' 
+                      ? `${totalAllocationPct}% (Est. ${formatCurrency(totalSavingsMonthly)}/mo)` 
+                      : `${formatCurrency(totalSavingsMonthly)}/mo`}
+                  </span>
+                  {savingsAllocMode === 'percentSurplus' && totalAllocationPct !== 100 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sum = totalAllocationPct;
+                        if (sum === 0) {
+                          setBudgetSavings(prev => ({ ...prev, brokerage: 100 }));
+                          return;
+                        }
+                        const newSavings = {};
+                        let newSum = 0;
+                        Object.keys(budgetSavings).forEach(k => {
+                          const val = budgetSavings[k] || 0;
+                          const scaled = Math.round((val / sum) * 100);
+                          newSavings[k] = scaled;
+                          newSum += scaled;
+                        });
+                        const diff = 100 - newSum;
+                        if (diff !== 0) {
+                          const keys = Object.keys(newSavings);
+                          let maxKey = 'brokerage';
+                          keys.forEach(k => {
+                            if (newSavings[k] > (newSavings[maxKey] || 0)) {
+                              maxKey = k;
+                            }
+                          });
+                          newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
+                        }
+                        setBudgetSavings(newSavings);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: '0.7rem', padding: 0 }}
+                    >
+                      (Auto-Balance to 100%)
+                    </button>
+                  )}
                   {totalSavingsMonthly > 0 && (
                     <button
                       type="button"
@@ -4372,6 +6185,64 @@ export default function FireSimulator() {
                   )}
                 </div>
               </h4>
+
+              {/* Toggle Card */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.5rem', 
+                marginBottom: '1rem', 
+                padding: '0.6rem 0.75rem', 
+                background: 'rgba(255, 255, 255, 0.02)', 
+                borderRadius: '6px', 
+                border: '1px solid var(--border-color)' 
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Savings Allocation Mode:</span>
+                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSavingsAllocMode('fixed')}
+                    style={{ 
+                      flex: 1, 
+                      background: savingsAllocMode === 'fixed' ? 'var(--primary)' : 'transparent', 
+                      border: 'none', 
+                      color: savingsAllocMode === 'fixed' ? '#ffffff' : 'var(--text-secondary)',
+                      fontSize: '0.75rem', 
+                      fontWeight: '700',
+                      padding: '0.35rem 0.25rem', 
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Fixed Amount ($)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSavingsAllocMode('percentSurplus')}
+                    style={{ 
+                      flex: 1, 
+                      background: savingsAllocMode === 'percentSurplus' ? 'var(--primary)' : 'transparent', 
+                      border: 'none', 
+                      color: savingsAllocMode === 'percentSurplus' ? '#ffffff' : 'var(--text-secondary)',
+                      fontSize: '0.75rem', 
+                      fontWeight: '700',
+                      padding: '0.35rem 0.25rem', 
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Percent of Surplus (%)
+                  </button>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-tertiary)', lineHeight: '1.35' }}>
+                  {savingsAllocMode === 'fixed' 
+                    ? '💰 Saves fixed dollar amounts monthly. If expenses (like childcare daycare) increase, you will draw from your brokerage/savings to fund these savings targets.' 
+                    : '📊 Dynamically saves a percentage of your monthly surplus. If expenses (like childcare) rise and wipe out your surplus, savings automatically drop to 0% during those years to prevent running out of money.'}
+                </p>
+              </div>
+
               <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {[
                   { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
@@ -4384,27 +6255,77 @@ export default function FireSimulator() {
                   { key: 'emergency', label: 'Emergency Fund' },
                   { key: 'debt', label: 'Debt Payoff' },
                   { key: 'other', label: 'Other Savings' }
-                ].map(item => (
-                  <div key={item.key} className="budget-input-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                      {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                ].map(item => {
+                  const diff = budgetDiffs?.savings?.[item.key];
+                  const hasDiff = diff && diff !== 0;
+                  return (
+                    <div 
+                      key={item.key} 
+                      className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        transition: 'all 0.3s ease',
+                        padding: hasDiff ? '0.25rem 0.5rem' : '0',
+                        borderRadius: hasDiff ? '6px' : '0',
+                        border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                          {hasDiff && (
+                            <span style={{ 
+                              fontSize: '0.7rem', 
+                              fontWeight: 'bold', 
+                              color: diff > 0 ? '#10b981' : '#f43f5e',
+                              background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                              padding: '0.1rem 0.35rem',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center'
+                            }}>
+                              {savingsAllocMode === 'percentSurplus'
+                                ? (diff > 0 ? `+${diff}%` : `${diff}%`)
+                                : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
+                            </span>
+                          )}
+                        </div>
+                        {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                        <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                          <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                          <input
+                            type="number"
+                            className="input-number-box"
+                            style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                            value={budgetSavings[item.key] || 0}
+                            onChange={(e) => setBudgetSavings({
+                              ...budgetSavings,
+                              [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                            })}
+                          />
+                        </div>
+                        {savingsAllocMode === 'percentSurplus' && (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
+                            Est. {formatCurrency(Math.round(surplusMonthly * ((budgetSavings[item.key] || 0) / 100)))}/mo
+                            {currentChildCostsMonthly > 0 && (
+                              <>
+                                <br />
+                                <span style={{ color: 'var(--accent-orange, #f59e0b)' }}>
+                                  ({formatCurrency(Math.round(surplusWithChild * ((budgetSavings[item.key] || 0) / 100)))}/mo during child years)
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                      <span className="currency-symbol">$</span>
-                      <input
-                        type="number"
-                        className="input-number-box"
-                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                        value={budgetSavings[item.key] || 0}
-                        onChange={(e) => setBudgetSavings({
-                          ...budgetSavings,
-                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                        })}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             
@@ -4434,107 +6355,231 @@ export default function FireSimulator() {
                   { key: 'healthcare', label: 'Healthcare & Insurance' },
                   { key: 'leisure', label: 'Leisure & Leisure Travel' },
                   { key: 'misc', label: 'Miscellaneous Expenses' }
-                ].map(item => (
-                  <div key={item.key} className="budget-input-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                    <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                      <span className="currency-symbol">$</span>
+                ].map(item => {
+                  const diff = budgetDiffs?.expenses?.[item.key];
+                  const hasDiff = diff && diff !== 0;
+                  return (
+                    <div 
+                      key={item.key} 
+                      className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        transition: 'all 0.3s ease',
+                        padding: hasDiff ? '0.25rem 0.5rem' : '0',
+                        borderRadius: hasDiff ? '6px' : '0',
+                        border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                          {hasDiff && (
+                            <span style={{ 
+                              fontSize: '0.7rem', 
+                              fontWeight: 'bold', 
+                              color: diff > 0 ? '#10b981' : '#f43f5e',
+                              background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                              padding: '0.1rem 0.35rem',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center'
+                            }}>
+                              {diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                        <span className="currency-symbol">$</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                          value={budgetExpenses[item.key] || 0}
+                          onChange={(e) => setBudgetExpenses({
+                            ...budgetExpenses,
+                            [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                          })}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {currentChildCostsMonthly > 0 && (
+                  <div 
+                    className="budget-input-row" 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      padding: '0.35rem 0.5rem',
+                      background: 'rgba(245, 158, 11, 0.04)',
+                      borderRadius: '6px',
+                      border: '1px dashed rgba(245, 158, 11, 0.25)',
+                      marginTop: '0.75rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span className="input-name" style={{ fontSize: '0.8rem', margin: 0, fontWeight: '700', color: 'var(--accent-orange, #f59e0b)' }}>
+                          👶 Childcare & Support (Temporary)
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                        Roadmap child event cost (Age {inputs.currentAge})
+                      </span>
+                    </div>
+                    <div className="input-prefix-wrapper" style={{ width: '110px', opacity: 0.85 }}>
+                      <span className="currency-symbol" style={{ color: 'var(--accent-orange, #f59e0b)' }}>$</span>
                       <input
-                        type="number"
+                        type="text"
+                        disabled
                         className="input-number-box"
-                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                        value={budgetExpenses[item.key] || 0}
-                        onChange={(e) => setBudgetExpenses({
-                          ...budgetExpenses,
-                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                        })}
+                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem', background: 'transparent', border: 'none', color: 'var(--accent-orange, #f59e0b)', fontWeight: 'bold' }}
+                        value={currentChildCostsMonthly}
                       />
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </div>
             
           </div>
           
           {/* Live Reconciliation Panel */}
-          <div className="budget-reconciliation-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Take-home Income</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(budgetMonthlyIncome)}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Savings</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>-{formatCurrency(activeSavings)}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Spending</span>
-                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(activeSpending)}</strong>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Status</span>
-                {remainingMonthly > 0 ? (
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>{formatCurrency(remainingMonthly)} Leftover</strong>
-                ) : remainingMonthly < 0 ? (
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-rose)' }}>{formatCurrency(Math.abs(remainingMonthly))} Deficit</strong>
-                ) : (
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>Balanced</strong>
-                )}
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                {remainingMonthly > 0 ? (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
-                    🟢 Leftover: {formatCurrency(remainingMonthly)}/mo unallocated
-                  </span>
-                ) : remainingMonthly < 0 ? (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
-                    🔴 Deficit: {formatCurrency(Math.abs(remainingMonthly))}/mo over-allocated
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
-                    ✅ Perfectly balanced! $0 leftover
-                  </span>
-                )}
-              </div>
-              
-              {remainingMonthly !== 0 && (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {remainingMonthly > 0 && (
-                    <>
-                      <button 
-                        type="button" 
-                        className="list-builder-edit-btn" 
-                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
-                        onClick={() => handleAllocateRemaining('hysa')}
-                      >
-                        📥 Put in HYSA
-                      </button>
-                      <button 
-                        type="button" 
-                        className="list-builder-edit-btn" 
-                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
-                        onClick={() => handleAllocateRemaining('brokerage')}
-                      >
-                        📥 Put in Brokerage
-                      </button>
-                    </>
+          {(() => {
+            return (
+              <div className="budget-reconciliation-panel" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Take-home Income</span>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{formatCurrency(budgetMonthlyIncome)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>
+                      {savingsAllocMode === 'percentSurplus' && currentChildCostsMonthly > 0 ? 'Monthly Savings (Base / Current)' : 'Monthly Savings'}
+                    </span>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>
+                      {savingsAllocMode === 'percentSurplus' && currentChildCostsMonthly > 0 
+                        ? `-${formatCurrency(activeSavings)} / -${formatCurrency(childAdjustedSavings)}` 
+                        : `-${formatCurrency(activeSavings)}`}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Spending (Base)</span>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(activeSpending)}</strong>
+                  </div>
+                  {inputs.includeTaxes && monthlyTax > 0 && (
+                    <div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Taxes (Est. Progressive)</span>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>-{formatCurrency(monthlyTax)}</strong>
+                    </div>
                   )}
-                  <button 
-                    type="button" 
-                    className="list-builder-edit-btn" 
-                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
-                    onClick={handleAdjustGrossIncome}
-                  >
-                    ⚖️ Adjust Income to Match
-                  </button>
+                  {currentChildCostsMonthly > 0 && (
+                    <div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange, #f59e0b)', display: 'block' }}>Childcare Costs (Temp)</span>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--accent-orange, #f59e0b)' }}>-{formatCurrency(currentChildCostsMonthly)}</strong>
+                    </div>
+                  )}
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Net Cash Flow (Current)</span>
+                    {netRemaining > 0 ? (
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>{formatCurrency(netRemaining)} Leftover</strong>
+                    ) : netRemaining < 0 ? (
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--accent-rose)' }}>{formatCurrency(Math.abs(netRemaining))} Deficit</strong>
+                    ) : (
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>Balanced</strong>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    {currentChildCostsMonthly > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        <span style={{ fontSize: '0.78rem', color: netRemaining < 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 'bold' }}>
+                          {netRemaining < 0 
+                            ? `🔴 Cash Flow Deficit: ${formatCurrency(Math.abs(netRemaining))}/mo deficit at parent age ${inputs.currentAge}.`
+                            : `🟢 Cash Flow Balanced: ${formatCurrency(netRemaining)}/mo surplus at parent age ${inputs.currentAge}.`}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                          {savingsAllocMode === 'percentSurplus'
+                            ? (netRemaining < 0
+                                ? `ℹ️ Your Percent of Surplus rules automatically dropped savings to 0% during child-rearing years, but childcare costs still exceed income. The simulator will draw ${formatCurrency(Math.abs(netRemaining))}/mo from your portfolio to cover this temporary deficit.`
+                                : 'ℹ️ Your Percent of Surplus rules automatically dropped savings during child-rearing years to protect your cash.')
+                            : '⚠️ Fixed savings targets are forcing drawdowns. Consider switching to "Percent of Surplus" savings mode or adjusting your spending/roadmap.'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div>
+                        {remainingMonthly > 0 ? (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
+                            🟢 Leftover: {formatCurrency(remainingMonthly)}/mo unallocated
+                          </span>
+                        ) : remainingMonthly < 0 ? (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
+                            🔴 Deficit: {formatCurrency(Math.abs(remainingMonthly))}/mo over-allocated
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 'bold' }}>
+                            ✅ Perfectly balanced! $0 leftover
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {(remainingMonthly !== 0 || netRemaining < 0) && (
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      {remainingMonthly > 0 && (
+                        <>
+                          <button 
+                            type="button" 
+                            className="list-builder-edit-btn" 
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                            onClick={() => handleAllocateRemaining('hysa')}
+                          >
+                            📥 Put in HYSA
+                          </button>
+                          <button 
+                            type="button" 
+                            className="list-builder-edit-btn" 
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                            onClick={() => handleAllocateRemaining('brokerage')}
+                          >
+                            📥 Put in Brokerage
+                          </button>
+                        </>
+                      )}
+                      {((savingsAllocMode === 'fixed' && netRemaining < 0 && (totalSavingsMonthly > 0 || budgetMonthlySavings > 0)) ||
+                        (savingsAllocMode === 'percentSurplus' && totalAllocationPct > 100)) && (
+                        <button 
+                          type="button" 
+                          className="list-builder-edit-btn" 
+                          style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', borderColor: 'var(--accent-rose)', color: '#fda4af' }}
+                          onClick={handleAutoReduceSavingsToBalance}
+                        >
+                          ⚖️ Auto-Reduce Savings
+                        </button>
+                      )}
+                      <button 
+                        type="button" 
+                        className="list-builder-edit-btn" 
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                        onClick={handleAdjustGrossIncome}
+                      >
+                        ⚖️ Adjust Income to Match
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           
           {/* Warnings & Guardrails */}
           {(() => {
@@ -4862,6 +6907,27 @@ export default function FireSimulator() {
               activeResults.retirementReadyAge,
               inputs.lifeExpectancy
             );
+
+            const targetRetAge = Number(inputs.targetRetirementAge);
+            const readyAge = activeResults.retirementReadyAge;
+            const isNotAchieved = readyAge === null || targetRetAge < readyAge;
+
+            const gapAmount = activeResults.endingSurplusShortfall < 0 
+              ? -activeResults.endingSurplusShortfall 
+              : Math.max(0, activeResults.retirementReadyTarget - activeResults.portfolioAtRetirement);
+            
+            const yearsAdditionalWork = readyAge ? Math.max(0, readyAge - targetRetAge) : 0;
+            
+            const yearsToRetire = targetRetAge - Number(inputs.currentAge);
+            const additionalSavings = estimateAdditionalMonthlySavings(gapAmount, yearsToRetire, inputs.expectedReturn);
+            
+            const incomeVal = Number(inputs.simpleIncome) || 50000;
+            const additionalSavingsPercent = incomeVal > 0 ? (additionalSavings * 12 / incomeVal) * 100 : 0;
+            
+            const yearsOfRetirement = Number(inputs.lifeExpectancy) - targetRetAge;
+            const annualSpendingVal = activeResults.annualRetirementSpending || 40000;
+            const spendingReductionPercent = Math.min(100, Math.max(1, Math.round((gapAmount / (annualSpendingVal * Math.max(1, yearsOfRetirement))) * 100)));
+
             return (
               <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -4957,6 +7023,74 @@ export default function FireSimulator() {
                     </div>
                   </div>
                 </div>
+
+                {/* View Values In Preference Toggle */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'flex-end', 
+                  gap: '0.5rem', 
+                  marginBottom: '0.65rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <span>View Values In:</span>
+                  <div className="segmented-control" style={{ 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)', 
+                    borderRadius: '6px', 
+                    padding: '2px', 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}>
+                    <button
+                      type="button"
+                      className={`segmented-control-btn ${displayMode === 'future' ? 'active' : ''}`}
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        fontSize: '0.7rem',
+                        borderRadius: '4px',
+                        background: displayMode === 'future' ? 'var(--primary)' : 'transparent',
+                        color: displayMode === 'future' ? '#fff' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => setDisplayMode('future')}
+                    >
+                      Future Dollars
+                    </button>
+                    <button
+                      type="button"
+                      className={`segmented-control-btn ${displayMode === 'today' ? 'active' : ''}`}
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        fontSize: '0.7rem',
+                        borderRadius: '4px',
+                        background: displayMode === 'today' ? 'var(--primary)' : 'transparent',
+                        color: displayMode === 'today' ? '#fff' : 'var(--text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}
+                      onClick={() => setDisplayMode('today')}
+                    >
+                      Today’s Dollars
+                      <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                        <span className="toggle-tooltip-icon" style={{ width: '10px', height: '10px', fontSize: '7px', lineHeight: '10px' }}>i</span>
+                        <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                          Today’s Dollars adjusts future values for inflation to show equivalent purchasing power.
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
                 
                 {/* Outcome Banner (Compact) */}
                 <div style={{ 
@@ -4997,8 +7131,8 @@ export default function FireSimulator() {
                         ? 'Comfortable Age' 
                         : 'Indefinite Age'}
                     </span>
-                    <strong style={{ fontSize: '1.05rem', color: activeResults.retirementReadyAge ? 'var(--accent-emerald)' : 'var(--text-secondary)', fontWeight: '800' }}>
-                      {activeResults.retirementReadyAge ? `Age ${activeResults.retirementReadyAge}` : 'Not Reached'}
+                    <strong style={{ fontSize: readyAge ? '1.05rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', fontWeight: '800' }}>
+                      {readyAge ? `Age ${readyAge}` : 'Current Plan Needs Adjustment'}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
@@ -5010,29 +7144,29 @@ export default function FireSimulator() {
                           : 'Indefinite Target'}
                     </span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(activeResults.retirementReadyTarget)}
+                      {formatCurrency(displayedResults.retirementReadyTarget)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {activeResults.targetRetirementAge === inputs.lifeExpectancy ? 'N/A' : formatCurrency(activeResults.portfolioAtRetirement)}
+                      {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Retirement Income</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(activeResults.retirementIncomeSources)} / yr</strong>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(displayedResults.retirementIncomeSources)} / yr</strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Annual Spending</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(activeResults.annualRetirementSpending)} / yr
+                      {formatCurrency(displayedResults.annualRetirementSpending)} / yr
                     </strong>
                   </div>
                 </div>
 
                 {/* Retirement Improvement Plan Banner (Compact) */}
-                {improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                {activeStep === 2 && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
                   <div className="improvement-banner-container" style={{ marginTop: '0.65rem', padding: '0.35rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
@@ -5048,10 +7182,37 @@ export default function FireSimulator() {
                     </button>
                   </div>
                 )}
+
               </div>
             );
           })()}
           
+          {/* Things You’re Currently Managing Section */}
+          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1, minWidth: '280px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                  📋 Things You’re Currently Managing
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                  Many people have student loans, car loans, mortgages, or credit card balances. Adding them helps make your plan more accurate.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0, height: '32px' }}
+                onClick={handleCreateCurrentCondition}
+              >
+                ➕ Add Current Condition
+              </button>
+            </div>
+            
+            <div style={{ marginTop: '0.25rem' }}>
+              {renderCurrentConditionsList()}
+            </div>
+          </div>
+
           {/* Centerpiece Timeline */}
           <div className="glass-card timeline-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.4rem' }}>
@@ -5115,12 +7276,155 @@ export default function FireSimulator() {
 
             {/* Horizontal Timeline (Desktop) */}
             <div className="timeline-wrapper">
-              <div className="timeline-track-container" style={{ height: '125px' }}>
-                <div className="timeline-line-axis" style={{ top: '100px' }} />
+              <style>{`
+                .timeline-phase-band {
+                  transition: all 0.2s ease !important;
+                }
+                .timeline-phase-band:hover {
+                  filter: brightness(1.2) !important;
+                  box-shadow: 0 0 10px rgba(255, 255, 255, 0.15) !important;
+                  cursor: pointer;
+                }
+              `}</style>
+              <div className="timeline-track-container" style={{ height: '160px' }}>
+                {/* Budget Buckets (Bands) representing lifecycle phases */}
+                {(() => {
+                  const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                  if (totalYears <= 0) return null;
+
+                  const retAge = activeResults.targetRetirementAge || inputs.lifeExpectancy;
+                  const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
+                  
+                  // Determine child years range
+                  const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+                  let minChildParentAge = Infinity;
+                  let maxChildParentAge = -Infinity;
+                  childEvents.forEach(ev => {
+                    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+                    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+                    const maxAge = includeCollege ? 22 : 18;
+                    
+                    if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+                    if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+                  });
+
+                  const showChildBand = minChildParentAge < maxChildParentAge && maxChildParentAge > inputs.currentAge;
+                  
+                  const childStartPct = showChildBand 
+                    ? Math.max(0, Math.min(100, ((minChildParentAge - inputs.currentAge) / totalYears) * 100))
+                    : 0;
+                  const childEndPct = showChildBand
+                    ? Math.max(0, Math.min(100, ((maxChildParentAge - inputs.currentAge) / totalYears) * 100))
+                    : 0;
+
+                  const savingIntervals = getChildCountIntervals(inputs.currentAge, retAge, inputs.lifeEvents);
+
+                  return (
+                    <div style={{ position: 'absolute', top: '102px', left: '70px', right: '70px', height: '22px', display: 'flex', gap: '2px', pointerEvents: 'none', userSelect: 'none', zIndex: 10 }}>
+                      {/* Work & Save Band */}
+                      {workPct > 0 && (
+                        <div 
+                          className="timeline-phase-band"
+                          title="Click to adjust working budget & savings"
+                          onClick={() => handleSetBudgetClick('workSave')}
+                          style={{
+                            width: `${workPct}%`,
+                            background: 'rgba(99, 102, 241, 0.08)',
+                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                            borderRadius: '4px 0 0 4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.68rem',
+                            color: '#a5b4fc',
+                            fontWeight: '700',
+                            pointerEvents: 'auto',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          💼 Work & Save Phase
+                        </div>
+                      )}
+                      {/* Retirement Band */}
+                      {workPct < 100 && (
+                        <div 
+                          className="timeline-phase-band"
+                          title="Click to adjust retirement age & spending"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire' && e.enabled);
+                            if (retireEvent) {
+                              setSelectedTimelineEvent(retireEvent);
+                              setSelectedYear(Number(retireEvent.age));
+                            }
+                          }}
+                          style={{
+                            width: `${100 - workPct}%`,
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            borderRadius: '0 4px 4px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.68rem',
+                            color: '#6ee7b7',
+                            fontWeight: '700',
+                            pointerEvents: 'auto',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🎉 Retirement Phase
+                        </div>
+                      )}
+
+                      {/* Childcare overlay bands */}
+                      {savingIntervals.map((interval, idx) => {
+                        if (interval.childCount === 0) return null;
+                        const startPct = Math.max(0, Math.min(100, ((interval.startAge - inputs.currentAge) / totalYears) * 100));
+                        const endPct = Math.max(0, Math.min(100, ((interval.endAge - inputs.currentAge) / totalYears) * 100));
+                        const widthPct = endPct - startPct;
+                        if (widthPct <= 0) return null;
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            className="timeline-phase-band"
+                            title={`Click to adjust budget for ${interval.childCount === 1 ? '1 Child' : interval.childCount + ' Kids'} childcare phase`}
+                            onClick={() => handleSetBudgetClick(`interval_${idx}`)}
+                            style={{
+                              position: 'absolute',
+                              left: `${startPct}%`,
+                              width: `${widthPct}%`,
+                              top: '0',
+                              bottom: '0',
+                              background: 'rgba(245, 158, 11, 0.06)',
+                              border: '1.5px dashed rgba(245, 158, 11, 0.45)',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.65rem',
+                              color: '#f59e0b',
+                              fontWeight: '800',
+                              zIndex: 2,
+                              boxShadow: '0 0 4px rgba(245, 158, 11, 0.1)',
+                              pointerEvents: 'auto',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            👶 {interval.childCount === 1 ? '1 Child' : `${interval.childCount} Kids`}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <div className="timeline-line-axis" style={{ top: '130px' }} />
                 <div
                   className="timeline-progress-line"
                   style={{
-                    top: '100px',
+                    top: '130px',
                     width: activeResults.targetRetirementAge 
                       ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
                       : '0px'
@@ -5128,7 +7432,7 @@ export default function FireSimulator() {
                 />
 
                 {/* Chronological Axis Number Line Ticks */}
-                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '100px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '130px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const ticks = [];
@@ -5151,7 +7455,7 @@ export default function FireSimulator() {
                   })()}
                 </div>
                 
-                <div className="timeline-events-container">
+                <div className="timeline-events-container" style={{ pointerEvents: 'none', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}>
                   {timelineEvents.map((evt, idx) => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const isDraggingThis = !!(draggingInfo && (
@@ -5169,9 +7473,10 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${63 - (evt.stackIndex * 36)}px`, 
+                          top: `${85 - (evt.stackIndex * 36)}px`, 
                           transform: 'translateX(-50%)',
-                          cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer'
+                          cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer',
+                          pointerEvents: 'auto'
                         }}
                         onMouseDown={(e) => handleNodeDragStart(e, evt)}
                         onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -5311,17 +7616,48 @@ export default function FireSimulator() {
             </div>
           </div>
 
-          {/* Net Worth Trajectory Graph (Full Width, directly below timeline) */}
+          {/* Wealth Journey Graph (Full Width, directly below timeline) */}
           {validation.errors.length === 0 && (
             <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0 }}>Net Worth Trajectory</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Wealth Journey</h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={showAssets}
+                      onChange={(e) => setShowAssets(e.target.checked)}
+                      style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                    />
+                    <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={showDebt}
+                      onChange={(e) => setShowDebt(e.target.checked)}
+                      style={{ accentColor: '#ef4444', cursor: 'pointer' }}
+                    />
+                    <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={showNetWorth}
+                      onChange={(e) => setShowNetWorth(e.target.checked)}
+                      style={{ accentColor: '#8b5cf6', cursor: 'pointer' }}
+                    />
+                    <span style={{ color: '#8b5cf6', fontWeight: '700' }}>Net Worth (Purple)</span>
+                  </label>
+                </div>
               </div>
               <div className="chart-container-inner" style={{ height: '240px', cursor: 'crosshair' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={activeResults.data}
+                    data={displayedResults.data}
                     margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
                     onClick={(data) => {
                       if (data && data.activeLabel) {
@@ -5364,22 +7700,41 @@ export default function FireSimulator() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="netWorth"
-                      name="Net Worth"
-                      stroke={colorBlindMode ? '#ea580c' : '#6366f1'}
+                      dataKey="assets"
+                      name="Total Assets"
+                      stroke="#10b981"
                       strokeWidth={2}
                       dot={false}
+                      hide={!showAssets}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="debt"
+                      name="Total Debt"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      dot={false}
+                      hide={!showDebt}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netWorth"
+                      name="Net Worth"
+                      stroke="#8b5cf6"
+                      strokeWidth={2.5}
+                      dot={false}
+                      hide={!showNetWorth}
                     />
 
                     {/* 1. Planned Retirement Age */}
-                    {activeResults.targetRetirementAge && (
+                    {displayedResults.targetRetirementAge && (
                       <ReferenceLine
-                        x={activeResults.targetRetirementAge}
+                        x={displayedResults.targetRetirementAge}
                         stroke="#a855f7"
                         strokeDasharray="3 3"
                         strokeWidth={1.5}
                         label={{
-                          value: `Retirement: Age ${activeResults.targetRetirementAge}`,
+                          value: `Retirement: Age ${displayedResults.targetRetirementAge}`,
                           position: 'insideTopRight',
                           fill: 'var(--text-primary)',
                           fontSize: 9,
@@ -5389,14 +7744,14 @@ export default function FireSimulator() {
                     )}
 
                     {/* 2. Retirement Ready Age */}
-                    {activeResults.retirementReadyAge && (
+                    {displayedResults.retirementReadyAge && (
                       <ReferenceLine
-                        x={activeResults.retirementReadyAge}
+                        x={displayedResults.retirementReadyAge}
                         stroke="#10b981"
                         strokeDasharray="4 4"
                         strokeWidth={1.5}
                         label={{
-                          value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${activeResults.retirementReadyAge}`,
+                          value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${displayedResults.retirementReadyAge}`,
                           position: 'insideTopRight',
                           fill: 'var(--text-primary)',
                           fontSize: 9,
@@ -5406,14 +7761,14 @@ export default function FireSimulator() {
                     )}
 
                     {/* 3. Assets Depleted Age */}
-                    {activeResults.runOutAge && (
+                    {displayedResults.runOutAge && (
                       <ReferenceLine
-                        x={activeResults.runOutAge}
+                        x={displayedResults.runOutAge}
                         stroke="#ef4444"
                         strokeDasharray="4 4"
                         strokeWidth={1.5}
                         label={{
-                          value: `Assets Run Out: Age ${activeResults.runOutAge}`,
+                          value: `Assets Run Out: Age ${displayedResults.runOutAge}`,
                           position: 'insideTopRight',
                           fill: 'var(--text-primary)',
                           fontSize: 9,
@@ -5424,6 +7779,26 @@ export default function FireSimulator() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              {((inputs.lifeEvents || []).some(e => e.type === 'haveChild' && e.enabled) || displayedResults.runOutAge !== null) && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.6rem',
+                  padding: '0.65rem 0.85rem',
+                  background: 'rgba(99, 102, 241, 0.04)',
+                  border: '1px dashed rgba(99, 102, 241, 0.25)',
+                  borderRadius: '6px',
+                  marginTop: '0.5rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.45'
+                }}>
+                  <span style={{ fontSize: '1rem', marginTop: '-0.1rem' }}>💡</span>
+                  <div>
+                    <strong style={{ color: 'var(--text-primary)' }}>Lifecycle Planning Note:</strong> Temporary deficits or portfolio drawdowns (where your Net Worth line dips or flattens, such as during high-expense childcare/daycare years or early retirement) are a normal and <strong>perfectly acceptable part of a long-term financial roadmap</strong>. As long as your portfolio recovery projections climb back up in the long run, your plan remains sustainable.
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5437,8 +7812,9 @@ export default function FireSimulator() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
                   Select a life decision or milestone from the dropdown above the timeline to add it. Drag events on the timeline above or edit them below to map out your roadmap.
                 </p>
-                {generateLifeStory(inputs, activeResults)}
+                {generateLifeStory(inputs, displayedResults)}
               </div>
+              {renderChildCostsBuckets()}
             </div>
 
             {/* Right Column: Graphs, Snapshot, and Settings */}
@@ -5447,10 +7823,10 @@ export default function FireSimulator() {
               {/* Benchmarks Snapshot */}
               {validation.errors.length === 0 && (() => {
                 const activeYear = selectedYear !== null ? selectedYear : Number(inputs.currentAge);
-                const yearData = activeResults.data.find(d => d.age === activeYear);
+                const yearData = displayedResults.data.find(d => d.age === activeYear);
                 if (!yearData) return null;
 
-                const isWorking = activeYear < activeResults.targetRetirementAge;
+                const isWorking = activeYear < displayedResults.targetRetirementAge;
                 
                 return (
                   <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -5509,6 +7885,39 @@ export default function FireSimulator() {
                         }}>
                           {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
                         </strong>
+                      </div>
+                    </div>
+
+                    {/* Cash Flow Details Breakdown */}
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                        📊 Cash Flow Details
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Base Annual Spending:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {formatCurrency(Math.max(0, yearData.expenses - (yearData.taxes || 0) - (yearData.childCosts || 0)))}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Child Costs:</span>
+                          <strong style={{ color: yearData.childCosts > 0 ? 'var(--accent-orange, #f59e0b)' : 'var(--text-primary)' }}>
+                            {formatCurrency(yearData.childCosts || 0)}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Total Annual Spending:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                          <span>Net Savings:</span>
+                          <strong style={{ color: yearData.withdrawals > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                            {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
+                          </strong>
+                        </div>
                       </div>
                     </div>
 
@@ -5826,126 +8235,7 @@ export default function FireSimulator() {
           </div>
 
 
-          {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-            <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
-              <div className="improvement-modal-card" onClick={(e) => e.stopPropagation()}>
-                <div className="improvement-modal-header">
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                    💡 Retirement Improvement Plan
-                  </h3>
-                  <button 
-                    type="button" 
-                    className="improvement-modal-close-btn"
-                    onClick={() => setShowImprovementModal(false)}
-                  >
-                    &times;
-                  </button>
-                </div>
-                
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: '1.45' }}>
-                  Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or retiring slightly later can make a massive difference:
-                </p>
 
-                <div className="improvement-plan-grid">
-                  {improvementPlan.rankedPlan.map((scenario) => {
-                    const isBalanced = scenario.type === 'combined';
-                    const badgeStyle = getPaceBadgeStyles(scenario.savingsFocus);
-                    return (
-                      <div 
-                        key={scenario.type} 
-                        className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
-                      >
-                        <div className="improvement-plan-card-main-content">
-                          <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <h4 className="improvement-plan-card-title" style={{ margin: 0 }}>
-                              <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
-                              <span>{scenario.title}</span>
-                            </h4>
-                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                              {isBalanced && (
-                                <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
-                                  {scenario.badge}
-                                </span>
-                              )}
-                              <span 
-                                className="improvement-plan-card-badge" 
-                                style={{ 
-                                  fontSize: '0.65rem', 
-                                  textTransform: 'uppercase', 
-                                  fontWeight: '800', 
-                                  padding: '0.15rem 0.45rem', 
-                                  borderRadius: '4px', 
-                                  letterSpacing: '0.05em',
-                                  background: badgeStyle.background,
-                                  color: badgeStyle.color,
-                                  border: badgeStyle.border
-                                }}
-                              >
-                                {scenario.savingsFocus}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="improvement-plan-card-details">
-                            <p className="improvement-plan-card-description">
-                              {scenario.details}
-                            </p>
-                            {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
-                              <ul className="improvement-plan-card-bullets">
-                                {scenario.bulletPoints.map((pt, i) => (
-                                  <li key={i}>{pt}</li>
-                                ))}
-                              </ul>
-                            )}
-                            {scenario.extraAction && (
-                              <p className="improvement-plan-card-extra">
-                                {scenario.extraAction}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="improvement-plan-card-kpi-block">
-                          <div className="improvement-plan-kpi-item">
-                            <span className="kpi-item-label">Estimated Ready Age</span>
-                            <strong className="kpi-item-value">Age {scenario.readyAge}</strong>
-                          </div>
-                          <div className="improvement-plan-kpi-item">
-                            <span className="kpi-item-label">Retirement Gain</span>
-                            <strong className="kpi-item-value gain-value" style={{ fontSize: '0.8rem' }}>
-                              {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
-                                `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner (vs. Age ${activeResults.retirementReadyAge} on current path)`
-                              ) : (
-                                '✨ Sustainable!'
-                              )}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="improvement-plan-card-apply-btn"
-                          onClick={() => handleApplyImprovementScenario(scenario)}
-                        >
-                          Apply Scenario
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', borderRadius: '6px' }}
-                    onClick={() => setShowImprovementModal(false)}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       )}
@@ -6032,8 +8322,131 @@ export default function FireSimulator() {
       )}
 
       {editingEvent && renderEventForm(editingEvent)}
+      {childImpactSummary && renderChildImpactModal()}
       {isBudgetModalOpen && renderBudgetModal()}
       {isSavingsDetailsOpen && renderSavingsDetailsModal()}
+      {editingCondition && renderCurrentConditionModal()}
+
+      {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+        <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
+          <div className="improvement-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="improvement-modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                💡 Retirement Improvement Plan
+              </h3>
+              <button 
+                type="button" 
+                className="improvement-modal-close-btn"
+                onClick={() => setShowImprovementModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: '1.45' }}>
+              Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or retiring slightly later can make a massive difference:
+            </p>
+
+            <div className="improvement-plan-grid">
+              {improvementPlan.rankedPlan.map((scenario) => {
+                const isBalanced = scenario.type === 'combined';
+                const badgeStyle = getPaceBadgeStyles(scenario.savingsFocus);
+                return (
+                  <div 
+                    key={scenario.type} 
+                    className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
+                  >
+                    <div className="improvement-plan-card-main-content">
+                      <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <h4 className="improvement-plan-card-title" style={{ margin: 0 }}>
+                          <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
+                          <span>{scenario.title}</span>
+                        </h4>
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                          {isBalanced && (
+                            <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
+                              {scenario.badge}
+                            </span>
+                          )}
+                          <span 
+                            className="improvement-plan-card-badge" 
+                            style={{ 
+                              fontSize: '0.65rem', 
+                              textTransform: 'uppercase', 
+                              fontWeight: '800', 
+                              padding: '0.15rem 0.45rem', 
+                              borderRadius: '4px', 
+                              letterSpacing: '0.05em',
+                              background: badgeStyle.background,
+                              color: badgeStyle.color,
+                              border: badgeStyle.border
+                            }}
+                          >
+                            {scenario.savingsFocus}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="improvement-plan-card-details">
+                        <p className="improvement-plan-card-description">
+                          {scenario.details}
+                        </p>
+                        {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                          <ul className="improvement-plan-card-bullets">
+                            {scenario.bulletPoints.map((pt, i) => (
+                              <li key={i}>{pt}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {scenario.extraAction && (
+                          <p className="improvement-plan-card-extra">
+                            {scenario.extraAction}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="improvement-plan-card-kpi-block">
+                      <div className="improvement-plan-kpi-item">
+                        <span className="kpi-item-label">Estimated Ready Age</span>
+                        <strong className="kpi-item-value">Age {scenario.readyAge}</strong>
+                      </div>
+                      <div className="improvement-plan-kpi-item">
+                        <span className="kpi-item-label">Retirement Gain</span>
+                        <strong className="kpi-item-value gain-value" style={{ fontSize: '0.8rem' }}>
+                          {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
+                            `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner (vs. Age ${activeResults.retirementReadyAge} on current path)`
+                          ) : (
+                            '✨ Sustainable!'
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="improvement-plan-card-apply-btn"
+                      onClick={() => handleApplyImprovementScenario(scenario)}
+                    >
+                      Apply Scenario
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', borderRadius: '6px' }}
+                onClick={() => setShowImprovementModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

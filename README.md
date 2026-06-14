@@ -55,3 +55,17 @@ To verify input conditions, see the comprehensive [Test Cases Checklist](file://
    ```bash
    npm run build
    ```
+
+4. **Run End-to-End (E2E) Browser Tests**:
+   Ensure Playwright browsers are installed first:
+   ```bash
+   npx playwright install
+   ```
+   Run all E2E tests headlessly (Chromium, Firefox, WebKit):
+   ```bash
+   npm run test:e2e
+   ```
+   To run tests in the interactive UI mode:
+   ```bash
+   npm run test:e2e:ui
+   ```

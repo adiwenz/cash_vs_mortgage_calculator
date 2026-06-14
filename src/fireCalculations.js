@@ -107,6 +107,24 @@ export function getSocialSecurityFactor(claimingAge) {
   }
 }
 
+export function getActiveChildrenCountAtAge(age, lifeEvents) {
+  let count = 0;
+  const childEvents = (lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  childEvents.forEach(ev => {
+    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+    const childAge = age - birthAge;
+    if (childAge >= startAge) {
+      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+      const maxAge = includeCollege ? 22 : 18;
+      if (childAge < maxAge) {
+        count++;
+      }
+    }
+  });
+  return count;
+}
+
 export function runFireSimulation(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
@@ -167,8 +185,114 @@ export function runFireSimulation(inputs) {
   let homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
   let debtBalance = 0; // Removed from starting assets, tracked dynamically via debtList
 
-  const incomeList = inputs.incomeList || [];
-  const spendingPhases = inputs.spendingPhases || [];
+  const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
+  let incomeList = inputs.incomeList || [];
+  if (!hasActiveChild) {
+    incomeList = incomeList
+      .filter(inc => inc.id !== 'simple-inc-childcare')
+      .map(inc => {
+        if (inc.id === 'simple-inc-worksave') {
+          return { ...inc, startAge: currentAge };
+        }
+        return inc;
+      });
+  }
+  const customIncomes = currentConditions
+    .filter(c => c.type === 'income')
+    .map(c => ({
+      id: c.id || `custom-income-${Date.now()}`,
+      name: c.name || 'Income Source',
+      amount: Number(c.monthlyAmount || 0) * 12,
+      startAge: currentAge,
+      endAge: c.endAge ? Number(c.endAge) : lifeExpectancy,
+      growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : 0.03,
+      frequency: 'yearly',
+      isTaxable: true
+    }));
+  const combinedIncomeList = [...incomeList, ...customIncomes];
+
+  // Calculate initial child costs at parent's currentAge in today's dollars
+  let initialChildCostsAnnual = 0;
+  enabledEvents.forEach(ev => {
+    if (ev.type === 'haveChild') {
+      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+      const childAge = currentAge - birthAge;
+
+      if (childAge >= childStartAge) {
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+
+        if (childAge < maxAge) {
+          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+          let annualCost = 0;
+          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+          initialChildCostsAnnual += annualCost;
+        }
+      }
+    }
+  });
+
+  // Calculate excess childcare income boost above standard income
+  let excessBoost = 0;
+  if (inputs.budgetDetails && inputs.budgetDetails.childcareIncome !== undefined) {
+    const ccIncomeAnnual = (Number(inputs.budgetDetails.childcareIncome) || 0) * 12;
+    const wsIncomeAnnual = (Number(inputs.budgetDetails.income) || 0) * 12;
+    excessBoost = Math.max(0, ccIncomeAnnual - wsIncomeAnnual);
+  }
+
+  // Calculate peak childcare cost across the timeline in today's dollars
+  let maxChildCostsAnnual = 0;
+  const childEventsForPeak = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  if (childEventsForPeak.length > 0) {
+    for (let age = currentAge; age < targetRetirementAge; age++) {
+      let yearCost = 0;
+      childEventsForPeak.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+        const childAge = age - birthAge;
+        if (childAge >= childStartAge) {
+          const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+          const maxAge = includeCollege ? 22 : 18;
+          if (childAge < maxAge) {
+            const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+            const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+            const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+            const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+            let annualCost = 0;
+            if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+            else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+            else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+            else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+            yearCost += annualCost;
+          }
+        }
+      });
+      if (yearCost > maxChildCostsAnnual) {
+        maxChildCostsAnnual = yearCost;
+      }
+    }
+  }
+
+  let spendingPhases = inputs.spendingPhases || [];
+  if (!hasActiveChild) {
+    spendingPhases = spendingPhases
+      .filter(p => p.id !== 'simple-spend-childcare')
+      .map(p => {
+        if (p.id === 'simple-spend-worksave') {
+          return { ...p, startAge: currentAge };
+        }
+        return p;
+      });
+  }
   const allocationRules = inputs.allocationRules || [];
   const debtList = inputs.debtList || [];
 
@@ -176,10 +300,10 @@ export function runFireSimulation(inputs) {
 
   // Initialize Debts & Loans Schedule (including custom debts)
   const customDebts = currentConditions
-    .filter(c => c.type === 'debt')
+    .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
     .map(c => ({
       id: c.id || `custom-debt-${Date.now()}`,
-      name: c.name || 'Debt',
+      name: c.name || c.subtype || 'Debt',
       balance: Number(c.value) || 0,
       interestRate: (Number(c.rate) || 0) / 100,
       payment: Number(c.monthlyAmount || 0) * 12,
@@ -275,7 +399,11 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    let activeLoans = startingLoans.map(l => ({ ...l }));
+    let activeLoans = startingLoans.map(l => ({
+      ...l,
+      totalInterestPaid: 0,
+      payoffAge: null
+    }));
 
     // Set up custom conditions lists
     let customAssets = currentConditions
@@ -313,18 +441,19 @@ export function runFireSimulation(inputs) {
       }));
 
     let customObligations = currentConditions
-      .filter(c => c.type === 'obligation')
+      .filter(c => c.type === 'obligation' || (c.type === 'debt' && (c.creditCardHandling === 'payoff' || !(Number(c.value) > 0))))
       .map(c => ({
         id: c.id,
-        name: c.name,
+        name: c.name || (c.type === 'debt' ? `${c.subtype || 'Debt'} Payment` : 'Obligation'),
         monthlyCost: Number(c.monthlyAmount) || 0,
-        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate,
+        growthRate: (c.type === 'debt') ? 0 : (c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate),
         endAge: c.endAge ? Number(c.endAge) : null
       }));
 
     let hasRunOut = false;
     let runOutAge = null;
     let endingSurplusShortfall = 0;
+    let cumulativeShortfall = 0;
     let initialSpending;
     const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge);
     if (initialPhase) {
@@ -513,6 +642,41 @@ export function runFireSimulation(inputs) {
     const nominalFactor = Math.pow(1 + inflationRate, year);
     annualEarlyWithdrawalPenalties = 0;
 
+    // Calculate child costs for this year (in today's dollars, then inflated)
+    let yearChildCostsToday = 0;
+    enabledEvents.forEach(ev => {
+      if (ev.type === 'haveChild') {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+        const childAge = age - birthAge;
+
+        if (childAge >= childStartAge) {
+          const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+          const maxAge = includeCollege ? 22 : 18;
+
+          if (childAge < maxAge) {
+            const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+            const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+            const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+            const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+            let annualCost = 0;
+            if (childAge >= 0 && childAge <= 4) {
+              annualCost = ages0to4;
+            } else if (childAge >= 5 && childAge <= 12) {
+              annualCost = ages5to12;
+            } else if (childAge >= 13 && childAge <= 18) {
+              annualCost = ages13to18;
+            } else if (childAge >= 19 && childAge <= 22) {
+              annualCost = ages19to22;
+            }
+            yearChildCostsToday += annualCost;
+          }
+        }
+      }
+    });
+    let yearChildCosts = yearChildCostsToday * nominalFactor;
+
     // Set progressive tax values for this year (adjusted for inflation)
     const taxConfig = U_S_TAX_DATA[filingStatus] || U_S_TAX_DATA.single;
     standardDeduction = taxConfig.standardDeduction * nominalFactor;
@@ -532,8 +696,13 @@ export function runFireSimulation(inputs) {
       balances.rothIra *= (1 + activeReturnRate);
       balances.hsa *= (1 + activeReturnRate);
       balances.other *= (1 + activeReturnRate);
-      balances.cash *= (1 + cashReturnRate);
-      balances.emergencyFund *= (1 + cashReturnRate);
+      balances.cash *= (1 + activeReturnRate);
+      balances.emergencyFund *= (1 + activeReturnRate);
+
+      if (cumulativeShortfall > 0) {
+        const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
+        cumulativeShortfall *= (1 + activeReturnRate);
+      }
 
       // Compound custom assets
       customAssets.forEach(ca => {
@@ -544,7 +713,7 @@ export function runFireSimulation(inputs) {
         }
         let rateToApply = ca.growthRate;
         if (rateToApply === null) {
-          if (ca.type === 'checkingSavings') rateToApply = cashReturnRate;
+          if (ca.type === 'checkingSavings') rateToApply = activeReturnRate;
           else rateToApply = activeReturnRate;
         }
         ca.balance *= (1 + rateToApply);
@@ -592,12 +761,77 @@ export function runFireSimulation(inputs) {
     let annualIncome = 0;
     taxableIncome = 0;
 
-    incomeList.forEach(inc => {
-      const effectiveEndAge = isAdvanced ? Math.min(inc.endAge, targetRetirementAge) : targetRetirementAge;
+    combinedIncomeList.forEach(inc => {
+      // Respect endAge if defined, even in simple mode (needed for split budget phases like childcare)
+      const effectiveEndAge = Math.min(inc.endAge !== undefined ? inc.endAge : targetRetirementAge, targetRetirementAge);
       if (age >= inc.startAge && age < effectiveEndAge) {
-        const yearsGrown = age - inc.startAge;
-        const baseAmount = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
-        let amount = baseAmount * Math.pow(1 + (Number(inc.growthRate) || 0), yearsGrown);
+        // Grow incomes from currentAge instead of startAge so that future-starting phases 
+        // maintain their specified purchasing power in today's dollars.
+        const yearsGrown = age - currentAge;
+        let amount;
+        if (inc.id === 'simple-inc-childcare') {
+          const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+          const wsIncome = Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167;
+          let baseCcIncome = wsIncome; // DEFAULT: NO AUTO-BUMP
+          
+          if (inputs.budgetDetails?.childcareBudgets?.[C]) {
+            baseCcIncome = Number(inputs.budgetDetails.childcareBudgets[C].income);
+          } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
+            if (C > 0) {
+              const occurringCounts = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
+              if (occurringCounts.length > 0) {
+                const bestC = Math.max(...occurringCounts);
+                baseCcIncome = Number(inputs.budgetDetails.childcareBudgets[bestC].income);
+              } else {
+                const configuredKeys = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number);
+                const refC = configuredKeys[0];
+                const refIncome = Number(inputs.budgetDetails.childcareBudgets[refC].income);
+                let boostPerChild = 1250;
+                if (refC > 0 && refIncome > wsIncome) {
+                  boostPerChild = (refIncome - wsIncome) / refC;
+                }
+                baseCcIncome = wsIncome + boostPerChild * C;
+              }
+            } else {
+              baseCcIncome = wsIncome;
+            }
+          } else if (C > 0 && inputs.budgetDetails?.childcareIncome !== undefined) {
+            // Keep backwards compatibility for old childcareIncome
+            const oldCcIncome = Number(inputs.budgetDetails.childcareIncome);
+            if (oldCcIncome > wsIncome) {
+              let initialCount = 0;
+              const currentAgeVal = Number(inputs.currentAge) || 30;
+              (inputs.lifeEvents || []).forEach(ev => {
+                if (ev.type === 'haveChild' && ev.enabled) {
+                  const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+                  const childAge = currentAgeVal - birthAge;
+                  const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+                  const maxAge = includeCollege ? 22 : 18;
+                  if (childAge >= 0 && childAge < maxAge) {
+                    initialCount++;
+                  }
+                }
+              });
+              let boostForOne = 1250;
+              if (initialCount > 0) {
+                boostForOne = (oldCcIncome - wsIncome) / initialCount;
+              } else {
+                boostForOne = oldCcIncome - wsIncome;
+              }
+              baseCcIncome = wsIncome + boostForOne * C;
+            } else {
+              baseCcIncome = oldCcIncome;
+            }
+          } else if (C === 0) {
+            baseCcIncome = wsIncome;
+          }
+          
+          const baseIncomeAnnual = baseCcIncome * 12;
+          amount = baseIncomeAnnual * Math.pow(1 + (Number(inc.growthRate) || 0), yearsGrown);
+        } else {
+          const baseAmount = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
+          amount = baseAmount * Math.pow(1 + (Number(inc.growthRate) || 0), yearsGrown);
+        }
 
         // Apply Barista FIRE salary overrides: job salary drops to 0
         const hasBaristaActive = enabledEvents.some(e => e.type === 'baristaFire' && age >= Number(e.startAge));
@@ -679,12 +913,44 @@ export function runFireSimulation(inputs) {
     const activePhase = spendingPhases.find(p => age >= p.startAge && age < p.endAge);
     let baseSpending;
     if (activePhase) {
-      if (activePhase.frequency === 'monthly') {
-        baseSpending = (Number(activePhase.amount) || 0) * 12;
-      } else if (activePhase.frequency === 'yearly') {
-        baseSpending = Number(activePhase.amount) || 0;
+      if (activePhase.id === 'simple-spend-childcare') {
+        const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+        const wsExpenses = Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542;
+        let baseCcExpenses = wsExpenses;
+        
+        if (inputs.budgetDetails?.childcareBudgets?.[C]) {
+          const ccExp = inputs.budgetDetails.childcareBudgets[C].expenses;
+          baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
+        } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
+          if (C > 0) {
+            const occurringCounts = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
+            if (occurringCounts.length > 0) {
+              const bestC = Math.max(...occurringCounts);
+              const ccExp = inputs.budgetDetails.childcareBudgets[bestC].expenses;
+              baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
+            } else {
+              const configuredKeys = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number);
+              const refC = configuredKeys[0];
+              const ccExp = inputs.budgetDetails.childcareBudgets[refC].expenses;
+              baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
+            }
+          } else {
+            baseCcExpenses = wsExpenses;
+          }
+        } else if (C > 0 && inputs.budgetDetails?.childcareExpenses) {
+          baseCcExpenses = Object.values(inputs.budgetDetails.childcareExpenses).reduce((sum, val) => sum + val, 0);
+        } else if (C === 0) {
+          baseCcExpenses = wsExpenses;
+        }
+        baseSpending = baseCcExpenses * 12;
       } else {
-        baseSpending = Number(activePhase.annualSpending) || Number(activePhase.amount) || 0;
+        if (activePhase.frequency === 'monthly') {
+          baseSpending = (Number(activePhase.amount) || 0) * 12;
+        } else if (activePhase.frequency === 'yearly') {
+          baseSpending = Number(activePhase.amount) || 0;
+        } else {
+          baseSpending = Number(activePhase.annualSpending) || Number(activePhase.amount) || 0;
+        }
       }
     } else if (spendingPhases.length > 0) {
       const firstPhase = spendingPhases[0];
@@ -728,25 +994,19 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Add children events childcare/support
-    enabledEvents.forEach(ev => {
-      if (ev.type === 'haveChild' && age >= Number(ev.birthAge)) {
-        const birthAge = Number(ev.birthAge);
-        const childAge = age - birthAge;
+    // Child costs for this year calculated at the top of the year loop
 
-        if (childAge === 0) {
-          annualExpenses += (Number(ev.oneTimeBirthCost) || 0) * nominalFactor;
-        }
-        const ccEndAge = Number(ev.childcareEndAge) || 5;
-        if (childAge >= 0 && childAge < ccEndAge) {
-          annualExpenses += (Number(ev.annualChildcareCost) || 0) * nominalFactor;
-        }
-        const supportEndAge = Number(ev.supportEndAge) || 18;
-        if (childAge >= 0 && childAge < supportEndAge) {
-          annualExpenses += (Number(ev.annualChildExpense) || 0) * nominalFactor;
-        }
+
+    // Add custom children expenses (legacy currentCondition type)
+    customChildren.forEach(c => {
+      if (age >= currentAge && (c.endAge === null || age < c.endAge)) {
+        const yearsElapsed = age - currentAge;
+        const costForYear = (c.monthlyCost * 12) * Math.pow(1 + c.growthRate, yearsElapsed);
+        yearChildCosts += costForYear;
       }
     });
+
+    annualExpenses += yearChildCosts;
 
     // Add colleges events
     enabledEvents.forEach(ev => {
@@ -787,14 +1047,7 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add custom children expenses
-    customChildren.forEach(c => {
-      if (age >= currentAge && (c.endAge === null || age < c.endAge)) {
-        const yearsElapsed = age - currentAge;
-        const costForYear = (c.monthlyCost * 12) * Math.pow(1 + c.growthRate, yearsElapsed);
-        annualExpenses += costForYear;
-      }
-    });
+    // Custom children handled above in yearChildCosts
 
     // Add custom obligations expenses
     customObligations.forEach(o => {
@@ -931,6 +1184,7 @@ export function runFireSimulation(inputs) {
     activeLoans.forEach(loan => {
       if (loan.balance > 0) {
         const interest = loan.balance * loan.interestRate;
+        loan.totalInterestPaid = (loan.totalInterestPaid || 0) + interest;
         
         let totalPayment = loan.payment;
         if (loan.paydownPlanEnabled && age >= loan.startAge) {
@@ -942,9 +1196,10 @@ export function runFireSimulation(inputs) {
         if (loan.balance + interest <= totalPayment) {
           actualPaid = loan.balance + interest;
           loan.balance = 0;
+          loan.payoffAge = age;
           dynamicMilestones.push({
             age,
-            label: `Paid off: ${loan.name}`,
+            label: `${loan.name} Paid Off`,
             type: 'debtPayoff',
             isMilestone: true
           });
@@ -962,7 +1217,7 @@ export function runFireSimulation(inputs) {
     // Debt payoff event (legacy template option - reduces portfolio, sets debtBalance to 0)
     enabledEvents.forEach(ev => {
       if (ev.type === 'debtPayoff' && age === Number(ev.payoffAge)) {
-        const amt = Number(ev.remainingBalance) || 0;
+        const amt = Number(ev.remainingBalance !== undefined ? ev.remainingBalance : ev.amount) || 0;
         const debtShortfall = deductFromLiquidAssets(amt, age);
         if (debtShortfall > 0.01) {
           hasRunOut = true;
@@ -1026,8 +1281,13 @@ export function runFireSimulation(inputs) {
     let taxes = 0;
     let grossSurplus = annualIncome - annualExpenses;
 
-    // Sort allocation rules by priority
+    // Sort allocation rules by priority and filter by active age range
     const sortedAllocations = [...allocationRules]
+      .filter(rule => {
+        const start = rule.startAge !== undefined ? Number(rule.startAge) : 0;
+        const end = rule.endAge !== undefined ? Number(rule.endAge) : Infinity;
+        return age >= start && age < end;
+      })
       .map(r => ({ ...r, priority: Number(r.priority) || 99 }))
       .sort((a, b) => a.priority - b.priority);
 
@@ -1239,6 +1499,11 @@ export function runFireSimulation(inputs) {
         }
       });
 
+      if (cumulativeShortfall > 0 && netSurplus > 0) {
+        const payDown = Math.min(cumulativeShortfall, netSurplus);
+        cumulativeShortfall -= payDown;
+        netSurplus -= payDown;
+      }
       // Leftover Surplus Sweep into Brokerage
       if (netSurplus > 0) {
         balances.brokerage += netSurplus;
@@ -1248,6 +1513,11 @@ export function runFireSimulation(inputs) {
     } else {
       // In retirement or coasting: we do not save new contributions.
       // Leftover surplus (if positive, e.g. from SS or pensions) is swept into Brokerage.
+      if (cumulativeShortfall > 0 && netSurplus > 0) {
+        const payDown = Math.min(cumulativeShortfall, netSurplus);
+        cumulativeShortfall -= payDown;
+        netSurplus -= payDown;
+      }
       if (netSurplus > 0) {
         balances.brokerage += netSurplus;
         netSurplus = 0;
@@ -1267,6 +1537,7 @@ export function runFireSimulation(inputs) {
 
       if (leftShortfall > 0.01) {
         shortfall = leftShortfall;
+        cumulativeShortfall += leftShortfall;
         hasRunOut = true;
         if (runOutAge === null) {
           runOutAge = age;
@@ -1383,10 +1654,45 @@ export function runFireSimulation(inputs) {
     }
 
     if (age === simLifeExpectancy) {
-      endingSurplusShortfall = hasRunOut ? -shortfall : liquidNW;
+      endingSurplusShortfall = cumulativeShortfall > 0 ? -cumulativeShortfall : liquidNW;
     }
 
     const totalPortfolio = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
+
+    // Compute total planned savings for lifestyle gap calculation
+    let plannedPreTaxSavings = 0;
+    let plannedPostTaxSavings = 0;
+    if (isSavingPeriod) {
+      customAssets.forEach(ca => {
+        if (ca.endAge === null || age < ca.endAge) {
+          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+          if (isPreTax) {
+            plannedPreTaxSavings += ca.monthlyContribution * 12;
+          } else {
+            plannedPostTaxSavings += ca.monthlyContribution * 12;
+          }
+        }
+      });
+      sortedAllocations.forEach(rule => {
+        const dest = rule.destination;
+        const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
+        let amt = 0;
+        if (rule.type === 'fixed') {
+          amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
+        } else if (rule.type === 'percentIncome') {
+          amt = annualIncome * (Number(rule.value) / 100);
+        }
+        if (isPreTax) {
+          plannedPreTaxSavings += amt;
+        } else {
+          plannedPostTaxSavings += amt;
+        }
+      });
+    }
+    const totalPlannedSavings = plannedPreTaxSavings + plannedPostTaxSavings;
+    const incomeAvailable = annualIncome + windfallReceived;
+    const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
+    const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
 
     logs.push({
       year,
@@ -1398,6 +1704,7 @@ export function runFireSimulation(inputs) {
       employerMatch: employerMatchContribution,
       withdrawals: withdrawal,
       shortfall,
+      cumulativeShortfall,
       portfolio: totalPortfolio,
       homeValue: totalHomeValue,
       homeEquity: Math.max(0, totalHomeValue - totalMortgageBalance),
@@ -1409,6 +1716,8 @@ export function runFireSimulation(inputs) {
       retirementReadyTarget: retirementReadyTargetForYear,
       coastFireNumber,
       isCoastAchieved,
+      childCosts: yearChildCosts,
+      lifestyleGap: lifestyleGapValue,
       // Record detailed asset allocations for breakdowns
       cashBalance: balances.cash + customAssets.filter(ca => ca.type === 'checkingSavings').reduce((sum, ca) => sum + ca.balance, 0),
       emergencyFundBalance: balances.emergencyFund,
@@ -1421,6 +1730,13 @@ export function runFireSimulation(inputs) {
     });
   }
 
+    const debtSummaries = activeLoans.map(loan => ({
+      id: loan.id,
+      name: loan.name,
+      totalInterestPaid: loan.totalInterestPaid || 0,
+      payoffAge: loan.balance <= 0 ? loan.payoffAge : null
+    }));
+
     return {
       moneyLasts: !hasRunOut,
       runOutAge,
@@ -1428,7 +1744,8 @@ export function runFireSimulation(inputs) {
       logs,
       dynamicMilestones,
       coastAge,
-      lastWorkingYearSpendingNominal
+      lastWorkingYearSpendingNominal,
+      debtSummaries
     };
   };
 
@@ -1453,10 +1770,14 @@ export function runFireSimulation(inputs) {
       homeEquity: log.homeEquity / factor,
       mortgageBalance: log.mortgageBalance / factor,
       debtBalance: log.debtBalance / factor,
-      netWorth: log.netWorth / factor,
+      netWorth: (log.netWorth - (log.cumulativeShortfall || 0)) / factor,
+      assets: (log.portfolio + log.homeValue) / factor,
+      debt: (log.debtBalance + log.mortgageBalance + (log.cumulativeShortfall || 0)) / factor,
       fiNumber: log.fiNumber / factor,
       retirementReadyTarget: log.retirementReadyTarget / factor,
       coastFireNumber: log.coastFireNumber / factor,
+      childCosts: log.childCosts / factor,
+      lifestyleGap: log.lifestyleGap / factor,
       cashBalance: log.cashBalance / factor,
       emergencyFundBalance: log.emergencyFundBalance / factor,
       brokerageBalance: log.brokerageBalance / factor,
@@ -1604,28 +1925,44 @@ export function runFireSimulation(inputs) {
   // Compute Retirement Outcome
   let retirementOutcome;
   if (plannedResults.runOutAge === null) {
-    const portAtRet = retirementLog ? retirementLog.portfolio : 0;
-    const portAtEnd = deflatedLogs.length > 0 ? deflatedLogs[deflatedLogs.length - 1].portfolio : 0;
-    const annSpending = retirementLog ? retirementLog.expenses : 50000;
-    
-    if (readinessCriteria === 'lastsIndefinitely') {
-      if (retirementReadyAgeSWR !== null && targetRetirementAge >= retirementReadyAgeSWR) {
-        retirementOutcome = 'comfortable';
-      } else {
-        retirementOutcome = 'sustainable';
-      }
+    if (retirementReadyAgeComfortable !== null && targetRetirementAge >= retirementReadyAgeComfortable) {
+      retirementOutcome = 'comfortable';
     } else {
-      // Comfortable if ending portfolio is >= 50% of portfolio at retirement, or is >= 10x annual retirement spending, or remains above $100k
-      if (portAtEnd >= portAtRet * 0.5 || portAtEnd >= annSpending * 10 || portAtEnd >= 100000) {
-        retirementOutcome = 'comfortable';
-      } else {
-        retirementOutcome = 'sustainable';
-      }
+      retirementOutcome = 'sustainable';
     }
   } else {
     // runs out before life expectancy
     retirementOutcome = 'retirementGap';
   }
+
+  const nominalRetirementLog = plannedResults.logs.find(log => log.age === targetRetirementAge) || plannedResults.logs[plannedResults.logs.length - 1];
+
+  let nominalRetirementReadyTarget = 0;
+  if (retirementReadyAge !== null) {
+    const readyLogNominal = plannedResults.logs.find(l => l.age === retirementReadyAge);
+    nominalRetirementReadyTarget = readyLogNominal ? readyLogNominal.fiNumber : (retirementReadyTarget * Math.pow(1 + inflationRate, retirementReadyAge - currentAge));
+  }
+
+  let nominalRetirementIncomeSources = 0;
+  enabledEvents.forEach(ev => {
+    if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
+      const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
+      let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+      if (ev.type === 'socialSecurity') {
+        if (claimingAge < 62) {
+          monthlyBenefit = 0;
+        } else {
+          monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
+        }
+      }
+      let annualAmt = monthlyBenefit * 12;
+      if (ev.inflationAdjusted !== false) {
+        const factor = Math.pow(1 + inflationRate, claimingAge - currentAge);
+        annualAmt = annualAmt * factor;
+      }
+      nominalRetirementIncomeSources += annualAmt;
+    }
+  });
 
   return {
     currentNetWorth: (Number(assets.cash) || 0) +
@@ -1654,13 +1991,30 @@ export function runFireSimulation(inputs) {
     portfolioAtRetirement: retirementLog ? retirementLog.portfolio : 0,
     netWorthAtRetirement: retirementLog ? retirementLog.netWorth : 0,
     annualRetirementSpending: retirementLog ? retirementLog.expenses : 0,
+    retirementOutcome,
     moneyLasts: plannedResults.moneyLasts,
     runOutAge: plannedResults.runOutAge,
-    retirementOutcome,
     endingSurplusShortfall: finalSurplusShortfall,
     coastAge: plannedResults.coastAge,
     dynamicMilestones: plannedResults.dynamicMilestones,
-    data: deflatedLogs
+    debtSummaries: plannedResults.debtSummaries,
+    data: deflatedLogs,
+    
+    // Nominal vs Deflated support
+    deflatedData: deflatedLogs,
+    nominalData: plannedResults.logs,
+    nominalRetirementReadyTarget,
+    deflatedRetirementReadyTarget: retirementReadyTarget,
+    nominalPortfolioAtRetirement: nominalRetirementLog ? nominalRetirementLog.portfolio : 0,
+    deflatedPortfolioAtRetirement: retirementLog ? retirementLog.portfolio : 0,
+    nominalNetWorthAtRetirement: nominalRetirementLog ? nominalRetirementLog.netWorth : 0,
+    deflatedNetWorthAtRetirement: retirementLog ? retirementLog.netWorth : 0,
+    nominalAnnualRetirementSpending: nominalRetirementLog ? nominalRetirementLog.expenses : 0,
+    deflatedAnnualRetirementSpending: retirementLog ? retirementLog.expenses : 0,
+    nominalEndingSurplusShortfall: plannedResults.endingSurplusShortfall,
+    deflatedEndingSurplusShortfall: finalSurplusShortfall,
+    nominalRetirementIncomeSources,
+    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars
   };
 }
 
@@ -1749,8 +2103,9 @@ export function validateFireInputs(inputs) {
     }
     if (ev.type === 'haveChild' && ev.enabled) {
       const birthAge = Number(ev.birthAge);
-      if (birthAge < currentAge) {
-        errors.push(`Child birth age (${birthAge}) for event #${i+1} cannot be in the past.`);
+      const childStartAge = Number(ev.childStartAge || 0);
+      if (birthAge < currentAge && childStartAge === 0) {
+        errors.push(`Child birth age (${birthAge}) for event #${i+1} cannot be in the past unless the child is already born.`);
       }
     }
     if (ev.type === 'sabbatical' && ev.enabled) {

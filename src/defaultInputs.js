@@ -19,28 +19,35 @@ export const DEFAULT_FIRE_INPUTS = {
   simpleIncome: 50000,
   simpleExpenses: 42500,
   simpleInvestments: 5000,
+  childCosts: {
+    ages0to4: 15000,
+    ages5to12: 15000,
+    ages13to18: 15000,
+    ages19to22: 15000,
+    includeCollege: false
+  },
   assets: {
-    cash: 500,
-    emergencyFund: 750,
-    brokerage: 500,
-    trad401k: 1750,
-    tradIra: 500,
-    rothIra: 750,
-    hsa: 250,
+    cash: 0,
+    emergencyFund: 0,
+    brokerage: 5000,
+    trad401k: 0,
+    tradIra: 0,
+    rothIra: 0,
+    hsa: 0,
     realEstate: 0,
     other: 0,
     debts: 0
   },
   budgetDetails: {
     savings: {
-      trad401k: 100,
-      rothIra: 50,
+      trad401k: 200,
+      rothIra: 100,
       tradIra: 0,
       hsa: 50,
       brokerage: 0,
-      checking: 50,
-      hysa: 50,
-      emergency: 26,
+      checking: 100,
+      hysa: 100,
+      emergency: 75,
       debt: 0,
       other: 0
     },
@@ -51,7 +58,7 @@ export const DEFAULT_FIRE_INPUTS = {
       transportation: 400,
       healthcare: 300,
       leisure: 300,
-      misc: 141
+      misc: 142
     }
   },
   incomeList: [
@@ -81,17 +88,13 @@ export const DEFAULT_FIRE_INPUTS = {
   ],
   allocationRules: [
     {
-      id: 'alloc-1',
+      id: 'alloc-surplus',
       destination: 'brokerage',
       type: 'percentSurplus',
       value: 100,
       frequency: 'yearly',
       priority: 1,
-      smartRule: {
-        enabled: false,
-        targetValue: 0,
-        redirectDestination: 'brokerage'
-      }
+      smartRule: { enabled: false, targetValue: 0, redirectDestination: 'brokerage' }
     }
   ],
   lifeEvents: [
