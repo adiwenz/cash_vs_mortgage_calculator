@@ -4619,6 +4619,11 @@ export default function FireSimulator() {
 
     const isStillReady = afterAge !== null && (diffYears <= 0 || afterAge <= inputs.targetRetirementAge);
 
+    const startAge = event.childStartAge !== undefined ? Number(event.childStartAge) : 0;
+    const includeCollege = !!event.includeCollege;
+    const maxAge = includeCollege ? 22 : 18;
+    const years = Math.max(0, maxAge - startAge);
+
     return (
       <div className="modal-backdrop" onClick={() => setChildImpactSummary(null)}>
         <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
@@ -4649,7 +4654,7 @@ export default function FireSimulator() {
             <div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estimated Child Costs:</div>
               <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
-                {formatCurrency(annualSpending)}/year
+                {formatCurrency(annualSpending)}/year for {years} years
               </div>
             </div>
           </div>
