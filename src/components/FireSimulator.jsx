@@ -4335,10 +4335,10 @@ export default function FireSimulator() {
               icon: '👶',
               type: 'haveChild',
               description: ev.childName 
-                ? `Welcomed ${ev.childName}! Childcare/support runs until support ends at age ${ev.supportEndAge || 18}.`
-                : `Welcomed a child! Childcare/support runs until support ends at age ${ev.supportEndAge || 18}.`
+                ? `Welcomed ${ev.childName}! Childcare/support runs until support ends at age ${ev.includeCollege ? 22 : 18}.`
+                : `Welcomed a child! Childcare/support runs until support ends at age ${ev.includeCollege ? 22 : 18}.`
             });
-            const supportEndAge = Number(ev.supportEndAge) || 18;
+            const supportEndAge = ev.includeCollege ? 22 : 18;
             const parentAgeAtEnd = age + supportEndAge;
             if (parentAgeAtEnd <= inp.lifeExpectancy) {
               events.push({

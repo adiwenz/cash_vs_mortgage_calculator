@@ -400,6 +400,11 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Save Event', exact: true }).click();
     await page.getByRole('button', { name: 'Done', exact: true }).click(); // Close child welcome modal
 
+    // Assert childcare end milestone is at age 53 (35 + 18)
+    const milestoneNode53 = page.locator('.timeline-node:has-text("Support for Liam Ends")');
+    await expect(milestoneNode53).toBeVisible();
+    await expect(milestoneNode53).toContainText('Age 53');
+
     // 2. Click on the child node to edit
     const liamNode = page.locator('.timeline-node:has-text("Have Child: Liam")');
     await liamNode.click();
@@ -420,6 +425,11 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
 
     // Close the welcome modal
     await page.getByRole('button', { name: 'Done', exact: true }).click();
+
+    // Assert childcare end milestone shifted to age 57 (35 + 22)
+    const milestoneNode57 = page.locator('.timeline-node:has-text("Support for Liam Ends")');
+    await expect(milestoneNode57).toBeVisible();
+    await expect(milestoneNode57).toContainText('Age 57');
   });
 
 });
