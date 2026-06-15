@@ -260,8 +260,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       targetRetirementAge: newRetirementAge,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
-        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id && (inc.id.startsWith('simple-inc-childcare') || inc.id.startsWith('simple-inc-prechild') || inc.id.startsWith('child-income-boost'))) return inc;
+        if (inc.id === 'simple-inc' || (inc.id && inc.id.startsWith('simple-inc-worksave')) || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
         return inc;
@@ -283,8 +283,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       simpleIncome: newIncome,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
-        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id && (inc.id.startsWith('simple-inc-childcare') || inc.id.startsWith('simple-inc-prechild') || inc.id.startsWith('child-income-boost'))) return inc;
+        if (inc.id === 'simple-inc' || (inc.id && inc.id.startsWith('simple-inc-worksave')) || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
         }
         return inc;
@@ -315,8 +315,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
-        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id && (inc.id.startsWith('simple-inc-childcare') || inc.id.startsWith('simple-inc-prechild') || inc.id.startsWith('child-income-boost'))) return inc;
+        if (inc.id === 'simple-inc' || (inc.id && inc.id.startsWith('simple-inc-worksave')) || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
         return inc;
@@ -351,8 +351,8 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
-        if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
+        if (inc.id && (inc.id.startsWith('simple-inc-childcare') || inc.id.startsWith('simple-inc-prechild') || inc.id.startsWith('child-income-boost'))) return inc;
+        if (inc.id === 'simple-inc' || (inc.id && inc.id.startsWith('simple-inc-worksave')) || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: target65Age };
         }
         return inc;
@@ -7505,12 +7505,9 @@ export default function FireSimulator() {
       const rawIncomeItem = (inputs.incomeList || []).find(inc => 
         activePhaseObj.startAge >= inc.startAge && 
         activePhaseObj.startAge < inc.endAge && 
-        inc.id !== 'simple-inc-childcare' && 
-        !inc.id.startsWith('simple-inc-childcare-') && 
-        inc.id !== 'simple-inc-worksave' && 
-        !inc.id.startsWith('simple-inc-worksave-') &&
-        inc.id !== 'simple-inc-prechild' &&
-        !inc.id.startsWith('simple-inc-prechild-') &&
+        !inc.id.startsWith('simple-inc-childcare') && 
+        !inc.id.startsWith('simple-inc-worksave') && 
+        !inc.id.startsWith('simple-inc-prechild') && 
         !inc.id.startsWith('child-income-boost')
       );
       let baseSalaryMonthly = 0;
@@ -9412,18 +9409,39 @@ export default function FireSimulator() {
                     // Childcare support
                     const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
                     if (childEvents.length > 0) {
-                      const minChildAge = Math.min(...childEvents.map(ev => Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30));
-                      const maxChildAge = Math.max(...childEvents.map(ev => (Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30) + (ev.includeCollege ? 22 : 18)));
-                      if (minChildAge < maxChildAge && maxChildAge > inputs.currentAge) {
+                      const activeAges = [];
+                      for (let age = inputs.currentAge; age < inputs.lifeExpectancy; age++) {
+                        if (getActiveChildrenCountAtAge(age, inputs.lifeEvents) > 0) {
+                          activeAges.push(age);
+                        }
+                      }
+                      
+                      const ccIntervals = [];
+                      if (activeAges.length > 0) {
+                        let start = activeAges[0];
+                        let prev = activeAges[0];
+                        for (let i = 1; i < activeAges.length; i++) {
+                          if (activeAges[i] === prev + 1) {
+                            prev = activeAges[i];
+                          } else {
+                            ccIntervals.push({ start, end: prev + 1 });
+                            start = activeAges[i];
+                            prev = activeAges[i];
+                          }
+                        }
+                        ccIntervals.push({ start, end: prev + 1 });
+                      }
+
+                      ccIntervals.forEach((interval, idx) => {
                         activeCommitments.push({
-                          id: 'childcare',
+                          id: `childcare-${idx}`,
                           label: 'Childcare & Support',
                           emoji: '👶',
-                          startAge: Math.max(inputs.currentAge, minChildAge),
-                          endAge: Math.min(inputs.lifeExpectancy, maxChildAge),
+                          startAge: interval.start,
+                          endAge: interval.end,
                           className: 'commitment-span childcare'
                         });
-                      }
+                      });
                     }
 
                     // Marriage

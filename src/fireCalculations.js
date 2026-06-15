@@ -323,152 +323,172 @@ export function runFireSimulation(inputs) {
   let spendingPhases = inputs.spendingPhases || [];
 
   if (hasActiveChild) {
-    const childEvents = enabledEvents.filter(e => e.type === 'haveChild');
-    let minChildParentAge = Infinity;
-    let maxChildParentAge = -Infinity;
-    childEvents.forEach(ev => {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-      const maxAge = includeCollege ? 22 : 18;
-      if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-      if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
-    });
+    const incomeSegments = getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents);
+    const spendingSegments = getPartitionedPhases(currentAge, maxLifeExpectancy, enabledEvents);
 
-    const childEndAge = Math.min(maxLifeExpectancy, Math.max(currentAge, maxChildParentAge));
-    const childcareStartAge = Math.max(currentAge, minChildParentAge);
-    const childcareEndAge = childEndAge;
-    const expectedIncEndAge = Math.min(targetRetirementAge, childcareEndAge);
-    const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+    const hasChildcarePhase = incomeSegments.some(seg => seg.type === 'childcare') || spendingSegments.some(seg => seg.type === 'childcare');
 
     if (hasChildcarePhase) {
-      const existingIncChildcare = incomeList.find(inc => inc.id === 'simple-inc-childcare');
-      const existingSpendChildcare = spendingPhases.find(p => p.id === 'simple-spend-childcare');
+      const existingAutoIncomes = incomeList.filter(inc => 
+        inc.id.startsWith('simple-inc-prechild') ||
+        inc.id.startsWith('simple-inc-childcare') ||
+        inc.id.startsWith('simple-inc-worksave')
+      );
+      const needsIncomeRegen = existingAutoIncomes.length !== incomeSegments.length ||
+        incomeSegments.some(seg => {
+          const expectedId = seg.type === 'childcare' 
+            ? `simple-inc-childcare-${seg.startAge}-${seg.endAge}`
+            : (seg.startAge === currentAge ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}` : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
+          const match = existingAutoIncomes.find(inc => inc.id === expectedId);
+          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
+        });
 
-      const needsRegen = !existingIncChildcare || !existingSpendChildcare ||
-        existingIncChildcare.startAge !== childcareStartAge ||
-        existingIncChildcare.endAge !== expectedIncEndAge ||
-        existingSpendChildcare.startAge !== childcareStartAge ||
-        existingSpendChildcare.endAge !== childcareEndAge;
+      const existingAutoSpending = spendingPhases.filter(p => 
+        p.id.startsWith('simple-spend-prechild') ||
+        p.id.startsWith('simple-spend-childcare') ||
+        p.id.startsWith('simple-spend-worksave')
+      );
+      const needsSpendingRegen = existingAutoSpending.length !== spendingSegments.length ||
+        spendingSegments.some(seg => {
+          const expectedId = seg.type === 'childcare'
+            ? `simple-spend-childcare-${seg.startAge}-${seg.endAge}`
+            : (seg.startAge === currentAge ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}` : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`);
+          const match = existingAutoSpending.find(p => p.id === expectedId);
+          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
+        });
+
+      const needsRegen = needsIncomeRegen || needsSpendingRegen;
 
       if (needsRegen) {
         // Splitting incomeList
         const cleanIncomeList = incomeList.filter(inc => 
           inc.id !== 'inc-1' && 
           inc.id !== 'simple-inc' && 
-          inc.id !== 'simple-inc-prechild' &&
-          inc.id !== 'simple-inc-childcare' && 
-          inc.id !== 'simple-inc-worksave'
+          !inc.id.startsWith('simple-inc-prechild') &&
+          !inc.id.startsWith('simple-inc-childcare') && 
+          !inc.id.startsWith('simple-inc-worksave')
         );
         const wsIncomeAnnual = (Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167) * 12;
         const finalChildcareBudgets = inputs.budgetDetails?.childcareBudgets || {};
-        let childcareIncome = inputs.budgetDetails?.childcareIncome;
-        if (Object.keys(finalChildcareBudgets).length > 0) {
-          const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
-          childcareIncome = finalChildcareBudgets[minC].income;
-        }
-        const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
+        
+        incomeSegments.forEach(seg => {
+          if (seg.type === 'childcare') {
+            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
+            let childcareIncome = inputs.budgetDetails?.childcareIncome;
+            if (finalChildcareBudgets[C]) {
+              childcareIncome = finalChildcareBudgets[C].income;
+            } else if (Object.keys(finalChildcareBudgets).length > 0) {
+              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+              childcareIncome = finalChildcareBudgets[minC].income;
+            }
+            const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
 
-        if (childcareStartAge > currentAge) {
-          cleanIncomeList.push({
-            id: 'simple-inc-prechild',
-            name: 'Salary / Main Income (Standard Work Phase)',
-            amount: wsIncomeAnnual,
-            frequency: 'yearly',
-            startAge: currentAge,
-            endAge: childcareStartAge,
-            growthRate: 0.03,
-            isTaxable: true
-          });
-        }
+            const existingChildcareInc = incomeList.find(inc => 
+              inc.id === 'simple-inc-childcare' || inc.id.startsWith('simple-inc-childcare-')
+            );
+            const growthRate = existingChildcareInc && existingChildcareInc.growthRate !== undefined 
+              ? existingChildcareInc.growthRate 
+              : 0.03;
 
-        if (expectedIncEndAge > childcareStartAge) {
-          cleanIncomeList.push({
-            id: 'simple-inc-childcare',
-            name: 'Salary / Main Income (Childcare Phase)',
-            amount: ccIncomeAnnual,
-            frequency: 'yearly',
-            startAge: childcareStartAge,
-            endAge: expectedIncEndAge,
-            growthRate: 0.03,
-            isTaxable: true
-          });
-        }
-        if (targetRetirementAge > childcareEndAge) {
-          cleanIncomeList.push({
-            id: 'simple-inc-worksave',
-            name: 'Salary / Main Income (Standard Work Phase)',
-            amount: wsIncomeAnnual,
-            frequency: 'yearly',
-            startAge: childcareEndAge,
-            endAge: targetRetirementAge,
-            growthRate: 0.03,
-            isTaxable: true
-          });
-        }
+            cleanIncomeList.push({
+              id: `simple-inc-childcare-${seg.startAge}-${seg.endAge}`,
+              name: 'Salary / Main Income (Childcare Phase)',
+              amount: ccIncomeAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              growthRate: growthRate,
+              isTaxable: true
+            });
+          } else {
+            const expectedId = seg.startAge === currentAge
+              ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}`
+              : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`;
+
+            const existingStandardInc = incomeList.find(inc => 
+              inc.id === 'simple-inc-worksave' || inc.id.startsWith('simple-inc-worksave-') ||
+              inc.id === 'simple-inc-prechild' || inc.id.startsWith('simple-inc-prechild-') ||
+              inc.id === 'simple-inc' || inc.id === 'inc-1'
+            );
+            const growthRate = existingStandardInc && existingStandardInc.growthRate !== undefined
+              ? existingStandardInc.growthRate
+              : 0.03;
+
+            cleanIncomeList.push({
+              id: expectedId,
+              name: 'Salary / Main Income (Standard Work Phase)',
+              amount: wsIncomeAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              growthRate: growthRate,
+              isTaxable: true
+            });
+          }
+        });
         incomeList = cleanIncomeList;
 
         // Splitting spendingPhases
         const cleanSpendingPhases = spendingPhases.filter(p => 
           p.id !== 'spend-1' && 
           p.id !== 'simple-spend' && 
-          p.id !== 'simple-spend-prechild' &&
-          p.id !== 'simple-spend-childcare' && 
-          p.id !== 'simple-spend-worksave'
+          !p.id.startsWith('simple-spend-prechild') &&
+          !p.id.startsWith('simple-spend-childcare') && 
+          !p.id.startsWith('simple-spend-worksave')
         );
         const wsExpensesAnnual = (Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542) * 12;
-        let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
-        if (Object.keys(finalChildcareBudgets).length > 0) {
-          const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
-          childcareExpensesVal = finalChildcareBudgets[minC].expenses;
-        }
-        const ccExpensesAnnual = childcareExpensesVal
-          ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
-          : wsExpensesAnnual;
 
-        if (childcareStartAge > currentAge) {
-          cleanSpendingPhases.push({
-            id: 'simple-spend-prechild',
-            name: 'Lifestyle Spending (Standard Work Phase)',
-            amount: wsExpensesAnnual,
-            frequency: 'yearly',
-            startAge: currentAge,
-            endAge: childcareStartAge,
-            annualSpending: wsExpensesAnnual
-          });
-        }
+        spendingSegments.forEach(seg => {
+          if (seg.type === 'childcare') {
+            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
+            let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
+            if (finalChildcareBudgets[C]) {
+              childcareExpensesVal = finalChildcareBudgets[C].expenses;
+            } else if (Object.keys(finalChildcareBudgets).length > 0) {
+              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+              childcareExpensesVal = finalChildcareBudgets[minC].expenses;
+            }
+            const ccExpensesAnnual = childcareExpensesVal
+              ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
+              : wsExpensesAnnual;
 
-        if (childcareEndAge > childcareStartAge) {
-          cleanSpendingPhases.push({
-            id: 'simple-spend-childcare',
-            name: 'Lifestyle Spending (Childcare Phase)',
-            amount: ccExpensesAnnual,
-            frequency: 'yearly',
-            startAge: childcareStartAge,
-            endAge: childcareEndAge,
-            annualSpending: ccExpensesAnnual
-          });
-        }
-        if (maxLifeExpectancy > childcareEndAge) {
-          cleanSpendingPhases.push({
-            id: 'simple-spend-worksave',
-            name: 'Lifestyle Spending (Standard Work Phase)',
-            amount: wsExpensesAnnual,
-            frequency: 'yearly',
-            startAge: childcareEndAge,
-            endAge: maxLifeExpectancy,
-            annualSpending: wsExpensesAnnual
-          });
-        }
+            cleanSpendingPhases.push({
+              id: `simple-spend-childcare-${seg.startAge}-${seg.endAge}`,
+              name: 'Lifestyle Spending (Childcare Phase)',
+              amount: ccExpensesAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              annualSpending: ccExpensesAnnual
+            });
+          } else {
+            const expectedId = seg.startAge === currentAge
+              ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}`
+              : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`;
+            cleanSpendingPhases.push({
+              id: expectedId,
+              name: 'Lifestyle Spending (Standard Work Phase)',
+              amount: wsExpensesAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              annualSpending: wsExpensesAnnual
+            });
+          }
+        });
         spendingPhases = cleanSpendingPhases;
       }
     }
   }
 
   if (!isAdvanced) {
+    const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
     incomeList = incomeList.map(inc => {
-      if (inc.id === 'inc-1' || inc.id === 'simple-inc-worksave' || inc.id === 'simple-inc-prechild' || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
+      if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
         if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
-          const end = (inc.id === 'simple-inc-prechild') ? inc.endAge : targetRetirementAge;
+          const isGapPhase = inc.id.startsWith('simple-inc-worksave') && 
+            incomeSegments.some(seg => seg.type === 'standard' && seg.endAge < targetRetirementAge && inc.id === `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
+          const end = (inc.id.startsWith('simple-inc-prechild') || isGapPhase) ? inc.endAge : targetRetirementAge;
           return { ...inc, amount: Number(inputs.simpleIncome) || inc.amount, endAge: end };
         }
       }
@@ -477,9 +497,9 @@ export function runFireSimulation(inputs) {
   }
   if (!hasActiveChild) {
     incomeList = incomeList
-      .filter(inc => inc.id !== 'simple-inc-childcare' && inc.id !== 'simple-inc-prechild')
+      .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'))
       .map(inc => {
-        if (inc.id === 'simple-inc-worksave') {
+        if (inc.id.startsWith('simple-inc-worksave')) {
           return { ...inc, startAge: currentAge };
         }
         return inc;
@@ -573,18 +593,20 @@ export function runFireSimulation(inputs) {
   // spendingPhases is already defined and split above if hasActiveChild was true
   if (!isAdvanced) {
     spendingPhases = spendingPhases.map(p => {
-      if (p.id === 'spend-1' || p.id === 'simple-spend-worksave' || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
-        const amt = Number(inputs.simpleExpenses) || p.amount;
-        return { ...p, amount: amt, annualSpending: amt };
+      if (p.id === 'spend-1' || p.id.startsWith('simple-spend-worksave') || p.id.startsWith('simple-spend-prechild') || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
+        if (!p.id.includes('childcare') && !p.name.toLowerCase().includes('childcare')) {
+          const amt = Number(inputs.simpleExpenses) || p.amount;
+          return { ...p, amount: amt, annualSpending: amt };
+        }
       }
       return p;
     });
   }
   if (!hasActiveChild) {
     spendingPhases = spendingPhases
-      .filter(p => p.id !== 'simple-spend-childcare' && p.id !== 'simple-spend-prechild')
+      .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'))
       .map(p => {
-        if (p.id === 'simple-spend-worksave') {
+        if (p.id.startsWith('simple-spend-worksave')) {
           return { ...p, startAge: currentAge };
         }
         return p;
@@ -1176,7 +1198,7 @@ export function runFireSimulation(inputs) {
         // maintain their specified purchasing power in today's dollars.
         const yearsGrown = age - currentAge;
         let amount;
-        if (inc.id === 'simple-inc-childcare') {
+        if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc-childcare')) {
           const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
           const wsIncome = Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167;
           let baseCcIncome = wsIncome; // DEFAULT: NO AUTO-BUMP
@@ -1352,7 +1374,7 @@ export function runFireSimulation(inputs) {
     const activePhase = spendingPhases.find(p => age >= p.startAge && age < p.endAge);
     let baseSpending;
     if (activePhase) {
-      if (activePhase.id === 'simple-spend-childcare') {
+      if (activePhase.id && typeof activePhase.id === 'string' && activePhase.id.startsWith('simple-spend-childcare')) {
         const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
         const wsExpenses = Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542;
         let baseCcExpenses = wsExpenses;
@@ -2659,7 +2681,9 @@ export function runFireSimulation(inputs) {
     deflatedEndingSurplusShortfall: finalSurplusShortfall,
     nominalRetirementIncomeSources,
     deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars,
-    socialSecurityDetails
+    socialSecurityDetails,
+    incomeList,
+    spendingPhases
   };
 }
 
@@ -2796,6 +2820,33 @@ export function getSavingsPriority(key) {
   return priorities[key] || 99;
 }
 
+export function getPartitionedPhases(startAge, endAge, enabledEvents) {
+  const segments = [];
+  if (startAge >= endAge) return segments;
+
+  let currentType = getActiveChildrenCountAtAge(startAge, enabledEvents) > 0 ? 'childcare' : 'standard';
+  let segmentStart = startAge;
+
+  for (let age = startAge + 1; age < endAge; age++) {
+    const type = getActiveChildrenCountAtAge(age, enabledEvents) > 0 ? 'childcare' : 'standard';
+    if (type !== currentType) {
+      segments.push({
+        type: currentType,
+        startAge: segmentStart,
+        endAge: age
+      });
+      currentType = type;
+      segmentStart = age;
+    }
+  }
+  segments.push({
+    type: currentType,
+    startAge: segmentStart,
+    endAge: endAge
+  });
+  return segments;
+}
+
 export function getNormalizedPhases(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
@@ -2918,8 +2969,8 @@ export function getNormalizedPhases(inputs) {
       const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
       const childEv = enabledEvents.find(e => e.type === 'haveChild' && Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) === start);
       const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge !== undefined ? e.purchaseAge : e.age) === start);
-      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
-      const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && sp.id !== 'simple-spend-childcare');
+      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
+      const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && !sp.id.startsWith('simple-spend-childcare') && !sp.id.startsWith('simple-spend-prechild'));
 
       if (marriageEv) {
         type = 'marriage';
@@ -2932,7 +2983,7 @@ export function getNormalizedPhases(inputs) {
 
     // Defaults calculations
     // User monthly income
-    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
     let baseSalaryMonthly = 0;
     let growthRate = 0.03;
     if (start >= targetRetirementAge) {
@@ -2981,7 +3032,7 @@ export function getNormalizedPhases(inputs) {
     const defaultIncome = baseSalaryMonthly + childBoost + ssMonthlyIncome;
 
     // User monthly expenses
-    const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && sp.id !== 'simple-spend-childcare');
+    const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && !sp.id.startsWith('simple-spend-childcare') && !sp.id.startsWith('simple-spend-prechild'));
     let baseExpensesMonthly = 0;
     if (start >= targetRetirementAge) {
       baseExpensesMonthly = 0;
@@ -3253,7 +3304,7 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
     const currentPhase = preRetirementPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || preRetirementPhases[0];
     startingIncomeAnnual = currentPhase ? currentPhase.income * 12 : (Number(inputs.simpleIncome) || 50000);
   } else {
-    const rawIncomeItem = (inputs.incomeList || []).find(inc => inc.startAge <= currentAge && inc.endAge > currentAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => inc.startAge <= currentAge && inc.endAge > currentAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
     startingIncomeAnnual = rawIncomeItem 
       ? (rawIncomeItem.frequency === 'monthly' ? rawIncomeItem.amount * 12 : rawIncomeItem.amount) 
       : (Number(inputs.simpleIncome) || 50000);
@@ -3294,7 +3345,7 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
         growthRate = 0.03;
       }
     } else {
-      const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
+      const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
       if (activeIncomeItem) {
         baseIncomeMonthly = activeIncomeItem.frequency === 'monthly' ? Number(activeIncomeItem.amount) : Number(activeIncomeItem.amount) / 12;
         growthRate = Number(activeIncomeItem.growthRate) || 0.03;
