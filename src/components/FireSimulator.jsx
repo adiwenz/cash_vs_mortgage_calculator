@@ -7978,7 +7978,7 @@ export default function FireSimulator() {
                 </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ flex: 1, minHeight: 0, maxHeight: 'calc(85vh - 7rem)', overflowY: 'auto', paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 
                 {/* Needs Breakdown */}
                 {(!activeBreakdownTab || activeBreakdownTab === 'needs') && (
