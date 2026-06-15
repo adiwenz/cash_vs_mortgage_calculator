@@ -1,5 +1,5 @@
 import { getChildCostOffsetRecommendations } from './src/recommendations.js';
-import { runFireSimulation } from './src/fireCalculations.js';
+import { runFireSimulation, getNormalizedPhases } from './src/fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
 
 console.log('--- Running test_child_recommendations ---');
@@ -107,6 +107,57 @@ try {
     }
   }
   console.log('✅ Test 5 Passed: Recommendation improves/preserves retirement readiness.');
+
+  // Test 6: Child event moved to future age (e.g. 39) with parent current age 35
+  const moveChildInputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  moveChildInputs.currentAge = 35;
+  moveChildInputs.targetRetirementAge = 60;
+  moveChildInputs.lifeEvents = [
+    {
+      id: 'child-move-test',
+      type: 'haveChild',
+      enabled: true,
+      name: 'Test Child',
+      birthAge: 35, // starts at 35
+      childStartAge: 0,
+      costMethod: 'custom',
+      customAges0to4: 15000,
+      customAges5to12: 15000,
+      customAges13to18: 15000,
+      customAges19to22: 15000,
+      includeCollege: false
+    }
+  ];
+
+  // 1. Run simulation once with child at 35 to initialize budget details / simple-inc-childcare
+  let results1 = runFireSimulation(moveChildInputs);
+  let phases1 = getNormalizedPhases(moveChildInputs);
+
+  // 2. Now move child event to 39
+  moveChildInputs.lifeEvents[0].birthAge = 39;
+  let results2 = runFireSimulation(moveChildInputs);
+  let phases2 = getNormalizedPhases(moveChildInputs);
+
+  // Assertions:
+  // Pre-child phase 35-39:
+  const preChildPhase = phases2.find(p => p.startAge === 35 && p.endAge === 39);
+  assert(preChildPhase !== undefined, 'Should have a pre-child phase from 35 to 39');
+  assert(preChildPhase.type === 'workSave', 'Pre-child phase should be type workSave');
+  // Check that pre-child phase does NOT get child childcare income boost
+  const baseSalaryMonthly = Math.round((Number(moveChildInputs.simpleIncome) || 50000) / 12);
+  assert(preChildPhase.income === baseSalaryMonthly, `Pre-child phase income should be base salary monthly ${baseSalaryMonthly}, got ${preChildPhase.income}`);
+
+  // Childcare phase 39-57:
+  const childcarePhase = phases2.find(p => p.startAge === 39 && p.endAge === 57);
+  assert(childcarePhase !== undefined, 'Should have a childcare phase from 39 to 57');
+  assert(childcarePhase.type === 'childcare', 'Childcare phase should be type childcare');
+  assert(childcarePhase.income === baseSalaryMonthly + 1250, `Childcare phase income should have the child boost, expected ${baseSalaryMonthly + 1250}, got ${childcarePhase.income}`);
+
+  // Verify there are no duplicate childcare tabs/phases (e.g. split at 53)
+  const childcarePhases = phases2.filter(p => p.type === 'childcare');
+  assert(childcarePhases.length === 1, `Should only have exactly 1 childcare phase tab, got ${childcarePhases.length}`);
+
+  console.log('✅ Test 6 Passed: Moving child event from 35 to 39 regenerates phases and removes childcare boost/duplicate tabs correctly.');
 
   console.log('--- ALL test_child_recommendations PASSED ---');
   process.exit(0);

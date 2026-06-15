@@ -260,7 +260,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       targetRetirementAge: newRetirementAge,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
@@ -283,7 +283,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       simpleIncome: newIncome,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
         }
@@ -315,7 +315,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
@@ -351,7 +351,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: target65Age };
         }
@@ -937,7 +937,8 @@ export default function FireSimulator() {
                 inc.name.toLowerCase().includes('salary') ||
                 inc.name.toLowerCase().includes('main income')) &&
                 !inc.id.startsWith('simple-inc-childcare') &&
-                !inc.id.startsWith('simple-inc-worksave')
+                !inc.id.startsWith('simple-inc-worksave') &&
+                !inc.id.startsWith('simple-inc-prechild')
               ) {
                 return {
                   ...inc,
@@ -954,7 +955,8 @@ export default function FireSimulator() {
                 phase.name.toLowerCase().includes('lifestyle') ||
                 phase.name.toLowerCase().includes('spending')) &&
                 !phase.id.startsWith('simple-spend-childcare') &&
-                !phase.id.startsWith('simple-spend-worksave')
+                !phase.id.startsWith('simple-spend-worksave') &&
+                !phase.id.startsWith('simple-spend-prechild')
               ) {
                 return {
                   ...phase,
@@ -6369,7 +6371,9 @@ export default function FireSimulator() {
         inc.id !== 'simple-inc-childcare' && 
         !inc.id.startsWith('simple-inc-childcare-') && 
         inc.id !== 'simple-inc-worksave' && 
-        !inc.id.startsWith('simple-inc-worksave-')
+        !inc.id.startsWith('simple-inc-worksave-') &&
+        inc.id !== 'simple-inc-prechild' &&
+        !inc.id.startsWith('simple-inc-prechild-')
       );
       let baseSalaryMonthly = 0;
       if (rawIncomeItem) {
