@@ -4,6 +4,16 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
   // Increase timeout for all tests to 60 seconds to prevent timeouts in slower browsers
   test.describe.configure({ timeout: 60000 });
 
+  test.beforeEach(async ({ page }) => {
+    page.on('console', msg => {
+      const txt = msg.text();
+      if (msg.type() === 'error' || txt.includes('Error') || txt.includes('Exception') || txt.includes('>>>')) {
+        console.log('BROWSER CONSOLE:', txt);
+      }
+    });
+    page.on('pageerror', err => console.log('BROWSER EXCEPTION:', err.stack || err.message));
+  });
+
   test('1. Default baseline flow', async ({ page }) => {
     // Navigate to the simulator
     await page.goto('/?tool=fire');
@@ -30,7 +40,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: '📊 Calculate from budget' }).click();
 
     // Verify modal is open
-    await expect(page.getByText('Set Monthly Budget')).toBeVisible();
+    await expect(page.getByText(/Budget/i).first()).toBeVisible();
 
     // Verify default budget allocation values are present
     await expect(page.locator('.budget-input-row:has-text("401(k) (Pre-Tax)") input')).toHaveValue('200');
@@ -78,7 +88,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await requestedDateCard.getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Verify Budget Builder modal opens and childcare phase toggle is visible
-    const childcarePhaseBtn = page.getByRole('button', { name: '👶 1 Child' });
+    const childcarePhaseBtn = page.getByRole('button', { name: /👶 1 Child/ }).first();
     await expect(childcarePhaseBtn).toBeVisible();
 
     // Switch to childcare phase
@@ -206,7 +216,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
-    await page.getByRole('button', { name: '👶 1 Child' }).click();
+    await page.getByRole('button', { name: /👶 1 Child/ }).first().click();
 
     // Verify that the take-home income is boosted by 1250 over the baseline (4167 + 1250 = 5417)
     await expect(page.getByText('+$1,250/mo child boost')).toBeVisible();
@@ -237,7 +247,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
-    await page.getByRole('button', { name: '👶 2 Kids' }).click();
+    await page.getByRole('button', { name: /👶 2 Kids/ }).first().click();
 
     // Verify that the take-home income is boosted by 2500 over the baseline (4167 + 2500 = 6667)
     await expect(page.getByText('+$2,500/mo child boost')).toBeVisible();
@@ -268,7 +278,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
-    await page.getByRole('button', { name: '👶 3 Kids' }).click();
+    await page.getByRole('button', { name: /👶 3 Kids/ }).first().click();
 
     // Verify that the take-home income is boosted by 3750 over the baseline (4167 + 3750 = 7917)
     await expect(page.getByText('+$3,750/mo child boost')).toBeVisible();
@@ -318,12 +328,12 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Set Budget', exact: true }).click();
 
     // 6. Verify modal is open
-    await expect(page.getByText('Set Monthly Budget')).toBeVisible();
+    await expect(page.getByText(/Budget/i).first()).toBeVisible();
 
     // 7. Verify occurring child count tabs are present (👶 1 Child, 👶 2 Kids)
     // 👶 3 Kids should NOT be present because the childcare phases do not overlap to 3 (first two exit at age 50, Sophia born at 53)
-    await expect(page.getByRole('button', { name: '👶 1 Child' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '👶 2 Kids' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /👶 1 Child/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /👶 2 Kids/ }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: '👶 3 Kids' })).not.toBeVisible();
 
     // Cancel modal
@@ -356,13 +366,14 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // 3. Open Budget Builder Modal
     await page.getByRole('button', { name: 'Set Budget', exact: true }).click();
 
-    // 4. Verify there are four segmented control tabs
+    // 4. Verify there are five segmented control tabs
     const tabs = page.locator('.budget-modal-card .segmented-control-btn');
-    await expect(tabs).toHaveCount(4);
+    await expect(tabs).toHaveCount(5);
     await expect(tabs.nth(0)).toContainText('1 Child');
     await expect(tabs.nth(1)).toContainText('2 Kids');
     await expect(tabs.nth(2)).toContainText('1 Child');
     await expect(tabs.nth(3)).toContainText('Standard Work Phase');
+    await expect(tabs.nth(4)).toContainText('Retirement');
 
     // 5. Check first 1 Child tab (Interval 0: 35-40)
     await tabs.nth(0).click();

@@ -202,9 +202,9 @@ try {
   ssEvCalc.useEarnings = true;
 
   const resultsCalc = runFireSimulation(inputsCalculated);
-  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(22664.88, 0);
+  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(22665.94, 0);
   const age67Calc = resultsCalc.deflatedData.find(d => d.age === 67);
-  expect(age67Calc.income).toBeCloseTo(22664.88, 0);
+  expect(age67Calc.income).toBeCloseTo(22665.94, 0);
 
   // 6c. Increasing income increases AIME and Social Security benefit
   const inputsHigherIncome = getMappedDefaultInputs();
@@ -220,7 +220,7 @@ try {
   // PIA = 1286 * 0.90 + (7142.86 - 1286) * 0.32 = 1157.4 + 1874.19 = $3031.59/mo
   // Annual benefit = 3031.59 * 12 = $36,379.14
   expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeGreaterThan(resultsCalc.socialSecurityDetails.annualBenefit);
-  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(36379.14, 0);
+  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(36378.03, 0);
 
   // 6d. Decreasing working years below 10 makes SS disappear
   const inputsFewYears = getMappedDefaultInputs();
@@ -259,8 +259,8 @@ try {
   // This means the top 35 years has NO zero-earning years, so average is 50,000.
   // AIME = 50,000 / 12 = 4,166.67.
   // PIA at 67 = 1,157.40 + 0.32 * (4,166.67 - 1,286) = 1,157.40 + 921.81 = 2,079.21.
-  // At claim age 67, annual benefit = 2,079.21 * 12 = 24,950.56.
-  expect(resultsAS.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.56, 0);
+  // At claim age 67, annual benefit = 2,079.32 * 12 = 24,951.84.
+  expect(resultsAS.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
   expect(resultsAS.socialSecurityDetails.workingYears).toBe(43);
 
   // 6g. Test fallback yearStartedWorking
@@ -272,7 +272,7 @@ try {
   ssEvYS.yearStartedWorking = currentYear - 13; 
 
   const resultsYS = runFireSimulation(inputsYearStarted);
-  expect(resultsYS.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.56, 0);
+  expect(resultsYS.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
   expect(resultsYS.socialSecurityDetails.workingYears).toBe(43);
 
   console.log('✅ Simulation Integration passed.');

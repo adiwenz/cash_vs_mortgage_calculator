@@ -320,6 +320,112 @@ export function runFireSimulation(inputs) {
 
   const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
   let incomeList = inputs.incomeList || [];
+  let spendingPhases = inputs.spendingPhases || [];
+
+  if (hasActiveChild) {
+    const hasSimpleIncChildcare = incomeList.some(inc => inc.id === 'simple-inc-childcare');
+    if (!hasSimpleIncChildcare) {
+      const childEvents = enabledEvents.filter(e => e.type === 'haveChild');
+      let minChildParentAge = Infinity;
+      let maxChildParentAge = -Infinity;
+      childEvents.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+      });
+
+      const childEndAge = Math.min(maxLifeExpectancy, Math.max(currentAge, maxChildParentAge));
+      const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+
+      if (hasChildcarePhase) {
+        // Splitting incomeList
+        const cleanIncomeList = incomeList.filter(inc => 
+          inc.id !== 'inc-1' && 
+          inc.id !== 'simple-inc' && 
+          inc.id !== 'simple-inc-childcare' && 
+          inc.id !== 'simple-inc-worksave'
+        );
+        const wsIncomeAnnual = (Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167) * 12;
+        const finalChildcareBudgets = inputs.budgetDetails?.childcareBudgets || {};
+        let childcareIncome = inputs.budgetDetails?.childcareIncome;
+        if (Object.keys(finalChildcareBudgets).length > 0) {
+          const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+          childcareIncome = finalChildcareBudgets[minC].income;
+        }
+        const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12) + 1250) * 12;
+
+        if (childEndAge > currentAge) {
+          cleanIncomeList.push({
+            id: 'simple-inc-childcare',
+            name: 'Salary / Main Income (Childcare Phase)',
+            amount: ccIncomeAnnual,
+            frequency: 'yearly',
+            startAge: currentAge,
+            endAge: Math.min(targetRetirementAge, childEndAge),
+            growthRate: 0.03,
+            isTaxable: true
+          });
+        }
+        if (targetRetirementAge > childEndAge) {
+          cleanIncomeList.push({
+            id: 'simple-inc-worksave',
+            name: 'Salary / Main Income (Standard Work Phase)',
+            amount: wsIncomeAnnual,
+            frequency: 'yearly',
+            startAge: childEndAge,
+            endAge: targetRetirementAge,
+            growthRate: 0.03,
+            isTaxable: true
+          });
+        }
+        incomeList = cleanIncomeList;
+
+        // Splitting spendingPhases
+        const cleanSpendingPhases = spendingPhases.filter(p => 
+          p.id !== 'spend-1' && 
+          p.id !== 'simple-spend' && 
+          p.id !== 'simple-spend-childcare' && 
+          p.id !== 'simple-spend-worksave'
+        );
+        const wsExpensesAnnual = (Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542) * 12;
+        let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
+        if (Object.keys(finalChildcareBudgets).length > 0) {
+          const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+          childcareExpensesVal = finalChildcareBudgets[minC].expenses;
+        }
+        const ccExpensesAnnual = childcareExpensesVal
+          ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
+          : wsExpensesAnnual;
+
+        if (childEndAge > currentAge) {
+          cleanSpendingPhases.push({
+            id: 'simple-spend-childcare',
+            name: 'Lifestyle Spending (Childcare Phase)',
+            amount: ccExpensesAnnual,
+            frequency: 'yearly',
+            startAge: currentAge,
+            endAge: childEndAge,
+            annualSpending: ccExpensesAnnual
+          });
+        }
+        if (maxLifeExpectancy > childEndAge) {
+          cleanSpendingPhases.push({
+            id: 'simple-spend-worksave',
+            name: 'Lifestyle Spending (Standard Work Phase)',
+            amount: wsExpensesAnnual,
+            frequency: 'yearly',
+            startAge: childEndAge,
+            endAge: maxLifeExpectancy,
+            annualSpending: wsExpensesAnnual
+          });
+        }
+        spendingPhases = cleanSpendingPhases;
+      }
+    }
+  }
+
   if (!isAdvanced) {
     incomeList = incomeList.map(inc => {
       if (inc.id === 'inc-1' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
@@ -425,7 +531,7 @@ export function runFireSimulation(inputs) {
     }
   }
 
-  let spendingPhases = inputs.spendingPhases || [];
+  // spendingPhases is already defined and split above if hasActiveChild was true
   if (!isAdvanced) {
     spendingPhases = spendingPhases.map(p => {
       if (p.id === 'spend-1' || p.id === 'simple-spend-worksave' || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
@@ -1034,7 +1140,14 @@ export function runFireSimulation(inputs) {
           const wsIncome = Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167;
           let baseCcIncome = wsIncome; // DEFAULT: NO AUTO-BUMP
           
-          if (inputs.budgetDetails?.childcareBudgets?.[C]) {
+          const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge && p.type === 'childcare');
+          let hasSavedPhase = false;
+          if (activePhaseForAge && inputs.budgetDetails?.phases) {
+            hasSavedPhase = inputs.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
+          }
+          if (activePhaseForAge && hasSavedPhase) {
+            baseCcIncome = activePhaseForAge.income;
+          } else if (inputs.budgetDetails?.childcareBudgets?.[C]) {
             baseCcIncome = Number(inputs.budgetDetails.childcareBudgets[C].income);
           } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
             if (C > 0) {
@@ -1181,7 +1294,14 @@ export function runFireSimulation(inputs) {
         const wsExpenses = Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542;
         let baseCcExpenses = wsExpenses;
         
-        if (inputs.budgetDetails?.childcareBudgets?.[C]) {
+        const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge && p.type === 'childcare');
+        let hasSavedPhase = false;
+        if (activePhaseForAge && inputs.budgetDetails?.phases) {
+          hasSavedPhase = inputs.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
+        }
+        if (activePhaseForAge && hasSavedPhase && activePhaseForAge.expenses) {
+          baseCcExpenses = Object.values(activePhaseForAge.expenses).reduce((sum, val) => sum + val, 0);
+        } else if (inputs.budgetDetails?.childcareBudgets?.[C]) {
           const ccExp = inputs.budgetDetails.childcareBudgets[C].expenses;
           baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
         } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
@@ -2569,7 +2689,7 @@ export function getNormalizedPhases(inputs) {
 
     if (childCount > 0) {
       type = 'childcare';
-      name = 'Childcare Phase';
+      name = childCount === 1 ? '1 Child' : `${childCount} Kids`;
       icon = '👶';
     } else {
       const marriageEv = enabledEvents.find(e => e.type === 'marriage' && Number(e.age) === start);
@@ -2594,10 +2714,10 @@ export function getNormalizedPhases(inputs) {
     let baseSalaryMonthly = 0;
     let growthRate = 0.03;
     if (rawIncomeItem) {
-      baseSalaryMonthly = rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12;
+      baseSalaryMonthly = rawIncomeItem.frequency === 'monthly' ? Math.round(Number(rawIncomeItem.amount)) : Math.round(Number(rawIncomeItem.amount) / 12);
       growthRate = Number(rawIncomeItem.growthRate) || 0.03;
     } else {
-      baseSalaryMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
+      baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
       growthRate = 0.03;
     }
 
@@ -2611,9 +2731,9 @@ export function getNormalizedPhases(inputs) {
     const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && sp.id !== 'simple-spend-childcare');
     let baseExpensesMonthly = 0;
     if (rawSpendingItem) {
-      baseExpensesMonthly = rawSpendingItem.frequency === 'monthly' ? Number(rawSpendingItem.amount) : Number(rawSpendingItem.amount) / 12;
+      baseExpensesMonthly = rawSpendingItem.frequency === 'monthly' ? Math.round(Number(rawSpendingItem.amount)) : Math.round(Number(rawSpendingItem.amount) / 12);
     } else {
-      baseExpensesMonthly = (Number(inputs.simpleExpenses) || 42500) / 12;
+      baseExpensesMonthly = Math.round((Number(inputs.simpleExpenses) || 42500) / 12);
     }
 
     const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
@@ -2627,7 +2747,7 @@ export function getNormalizedPhases(inputs) {
 
     if (isMarried) {
       const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
-      spouseIncome = spouseMember ? (Number(spouseMember.income) || 0) / 12 : (Number(marriageEvent.spouseIncome || 0) / 12);
+      spouseIncome = spouseMember ? Math.round((Number(spouseMember.income) || 0) / 12) : Math.round(Number(marriageEvent.spouseIncome || 0) / 12);
       spouseIncomeGrowthRate = spouseMember
         ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
         : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
@@ -2640,9 +2760,9 @@ export function getNormalizedPhases(inputs) {
 
       // default combined spending if married
       if (marriageEvent.combinedSpendingAfterMarriage) {
-        baseExpensesMonthly = Number(marriageEvent.combinedSpendingAfterMarriage) / 12;
+        baseExpensesMonthly = Math.round(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
       } else {
-        const spousePersonal = spouseIncome * 12 * (1 - spouseSavingsRate / 100) / 12; // default spouse spending
+        const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100)); // default spouse spending
         const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
         const housing = Number(marriageEvent.housingSavings || 0);
         baseExpensesMonthly = baseExpensesMonthly + spousePersonal + lifestyle + housing;
@@ -2662,6 +2782,20 @@ export function getNormalizedPhases(inputs) {
     const diff = Math.round(baseExpensesMonthly) - sumVal;
     defaultExpenses.misc += diff;
 
+    if (childCount > 0) {
+      if (inputs.budgetDetails?.childcareBudgets?.[childCount]?.expenses) {
+        defaultExpenses = { ...inputs.budgetDetails.childcareBudgets[childCount].expenses };
+      } else if (inputs.budgetDetails?.childcareExpenses) {
+        defaultExpenses = { ...inputs.budgetDetails.childcareExpenses };
+      } else if (inputs.budgetDetails?.expenses) {
+        defaultExpenses = { ...inputs.budgetDetails.expenses };
+      }
+    } else {
+      if (inputs.budgetDetails?.expenses) {
+        defaultExpenses = { ...inputs.budgetDetails.expenses };
+      }
+    }
+
     // Default savings
     let defaultSavingsMonthly = 0;
     if (inputs.preTaxSavingsRate) {
@@ -2669,9 +2803,23 @@ export function getNormalizedPhases(inputs) {
     } else {
       defaultSavingsMonthly = Math.max(0, Math.round(defaultIncome - baseExpensesMonthly));
     }
-    const defaultSavings = {
+    
+    let defaultSavings = {
       trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: defaultSavingsMonthly, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
     };
+    if (childCount > 0) {
+      if (inputs.budgetDetails?.childcareBudgets?.[childCount]?.savings) {
+        defaultSavings = { ...inputs.budgetDetails.childcareBudgets[childCount].savings };
+      } else if (inputs.budgetDetails?.childcareSavings) {
+        defaultSavings = { ...inputs.budgetDetails.childcareSavings };
+      } else if (inputs.budgetDetails?.savings) {
+        defaultSavings = { ...inputs.budgetDetails.savings };
+      }
+    } else {
+      if (inputs.budgetDetails?.savings) {
+        defaultSavings = { ...inputs.budgetDetails.savings };
+      }
+    }
 
     let defaultPartnerSavings = {
       trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
@@ -2684,6 +2832,26 @@ export function getNormalizedPhases(inputs) {
     // Lookup saved phase override
     const savedPhase = (inputs.budgetDetails?.phases || []).find(p => Number(p.startAge) === start || p.id === id);
 
+    let resolvedIncome = defaultIncome;
+    if (savedPhase && savedPhase.income !== undefined) {
+      resolvedIncome = Number(savedPhase.income);
+      if (type === 'childcare') {
+        let savedChildCount = 0;
+        if (savedPhase.type === 'childcare' && savedPhase.name) {
+          if (savedPhase.name.includes('1 Child')) {
+            savedChildCount = 1;
+          } else {
+            const match = savedPhase.name.match(/(\d+)\s+Kids?/i);
+            if (match) {
+              savedChildCount = parseInt(match[1], 10);
+            }
+          }
+        }
+        // If childCount is different, adjust the income boost accordingly
+        resolvedIncome += (childCount - savedChildCount) * 1250;
+      }
+    }
+
     const phase = {
       id,
       name,
@@ -2692,7 +2860,7 @@ export function getNormalizedPhases(inputs) {
       startAge: start,
       endAge: end,
       childCount,
-      income: savedPhase?.income !== undefined ? Number(savedPhase.income) : defaultIncome,
+      income: resolvedIncome,
       incomeGrowthRate: growthRate,
       savingsAllocMode: savedPhase?.savingsAllocMode || inputs.budgetDetails?.savingsAllocMode || 'fixed',
       savings: savedPhase?.savings ? { ...savedPhase.savings } : defaultSavings,

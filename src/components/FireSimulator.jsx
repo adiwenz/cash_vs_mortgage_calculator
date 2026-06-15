@@ -1124,9 +1124,29 @@ export default function FireSimulator() {
     const yearsUntilRetirement = Math.max(0, targetRetirementAge - currentAge);
     const rateOfReturn = (Number(inputs.expectedReturn) || 7) / 100;
     const swr = (Number(inputs.swr) || 4) / 100;
-    const retirementExpenses = activeResults.annualRetirementSpending || 40000;
-    const shortfall = activeResults.endingSurplusShortfall < 0 ? -activeResults.endingSurplusShortfall : 0;
     const marginalTaxRate = inputs.includeTaxes ? 0.25 : 0.0;
+
+    // Run a temporary simulation with the default childcare boost enabled
+    // so recommendations are calculated against the post-boost baseline.
+    const recInputs = JSON.parse(JSON.stringify(inputs));
+    const normPhases = getNormalizedPhases(recInputs);
+    if (!recInputs.budgetDetails) recInputs.budgetDetails = {};
+    recInputs.budgetDetails.phases = normPhases.map(p => ({
+      id: p.id,
+      type: p.type,
+      name: p.name,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      income: p.income,
+      savingsAllocMode: p.smartRule || p.savingsAllocMode || 'fixed',
+      savings: p.savings,
+      partnerSavings: p.partnerSavings,
+      expenses: p.expenses
+    }));
+    const recResults = runFireSimulation(recInputs);
+
+    const retirementExpenses = recResults.annualRetirementSpending || 40000;
+    const shortfall = recResults.endingSurplusShortfall < 0 ? -recResults.endingSurplusShortfall : 0;
 
     // Determine childcare phase and peak monthly child cost
     const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
@@ -1205,10 +1225,10 @@ export default function FireSimulator() {
 
     const unfundedMaxChildCostsMonthly = Math.max(0, maxChildCostsMonthly - currentChildcareIncomeBoostMonthly);
 
-    const currentReadyAge = activeResults.retirementReadyAge;
-    const hasShortfall = activeResults.endingSurplusShortfall < 0 || 
-                         !activeResults.moneyLasts ||
-                         (activeResults.retirementReadyAge && inputs.targetRetirementAge < activeResults.retirementReadyAge) ||
+    const currentReadyAge = recResults.retirementReadyAge;
+    const hasShortfall = recResults.endingSurplusShortfall < 0 || 
+                         !recResults.moneyLasts ||
+                         (recResults.retirementReadyAge && inputs.targetRetirementAge < recResults.retirementReadyAge) ||
                          (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
 
     if (!hasShortfall) return null;
@@ -1723,9 +1743,10 @@ export default function FireSimulator() {
 
     const currentPhase = normalizedPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normalizedPhases[0];
     if (currentPhase) {
+      const childBoostForCurrent = (currentPhase.childCount || 0) * 1250;
       initialEdited[currentPhase.id] = {
         ...currentPhase,
-        income: Math.round(targetIncome / 12),
+        income: Math.round(targetIncome / 12) + childBoostForCurrent,
         savings: targetSavingsMap,
         expenses: targetExpensesMap,
         savingsAllocMode: inp.budgetDetails?.savingsAllocMode || 'fixed'
@@ -2634,7 +2655,8 @@ export default function FireSimulator() {
       const currentPhase = Object.values(finalEdited).find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || Object.values(finalEdited)[0];
       
       if (currentPhase) {
-        newInputs.simpleIncome = currentPhase.income * 12;
+        const childBoost = (currentPhase.childCount || 0) * 1250;
+        newInputs.simpleIncome = (currentPhase.income - childBoost) * 12;
         newInputs.simpleExpenses = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
       }
 
@@ -2701,6 +2723,13 @@ export default function FireSimulator() {
 
       // Let the single source of truth properly build suffix-indexed childcare phases, spending phases and rules
       syncChildcarePhasesAndRules(newInputs);
+
+      console.log('>>> SAVE BUDGET:', {
+        id: scen.id,
+        simpleIncome: newInputs.simpleIncome,
+        simpleExpenses: newInputs.simpleExpenses,
+        phases: newInputs.budgetDetails?.phases
+      });
 
       return {
         ...scen,
@@ -6534,7 +6563,7 @@ export default function FireSimulator() {
         modalTitle = 'Marriage Phase Budget';
       } else if (activePhaseObj.type === 'divorce') {
         modalTitle = 'Divorce Phase Budget';
-      } else if (activePhaseObj.type === 'child') {
+      } else if (activePhaseObj.type === 'childcare') {
         modalTitle = `Childcare Phase Budget (${activePhaseObj.childCount} Child${activePhaseObj.childCount === 1 ? '' : 'ren'})`;
       } else if (activePhaseObj.type === 'move') {
         modalTitle = `Move Phase Budget (${activePhaseObj.name})`;
