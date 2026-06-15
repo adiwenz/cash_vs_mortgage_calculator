@@ -1,10 +1,10 @@
 ---
 name: run-verification-tests
-description: Automatically run all verification tests after making any code changes to prevent regressions.
+description: Automatically run changed verification tests after making code changes to prevent regressions.
 ---
 # Run Verification Tests on Change
 
-This skill ensures that whenever you modify, create, or delete any source code, component, calculation module, or test in this repository, you must execute the verification test suite before ending your turn or presenting results to the user.
+This skill ensures that whenever you modify, create, or delete any source code, component, calculation module, or test in this repository, you must execute the changed verification tests (only targeting the changed files and changed E2E tests, i.e., `npx playwright test --only-changed=main` for Playwright, not the whole Playwright test suite) before ending your turn or presenting results to the user.
 
 ## Instructions
 
@@ -23,11 +23,12 @@ This skill ensures that whenever you modify, create, or delete any source code, 
      (or `npm run test:unit:related <changed files>`). Avoid running the full suite `npm run test:unit` during development iterations.
 
 3. **E2E Changed Validation (Playwright)**:
-   - For Playwright end-to-end tests, default to running only changed tests relative to the main branch:
+   - For Playwright end-to-end tests, only run changed tests relative to the main branch when code is changed:
      ```bash
      npx playwright test --only-changed=main
      ```
      (or `npm run test:e2e:changed`).
+   - Do NOT run the whole Playwright test suite (`npx playwright test` or `npm run test:e2e`) when code is changed during development.
 
 4. **Broader/Full-Suite Validation**:
    - Only run the full E2E suite (`npm run test:e2e:full` / `npx playwright test`) or full unit test suite (`npm run test:unit`) when:

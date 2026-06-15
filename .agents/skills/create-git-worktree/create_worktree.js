@@ -101,7 +101,19 @@ try {
   process.exit(1);
 }
 
-// 6. Display results
+// 6. Run npm install inside the new worktree
+console.log(`\nRunning: npm install inside "${finalWorktreePath}"`);
+try {
+  execSync('npm install', {
+    cwd: finalWorktreePath,
+    stdio: 'inherit'
+  });
+} catch (error) {
+  console.error('\nError: Failed to run npm install in the new worktree:', error.message);
+  process.exit(1);
+}
+
+// 7. Display results
 console.log(`\n==================================================`);
 console.log(`🎉 Git Worktree successfully created!`);
 console.log(`==================================================`);

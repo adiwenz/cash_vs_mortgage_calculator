@@ -18,6 +18,7 @@ At the start of a new coding conversation or implementation task:
    ```bash
    node .agents/skills/create-git-worktree/create_worktree.js "<Task Title>"
    ```
+   *Note: The script automatically runs `npm install` inside the newly created worktree directory.*
 
 3. **Verify Git Status**:
    The script checks if the repository has uncommitted changes. If it is dirty:
