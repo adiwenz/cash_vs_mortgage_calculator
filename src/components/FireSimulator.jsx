@@ -6451,7 +6451,7 @@ export default function FireSimulator() {
       );
       let baseSalaryMonthly = 0;
       if (isRetirementPhase) {
-        baseSalaryMonthly = 0;
+        baseSalaryMonthly = activePhaseObj.ssMonthlyIncome || 0;
       } else if (rawIncomeItem) {
         baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
       } else {

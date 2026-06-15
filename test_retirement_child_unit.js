@@ -231,7 +231,7 @@ try {
 
   let baseSalaryMonthly = 0;
   if (isRetirementPhase) {
-    baseSalaryMonthly = 0;
+    baseSalaryMonthly = retiredChildPhase.ssMonthlyIncome || 0;
   } else if (rawIncomeItem) {
     baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
   } else {
@@ -248,6 +248,83 @@ try {
   assert(activeChildBoost === 1250, `Expected activeChildBoost to be 1250, got ${activeChildBoost}`);
 
   console.log('✅ Test 4 Passed: baseSalaryMonthly is 0 and activeChildBoost is 1250 (fully visible).');
+
+  // ----------------------------------------------------
+  // Test 5: Retired, has child, receiving Social Security
+  // ----------------------------------------------------
+  console.log('\nRunning Test 5: Verify total income shows SS + 1250 boost, but activeChildBoost shows only +1250...');
+
+  const ssChildInputs = JSON.parse(JSON.stringify(baselineInputs));
+  
+  // Enable Social Security
+  const ssEv = ssChildInputs.lifeEvents.find(e => e.type === 'socialSecurity');
+  if (ssEv) {
+    ssEv.enabled = true;
+    ssEv.claimingAge = 62;
+    ssEv.useEarnings = false;
+    ssEv.monthlyBenefit = 2000;
+  } else {
+    ssChildInputs.lifeEvents.push({
+      id: 'ss-event',
+      type: 'socialSecurity',
+      enabled: true,
+      claimingAge: 62,
+      useEarnings: false,
+      monthlyBenefit: 2000
+    });
+  }
+
+  // Add child event
+  ssChildInputs.lifeEvents.push({
+    id: 'child-event-5',
+    type: 'haveChild',
+    enabled: true,
+    name: 'Late Child 5',
+    birthAge: 50,
+    childStartAge: 0,
+    costMethod: 'custom',
+    customAges0to4: 15000,
+    customAges5to12: 15000,
+    customAges13to18: 15000,
+    customAges19to22: 15000,
+    includeCollege: false
+  });
+
+  // Get recommendations and inject matching child income boosts (1250/mo)
+  const ssChildRecs = getChildCostOffsetRecommendations(ssChildInputs);
+  ssChildInputs.incomeList = [...(ssChildInputs.incomeList || []), ...ssChildRecs[0].incomeBoosts];
+
+  const ssChildPhases = getNormalizedPhases(ssChildInputs);
+  
+  // Phase 2 should be retire_60_68 (retired with child, age 60 to 68)
+  // Social Security claims at 62, which creates a boundary!
+  // So we will have a phase starting at 62: retire_62_68 (retired, receiving SS, has child)
+  const ssChildPhase = ssChildPhases.find(p => p.startAge === 62 && p.type === 'retire');
+  assert(ssChildPhase !== undefined, 'Should have a retirement phase starting at 62 when receiving SS and child is active');
+  assert(ssChildPhase.childCount > 0, 'Expected child count to be > 0 in this phase');
+  assert(ssChildPhase.ssMonthlyIncome > 0, `Expected ssMonthlyIncome to be > 0, got ${ssChildPhase.ssMonthlyIncome}`);
+
+  // Social Security benefit at claim age 62 is 2000 * factor
+  // factor for 62 is 0.70 (since full retirement age is 67, 5 years early is 30% reduction, so 70% of 2000 = 1400)
+  // Let's verify what ssMonthlyIncome is computed as:
+  const expectedSSMonthly = ssChildPhase.ssMonthlyIncome;
+  console.log(`  SS monthly benefit calculated: ${expectedSSMonthly}`);
+
+  // Total income should be SS monthly + 1250 child boost
+  const expectedTotalIncome = expectedSSMonthly + 1250;
+  assert(ssChildPhase.income === expectedTotalIncome, `Expected total phase income to be ${expectedTotalIncome}, got ${ssChildPhase.income}`);
+
+  // Simulate FireSimulator.jsx activeChildBoost logic
+  const simIsRetirement = ssChildPhase.type === 'retire';
+  let simBaseSalary = 0;
+  if (simIsRetirement) {
+    simBaseSalary = ssChildPhase.ssMonthlyIncome || 0;
+  }
+  
+  const simActiveChildBoost = Math.max(0, ssChildPhase.income - simBaseSalary);
+  assert(simActiveChildBoost === 1250, `Expected active child boost badge to show 1250, got ${simActiveChildBoost}`);
+
+  console.log('✅ Test 5 Passed: total income is SS + 1250, child boost badge correctly shows only +1250.');
 
   console.log('\n🎉 ALL test_retirement_child_unit PASSED SUCCESSFULLY!');
   process.exit(0);

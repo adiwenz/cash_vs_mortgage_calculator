@@ -3019,7 +3019,7 @@ export function getNormalizedPhases(inputs) {
     if (savedPhase && savedPhase.income !== undefined) {
       resolvedIncome = Number(savedPhase.income);
       if (childCount > 0 && childBoost > 0) {
-        const standardBase = (start >= targetRetirementAge) ? 0 : baseSalaryMonthly;
+        const standardBase = (start >= targetRetirementAge) ? ssMonthlyIncome : baseSalaryMonthly;
         if (resolvedIncome <= standardBase) {
           resolvedIncome += childBoost;
         }
@@ -3051,6 +3051,7 @@ export function getNormalizedPhases(inputs) {
       childCount,
       income: resolvedIncome,
       incomeGrowthRate: growthRate,
+      ssMonthlyIncome,
       savingsAllocMode: savedPhase?.savingsAllocMode || inputs.budgetDetails?.savingsAllocMode || 'fixed',
       savings: savedPhase?.savings ? { ...savedPhase.savings } : defaultSavings,
       partnerSavings: savedPhase?.partnerSavings ? { ...savedPhase.partnerSavings } : defaultPartnerSavings,
