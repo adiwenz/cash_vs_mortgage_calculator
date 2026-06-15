@@ -348,7 +348,8 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Layer 2: Assets & Commitments */
+
+/* Layer 2: Assets & Commitments (Decision Phases) */
 .commitment-track {
   height: 30px;
 }
@@ -389,7 +390,7 @@
   color: var(--accent-rose, #ec4899);
 }
 
-/* Layer 3: Events / Milestones Track */
+/* Layer 2: Events / Milestones Track */
 .events-row-content {
   height: 180px; /* Taller track to prevent overlaps with stacked glowing badges */
 }
@@ -2044,6 +2045,7 @@
 .budget-modal-card.redesigned {
   max-width: 680px;
   width: 95%;
+  height: 85vh;
   max-height: 85vh;
   display: flex;
   flex-direction: column;

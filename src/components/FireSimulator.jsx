@@ -8969,167 +8969,7 @@ export default function FireSimulator() {
               <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
                 <div className="timeline-grid" style={{ minWidth: '850px' }}>
                   
-                  {/* Layer 1: LIFE PHASES */}
-                  {(() => {
-                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                    if (totalYears <= 0) return null;
-                    const retAge = inputs.targetRetirementAge || inputs.lifeExpectancy;
-                    const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
-
-                    return (
-                      <div className="timeline-row">
-                        <div className="timeline-row-label">Life Phases</div>
-                        <div className="timeline-row-content life-phase-track">
-                          <div className="timeline-track-inner">
-                            {workPct > 0 && (
-                              <div
-                                className="life-phase-span work-save"
-                                style={{
-                                  left: '0%',
-                                  width: `${workPct}%`
-                                }}
-                              >
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
-                                  <span style={{ fontWeight: 700 }}>💼 Work & Save</span>
-                                  <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {inputs.currentAge}–{retAge}</span>
-                                </div>
-                              </div>
-                            )}
-                            {workPct < 100 && (
-                              <div
-                                className="life-phase-span retirement"
-                                style={{
-                                  left: `${workPct}%`,
-                                  width: `${100 - workPct}%`
-                                }}
-                              >
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
-                                  <span style={{ fontWeight: 700 }}>🏖️ Retirement</span>
-                                  <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {retAge}–{inputs.lifeExpectancy}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Layer 2: ASSETS & COMMITMENTS */}
-                  {(() => {
-                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                    if (totalYears <= 0) return null;
-
-                    const activeCommitments = [];
-
-                    // Homeownership spans
-                    inputs.lifeEvents.forEach(ev => {
-                      if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
-                        const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
-                        const houseName = asset?.name || 'Primary Home';
-                        const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-                        const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
-                        const sellAge = sellEv ? Number(sellEv.age) : inputs.lifeExpectancy;
-                        activeCommitments.push({
-                          id: `house-${ev.houseId}`,
-                          label: houseName,
-                          emoji: '🏠',
-                          startAge: buyAge,
-                          endAge: sellAge,
-                          className: 'commitment-span home'
-                        });
-                      }
-                    });
-
-                    // Childcare support
-                    const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-                    if (childEvents.length > 0) {
-                      const minChildAge = Math.min(...childEvents.map(ev => Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30));
-                      const maxChildAge = Math.max(...childEvents.map(ev => (Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30) + (ev.includeCollege ? 22 : 18)));
-                      if (minChildAge < maxChildAge && maxChildAge > inputs.currentAge) {
-                        activeCommitments.push({
-                          id: 'childcare',
-                          label: 'Childcare & Support',
-                          emoji: '👶',
-                          startAge: Math.max(inputs.currentAge, minChildAge),
-                          endAge: Math.min(inputs.lifeExpectancy, maxChildAge),
-                          className: 'commitment-span childcare'
-                        });
-                      }
-                    }
-
-                    // Marriage
-                    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-                    const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
-                    const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
-                    if (marriageEvent || hasSpouseInHousehold) {
-                      const start = marriageEvent ? Number(marriageEvent.age) : inputs.currentAge;
-                      const end = divorceEvent ? Number(divorceEvent.age) : inputs.lifeExpectancy;
-                      activeCommitments.push({
-                        id: 'marriage',
-                        label: 'Marriage',
-                        emoji: '💍',
-                        startAge: start,
-                        endAge: end,
-                        className: 'commitment-span marriage'
-                      });
-                    }
-
-                    if (activeCommitments.length === 0) {
-                      return (
-                        <div className="timeline-row">
-                          <div className="timeline-row-label">Commitments</div>
-                          <div className="timeline-row-content commitment-track">
-                            <div className="timeline-track-inner">
-                              <div
-                                className="commitment-span"
-                                style={{
-                                  left: '0%',
-                                  width: '100%',
-                                  background: 'rgba(255,255,255,0.02)',
-                                  border: '1px dashed var(--border-color)',
-                                  color: 'var(--text-tertiary)',
-                                  cursor: 'default'
-                                }}
-                              >
-                                No active commitments. Add a house purchase, child, or marriage above to see durations.
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return activeCommitments.map(c => {
-                      const startPct = Math.max(0, Math.min(100, ((c.startAge - inputs.currentAge) / totalYears) * 100));
-                      const endPct = Math.max(0, Math.min(100, ((c.endAge - inputs.currentAge) / totalYears) * 100));
-                      const widthPct = endPct - startPct;
-                      if (widthPct <= 0) return null;
-
-                      return (
-                        <div className="timeline-row" key={c.id}>
-                          <div className="timeline-row-label">
-                            <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
-                          </div>
-                          <div className="timeline-row-content commitment-track">
-                            <div className="timeline-track-inner">
-                              <div
-                                className={c.className}
-                                style={{
-                                  left: `${startPct}%`,
-                                  width: `${widthPct}%`
-                                }}
-                              >
-                                {c.emoji} {c.label} (Age {c.startAge}–{c.endAge === inputs.lifeExpectancy ? `${c.startAge}+` : c.endAge})
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-
-                  {/* Layer 3: MILESTONES / EVENTS */}
+                  {/* Layer 1: MILESTONES / EVENTS */}
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     if (totalYears <= 0) return null;
@@ -9310,6 +9150,141 @@ export default function FireSimulator() {
                                 );
                               }
                             })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Layer 2: DECISION PHASES (MARRIAGE, CHILDCARE, HOMEOWNERSHIP) */}
+                  {(() => {
+                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                    if (totalYears <= 0) return null;
+
+                    const activeCommitments = [];
+
+                    // Homeownership spans
+                    inputs.lifeEvents.forEach(ev => {
+                      if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
+                        const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
+                        const houseName = asset?.name || 'Primary Home';
+                        const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
+                        const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
+                        const sellAge = sellEv ? Number(sellEv.age) : inputs.lifeExpectancy;
+                        activeCommitments.push({
+                          id: `house-${ev.houseId}`,
+                          label: houseName,
+                          emoji: '🏠',
+                          startAge: buyAge,
+                          endAge: sellAge,
+                          className: 'commitment-span home'
+                        });
+                      }
+                    });
+
+                    // Childcare support
+                    const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+                    if (childEvents.length > 0) {
+                      const minChildAge = Math.min(...childEvents.map(ev => Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30));
+                      const maxChildAge = Math.max(...childEvents.map(ev => (Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30) + (ev.includeCollege ? 22 : 18)));
+                      if (minChildAge < maxChildAge && maxChildAge > inputs.currentAge) {
+                        activeCommitments.push({
+                          id: 'childcare',
+                          label: 'Childcare & Support',
+                          emoji: '👶',
+                          startAge: Math.max(inputs.currentAge, minChildAge),
+                          endAge: Math.min(inputs.lifeExpectancy, maxChildAge),
+                          className: 'commitment-span childcare'
+                        });
+                      }
+                    }
+
+                    // Marriage
+                    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+                    const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
+                    const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
+                    if (marriageEvent || hasSpouseInHousehold) {
+                      const start = marriageEvent ? Number(marriageEvent.age) : inputs.currentAge;
+                      const end = divorceEvent ? Number(divorceEvent.age) : inputs.lifeExpectancy;
+                      activeCommitments.push({
+                        id: 'marriage',
+                        label: 'Marriage',
+                        emoji: '💍',
+                        startAge: start,
+                        endAge: end,
+                        className: 'commitment-span marriage'
+                      });
+                    }
+
+                    return activeCommitments.map(c => {
+                      const startPct = Math.max(0, Math.min(100, ((c.startAge - inputs.currentAge) / totalYears) * 100));
+                      const endPct = Math.max(0, Math.min(100, ((c.endAge - inputs.currentAge) / totalYears) * 100));
+                      const widthPct = endPct - startPct;
+                      if (widthPct <= 0) return null;
+
+                      return (
+                        <div className="timeline-row" key={c.id}>
+                          <div className="timeline-row-label">
+                            <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
+                          </div>
+                          <div className="timeline-row-content commitment-track">
+                            <div className="timeline-track-inner">
+                              <div
+                                className={c.className}
+                                style={{
+                                  left: `${startPct}%`,
+                                  width: `${widthPct}%`
+                                }}
+                              >
+                                {c.emoji} {c.label} (Age {c.startAge}–{c.endAge === inputs.lifeExpectancy ? `${c.startAge}+` : c.endAge})
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+
+                  {/* Layer 3: LIFE PHASES */}
+                  {(() => {
+                    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                    if (totalYears <= 0) return null;
+                    const retAge = inputs.targetRetirementAge || inputs.lifeExpectancy;
+                    const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
+
+                    return (
+                      <div className="timeline-row">
+                        <div className="timeline-row-label">Life Phases</div>
+                        <div className="timeline-row-content life-phase-track">
+                          <div className="timeline-track-inner">
+                            {workPct > 0 && (
+                              <div
+                                className="life-phase-span work-save"
+                                style={{
+                                  left: '0%',
+                                  width: `${workPct}%`
+                                }}
+                              >
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+                                  <span style={{ fontWeight: 700 }}>💼 Work & Save</span>
+                                  <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {inputs.currentAge}–{retAge}</span>
+                                </div>
+                              </div>
+                            )}
+                            {workPct < 100 && (
+                              <div
+                                className="life-phase-span retirement"
+                                style={{
+                                  left: `${workPct}%`,
+                                  width: `${100 - workPct}%`
+                                }}
+                              >
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+                                  <span style={{ fontWeight: 700 }}>🏖️ Retirement</span>
+                                  <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {retAge}–{inputs.lifeExpectancy}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -9535,32 +9510,6 @@ export default function FireSimulator() {
               )}
             </div>
           )}
-
-          {/* Things You’re Currently Managing Section */}
-          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1, minWidth: '280px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                  📋 Things You’re Currently Managing
-                </h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-                  Many people have student loans, car loans, mortgages, or credit card balances. Adding them helps make your plan more accurate.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0, height: '32px' }}
-                onClick={handleCreateCurrentCondition}
-              >
-                ➕ Add Current Condition
-              </button>
-            </div>
-            
-            <div style={{ marginTop: '0.25rem' }}>
-              {renderCurrentConditionsList()}
-            </div>
-          </div>
 
           <div className="roadmap-grid-layout">
             
