@@ -1423,7 +1423,11 @@ export default function FireSimulator() {
 
   const handleApplyImprovementScenario = (scenario) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
-    const inp = scen.inputs;
+    let inp = scen.inputs;
+    if (scenario.type.startsWith('childOffset')) {
+      inp = JSON.parse(JSON.stringify(scen.inputs));
+      inp.incomeList = [...(inp.incomeList || []), ...(scenario.incomeBoosts || [])];
+    }
     const currentAgeVal = Number(inp.currentAge) || 30;
     const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
 
