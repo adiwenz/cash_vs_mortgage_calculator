@@ -376,6 +376,13 @@ const getPaceBadgeStyles = (savingsFocus) => {
     border: '1px solid var(--border-color)'
   };
   const focusLower = savingsFocus.toLowerCase();
+  if (focusLower.includes('tip')) {
+    return {
+      color: 'var(--primary)',
+      background: 'rgba(99, 102, 241, 0.12)',
+      border: '1px solid rgba(99, 102, 241, 0.3)'
+    };
+  }
   if (focusLower.includes('steady')) {
     return {
       color: '#10b981',
@@ -626,6 +633,7 @@ export default function FireSimulator() {
   });
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [showHouseAdvanced, setShowHouseAdvanced] = useState(false);
   const [isBudgetOpenFromMarriageWizard, setIsBudgetOpenFromMarriageWizard] = useState(false);
   const [activeBudgetPhase, setActiveBudgetPhase] = useState('workSave'); // 'workSave' | 'childcare'
   const [editedPhases, setEditedPhases] = useState({});
@@ -695,6 +703,9 @@ export default function FireSimulator() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const [editingEvent, setEditingEvent] = useState(null);
+  useEffect(() => {
+    setShowHouseAdvanced(false);
+  }, [editingEvent?.id]);
   const [childImpactSummary, setChildImpactSummary] = useState(null);
   const [editingCondition, setEditingCondition] = useState(null);
   const [budgetMonthlyIncome, setBudgetMonthlyIncome] = useState(4167);
@@ -1242,7 +1253,8 @@ export default function FireSimulator() {
                          (recResults.retirementReadyAge && inputs.targetRetirementAge < recResults.retirementReadyAge) ||
                          (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
 
-    if (!hasShortfall) return null;
+    const hasBuyHouse = (inputs.lifeEvents || []).some(e => e.type === 'buyHouse' && e.enabled);
+    if (!hasShortfall && !hasBuyHouse) return null;
 
     // Calculate sum of current liquid assets
     const currentAssets = (Number(inputs.assets?.cash) || 0) +
@@ -1396,6 +1408,28 @@ export default function FireSimulator() {
         incomeBoosts: rec.incomeBoosts,
         savingsFocus: 'Earn More',
         savingsEffortScore: 2
+      });
+    });
+
+    // 5. Homeownership tip
+    const buyHouseEvs = (inputs.lifeEvents || []).filter(e => e.type === 'buyHouse' && e.enabled);
+    buyHouseEvs.forEach(ev => {
+      const sellEv = (inputs.lifeEvents || []).find(e => e.type === 'sellHouse' && e.houseId === ev.houseId);
+      const sellAge = sellEv ? Number(sellEv.age) : Number(inputs.lifeExpectancy || 85);
+      list.push({
+        type: `houseSaleTip-${ev.id}`,
+        icon: '🏠',
+        title: 'Home ownership added',
+        details: `This assumes you'll sell the home at age ${sellAge}.`,
+        bulletPoints: [
+          'You can drag the sale event later directly on the timeline.'
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: 0,
+        savingsFocus: 'Tip',
+        savingsEffortScore: 0,
+        isInfoOnly: true
       });
     });
 
@@ -2004,10 +2038,23 @@ export default function FireSimulator() {
         downPayment: 80000,
         mortgageRate: 6.5,
         loanTerm: 30,
-        propertyTax: 1.2,
-        insurance: 0.5,
+        points: 0,
+        pmi: 0.5,
+        closingCosts: 3,
+        propertyTax: 1.1,
+        insurance: 0.35,
+        hoa: 0,
         maintenance: 1.0,
-        appreciationRate: 3.0
+        renovationCost: 0,
+        utilitiesIncrease: 0,
+        appreciationRate: 3.0,
+        sellingCost: 6,
+        yearsUntilSale: '',
+        currentRent: 0,
+        rentGrowth: 3,
+        renterInsurance: 0,
+        investmentReturn: 7,
+        inflation: 3
       };
     } else if (type === 'haveChild') {
       newEvent = {
@@ -2988,7 +3035,32 @@ export default function FireSimulator() {
     const curAge = inputs.currentAge || 35;
     
     if (type === 'buyHouse') {
-      defaults = { ...defaults, purchaseAge: 40, homePrice: 500000, downPayment: 100000 };
+      defaults = {
+        ...defaults,
+        purchaseAge: 40,
+        homePrice: 500000,
+        downPayment: 100000,
+        purchaseType: 'mortgage',
+        mortgageRate: 6.5,
+        loanTerm: 30,
+        points: 0,
+        pmi: 0.5,
+        closingCosts: 3,
+        propertyTax: 1.1,
+        insurance: 0.35,
+        hoa: 0,
+        maintenance: 1,
+        renovationCost: 0,
+        utilitiesIncrease: 0,
+        appreciationRate: 3,
+        sellingCost: 6,
+        yearsUntilSale: '',
+        currentRent: 0,
+        rentGrowth: 3,
+        renterInsurance: 0,
+        investmentReturn: 7,
+        inflation: 3
+      };
     } else if (type === 'haveChild') {
       defaults = {
         ...defaults,
@@ -3203,6 +3275,114 @@ export default function FireSimulator() {
           return inc;
         });
         newInputs.incomeList = [...updatedIncome, newInc];
+      } else if (type === 'buyHouse') {
+        const houseId = editingEvent.houseId || `house-${Date.now()}`;
+        
+        // Construct the updated HouseAsset
+        const houseAssetObj = {
+          id: houseId,
+          name: editingEvent.name || 'Primary Home',
+          purchasePrice: Number(editingEvent.homePrice),
+          downPayment: Number(editingEvent.downPayment),
+          purchaseType: editingEvent.purchaseType || 'mortgage',
+          mortgageRate: editingEvent.mortgageRate !== undefined ? Number(editingEvent.mortgageRate) : 6.5,
+          loanTermYears: editingEvent.loanTerm !== undefined ? Number(editingEvent.loanTerm) : 30,
+          points: editingEvent.points !== undefined ? Number(editingEvent.points) : 0,
+          pmi: editingEvent.pmi !== undefined ? Number(editingEvent.pmi) : 0.5,
+          closingCosts: editingEvent.closingCosts !== undefined ? Number(editingEvent.closingCosts) : 3,
+          propertyTaxRate: editingEvent.propertyTax !== undefined ? Number(editingEvent.propertyTax) : 1.1,
+          insuranceCost: editingEvent.insurance !== undefined ? Number(editingEvent.insurance) : 0.35,
+          hoaCost: editingEvent.hoa !== undefined ? Number(editingEvent.hoa) : 0,
+          maintenanceRate: editingEvent.maintenance !== undefined ? Number(editingEvent.maintenance) : 1.0,
+          renovationCost: editingEvent.renovationCost !== undefined ? Number(editingEvent.renovationCost) : 0,
+          utilitiesIncrease: editingEvent.utilitiesIncrease !== undefined ? Number(editingEvent.utilitiesIncrease) : 0,
+          appreciationRate: editingEvent.appreciationRate !== undefined ? Number(editingEvent.appreciationRate) : 3.0,
+          sellingCostRate: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
+          investmentReturn: editingEvent.investmentReturn !== undefined ? Number(editingEvent.investmentReturn) : 7,
+          inflation: editingEvent.inflation !== undefined ? Number(editingEvent.inflation) : 3,
+          currentRent: editingEvent.currentRent !== undefined ? Number(editingEvent.currentRent) : 0,
+          rentGrowth: editingEvent.rentGrowth !== undefined ? Number(editingEvent.rentGrowth) : 3,
+          renterInsurance: editingEvent.renterInsurance !== undefined ? Number(editingEvent.renterInsurance) : 0
+        };
+
+        if (!newInputs.houseAssets) {
+          newInputs.houseAssets = [];
+        }
+        if (newInputs.houseAssets.some(h => h.id === houseId)) {
+          newInputs.houseAssets = newInputs.houseAssets.map(h => h.id === houseId ? houseAssetObj : h);
+        } else {
+          newInputs.houseAssets = [...newInputs.houseAssets, houseAssetObj];
+        }
+
+        // Construct BuyHouseEvent
+        const buyEvId = editingEvent.id && editingEvent.id.startsWith('buy-') ? editingEvent.id : `buy-${Date.now()}`;
+        const buyEvObj = {
+          id: buyEvId,
+          type: 'buyHouse',
+          enabled: true,
+          name: 'Buy House',
+          purchaseAge: Number(editingEvent.purchaseAge),
+          age: Number(editingEvent.purchaseAge),
+          houseId: houseId
+        };
+
+        // Find or create linked SellHouseEvent
+        const existingSell = newInputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === houseId);
+        const purchaseAgeNum = Number(editingEvent.purchaseAge);
+        let defaultSellAge = Number(newInputs.lifeExpectancy || 85);
+        if (defaultSellAge <= purchaseAgeNum) {
+          defaultSellAge = purchaseAgeNum + 10;
+        }
+
+        const sellEvObj = existingSell ? {
+          ...existingSell,
+          age: Number(existingSell.age) <= purchaseAgeNum ? purchaseAgeNum + 10 : Number(existingSell.age),
+          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : existingSell.sellingCost
+        } : {
+          id: `sell-${Date.now()}`,
+          type: 'sellHouse',
+          enabled: true,
+          name: 'Sell House',
+          age: defaultSellAge,
+          houseId: houseId,
+          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
+          proceedsDestination: 'investments'
+        };
+
+        // Filter out existing buy/sell events and re-add updated ones
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== buyEvId && e.id !== sellEvObj.id && e.id !== editingEvent.id);
+        newInputs.lifeEvents = [...newInputs.lifeEvents, buyEvObj, sellEvObj];
+        
+        savedEvent = buyEvObj;
+
+      } else if (type === 'sellHouse') {
+        const sellEvId = editingEvent.id && editingEvent.id.startsWith('sell-') ? editingEvent.id : `sell-${Date.now()}`;
+        const sellEvObj = {
+          id: sellEvId,
+          type: 'sellHouse',
+          enabled: true,
+          name: 'Sell House',
+          age: Number(editingEvent.age),
+          houseId: editingEvent.houseId,
+          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
+          proceedsDestination: editingEvent.proceedsDestination || 'investments'
+        };
+
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== sellEvId && e.id !== editingEvent.id);
+        newInputs.lifeEvents = [...newInputs.lifeEvents, sellEvObj];
+
+        // Update sellingCostRate in HouseAsset
+        if (newInputs.houseAssets) {
+          newInputs.houseAssets = newInputs.houseAssets.map(h => {
+            if (h.id === editingEvent.houseId) {
+              return { ...h, sellingCostRate: Number(editingEvent.sellingCost) };
+            }
+            return h;
+          });
+        }
+
+        savedEvent = sellEvObj;
+
       } else {
         const isRetIncomeType = ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(type);
         let defaultName = 'Other Income';
@@ -3212,29 +3392,15 @@ export default function FireSimulator() {
         else if (type === 'annuity') defaultName = 'Annuity';
 
         let newEventObj = {
-          id: editingEvent.id && !['buyHouse', 'haveChild', 'college', 'windfall', 'debtPayoff', 'custom', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(editingEvent.id)
+          id: editingEvent.id && !['haveChild', 'college', 'windfall', 'debtPayoff', 'custom', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(editingEvent.id)
             ? editingEvent.id
             : `${type}-${Date.now()}`,
           type,
           enabled: true,
-          name: type === 'buyHouse' ? 'Buy a House' : type === 'haveChild' ? 'Have a Child' : type === 'college' ? 'College' : type === 'windfall' ? 'Windfall' : isRetIncomeType ? (editingEvent.name || defaultName) : editingEvent.name
+          name: type === 'haveChild' ? 'Have a Child' : type === 'college' ? 'College' : type === 'windfall' ? 'Windfall' : isRetIncomeType ? (editingEvent.name || defaultName) : editingEvent.name
         };
         
-        if (type === 'buyHouse') {
-          newEventObj = {
-            ...newEventObj,
-            purchaseAge: editingEvent.purchaseAge,
-            homePrice: editingEvent.homePrice,
-            downPayment: editingEvent.downPayment,
-            purchaseType: 'mortgage',
-            mortgageRate: 6.5,
-            loanTerm: 30,
-            propertyTax: 1.2,
-            insurance: 0.5,
-            maintenance: 1.0,
-            appreciationRate: 3.0
-          };
-        } else if (type === 'haveChild') {
+        if (type === 'haveChild') {
           newEventObj = {
             ...newEventObj,
             childName: editingEvent.childName || '',
@@ -3420,10 +3586,24 @@ export default function FireSimulator() {
     if (matchEvent) {
       setScenarios(prev => prev.map(scen => {
         if (scen.id !== currentScenarioId) return scen;
+        
+        let newEvents = scen.inputs.lifeEvents.filter(e => e.id !== matchEvent.id);
+        let newAssets = scen.inputs.houseAssets || [];
+
+        if (matchEvent.type === 'buyHouse' || matchEvent.type === 'sellHouse') {
+          const houseId = matchEvent.houseId;
+          if (houseId) {
+            newEvents = scen.inputs.lifeEvents.filter(e => e.houseId !== houseId);
+            newAssets = (scen.inputs.houseAssets || []).filter(h => h.id !== houseId);
+          }
+        }
+
         let newInputs = {
           ...scen.inputs,
-          lifeEvents: scen.inputs.lifeEvents.filter(e => e.id !== matchEvent.id)
+          lifeEvents: newEvents,
+          houseAssets: newAssets
         };
+
         if (evt.type === 'retire') {
           newInputs.targetRetirementAge = scen.inputs.lifeExpectancy;
         }
@@ -3517,6 +3697,9 @@ export default function FireSimulator() {
             let updated = { ...e };
             if (e.type === 'buyHouse') {
               updated.purchaseAge = newAge;
+              updated.age = newAge;
+            } else if (e.type === 'sellHouse') {
+              updated.age = newAge;
             } else if (e.type === 'haveChild') {
               updated.birthAge = newAge;
               const oldBirthAge = Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) || 30;
@@ -3616,6 +3799,14 @@ export default function FireSimulator() {
       let newAge = rawAge;
       if (evt.type === 'socialSecurity') {
         newAge = Math.max(62, Math.min(70, newAge));
+      } else if (evt.type === 'buyHouse' && evt.houseId) {
+        const sellEv = inputs.lifeEvents?.find(e => e.type === 'sellHouse' && e.houseId === evt.houseId);
+        const maxLimit = sellEv ? Number(sellEv.age) - 1 : maxAge;
+        newAge = Math.max(minAge, Math.min(maxLimit, newAge));
+      } else if (evt.type === 'sellHouse' && evt.houseId) {
+        const buyEv = inputs.lifeEvents?.find(e => e.type === 'buyHouse' && e.houseId === evt.houseId);
+        const minLimit = buyEv ? Number(buyEv.purchaseAge !== undefined ? buyEv.purchaseAge : buyEv.age) + 1 : minAge;
+        newAge = Math.max(minLimit, Math.min(maxAge, newAge));
       } else {
         newAge = Math.max(minAge, Math.min(maxAge, newAge));
       }
@@ -3702,11 +3893,42 @@ export default function FireSimulator() {
         type: matchEvent.type,
       };
       if (matchEvent.type === 'buyHouse') {
+        const asset = inputs.houseAssets?.find(h => h.id === matchEvent.houseId) || {};
         defaults = {
           ...defaults,
-          purchaseAge: matchEvent.purchaseAge,
-          homePrice: matchEvent.homePrice,
-          downPayment: matchEvent.downPayment
+          id: matchEvent.id,
+          houseId: matchEvent.houseId,
+          purchaseAge: matchEvent.purchaseAge !== undefined ? matchEvent.purchaseAge : matchEvent.age,
+          homePrice: asset.purchasePrice !== undefined ? asset.purchasePrice : (asset.homePrice !== undefined ? asset.homePrice : (matchEvent.homePrice || 500000)),
+          downPayment: asset.downPayment !== undefined ? asset.downPayment : (matchEvent.downPayment || 100000),
+          purchaseType: asset.purchaseType || matchEvent.purchaseType || 'mortgage',
+          mortgageRate: asset.mortgageRate !== undefined ? asset.mortgageRate : (matchEvent.mortgageRate !== undefined ? matchEvent.mortgageRate : 6.5),
+          loanTerm: asset.loanTermYears !== undefined ? asset.loanTermYears : (asset.loanTerm !== undefined ? asset.loanTerm : (matchEvent.loanTerm !== undefined ? matchEvent.loanTerm : 30)),
+          points: asset.points !== undefined ? asset.points : (matchEvent.points || 0),
+          pmi: asset.pmi !== undefined ? asset.pmi : (matchEvent.pmi !== undefined ? matchEvent.pmi : 0.5),
+          closingCosts: asset.closingCosts !== undefined ? asset.closingCosts : (matchEvent.closingCosts !== undefined ? matchEvent.closingCosts : 3),
+          propertyTax: asset.propertyTaxRate !== undefined ? asset.propertyTaxRate : (asset.propertyTax !== undefined ? asset.propertyTax : (matchEvent.propertyTax !== undefined ? matchEvent.propertyTax : 1.1)),
+          insurance: asset.insuranceCost !== undefined ? asset.insuranceCost : (asset.insurance !== undefined ? asset.insurance : (matchEvent.insurance !== undefined ? matchEvent.insurance : 0.35)),
+          hoa: asset.hoaCost !== undefined ? asset.hoaCost : (asset.hoa !== undefined ? asset.hoa : (matchEvent.hoa !== undefined ? matchEvent.hoa : 0)),
+          maintenance: asset.maintenanceRate !== undefined ? asset.maintenanceRate : (asset.maintenance !== undefined ? asset.maintenance : (matchEvent.maintenance !== undefined ? matchEvent.maintenance : 1.0)),
+          renovationCost: asset.renovationCost !== undefined ? asset.renovationCost : (matchEvent.renovationCost || 0),
+          utilitiesIncrease: asset.utilitiesIncrease !== undefined ? asset.utilitiesIncrease : (matchEvent.utilitiesIncrease || 0),
+          appreciationRate: asset.appreciationRate !== undefined ? asset.appreciationRate : (matchEvent.appreciationRate !== undefined ? matchEvent.appreciationRate : 3.0),
+          sellingCost: asset.sellingCostRate !== undefined ? asset.sellingCostRate : (asset.sellingCost !== undefined ? asset.sellingCost : 6),
+          currentRent: asset.currentRent !== undefined ? asset.currentRent : (matchEvent.currentRent || 0),
+          rentGrowth: asset.rentGrowth !== undefined ? asset.rentGrowth : (matchEvent.rentGrowth || 3),
+          renterInsurance: asset.renterInsurance !== undefined ? asset.renterInsurance : (matchEvent.renterInsurance || 0),
+          investmentReturn: asset.investmentReturn !== undefined ? asset.investmentReturn : (matchEvent.investmentReturn !== undefined ? matchEvent.investmentReturn : 7),
+          inflation: asset.inflation !== undefined ? asset.inflation : (matchEvent.inflation !== undefined ? matchEvent.inflation : 3)
+        };
+      } else if (matchEvent.type === 'sellHouse') {
+        defaults = {
+          ...defaults,
+          id: matchEvent.id,
+          houseId: matchEvent.houseId,
+          age: matchEvent.age,
+          sellingCost: matchEvent.sellingCost !== undefined ? matchEvent.sellingCost : 6,
+          proceedsDestination: matchEvent.proceedsDestination || 'investments'
         };
       } else if (matchEvent.type === 'haveChild') {
         defaults = {
@@ -4012,29 +4234,94 @@ export default function FireSimulator() {
         const age = Number(ev.purchaseAge || ev.birthAge || ev.startAge || ev.claimingAge || ev.ageReceived || ev.transferAge || ev.age);
         if (age >= inp.currentAge && age <= inp.lifeExpectancy) {
           if (ev.type === 'buyHouse') {
+            const asset = inp.houseAssets?.find(h => h.id === ev.houseId) || ev;
+            const houseName = asset.name || 'Primary Home';
+            const price = Number(asset.purchasePrice !== undefined ? asset.purchasePrice : (asset.homePrice || 500000));
+            const dp = Number(asset.downPayment || 0);
+            const loanTermVal = Number(asset.loanTermYears !== undefined ? asset.loanTermYears : (asset.loanTerm || 30));
+            const purchaseTypeVal = asset.purchaseType || 'mortgage';
+
             events.push({
               originalId: ev.id,
               age,
-              title: `Buy House`,
-              label: `Buy House`,
+              title: `Buy House: ${houseName}`,
+              label: `Buy ${houseName}`,
               icon: '🏠',
               type: 'buyHouse',
-              description: `Purchased a home for ${formatCurrency(ev.homePrice)} (${ev.purchaseType === 'cash' ? 'Cash Purchase' : 'Mortgage with ' + formatCurrency(ev.downPayment) + ' down'}).`
+              houseId: ev.houseId,
+              description: `Purchased "${houseName}" for ${formatCurrency(price)} (${purchaseTypeVal === 'cash' ? 'Cash Purchase' : 'Mortgage with ' + formatCurrency(dp) + ' down'}).`
             });
-            if (ev.purchaseType !== 'cash') {
-              const payoffAge = age + Number(ev.loanTerm);
-              if (payoffAge <= inp.lifeExpectancy) {
+
+            if (purchaseTypeVal !== 'cash') {
+              // Find linked sellHouse event age
+              const sellEv = inp.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId);
+              const sellAge = sellEv ? Number(sellEv.age) : (age + loanTermVal);
+              const payoffAge = age + loanTermVal;
+              if (payoffAge <= inp.lifeExpectancy && payoffAge < sellAge) {
                 events.push({
                   age: payoffAge,
-                  title: `Mortgage Paid Off`,
-                  label: `Mortgage Off`,
+                  title: `Mortgage Paid Off: ${houseName}`,
+                  label: `${houseName} Paid Off`,
                   icon: '🏠',
                   type: 'mortgageOff',
+                  houseId: ev.houseId,
                   isMilestone: true,
-                  description: `Mortgage on home is fully amortized, removing P&I payment of ${formatCurrency(propPIAmount(ev))} /yr from annual expenses.`
+                  description: `Mortgage on "${houseName}" is fully amortized, removing P&I payment of ${formatCurrency(propPIAmount(asset))} /yr from annual expenses.`
                 });
               }
             }
+          } else if (ev.type === 'sellHouse') {
+            const asset = inp.houseAssets?.find(h => h.id === ev.houseId);
+            const houseName = asset?.name || 'Home';
+            
+            let purchasePrice = 0;
+            let purchaseAge = 40;
+            let currentValue = 0;
+            let remainingMortgageBalance = 0;
+            let sellingCosts = 0;
+            let netProceeds = 0;
+            let yearsOwned = 0;
+            
+            if (asset) {
+              purchasePrice = Number(asset.purchasePrice || asset.homePrice || 0);
+              purchaseAge = Number(asset.purchaseAge || 40);
+              const saleAge = Number(ev.age || 50);
+              yearsOwned = Math.max(0, saleAge - purchaseAge);
+              const appreciationRate = (Number(asset.appreciationRate !== undefined ? asset.appreciationRate : 3.0)) / 100;
+              currentValue = purchasePrice * Math.pow(1 + appreciationRate, yearsOwned);
+              
+              if (asset.purchaseType !== 'cash') {
+                const loanAmount = Math.max(0, purchasePrice - Number(asset.downPayment || 0));
+                const rate = (Number(asset.mortgageRate !== undefined ? asset.mortgageRate : 6.5)) / 100;
+                const loanTerm = Number(asset.loanTermYears || asset.loanTerm || 30);
+                
+                if (yearsOwned >= loanTerm) {
+                  remainingMortgageBalance = 0;
+                } else if (loanAmount > 0 && loanTerm > 0) {
+                  const r = rate / 12;
+                  const n = loanTerm * 12;
+                  const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                  const elapsedMonths = yearsOwned * 12;
+                  const remainingMonths = n - elapsedMonths;
+                  remainingMortgageBalance = r === 0 ? monthlyPayment * remainingMonths : monthlyPayment * (1 - Math.pow(1 + r, -remainingMonths)) / r;
+                }
+              }
+              
+              const sellingCostRate = Number(ev.sellingCost !== undefined ? ev.sellingCost : 6);
+              sellingCosts = currentValue * (sellingCostRate / 100);
+              netProceeds = currentValue - remainingMortgageBalance - sellingCosts;
+            }
+
+            events.push({
+              originalId: ev.id,
+              age,
+              title: `Sell House: ${houseName}`,
+              label: `Sell ${houseName}`,
+              icon: '🏠',
+              type: 'sellHouse',
+              houseId: ev.houseId,
+              description: `Sold home "${houseName}" after ${yearsOwned} years for ${formatCurrency(currentValue)} (net proceeds: ${formatCurrency(netProceeds)} after mortgage payoff of ${formatCurrency(remainingMortgageBalance)} and ${ev.sellingCost || 6}% selling costs).`
+            });
           } else if (ev.type === 'haveChild') {
             events.push({
               originalId: ev.id,
@@ -4287,11 +4574,68 @@ export default function FireSimulator() {
       return 0;
     });
 
-    const ageCounts = {};
+    // Allocate stackIndex slots consistently for house-related events
+    const houseRanges = {};
+    inp.lifeEvents.forEach(ev => {
+      if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
+        const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
+        const sellEv = inp.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId);
+        const sellAge = sellEv ? Number(sellEv.age) : Number(inp.lifeExpectancy || 85);
+        houseRanges[ev.houseId] = {
+          start: Math.floor(buyAge),
+          end: Math.floor(sellAge)
+        };
+      }
+    });
+
+    const houseSlots = {};
+    const occupiedSlots = [];
+
+    const houseIds = Object.keys(houseRanges).sort((a, b) => houseRanges[a].start - houseRanges[b].start);
+    houseIds.forEach(houseId => {
+      const range = houseRanges[houseId];
+      let slot = 0;
+      while (true) {
+        if (!occupiedSlots[slot]) {
+          occupiedSlots[slot] = new Set();
+        }
+        let isFree = true;
+        for (let age = range.start; age <= range.end; age++) {
+          if (occupiedSlots[slot].has(age)) {
+            isFree = false;
+            break;
+          }
+        }
+        if (isFree) {
+          for (let age = range.start; age <= range.end; age++) {
+            occupiedSlots[slot].add(age);
+          }
+          houseSlots[houseId] = slot;
+          break;
+        }
+        slot++;
+      }
+    });
+
     return sorted.map(evt => {
-      const ageKey = Math.floor(evt.age);
-      const stackIndex = ageCounts[ageKey] || 0;
-      ageCounts[ageKey] = stackIndex + 1;
+      let stackIndex = 0;
+      if (evt.houseId && houseSlots[evt.houseId] !== undefined) {
+        stackIndex = houseSlots[evt.houseId];
+      } else {
+        const ageKey = Math.floor(evt.age);
+        let slot = 0;
+        while (true) {
+          if (!occupiedSlots[slot]) {
+            occupiedSlots[slot] = new Set();
+          }
+          if (!occupiedSlots[slot].has(ageKey)) {
+            occupiedSlots[slot].add(ageKey);
+            stackIndex = slot;
+            break;
+          }
+          slot++;
+        }
+      }
       return { ...evt, stackIndex };
     });
   }, [activeScenario.inputs, displayedResults]);
@@ -5427,11 +5771,58 @@ export default function FireSimulator() {
     if (type === 'marriage') {
       return renderMarriageWizard();
     }
+    const calculateHouseSummary = () => {
+      const p = parseFloat(editingEvent.homePrice) || 0;
+      const dp = parseFloat(editingEvent.downPayment) || 0;
+      const rate = (parseFloat(editingEvent.mortgageRate) || 6.5) / 100;
+      const mortgageTerm = parseInt(editingEvent.loanTerm) || 30;
+      
+      const loanAmount = Math.max(0, p - dp);
+      let monthlyPI = 0;
+      if (loanAmount > 0 && mortgageTerm > 0) {
+        const r = rate / 12;
+        const n = mortgageTerm * 12;
+        monthlyPI = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+      }
+      
+      const monthlyPropertyTax = (p * ((parseFloat(editingEvent.propertyTax) || 1.1) / 100)) / 12;
+      const monthlyInsurance = (p * ((parseFloat(editingEvent.insurance) || 0.35) / 100)) / 12;
+      const monthlyMaintenance = (p * ((parseFloat(editingEvent.maintenance) || 1.0) / 100)) / 12;
+      const monthlyHOA = parseFloat(editingEvent.hoa) || 0;
+      const monthlyUtilities = parseFloat(editingEvent.utilitiesIncrease) || 0;
+      
+      const hasPMI = dp < p * 0.2;
+      const monthlyPMI = hasPMI ? (loanAmount * ((parseFloat(editingEvent.pmi) || 0.5) / 100)) / 12 : 0;
+      
+      const monthlyOwnershipCost = monthlyPI + monthlyPropertyTax + monthlyInsurance + monthlyMaintenance + monthlyHOA + monthlyUtilities + monthlyPMI;
+      
+      const closingCostRate = parseFloat(editingEvent.closingCosts) || 3;
+      const closingCosts = p * (closingCostRate / 100);
+      const points = parseFloat(editingEvent.points) || 0;
+      const renovation = parseFloat(editingEvent.renovationCost) || 0;
+      
+      const cashNeeded = dp + closingCosts + points + renovation;
+      
+      const currentRent = parseFloat(editingEvent.currentRent) || 0;
+      const renterInsurance = parseFloat(editingEvent.renterInsurance) || 0;
+      const totalCurrentRentCost = currentRent + renterInsurance;
+      const rentDifference = monthlyOwnershipCost - totalCurrentRentCost;
+      
+      return {
+        monthlyPI,
+        monthlyOwnershipCost,
+        cashNeeded,
+        rentDifference,
+        currentRentConfigured: currentRent > 0
+      };
+    };
+
     return (
       <div className="modal-backdrop" onClick={() => setEditingEvent(null)}>
-        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={type === 'buyHouse' || type === 'sellHouse' ? { maxWidth: '650px', width: '90%' } : {}}>
         <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--primary)' }}>
           {type === 'buyHouse' && '🏠 Buy a House'}
+          {type === 'sellHouse' && '🏠 Sell a House'}
           {type === 'haveChild' && '👶 Have a Child'}
           {type === 'careerChange' && '💼 Career Change'}
           {type === 'move' && '📍 Move / Relocate'}
@@ -5471,7 +5862,7 @@ export default function FireSimulator() {
                   onChange={(e) => setEditingEvent({ ...editingEvent, homePrice: parseFloat(e.target.value) || 0 })}
                 />
               </div>
-              <div className="input-wrapper">
+              <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
                 <span className="input-name">Down Payment ($)</span>
                 <input
                   type="number"
@@ -5481,8 +5872,435 @@ export default function FireSimulator() {
                   onChange={(e) => setEditingEvent({ ...editingEvent, downPayment: parseFloat(e.target.value) || 0 })}
                 />
               </div>
+
+              {/* COLLAPSIBLE ADVANCED SETTINGS TRIGGER */}
+              <div style={{ gridColumn: 'span 2', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowHouseAdvanced(!showHouseAdvanced)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: 0,
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  {showHouseAdvanced ? '▼ Hide Advanced Settings' : '▶ Advanced Settings'}
+                </button>
+              </div>
+
+              {showHouseAdvanced && (
+                <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                  {/* GROUP 1: Mortgage */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>💳</span> Mortgage Settings
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name">Mortgage Rate (%)</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.mortgageRate}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, mortgageRate: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Loan Term (years)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.loanTerm}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, loanTerm: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Points / Fees ($)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.points}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, points: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Closing Costs (%)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.closingCosts}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, closingCosts: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      {editingEvent.downPayment < editingEvent.homePrice * 0.2 && (
+                        <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                          <span className="input-name">PMI Rate (% / year)</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="input-number-box"
+                            style={{ width: '100%' }}
+                            value={editingEvent.pmi}
+                            onChange={(e) => setEditingEvent({ ...editingEvent, pmi: parseFloat(e.target.value) || 0 })}
+                          />
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '0.15rem' }}>
+                            Required because down payment is less than 20%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* GROUP 2: Ownership Costs */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>🏡</span> Ownership Costs
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name">Property Tax (% / year)</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.propertyTax}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, propertyTax: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Homeowners Insurance (% / year)</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.insurance}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, insurance: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">HOA Dues ($ / month)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.hoa}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, hoa: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Maintenance (% / year)</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.maintenance}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, maintenance: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Renovation / Furnishing ($)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.renovationCost}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, renovationCost: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Utilities Increase ($ / month)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.utilitiesIncrease}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, utilitiesIncrease: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 3: Home Value Assumptions */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>📈</span> Home Value Assumptions
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name">Home Appreciation (% / year)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.appreciationRate}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, appreciationRate: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Selling Cost (%)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.sellingCost}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, sellingCost: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 4: Rent Comparison Assumptions */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>📊</span> Rent Comparison Assumptions
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name">Current Rent ($ / month)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.currentRent}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, currentRent: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Rent Growth (% / year)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.rentGrowth}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, rentGrowth: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                        <span className="input-name">Renter's Insurance ($ / month)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.renterInsurance}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, renterInsurance: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 5: Investment Assumptions */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>📈</span> Investment Assumptions
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name">Investment Return (%)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.investmentReturn}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, investmentReturn: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name">Inflation Rate (%)</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input-number-box"
+                          style={{ width: '100%' }}
+                          value={editingEvent.inflation}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, inflation: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Summary Box */}
+              {(() => {
+                const summary = calculateHouseSummary();
+                return (
+                  <div style={{
+                    gridColumn: 'span 2',
+                    background: 'rgba(99, 102, 241, 0.04)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.85rem 1rem',
+                    marginTop: '0.5rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--primary)' }}>
+                      🏠 Purchase & Cost Summary
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)' }}>Monthly Payment (P&I):</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(summary.monthlyPI)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)' }}>Cash Needed:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(summary.cashNeeded)}</strong>
+                      </div>
+                      <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '0.2rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Total Monthly Ownership Cost:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(summary.monthlyOwnershipCost)}/mo</strong>
+                        </div>
+                        {summary.currentRentConfigured && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Difference vs Current Rent:</span>
+                            <strong style={{ color: summary.rentDifference > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                              {summary.rentDifference > 0 ? '+' : ''}{formatCurrency(summary.rentDifference)}/mo
+                            </strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
+
+          {type === 'sellHouse' && (() => {
+            const asset = inputs.houseAssets?.find(h => h.id === editingEvent.houseId);
+            const buyEv = inputs.lifeEvents?.find(e => e.type === 'buyHouse' && e.houseId === editingEvent.houseId);
+            const purchaseAge = buyEv ? Number(buyEv.purchaseAge !== undefined ? buyEv.purchaseAge : buyEv.age) : 30;
+            const saleAge = Number(editingEvent.age) || 50;
+            const yearsOwned = Math.max(0, saleAge - purchaseAge);
+
+            const purchasePrice = Number(asset?.purchasePrice) || 0;
+            const downPayment = Number(asset?.downPayment) || 0;
+            const appreciationRate = (Number(asset?.appreciationRate) || 3.0) / 100;
+            const sellingCostRate = Number(editingEvent.sellingCost !== undefined ? editingEvent.sellingCost : 6.0);
+            const mortgageRate = (Number(asset?.mortgageRate) || 6.5) / 100;
+            const loanTermYears = Number(asset?.loanTermYears) || 30;
+            const isCash = asset?.purchaseType === 'cash' || downPayment >= purchasePrice;
+
+            const currentValue = purchasePrice * Math.pow(1 + appreciationRate, yearsOwned);
+
+            let remainingMortgageBalance = 0;
+            if (!isCash) {
+              const loanAmount = Math.max(0, purchasePrice - downPayment);
+              const elapsedYears = Math.max(0, yearsOwned - 1);
+              if (elapsedYears >= loanTermYears) {
+                remainingMortgageBalance = 0;
+              } else if (loanAmount > 0 && loanTermYears > 0) {
+                const r = mortgageRate / 12;
+                const n = loanTermYears * 12;
+                const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                const elapsedMonths = elapsedYears * 12;
+                const remainingMonths = n - elapsedMonths;
+                remainingMortgageBalance = r === 0 ? monthlyPayment * remainingMonths : monthlyPayment * (1 - Math.pow(1 + r, -remainingMonths)) / r;
+              }
+            }
+
+            const sellingCosts = currentValue * (sellingCostRate / 100);
+            const equity = currentValue - remainingMortgageBalance - sellingCosts;
+
+            return (
+              <>
+                <div className="input-wrapper">
+                  <span className="input-name">Sale Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.age}
+                    onChange={(e) => {
+                      const newAge = parseInt(e.target.value) || 50;
+                      setEditingEvent({ ...editingEvent, age: Math.max(purchaseAge, newAge) });
+                    }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '0.15rem' }}>
+                    Must be at or after purchase age ({purchaseAge})
+                  </span>
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-name">Selling Cost Rate (%)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.sellingCost}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, sellingCost: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                
+                <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                  <span className="input-name">Proceeds Destination</span>
+                  <select
+                    className="input-number-box"
+                    style={{ width: '100%', textAlign: 'left' }}
+                    value={editingEvent.proceedsDestination || 'investments'}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, proceedsDestination: e.target.value })}
+                  >
+                    <option value="investments">📈 Liquid Investments (Brokerage)</option>
+                    <option value="cash">💰 Cash Reserves</option>
+                  </select>
+                </div>
+
+                <div style={{
+                  gridColumn: 'span 2',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1rem',
+                  marginTop: '0.5rem'
+                }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>💰</span> Sale Proceeds Preview (Age {saleAge})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Appreciated Home Value ({yearsOwned} yrs owned):</span>
+                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(currentValue)}</span>
+                    </div>
+                    {!isCash && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Remaining Mortgage Balance:</span>
+                        <span style={{ fontWeight: '600', color: 'var(--accent-rose, #f43f5e)' }}>-{formatCurrency(remainingMortgageBalance)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Selling Costs ({sellingCostRate}%):</span>
+                      <span style={{ fontWeight: '600', color: 'var(--accent-rose, #f43f5e)' }}>-{formatCurrency(sellingCosts)}</span>
+                    </div>
+                    <div style={{ borderTop: '1px solid var(--border-color)', margin: '0.25rem 0' }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                      <span style={{ color: 'var(--text-primary)' }}>Estimated Net Proceeds:</span>
+                      <span style={{ color: 'var(--accent-emerald, #10b981)' }}>{formatCurrency(equity)}</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
 
           {type === 'haveChild' && (
             <>
@@ -8649,6 +9467,105 @@ export default function FireSimulator() {
                 </div>
                 
                 <div className="timeline-events-container" style={{ pointerEvents: 'none', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}>
+                  {(() => {
+                    const houseRanges = {};
+                    inputs.lifeEvents.forEach(ev => {
+                      if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
+                        const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
+                        const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId);
+                        const sellAge = sellEv ? Number(sellEv.age) : Number(inputs.lifeExpectancy || 85);
+                        houseRanges[ev.houseId] = {
+                          start: buyAge,
+                          end: sellAge
+                        };
+                      }
+                    });
+
+                    const houseSlots = {};
+                    const occupiedSlots = [];
+
+                    const houseIds = Object.keys(houseRanges).sort((a, b) => houseRanges[a].start - houseRanges[b].start);
+                    houseIds.forEach(houseId => {
+                      const range = houseRanges[houseId];
+                      let slot = 0;
+                      while (true) {
+                        if (!occupiedSlots[slot]) {
+                          occupiedSlots[slot] = new Set();
+                        }
+                        let isFree = true;
+                        for (let age = Math.floor(range.start); age <= Math.floor(range.end); age++) {
+                          if (occupiedSlots[slot].has(age)) {
+                            isFree = false;
+                            break;
+                          }
+                        }
+                        if (isFree) {
+                          for (let age = Math.floor(range.start); age <= Math.floor(range.end); age++) {
+                            occupiedSlots[slot].add(age);
+                          }
+                          houseSlots[houseId] = slot;
+                          break;
+                        }
+                        slot++;
+                      }
+                    });
+
+                    return Object.keys(houseRanges).map((houseId) => {
+                      const range = houseRanges[houseId];
+                      const slot = houseSlots[houseId] !== undefined ? houseSlots[houseId] : 0;
+                      const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                      
+                      const startPercent = totalYears > 0 ? ((range.start - inputs.currentAge) / totalYears) * 100 : 0;
+                      const endPercent = totalYears > 0 ? ((range.end - inputs.currentAge) / totalYears) * 100 : 0;
+                      
+                      const leftOffset = `calc(70px + (100% - 140px) * ${Math.max(0, Math.min(100, startPercent))} / 100)`;
+                      const rightOffset = `calc(70px + (100% - 140px) * ${Math.max(0, Math.min(100, 100 - endPercent))} / 100)`;
+                      const topOffset = `${145 - (slot * 36) + 13.5}px`; 
+                      
+                      const asset = inputs.houseAssets?.find(h => h.id === houseId);
+                      const houseName = asset?.name || 'Primary Home';
+
+                      return (
+                        <div
+                          key={`span-${houseId}`}
+                          style={{
+                            position: 'absolute',
+                            left: leftOffset,
+                            right: rightOffset,
+                            top: topOffset,
+                            height: '6px',
+                            background: 'rgba(99, 102, 241, 0.25)',
+                            backgroundImage: 'linear-gradient(90deg, var(--primary) 0%, rgba(99, 102, 241, 0.1) 50%, var(--primary) 100%)',
+                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                            borderRadius: '3px',
+                            zIndex: 10,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {(range.end - range.start) > 4 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '-16px',
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold',
+                              color: 'var(--text-secondary)',
+                              backgroundColor: 'var(--bg-primary)',
+                              padding: '1px 6px',
+                              borderRadius: '10px',
+                              border: '1px solid var(--border-color)',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              🏠 {houseName}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+
                   {timelineEvents.map((evt, idx) => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const isDraggingThis = !!(draggingInfo && (
@@ -9696,6 +10613,22 @@ export default function FireSimulator() {
                     Pre-tax withdrawals (Traditional 401k/IRA) are taxed as ordinary income. The engine simulates standard deductions and progressive federal income tax brackets (Single or Married Filing Jointly) adjusted annually for inflation. Additionally, a <strong>10% early withdrawal tax penalty</strong> is automatically enforced for all Traditional 401k/IRA drawdowns made before age <strong>59.5</strong>.
                   </p>
                 </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    🏠 Home Ownership & Mortgage Rules
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                    Models realistic homebuying and ownership cash flows:
+                    <span style={{ display: 'block', marginTop: '0.25rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-color)' }}>
+                      • <strong>Purchase Cash:</strong> Down payment + closing costs + points + renovation costs are deducted from liquid assets at the purchase age. If the down payment equals or exceeds the home price, it is treated as an all-cash purchase (no mortgage is created).<br />
+                      • <strong>Mortgage P&I:</strong> Monthly Principal & Interest (P&I) is calculated using the standard amortization formula based on the loan amount (Home Price minus Down Payment), interest rate, and term.<br />
+                      • <strong>Equity & Appreciation:</strong> Home value appreciates annually (default 3%), while the mortgage balance decreases over the loan term, increasing home equity.<br />
+                      • <strong>Ongoing Costs:</strong> Property tax (default 1.1% of home value), homeowners insurance (default 0.35% of home value), and maintenance (default 1.0% of home value) scale with appreciated home value annually. HOA dues and utility increases are adjusted annually for inflation.<br />
+                      • <strong>PMI & LTV Rules:</strong> If the down payment is less than 20% of the purchase price (initial Loan-to-Value, or LTV, ratio &gt; 80%), a Private Mortgage Insurance (PMI) fee (default 0.5% annually of the mortgage balance) is added to ongoing expenses. PMI automatically drops off once the outstanding mortgage balance falls to 80% or less of the original purchase price (LTV &le; 80%).<br />
+                      • <strong>Home Sale:</strong> If a move-out age or sale year is configured, the property is sold, selling costs (default 6%) are deducted, the remaining mortgage is paid off, and net proceeds are added to brokerage assets. All homeownership expenses then cease.
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -9803,13 +10736,24 @@ export default function FireSimulator() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="improvement-plan-card-apply-btn"
-                      onClick={() => handleApplyImprovementScenario(scenario)}
-                    >
-                      Apply Scenario
-                    </button>
+                    {scenario.isInfoOnly ? (
+                      <button
+                        type="button"
+                        className="improvement-plan-card-apply-btn"
+                        style={{ background: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                        onClick={() => setShowImprovementModal(false)}
+                      >
+                        Got it
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="improvement-plan-card-apply-btn"
+                        onClick={() => handleApplyImprovementScenario(scenario)}
+                      >
+                        Apply Scenario
+                      </button>
+                    )}
                   </div>
                 );
               })}

@@ -131,6 +131,7 @@ export const DEFAULT_FIRE_INPUTS = {
   ],
   debtList: [],
   currentConditions: [],
-  householdMembers: []
+  householdMembers: [],
+  houseAssets: []
 };
 

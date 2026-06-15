@@ -266,7 +266,8 @@ export function createRetirementProfile(overrides = {}) {
       }
     ],
     debtList: [],
-    currentConditions: []
+    currentConditions: [],
+    houseAssets: []
   };
 
   // Deep clone and merge overrides

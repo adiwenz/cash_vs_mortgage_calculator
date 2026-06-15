@@ -1576,21 +1576,40 @@ export function runFireSimulation(inputs) {
 
     // Resolve property buying events down payments
     enabledEvents.forEach(ev => {
-      if (ev.type === 'buyHouse' && age === Number(ev.purchaseAge)) {
-        const p = Number(ev.homePrice) || 0;
-        const purchaseType = ev.purchaseType || 'mortgage';
+      if (ev.type === 'buyHouse' && age === Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age)) {
+        const asset = (ev.houseId && inputs.houseAssets)
+          ? inputs.houseAssets.find(h => h.id === ev.houseId)
+          : ev;
 
-        if (purchaseType === 'cash') {
-          const closingCosts = p * 0.02;
-          const houseShortfall = deductFromLiquidAssets(p + closingCosts, age);
-          if (houseShortfall > 0.01) {
-            hasRunOut = true;
-            if (runOutAge === null) {
-              runOutAge = age;
-            }
+        if (!asset) return;
+
+        const p = Number(asset.homePrice !== undefined ? asset.homePrice : (asset.purchasePrice !== undefined ? asset.purchasePrice : 0)) || 0;
+        const dp = Number(asset.downPayment) || 0;
+        const isCash = dp >= p || asset.purchaseType === 'cash';
+
+        const closingCostsRate = asset.closingCosts !== undefined ? Number(asset.closingCosts) : 3;
+        const closingCosts = p * (closingCostsRate / 100);
+        const points = asset.points !== undefined ? Number(asset.points) : 0;
+        const renovationCost = asset.renovationCost !== undefined ? Number(asset.renovationCost) : 0;
+
+        let totalCashNeeded = closingCosts + points + renovationCost;
+        if (isCash) {
+          totalCashNeeded += p;
+        } else {
+          totalCashNeeded += dp;
+        }
+
+        const houseShortfall = deductFromLiquidAssets(totalCashNeeded, age);
+        if (houseShortfall > 0.01) {
+          hasRunOut = true;
+          if (runOutAge === null) {
+            runOutAge = age;
           }
+        }
 
+        if (isCash) {
           purchasedProperties.push({
+            id: asset.id || ev.id,
             purchaseAge: age,
             purchaseType: 'cash',
             homePrice: p,
@@ -1598,24 +1617,19 @@ export function runFireSimulation(inputs) {
             mortgageBalance: 0,
             annualPI: 0,
             loanTerm: 0,
-            propertyTaxRate: (Number(ev.propertyTax) || 1.2) / 100,
-            insuranceRate: (Number(ev.insurance) || 0.5) / 100,
-            maintenanceRate: (Number(ev.maintenance) || 1.0) / 100,
-            appreciationRate: (Number(ev.appreciationRate) || 3.0) / 100
+            propertyTaxRate: (asset.propertyTax !== undefined ? Number(asset.propertyTax) : (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : 1.1)) / 100,
+            insuranceRate: (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35)) / 100,
+            maintenanceRate: (asset.maintenance !== undefined ? Number(asset.maintenance) : (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : 1.0)) / 100,
+            appreciationRate: (asset.appreciationRate !== undefined ? Number(asset.appreciationRate) : 3.0) / 100,
+            hoa: asset.hoa !== undefined ? Number(asset.hoa) : (asset.hoaCost !== undefined ? Number(asset.hoaCost) : 0),
+            utilitiesIncrease: asset.utilitiesIncrease !== undefined ? Number(asset.utilitiesIncrease) : 0,
+            sellingCostRate: asset.sellingCost !== undefined ? Number(asset.sellingCost) : (asset.sellingCostRate !== undefined ? Number(asset.sellingCostRate) : 6),
+            yearsUntilSale: asset.yearsUntilSale !== undefined ? asset.yearsUntilSale : '',
+            inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3
           });
         } else {
-          const dp = Number(ev.downPayment) || 0;
-          const closingCosts = p * 0.02;
-          const houseShortfall = deductFromLiquidAssets(dp + closingCosts, age);
-          if (houseShortfall > 0.01) {
-            hasRunOut = true;
-            if (runOutAge === null) {
-              runOutAge = age;
-            }
-          }
-
-          const rate = (Number(ev.mortgageRate) || 6.5) / 100;
-          const mortgageTerm = Number(ev.loanTerm) || 30;
+          const rate = (asset.mortgageRate !== undefined ? Number(asset.mortgageRate) : 6.5) / 100;
+          const mortgageTerm = asset.loanTerm !== undefined ? Number(asset.loanTerm) : (asset.loanTermYears !== undefined ? Number(asset.loanTermYears) : 30);
           const loanAmount = Math.max(0, p - dp);
           let annualPI = 0;
 
@@ -1627,6 +1641,7 @@ export function runFireSimulation(inputs) {
           }
 
           purchasedProperties.push({
+            id: asset.id || ev.id,
             purchaseAge: age,
             purchaseType: 'mortgage',
             homePrice: p,
@@ -1637,14 +1652,81 @@ export function runFireSimulation(inputs) {
             annualPI,
             currentValue: p,
             mortgageBalance: loanAmount,
-            propertyTaxRate: (Number(ev.propertyTax) || 1.2) / 100,
-            insuranceRate: (Number(ev.insurance) || 0.5) / 100,
-            maintenanceRate: (Number(ev.maintenance) || 1.0) / 100,
-            appreciationRate: (Number(ev.appreciationRate) || 3.0) / 100
+            propertyTaxRate: (asset.propertyTax !== undefined ? Number(asset.propertyTax) : (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : 1.1)) / 100,
+            insuranceRate: (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35)) / 100,
+            maintenanceRate: (asset.maintenance !== undefined ? Number(asset.maintenance) : (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : 1.0)) / 100,
+            pmiRate: asset.pmi !== undefined ? Number(asset.pmi) : 0.5,
+            appreciationRate: (asset.appreciationRate !== undefined ? Number(asset.appreciationRate) : 3.0) / 100,
+            hoa: asset.hoa !== undefined ? Number(asset.hoa) : (asset.hoaCost !== undefined ? Number(asset.hoaCost) : 0),
+            utilitiesIncrease: asset.utilitiesIncrease !== undefined ? Number(asset.utilitiesIncrease) : 0,
+            sellingCostRate: asset.sellingCost !== undefined ? Number(asset.sellingCost) : (asset.sellingCostRate !== undefined ? Number(asset.sellingCostRate) : 6),
+            yearsUntilSale: asset.yearsUntilSale !== undefined ? asset.yearsUntilSale : '',
+            inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3
           });
         }
       }
     });
+
+    // Sell properties if they reach their sale age
+    const activeProperties = [];
+    purchasedProperties.forEach(prop => {
+      let shouldSell = false;
+      let sellingCostRate = prop.sellingCostRate || 6;
+      let proceedsDestination = 'investments';
+      let sellEvId = null;
+
+      // Check linked SellHouseEvent
+      const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && e.houseId === prop.id && age === Number(e.age));
+      if (sellEv) {
+        shouldSell = true;
+        if (sellEv.sellingCost !== undefined) {
+          sellingCostRate = Number(sellEv.sellingCost);
+        }
+        if (sellEv.proceedsDestination) {
+          proceedsDestination = sellEv.proceedsDestination;
+        }
+        sellEvId = sellEv.id;
+      } else {
+        // Fallback to old format yearsUntilSale/move-out age
+        let saleAge = null;
+        if (prop.yearsUntilSale !== undefined && prop.yearsUntilSale !== null && prop.yearsUntilSale !== '') {
+          const val = Number(prop.yearsUntilSale);
+          if (!isNaN(val) && val > 0) {
+            if (val < currentAge) {
+              saleAge = prop.purchaseAge + val;
+            } else {
+              saleAge = val;
+            }
+          }
+        }
+        if (saleAge !== null && age === saleAge) {
+          shouldSell = true;
+        }
+      }
+
+      if (shouldSell) {
+        const sellingCosts = prop.currentValue * (sellingCostRate / 100);
+        const netProceeds = prop.currentValue - sellingCosts - prop.mortgageBalance;
+        
+        if (proceedsDestination === 'cash') {
+          balances.cash += netProceeds;
+        } else {
+          balances.brokerage += netProceeds;
+        }
+
+        dynamicMilestones.push({
+          age,
+          label: `Sold Home`,
+          type: 'sellHouse',
+          isMilestone: true,
+          originalId: sellEvId || prop.id,
+          description: `Sold home for ${formatCurrency(prop.currentValue)}. Net proceeds after ${sellingCostRate}% selling costs (${formatCurrency(sellingCosts)}) and mortgage payoff (${formatCurrency(prop.mortgageBalance)}) were ${formatCurrency(netProceeds)} injected into ${proceedsDestination === 'cash' ? 'cash' : 'investments'}.`
+        });
+      } else {
+        activeProperties.push(prop);
+      }
+    });
+    purchasedProperties = activeProperties;
 
     // Appreciate home values and compile mortgage payments / property costs
     let totalHomeValue = homeEquityBaseline * nominalFactor;
@@ -1685,6 +1767,20 @@ export function runFireSimulation(inputs) {
       const ins = prop.currentValue * prop.insuranceRate;
       const maint = prop.currentValue * prop.maintenanceRate;
       annualExpenses += propTax + ins + maint;
+
+      // HOA & Utilities (inflated)
+      const propInflationRate = prop.inflation !== undefined ? (prop.inflation / 100) : inflationRate;
+      const hoaCost = (prop.hoa || 0) * 12 * Math.pow(1 + propInflationRate, age - prop.purchaseAge);
+      const utilitiesCost = (prop.utilitiesIncrease || 0) * 12 * Math.pow(1 + propInflationRate, age - prop.purchaseAge);
+      annualExpenses += hoaCost + utilitiesCost;
+
+      // PMI: 0.5% (or custom) annually if down payment < 20%, drops off when LTV <= 80%
+      if (prop.purchaseType === 'mortgage' && prop.downPayment < prop.homePrice * 0.2) {
+        if (prop.mortgageBalance > prop.homePrice * 0.8) {
+          const pmiCost = prop.mortgageBalance * ((prop.pmiRate || 0.5) / 100);
+          annualExpenses += pmiCost;
+        }
+      }
     });
 
     // Amortize ongoing debts (minimum payments + extra paydown plans)
@@ -2638,9 +2734,15 @@ export function validateFireInputs(inputs) {
   // Verify life events
   lifeEvents.forEach((ev, i) => {
     if (ev.type === 'buyHouse' && ev.enabled) {
-      const purchaseAge = Number(ev.purchaseAge);
+      const purchaseAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
       if (purchaseAge < currentAge) {
         errors.push(`Home Purchase age (${purchaseAge}) for event #${i+1} cannot be in the past.`);
+      }
+    }
+    if (ev.type === 'sellHouse' && ev.enabled) {
+      const saleAge = Number(ev.age);
+      if (saleAge < currentAge) {
+        errors.push(`Home Sale age (${saleAge}) for event #${i+1} cannot be in the past.`);
       }
     }
     if (ev.type === 'haveChild' && ev.enabled) {
@@ -2729,11 +2831,11 @@ export function getNormalizedPhases(inputs) {
     }
   });
 
-  // C. Life Events (marriage, divorce, haveChild, buyHouse)
+  // C. Life Events (marriage, divorce, haveChild, buyHouse, sellHouse)
   enabledEvents.forEach(ev => {
     const age = Number(ev.age || ev.purchaseAge || ev.birthAge || ev.startAge);
     if (age > currentAge && age < targetRetirementAge) {
-      if (['marriage', 'divorce', 'haveChild', 'buyHouse'].includes(ev.type)) {
+      if (['marriage', 'divorce', 'haveChild', 'buyHouse', 'sellHouse'].includes(ev.type)) {
         boundaries.add(age);
       }
     }
@@ -2794,7 +2896,7 @@ export function getNormalizedPhases(inputs) {
       const marriageEv = enabledEvents.find(e => e.type === 'marriage' && Number(e.age) === start);
       const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
       const childEv = enabledEvents.find(e => e.type === 'haveChild' && Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) === start);
-      const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge) === start);
+      const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge !== undefined ? e.purchaseAge : e.age) === start);
       const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
       const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && sp.id !== 'simple-spend-childcare');
 
