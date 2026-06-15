@@ -2942,6 +2942,12 @@ export function getNormalizedPhases(inputs) {
     let resolvedIncome = defaultIncome;
     if (savedPhase && savedPhase.income !== undefined) {
       resolvedIncome = Number(savedPhase.income);
+      if (childCount > 0 && childBoost > 0) {
+        const standardBase = (start >= targetRetirementAge) ? 0 : baseSalaryMonthly;
+        if (resolvedIncome <= standardBase) {
+          resolvedIncome += childBoost;
+        }
+      }
       if (type === 'childcare') {
         let savedChildCount = 0;
         if (savedPhase.type === 'childcare' && savedPhase.name) {

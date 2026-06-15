@@ -1794,9 +1794,10 @@ export default function FireSimulator() {
           }
         }
       });
+      const baseSalaryMonthly = (currentPhase.startAge >= targetRetAgeVal) ? 0 : Math.round(targetIncome / 12);
       initialEdited[currentPhase.id] = {
         ...currentPhase,
-        income: Math.round(targetIncome / 12) + childBoostForCurrent,
+        income: baseSalaryMonthly + childBoostForCurrent,
         savings: targetSavingsMap,
         expenses: targetExpensesMap,
         savingsAllocMode: inp.budgetDetails?.savingsAllocMode || 'fixed'
