@@ -260,7 +260,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       targetRetirementAge: newRetirementAge,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
@@ -283,7 +283,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
       ...currentInputs,
       simpleIncome: newIncome,
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, amount: (Number(inc.amount) || 0) + extraIncome };
         }
@@ -315,7 +315,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: newRetirementAge };
         }
@@ -351,7 +351,7 @@ const applyScenarioToInputs = (currentInputs, type, value) => {
         return phase;
       }),
       incomeList: currentInputs.incomeList.map(inc => {
-        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild') return inc;
+        if (inc.id === 'simple-inc-childcare' || inc.id === 'simple-inc-prechild' || inc.id.startsWith('child-income-boost')) return inc;
         if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
           return { ...inc, endAge: target65Age };
         }
@@ -498,7 +498,8 @@ const getActiveChildrenCountAtAge = (age, lifeEvents) => {
 const getBaseCareerIncomeAtAge = (age, inputs) => {
   const cleanIncomeList = (inputs.incomeList || []).filter(inc => 
     inc.id !== 'inc-1' && 
-    !inc.id.startsWith('simple-inc')
+    !inc.id.startsWith('simple-inc') &&
+    !inc.id.startsWith('child-income-boost')
   );
   let totalAnnual = 0;
   cleanIncomeList.forEach(inc => {
@@ -538,7 +539,8 @@ const getChildCountIntervals = (startAge, endAge, lifeEvents, incomeList = []) =
   // Custom career change boundaries
   const cleanIncomes = (incomeList || []).filter(inc => 
     inc.id !== 'inc-1' && 
-    !inc.id.startsWith('simple-inc')
+    !inc.id.startsWith('simple-inc') &&
+    !inc.id.startsWith('child-income-boost')
   );
   cleanIncomes.forEach(inc => {
     const sAge = Number(inc.startAge);
@@ -3083,6 +3085,24 @@ export default function FireSimulator() {
       
       // 1. If editing an existing event, remove it first from the appropriate list
       if (editingEvent.id) {
+        const oldEvent = newInputs.lifeEvents.find(e => e.id === editingEvent.id);
+        if (oldEvent && oldEvent.type === 'haveChild') {
+          const oldBirthAge = Number(oldEvent.birthAge !== undefined ? oldEvent.birthAge : oldEvent.parentAgeAtBirth) || 30;
+          const newBirthAge = Number(editingEvent.birthAge !== undefined ? editingEvent.birthAge : editingEvent.parentAgeAtBirth) || 30;
+          const ageDiff = newBirthAge - oldBirthAge;
+          if (ageDiff !== 0) {
+            newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+              if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${editingEvent.id}-`)) {
+                return {
+                  ...inc,
+                  startAge: inc.startAge + ageDiff,
+                  endAge: inc.endAge + ageDiff
+                };
+              }
+              return inc;
+            });
+          }
+        }
         if (newInputs.lifeEvents.some(e => e.id === editingEvent.id)) {
           newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== editingEvent.id);
         } else {
@@ -3476,6 +3496,20 @@ export default function FireSimulator() {
               updated.purchaseAge = newAge;
             } else if (e.type === 'haveChild') {
               updated.birthAge = newAge;
+              const oldBirthAge = Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) || 30;
+              const ageDiff = newAge - oldBirthAge;
+              if (ageDiff !== 0) {
+                newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+                  if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${e.id}-`)) {
+                    return {
+                      ...inc,
+                      startAge: inc.startAge + ageDiff,
+                      endAge: inc.endAge + ageDiff
+                    };
+                  }
+                  return inc;
+                });
+              }
             } else if (e.type === 'college') {
               updated.startAge = newAge;
             } else if (e.type === 'sabbatical') {
@@ -3907,7 +3941,7 @@ export default function FireSimulator() {
 
     // 1. Income Phases
     inp.incomeList.forEach(inc => {
-      if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc')) {
+      if (inc.id && typeof inc.id === 'string' && (inc.id.startsWith('simple-inc') || inc.id.startsWith('child-income-boost'))) {
         return;
       }
       if (inc.startAge > inp.currentAge && inc.startAge <= inp.lifeExpectancy) {
@@ -6373,7 +6407,8 @@ export default function FireSimulator() {
         inc.id !== 'simple-inc-worksave' && 
         !inc.id.startsWith('simple-inc-worksave-') &&
         inc.id !== 'simple-inc-prechild' &&
-        !inc.id.startsWith('simple-inc-prechild-')
+        !inc.id.startsWith('simple-inc-prechild-') &&
+        !inc.id.startsWith('child-income-boost')
       );
       let baseSalaryMonthly = 0;
       if (rawIncomeItem) {

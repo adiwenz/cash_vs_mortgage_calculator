@@ -2679,6 +2679,9 @@ export function getNormalizedPhases(inputs) {
 
   // A. Career Changes (from incomeList start ages)
   (inputs.incomeList || []).forEach(inc => {
+    if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
+      return;
+    }
     const start = Number(inc.startAge);
     if (start > currentAge && start < targetRetirementAge) {
       boundaries.add(start);
@@ -2735,7 +2738,7 @@ export function getNormalizedPhases(inputs) {
       const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
       const childEv = enabledEvents.find(e => e.type === 'haveChild' && Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) === start);
       const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge) === start);
-      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && inc.id !== 'simple-inc-childcare');
+      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
       const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && sp.id !== 'simple-spend-childcare');
 
       if (marriageEv) {
@@ -2749,7 +2752,7 @@ export function getNormalizedPhases(inputs) {
 
     // Defaults calculations
     // User monthly income
-    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && inc.id !== 'simple-inc-childcare');
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
     let baseSalaryMonthly = 0;
     let growthRate = 0.03;
     if (rawIncomeItem) {

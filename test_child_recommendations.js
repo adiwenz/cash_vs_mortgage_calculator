@@ -159,6 +159,51 @@ try {
 
   console.log('✅ Test 6 Passed: Moving child event from 35 to 39 regenerates phases and removes childcare boost/duplicate tabs correctly.');
 
+  // Test 7: Exclude child-income-boost from phase boundaries and lookups
+  const testInputs7 = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  testInputs7.currentAge = 35;
+  testInputs7.targetRetirementAge = 60;
+  testInputs7.lifeEvents = [
+    {
+      id: 'child-test-7',
+      type: 'haveChild',
+      enabled: true,
+      name: 'Test Child',
+      birthAge: 35,
+      childStartAge: 0,
+      costMethod: 'custom',
+      customAges0to4: 15000,
+      customAges5to12: 15000,
+      customAges13to18: 15000,
+      customAges19to22: 15000,
+      includeCollege: false
+    }
+  ];
+
+  // Get recommendations and inject the incomeBoosts
+  const recs7 = getChildCostOffsetRecommendations(testInputs7);
+  assert(recs7.length === 1, 'Should have 1 recommendation');
+  
+  testInputs7.incomeList = [...(testInputs7.incomeList || []), ...recs7[0].incomeBoosts];
+  
+  // Now run getNormalizedPhases
+  const phases7 = getNormalizedPhases(testInputs7);
+  
+  // Verify that there are only two phases: childcare_35_53 and workSave_53_60
+  // No splits at 40 or 48!
+  const childcarePhases7 = phases7.filter(p => p.type === 'childcare');
+  assert(childcarePhases7.length === 1, `Should have exactly 1 childcare phase, got ${childcarePhases7.length}`);
+  
+  const childcarePhase7 = childcarePhases7[0];
+  assert(childcarePhase7.startAge === 35 && childcarePhase7.endAge === 53, `Childcare phase should span 35 to 53, got ${childcarePhase7.startAge} to ${childcarePhase7.endAge}`);
+  
+  // Check that raw income lookup inside childcare phase ignores the child-income-boost item (which is 15000/yr) 
+  // and correctly uses standard base career salary (4167)
+  const baseSalary7 = Math.round((Number(testInputs7.simpleIncome) || 50000) / 12);
+  assert(childcarePhase7.income === baseSalary7 + 1250, `Childcare phase income should be base salary monthly ${baseSalary7} + child boost 1250, got ${childcarePhase7.income}`);
+
+  console.log('✅ Test 7 Passed: Child income boosts are successfully excluded from budget tab splits and base income lookups.');
+
   console.log('--- ALL test_child_recommendations PASSED ---');
   process.exit(0);
 } catch (err) {
