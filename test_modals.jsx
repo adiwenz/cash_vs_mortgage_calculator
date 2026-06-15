@@ -236,39 +236,32 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Step 1: Partner Finances
     const spouseIncome = getInputByWrapperText(/Spouse Income/i);
-    expect(spouseIncome.value).toBe('60000');
+    expect(spouseIncome.value).toBe('50000'); // Defaults to User Income
     
     // Check household summary
     expect(screen.getByText(/Live Household Summary/i)).toBeDefined();
-    expect(screen.getByText(/\$110,000/)).toBeDefined(); // User 50k + Spouse 60k
-    
-    // Toggle full partner profile
-    const profileBtn = screen.getByRole('button', { name: /Show Full Partner Profile/i });
-    fireEvent.click(profileBtn);
-    
-    const growthInput = getInputByWrapperText(/Income Growth Rate/i);
-    expect(growthInput.value).toBe('3');
+    expect(screen.getByText(/\$100,000/)).toBeDefined(); // User 50k + Spouse 50k
     
     // Modify spouse income and verify real-time household summary updates
     fireEvent.change(spouseIncome, { target: { value: '90000' } });
     expect(screen.getByText(/\$140,000/)).toBeDefined(); // User 50k + Spouse 90k
     
+    // Modify Savings Rate to 100% to test Zero Partner Personal Spending warning
+    const savingsRate = getInputByWrapperText(/Savings Rate/i);
+    expect(savingsRate.value).toBe('15'); // Defaults to User Savings Rate
+    fireEvent.change(savingsRate, { target: { value: '100' } });
+    expect(savingsRate.value).toBe('100');
+    
     // Click Next to Step 2
     const nextBtn = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextBtn);
     
-    // Step 2: Household Changes
-    expect(screen.getByText(/How Does Life Change After Marriage\?/i)).toBeDefined();
+    // Step 2: Life Together
+    expect(screen.getAllByText(/Life Together/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Shared Household Benefits/i)).toBeDefined();
     
-    // Budget Builder shortcut button exists
-    expect(screen.getAllByRole('button', { name: /Calculate from budget/i }).length).toBeGreaterThan(0);
-    
-    // Modify housing savings
-    const housingCostInput = getInputByWrapperText(/Shared Housing Savings \/ Cost/i);
-    expect(housingCostInput.value).toBe('-500'); // -6000 / 12
-    
-    fireEvent.change(housingCostInput, { target: { value: '-800' } });
-    expect(housingCostInput.value).toBe('-800');
+    // Update Household Budget CTA exists
+    expect(screen.getAllByRole('button', { name: /Update Household Budget/i }).length).toBeGreaterThan(0);
     
     // Include one-time wedding cost
     const weddingCheckbox = document.getElementById('include-wedding-cost');
@@ -282,19 +275,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Click Next to Step 3
     fireEvent.click(nextBtn);
     
-    // Step 3: Budget Preview & Warnings
-    expect(screen.getByText(/Household Budget Preview/i)).toBeDefined();
-    
-    // Warnings check - e.g. Zero partner personal spending warning.
-    // In default case, partner spending is based on net income 70%, so it's not 0.
-    // Let's go back and edit partner personal spending to 0 to trigger the warning.
-    const backBtn = screen.getByRole('button', { name: /Back/i });
-    fireEvent.click(backBtn); // back to step 2
-    
-    const personalSpending = getInputByWrapperText(/Partner Personal Spending/i);
-    fireEvent.change(personalSpending, { target: { value: '0' } });
-    
-    fireEvent.click(nextBtn); // forward to step 3
+    // Step 3: Marriage Impact
+    expect(screen.getAllByText(/Marriage Impact/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Before Marriage/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/After Marriage/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Tax Filing Status/i)).toBeDefined();
     
     // The Zero Partner Personal Spending Warning checkbox should be visible
     expect(screen.getByText(/Warning: Zero Partner Personal Spending/i)).toBeDefined();
@@ -303,28 +288,19 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(zeroSpendConfirm.checked).toBe(false);
     expect(lowSpendConfirm.checked).toBe(false);
     
-    // Next button should be disabled due to step 3 warning validation
-    const nextBtnStep3 = screen.getByRole('button', { name: /Next/i });
-    expect(nextBtnStep3.disabled).toBe(true);
+    // Save button should be disabled due to step 3 warning validation
+    const saveBtn = screen.getByRole('button', { name: /Save Marriage Event/i });
+    expect(saveBtn.disabled).toBe(true);
     
     // Confirm warnings
     fireEvent.click(zeroSpendConfirm);
     fireEvent.click(lowSpendConfirm);
     expect(zeroSpendConfirm.checked).toBe(true);
     expect(lowSpendConfirm.checked).toBe(true);
-    expect(nextBtnStep3.disabled).toBe(false);
+    expect(saveBtn.disabled).toBe(false);
     
-    // Click Next to Step 4 (Taxes)
-    fireEvent.click(nextBtnStep3);
-    expect(screen.getByText(/Tax Filing Status/i)).toBeDefined();
-    
-    // Click Next to Step 5 (Preview)
-    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
-    expect(screen.getByText(/Marriage Impact Preview/i)).toBeDefined();
-    
-    // Cancel the marriage event modal
-    const cancelBtn = document.querySelector('.event-form-overlay-card .list-builder-remove-btn');
-    fireEvent.click(cancelBtn);
+    // Click Save Marriage Event
+    fireEvent.click(saveBtn);
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Get Married/i })).toBeNull();

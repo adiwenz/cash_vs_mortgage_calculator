@@ -2588,16 +2588,179 @@ export default function FireSimulator() {
     setActiveStep(1);
   };
 
+  const getSavingsBreakdown = (editingEvent, inputs) => {
+    const curHousing = inputs.budgetDetails?.expenses?.housing !== undefined ? Number(inputs.budgetDetails.expenses.housing) : 1500;
+    const curUtilities = inputs.budgetDetails?.expenses?.utilities !== undefined ? Number(inputs.budgetDetails.expenses.utilities) : 400;
+    const curInternet = inputs.budgetDetails?.expenses?.internet !== undefined ? Number(inputs.budgetDetails.expenses.internet) : 100;
+    const curStreaming = inputs.budgetDetails?.expenses?.streaming !== undefined ? Number(inputs.budgetDetails.expenses.streaming) : 60;
+    const curHouseholdGoods = inputs.budgetDetails?.expenses?.householdGoods !== undefined ? Number(inputs.budgetDetails.expenses.householdGoods) : 500;
+
+    const housing = curHousing > 0 ? Math.round(curHousing * 0.5) : 750;
+    const utilities = curUtilities > 0 ? Math.round(curUtilities * 0.25) : 100;
+    const internet = curInternet > 0 ? Math.round(curInternet * 0.5) : 50;
+    const streaming = curStreaming > 0 ? Math.round(curStreaming * 0.5) : 30;
+    const otherShared = curHouseholdGoods > 0 ? Math.round(curHouseholdGoods * 0.1) : 50;
+    
+    const total = housing + utilities + internet + streaming + otherShared;
+    
+    return {
+      housing,
+      utilities,
+      internet,
+      streaming,
+      otherShared,
+      total
+    };
+  };
+
+  const calculateMarriageEstimates = (editingEvent, inputs) => {
+    if (!editingEvent) return null;
+
+    const spouseIncome = Number(editingEvent.spouseIncome) || 0;
+    const savingsRate = Number(editingEvent.savingsRate) || 0;
+    const partnerSavings = spouseIncome * (savingsRate / 100);
+    const partnerTax = calculateUSTaxForModal(spouseIncome, partnerSavings, 'single');
+    const partnerTakeHome = spouseIncome - partnerTax;
+    const partnerTakeHomeRemaining = Math.max(0, partnerTakeHome - partnerSavings);
+
+    // Calculate user spending baseline pre-retirement
+    let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
+    const initialPhase = (inputs.spendingPhases || []).find(p => (inputs.currentAge || 30) >= p.startAge && (inputs.currentAge || 30) < p.endAge) || (inputs.spendingPhases || [])[0];
+    if (initialPhase) {
+      if (initialPhase.frequency === 'monthly') {
+        userSpendingPreRetirement = (Number(initialPhase.amount) || 0) * 12;
+      } else if (initialPhase.frequency === 'yearly') {
+        userSpendingPreRetirement = Number(initialPhase.amount) || 0;
+      } else {
+        userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+      }
+    }
+
+    const curSavings = getSavingsBreakdown(editingEvent, inputs);
+    const totalSavingsAmount = curSavings.total * 12;
+
+    const combinedSpendingVal = Math.round(
+      Math.max(0, userSpendingPreRetirement + 
+      partnerTakeHomeRemaining - 
+      totalSavingsAmount)
+    );
+
+    const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
+    const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null 
+      ? Number(editingEvent.retirementSpendingNeed) 
+      : Math.round(spousePreRetirementSpending * 0.7);
+
+    return {
+      userSpendingPreRetirement,
+      partnerTakeHomeRemaining,
+      currentHousingCost: inputs.budgetDetails?.expenses?.housing !== undefined ? Number(inputs.budgetDetails.expenses.housing) : 1500,
+      housingOption: 'move',
+      housingCostAmount: - curSavings.housing * 12,
+      sharedCostSavingsAmount: - (curSavings.utilities + curSavings.internet + curSavings.streaming + curSavings.otherShared) * 12,
+      lifestyleOption: 'same',
+      lifestyleAdjustmentAmount: 0,
+      combinedSpendingVal,
+      spousePreRetirementSpending,
+      spouseRetSpendingVal,
+      partnerSavings,
+      partnerTax,
+      savingsBreakdown: curSavings
+    };
+  };
+
   const handleSetBudgetClick = (initialPhaseId = null) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
 
     const normalizedPhases = getNormalizedPhases(inp);
     
+    // Compute estimates if budget opened from marriage wizard
+    let estimatedExpenses = null;
+    let estimatedPartnerSavings = null;
+
+    if (isBudgetOpenFromMarriageWizard && editingEvent) {
+      const estimates = calculateMarriageEstimates(editingEvent, inp);
+      if (estimates) {
+        const userExpenses = inp.budgetDetails?.expenses || {
+          housing: 1500,
+          utilities: 300,
+          food: 400,
+          diningOut: 200,
+          transportation: 400,
+          healthcare: 300,
+          leisure: 300,
+          misc: 142
+        };
+        
+        // 1. Adjust Housing
+        let housingVal = Math.max(0, (userExpenses.housing || 1500) - estimates.savingsBreakdown.housing);
+        
+        // 2. Spouse personal spending (monthly)
+        const partnerMonthlySpend = Math.round(estimates.partnerTakeHomeRemaining / 12);
+        const nonHousingCats = ['utilities', 'food', 'diningOut', 'transportation', 'healthcare', 'leisure', 'misc'];
+        const userNonHousingTotal = nonHousingCats.reduce((sum, cat) => sum + (Number(userExpenses[cat]) || 0), 0);
+        
+        const tempExpenses = { ...userExpenses, housing: housingVal };
+        nonHousingCats.forEach(cat => {
+          let spouseCatSpend = 0;
+          if (userNonHousingTotal > 0) {
+            spouseCatSpend = partnerMonthlySpend * ((Number(userExpenses[cat]) || 0) / userNonHousingTotal);
+          } else {
+            spouseCatSpend = partnerMonthlySpend / nonHousingCats.length;
+          }
+          tempExpenses[cat] = Math.round((Number(userExpenses[cat]) || 0) + spouseCatSpend);
+        });
+        
+        // 3. Shared Cost Savings (Utilities, Internet, Streaming, and Other)
+        const nonHousingSavings = estimates.savingsBreakdown.utilities + estimates.savingsBreakdown.internet + estimates.savingsBreakdown.streaming + estimates.savingsBreakdown.otherShared;
+        let savingsToApply = nonHousingSavings;
+        const applied = Math.min(tempExpenses.utilities || 0, savingsToApply);
+        tempExpenses.utilities = Math.max(0, (tempExpenses.utilities || 0) - applied);
+        let remainingSavings = savingsToApply - applied;
+        if (remainingSavings > 0) {
+          const otherCats = ['misc', 'leisure', 'diningOut', 'transportation', 'food', 'healthcare'];
+          const otherTotal = otherCats.reduce((sum, cat) => sum + (Number(tempExpenses[cat]) || 0), 0);
+          if (otherTotal > 0) {
+            otherCats.forEach(cat => {
+              const deduct = remainingSavings * ((Number(tempExpenses[cat]) || 0) / otherTotal);
+              tempExpenses[cat] = Math.max(0, Math.round((Number(tempExpenses[cat]) || 0) - deduct));
+            });
+          }
+        }
+        
+        estimatedExpenses = tempExpenses;
+        
+        // Compute estimated spouse savings (monthly)
+        const spouseMonthlySavings = Math.round(estimates.partnerSavings / 12);
+        const trad401kAlloc = Math.min(1958, spouseMonthlySavings);
+        const checkingAlloc = Math.max(0, spouseMonthlySavings - trad401kAlloc);
+        estimatedPartnerSavings = {
+          trad401k: trad401kAlloc,
+          checking: checkingAlloc,
+          rothIra: 0,
+          tradIra: 0,
+          hsa: 0,
+          brokerage: 0,
+          hysa: 0,
+          emergency: 0,
+          debt: 0,
+          other: 0
+        };
+      }
+    }
+
     // Initialize editedPhases mapping
     const initialEdited = {};
     normalizedPhases.forEach(p => {
-      initialEdited[p.id] = { ...p };
+      if (p.type !== 'retire' && isBudgetOpenFromMarriageWizard && estimatedExpenses && estimatedPartnerSavings) {
+        initialEdited[p.id] = { 
+          ...p, 
+          expenses: { ...estimatedExpenses },
+          partnerSavings: { ...estimatedPartnerSavings }
+        };
+      } else {
+        initialEdited[p.id] = { ...p };
+      }
     });
     setEditedPhases(initialEdited);
 
@@ -2885,7 +3048,7 @@ export default function FireSimulator() {
               userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
             }
           }
-          const spousePersonalSpending = Math.round(Math.max(0, currentPhaseExpensesAnnual - userSpendingPreRetirement - (prev.housingCost !== undefined ? Number(prev.housingCost) : -6000) - (prev.lifestyleAdjustment !== undefined ? Number(prev.lifestyleAdjustment) : 0)) / 12);
+          const spousePersonalSpending = Math.round(Math.max(0, currentPhaseExpensesAnnual - userSpendingPreRetirement - (prev.housingCost !== undefined ? Number(prev.housingCost) : -6000)) / 12);
           return {
             ...prev,
             combinedSpendingAfterMarriage: currentPhaseExpensesAnnual,
@@ -3118,21 +3281,34 @@ export default function FireSimulator() {
     } else if (type === 'otherRetirementIncome') {
       defaults = { ...defaults, claimingAge: 65, monthlyBenefit: 800, inflationAdjusted: true, name: 'Other Income' };
     } else if (type === 'marriage') {
+      const userIncome = Number(inputs.simpleIncome) || 50000;
+      const userSavingsRate = Number(inputs.preTaxSavingsRate) || 15;
+      const userAssets = (Number(inputs.assets?.cash) || 0) +
+                         (Number(inputs.assets?.brokerage) || 0) +
+                         (Number(inputs.assets?.trad401k) || 0) +
+                         (Number(inputs.assets?.tradIra) || 0) +
+                         (Number(inputs.assets?.rothIra) || 0) +
+                         (Number(inputs.assets?.hsa) || 0) +
+                         (Number(inputs.assets?.other) || 0);
+      const userDebt = (Number(inputs.assets?.debts) || 0) +
+                       (inputs.debtList || []).reduce((sum, d) => sum + Number(d.balance || 0), 0);
+
       defaults = {
         ...defaults,
         age: inputs.currentAge || 35,
-        spouseIncome: 60000,
+        spouseIncome: userIncome,
         incomeGrowthRate: 3,
-        cash: 10000,
-        investments: 25000,
-        retirement: 50000,
+        cash: 0,
+        investments: userAssets,
+        retirement: 0,
         debtStudent: 0,
         debtCredit: 0,
-        debtOther: 0,
-        savingsRate: 15,
-        housingOption: 'savings',
-        housingSavings: -500,
-        housingCost: -6000,
+        debtOther: userDebt,
+        savingsRate: userSavingsRate,
+        housingOption: 'move',
+        housingSavings: 0,
+        housingCost: 0,
+        lifestyleOption: 'same',
         lifestyleAdjustment: 0,
         includeWeddingCost: false,
         weddingCost: 20000,
@@ -3144,7 +3320,8 @@ export default function FireSimulator() {
         spouseSocialSecurityAge: 67,
         spouseEstimatedSocialSecurityBenefit: 0,
         spouseDesiredRetirementAge: '',
-        retirementSpendingNeed: ''
+        retirementSpendingNeed: '',
+        partnerRetiresWithUser: true
       };
     }
     
@@ -3476,38 +3653,29 @@ export default function FireSimulator() {
             amount: editingEvent.amount
           };
         } else if (type === 'marriage') {
-          let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
-          const initialPhase = (inputs.spendingPhases || []).find(p => (inputs.currentAge || 30) >= p.startAge && (inputs.currentAge || 30) < p.endAge) || (inputs.spendingPhases || [])[0];
-          if (initialPhase) {
-            if (initialPhase.frequency === 'monthly') {
-              userSpendingPreRetirement = (Number(initialPhase.amount) || 0) * 12;
-            } else if (initialPhase.frequency === 'yearly') {
-              userSpendingPreRetirement = Number(initialPhase.amount) || 0;
-            } else {
-              userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
-            }
-          }
-
-          const combinedSpendingVal = editingEvent.combinedSpendingAfterMarriage !== undefined ? Number(editingEvent.combinedSpendingAfterMarriage) : Math.round(userSpendingPreRetirement * 1.5);
-          const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
-          const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null ? Number(editingEvent.retirementSpendingNeed) : Math.round(spousePreRetirementSpending * 0.7);
+          const estimates = calculateMarriageEstimates(editingEvent, newInputs);
+          const combinedSpendingVal = estimates ? estimates.combinedSpendingVal : 0;
+          const spouseRetSpendingVal = estimates ? estimates.spouseRetSpendingVal : 0;
+          const housingCostAmount = estimates ? estimates.housingCostAmount : 0;
+          const lifestyleAdjustmentAmount = estimates ? estimates.lifestyleAdjustmentAmount : 0;
 
           newEventObj = {
             ...newEventObj,
             age: Number(editingEvent.age),
             spouseIncome: Number(editingEvent.spouseIncome),
-            incomeGrowthRate: Number(editingEvent.incomeGrowthRate),
-            cash: Number(editingEvent.cash),
-            investments: Number(editingEvent.investments),
-            retirement: Number(editingEvent.retirement),
-            debtStudent: Number(editingEvent.debtStudent),
-            debtCredit: Number(editingEvent.debtCredit),
-            debtOther: Number(editingEvent.debtOther),
+            incomeGrowthRate: Number(editingEvent.incomeGrowthRate || 3),
+            cash: Number(editingEvent.cash || 0),
+            investments: Number(editingEvent.investments || 0),
+            retirement: Number(editingEvent.retirement || 0),
+            debtStudent: Number(editingEvent.debtStudent || 0),
+            debtCredit: Number(editingEvent.debtCredit || 0),
+            debtOther: Number(editingEvent.debtOther || 0),
             savingsRate: Number(editingEvent.savingsRate),
-            housingOption: editingEvent.housingOption || 'none',
-            housingSavings: Number(editingEvent.housingSavings),
-            housingCost: editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000,
-            lifestyleAdjustment: Number(editingEvent.lifestyleAdjustment),
+            housingOption: estimates ? estimates.housingOption : 'move',
+            housingSavings: 0,
+            housingCost: housingCostAmount,
+            lifestyleOption: estimates ? estimates.lifestyleOption : 'same',
+            lifestyleAdjustment: lifestyleAdjustmentAmount,
             includeWeddingCost: !!editingEvent.includeWeddingCost,
             weddingCost: Number(editingEvent.weddingCost),
             weddingAge: Number(editingEvent.weddingAge),
@@ -3516,7 +3684,9 @@ export default function FireSimulator() {
             spouseLifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            spouseDesiredRetirementAge: null,
+            desiredRetirementAge: null,
+            partnerRetiresWithUser: true,
             retirementSpendingNeed: spouseRetSpendingVal,
             combinedSpendingAfterMarriage: combinedSpendingVal
           };
@@ -3529,28 +3699,30 @@ export default function FireSimulator() {
             activeFromDate: Number(editingEvent.age),
             activeUntilDate: null,
             income: Number(editingEvent.spouseIncome),
-            incomeGrowthRate: Number(editingEvent.incomeGrowthRate) / 100,
+            incomeGrowthRate: Number(editingEvent.incomeGrowthRate || 3) / 100,
             assets: {
-              cash: Number(editingEvent.cash),
-              investments: Number(editingEvent.investments),
-              retirement: Number(editingEvent.retirement)
+              cash: Number(editingEvent.cash || 0),
+              investments: Number(editingEvent.investments || 0),
+              retirement: Number(editingEvent.retirement || 0)
             },
             debts: {
-              student: Number(editingEvent.debtStudent),
-              credit: Number(editingEvent.debtCredit),
-              other: Number(editingEvent.debtOther)
+              student: Number(editingEvent.debtStudent || 0),
+              credit: Number(editingEvent.debtCredit || 0),
+              other: Number(editingEvent.debtOther || 0)
             },
             savingsRate: Number(editingEvent.savingsRate),
             currentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
             lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            spouseDesiredRetirementAge: null,
+            desiredRetirementAge: null,
+            partnerRetiresWithUser: true,
             retirementSpendingNeed: spouseRetSpendingVal,
-            growthRate: Number(editingEvent.incomeGrowthRate),
+            growthRate: Number(editingEvent.incomeGrowthRate || 3),
             combinedSpendingAfterMarriage: combinedSpendingVal,
-            housingCost: editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000,
-            lifestyleAdjustment: Number(editingEvent.lifestyleAdjustment)
+            housingCost: housingCostAmount,
+            lifestyleAdjustment: lifestyleAdjustmentAmount
           };
           if (spouseIdx !== -1) {
             nextHouseholdMembers[spouseIdx] = spouseRecord;
@@ -4935,19 +5107,11 @@ export default function FireSimulator() {
         setEditingEvent({ ...editingEvent, wizardStep: 2 });
       } else if (stepId === 2) {
         setEditingEvent({ ...editingEvent, wizardStep: 3 });
-      } else if (stepId === 3) {
-        setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 4 : 5 });
-      } else if (stepId === 4) {
-        setEditingEvent({ ...editingEvent, wizardStep: 5 });
       }
     };
 
     const handleBack = () => {
-      if (stepId === 5) {
-        setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 4 : 3 });
-      } else if (stepId === 4) {
-        setEditingEvent({ ...editingEvent, wizardStep: 3 });
-      } else if (stepId === 3) {
+      if (stepId === 3) {
         setEditingEvent({ ...editingEvent, wizardStep: 2 });
       } else if (stepId === 2) {
         setEditingEvent({ ...editingEvent, wizardStep: 1 });
@@ -4956,6 +5120,7 @@ export default function FireSimulator() {
 
     // Calculate Combined Live Summary
     const userIncome = Number(inputs.simpleIncome) || 50000;
+    const userSavingsRate = Number(inputs.preTaxSavingsRate) || 15;
     const spouseIncome = Number(editingEvent.spouseIncome) || 0;
     const combinedIncome = userIncome + spouseIncome;
 
@@ -4991,22 +5156,22 @@ export default function FireSimulator() {
       }
     }
 
-    const partnerSavings = spouseIncome * ((editingEvent.savingsRate || 0) / 100);
-    const partnerTax = calculateUSTaxForModal(spouseIncome, partnerSavings, 'single');
-    const partnerTakeHome = spouseIncome - partnerTax;
-    const partnerTakeHomeRemaining = Math.max(0, partnerTakeHome - partnerSavings);
-    const defaultPartnerSpendingAnnual = partnerTakeHomeRemaining * 0.7;
-    const defaultPartnerSpendingMonthly = Math.round(defaultPartnerSpendingAnnual / 12);
+    const estimates = calculateMarriageEstimates(editingEvent, inputs);
+    const partnerSavings = estimates ? estimates.partnerSavings : 0;
+    const partnerTax = estimates ? estimates.partnerTax : 0;
+    const partnerTakeHomeRemaining = estimates ? estimates.partnerTakeHomeRemaining : 0;
+    const currentHousingCost = estimates ? estimates.currentHousingCost : 1500;
+    const housingOption = estimates ? estimates.housingOption : 'move';
+    const housingCostAmount = estimates ? estimates.housingCostAmount : 0;
+    const sharedCostSavingsAmount = estimates ? estimates.sharedCostSavingsAmount : -3000;
+    const lifestyleOption = estimates ? estimates.lifestyleOption : 'same';
+    const lifestyleAdjustmentAmount = estimates ? estimates.lifestyleAdjustmentAmount : 0;
+    const combinedSpendingVal = estimates ? estimates.combinedSpendingVal : 0;
+    const spousePreRetirementSpending = estimates ? estimates.spousePreRetirementSpending : 0;
+    const spouseRetSpendingVal = estimates ? estimates.spouseRetSpendingVal : 0;
 
-    const partnerPersonalSpending = editingEvent.spousePersonalSpending !== undefined ? Number(editingEvent.spousePersonalSpending) : defaultPartnerSpendingMonthly;
-
-    const housingCostAmount = editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000;
-    const lifestyleAdjustmentAmount = Number(editingEvent.lifestyleAdjustment || 0);
+    const partnerPersonalSpending = Math.round(partnerTakeHomeRemaining / 12);
     const weddingCostAmount = editingEvent.includeWeddingCost ? Number(editingEvent.weddingCost || 20000) : 0;
-
-    const combinedSpendingVal = Math.round(userSpendingPreRetirement + (partnerPersonalSpending * 12) + housingCostAmount + lifestyleAdjustmentAmount);
-    const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
-    const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null ? Number(editingEvent.retirementSpendingNeed) : Math.round(spousePreRetirementSpending * 0.7);
 
     // Net Cash Flow Impact = Spouse Income - (Combined Spend - User Spend) - Housing Cost - Lifestyle Cost
     const netCashFlowImpact = spouseIncome - spousePreRetirementSpending - housingCostAmount - lifestyleAdjustmentAmount;
@@ -5026,8 +5191,8 @@ export default function FireSimulator() {
 
     const isStep3Invalid = (combinedSpendingVal <= userSpendingPreRetirement && !isZeroSpendingConfirmed) || (partnerPersonalSpending === 0 && !isPartnerZeroSpendingConfirmed);
 
-    // Simulation Previews (Step 5 with Taxes, or Step 4 without Taxes)
-    const isPreviewStep = stepId === (showTaxesStep ? 5 : 4);
+    // Simulation Previews (Step 3)
+    const isPreviewStep = stepId === 3;
     let beforeReadyAge = null;
     let afterReadyAge = null;
     if (isPreviewStep) {
@@ -5047,7 +5212,8 @@ export default function FireSimulator() {
             enabled: true,
             retirementSpendingNeed: spouseRetSpendingVal,
             combinedSpendingAfterMarriage: combinedSpendingVal,
-            housingCost: housingCostAmount
+            housingCost: housingCostAmount,
+            partnerRetiresWithUser: true
           }
         ],
         householdMembers: [
@@ -5074,12 +5240,13 @@ export default function FireSimulator() {
             lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            desiredRetirementAge: null, // Forces spouse to retire at same age as user
             retirementSpendingNeed: spouseRetSpendingVal,
             growthRate: Number(editingEvent.incomeGrowthRate),
             combinedSpendingAfterMarriage: combinedSpendingVal,
             housingCost: housingCostAmount,
-            lifestyleAdjustment: lifestyleAdjustmentAmount
+            lifestyleAdjustment: lifestyleAdjustmentAmount,
+            partnerRetiresWithUser: true
           }
         ]
       };
@@ -5106,51 +5273,24 @@ export default function FireSimulator() {
 
             <div className={`wizard-step-divider ${stepId >= 2 ? 'active' : ''}`} />
 
-            {/* Step 2: Changes */}
+            {/* Step 2: Life Together */}
             <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => {
               setEditingEvent({ ...editingEvent, wizardStep: 2 });
             }}>
               <div className="wizard-step-icon">2</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Changes</span>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Life Together</span>
             </div>
 
             <div className={`wizard-step-divider ${stepId >= 3 ? 'active' : ''}`} />
 
-            {/* Step 3: Budget Preview */}
-            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''} ${stepId > 3 ? 'completed' : ''}`} onClick={() => {
-              if (stepId > 3 || stepId === 2) {
+            {/* Step 3: Marriage Impact */}
+            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''}`} onClick={() => {
+              if (stepId > 1) {
                 setEditingEvent({ ...editingEvent, wizardStep: 3 });
               }
             }}>
               <div className="wizard-step-icon">3</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Budget Preview</span>
-            </div>
-
-            {/* Step 4: Taxes (Only shown if showTaxesStep is true) */}
-            {showTaxesStep && (
-              <>
-                <div className={`wizard-step-divider ${stepId >= 4 ? 'active' : ''}`} />
-                <div className={`wizard-step-node ${stepId === 4 ? 'active' : ''} ${stepId > 4 ? 'completed' : ''}`} onClick={() => {
-                  if (!isStep3Invalid) {
-                    setEditingEvent({ ...editingEvent, wizardStep: 4 });
-                  }
-                }}>
-                  <div className="wizard-step-icon">4</div>
-                  <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Taxes</span>
-                </div>
-              </>
-            )}
-
-            <div className={`wizard-step-divider ${stepId === (showTaxesStep ? 5 : 4) ? 'active' : ''}`} />
-
-            {/* Step 5 / 4: Preview */}
-            <div className={`wizard-step-node ${stepId === 5 || (!showTaxesStep && stepId === 4) ? 'active' : ''}`} onClick={() => {
-              if (!isStep3Invalid) {
-                setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 5 : 4 });
-              }
-            }}>
-              <div className="wizard-step-icon">{showTaxesStep ? 5 : 4}</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Preview</span>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Marriage Impact</span>
             </div>
           </div>
 
@@ -5164,7 +5304,12 @@ export default function FireSimulator() {
                 </p>
               </div>
 
-              {/* Basic Fields */}
+              {/* Assumed finances helper text */}
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '0.65rem 0.85rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                ℹ️ We’ve assumed your partner’s finances are similar to yours. You can customize these values if needed.
+              </div>
+
+              {/* Step 1 Inputs */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="input-wrapper">
                   <span className="input-name">Marriage Age</span>
@@ -5196,163 +5341,27 @@ export default function FireSimulator() {
                     onChange={(e) => setEditingEvent({ ...editingEvent, savingsRate: parseInt(e.target.value) || 0 })}
                   />
                 </div>
-              </div>
-
-              {/* Collapsible toggle */}
-              <button
-                type="button"
-                className="list-builder-edit-btn"
-                onClick={() => setIsFullPartnerProfileOpen(!isFullPartnerProfileOpen)}
-                style={{ width: '100%', margin: '0.5rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem', fontSize: '0.8rem' }}
-              >
-                👤 {isFullPartnerProfileOpen ? 'Hide Full Partner Profile' : 'Show Full Partner Profile'}
-              </button>
-
-              {isFullPartnerProfileOpen && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', border: '1px dashed var(--border-color)', padding: '0.85rem', borderRadius: '6px', background: 'rgba(255,255,255,0.01)', maxHeight: '240px', overflowY: 'auto' }}>
-                  <div className="input-wrapper">
-                    <span className="input-name">Income Growth Rate (%)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.incomeGrowthRate !== undefined ? editingEvent.incomeGrowthRate : 3}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, incomeGrowthRate: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Current Age</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.spouseCurrentAge !== undefined ? editingEvent.spouseCurrentAge : (inputs.currentAge || 30)}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseCurrentAge: parseInt(e.target.value) || (inputs.currentAge || 30) })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Desired Retirement Age</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== null ? editingEvent.spouseDesiredRetirementAge : ''}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseDesiredRetirementAge: e.target.value !== '' ? parseInt(e.target.value) : '' })}
-                      placeholder="e.g. 65 (optional)"
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Life Expectancy</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.spouseLifeExpectancy !== undefined ? editingEvent.spouseLifeExpectancy : (inputs.lifeExpectancy || 85)}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseLifeExpectancy: parseInt(e.target.value) || (inputs.lifeExpectancy || 85) })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse SS Claim Age</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.spouseSocialSecurityAge !== undefined ? editingEvent.spouseSocialSecurityAge : 67}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseSocialSecurityAge: parseInt(e.target.value) || 67 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Est. SS Benefit ($/month)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined ? editingEvent.spouseEstimatedSocialSecurityBenefit : 0}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseEstimatedSocialSecurityBenefit: parseFloat(e.target.value) || 0 })}
-                      placeholder="0 (auto-calculate)"
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Retirement Spending Need ($/year)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== null ? editingEvent.retirementSpendingNeed : ''}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, retirementSpendingNeed: e.target.value !== '' ? parseFloat(e.target.value) : '' })}
-                      placeholder="optional"
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2', height: '1px', borderBottom: '1px solid var(--border-color)', margin: '0.4rem 0' }} />
-
-                  {/* Assets */}
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Cash Savings ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.cash !== undefined ? editingEvent.cash : 10000}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, cash: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Investments ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.investments !== undefined ? editingEvent.investments : 25000}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, investments: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Retirement ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.retirement !== undefined ? editingEvent.retirement : 50000}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, retirement: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2', height: '1px', borderBottom: '1px solid var(--border-color)', margin: '0.4rem 0' }} />
-
-                  {/* Debts */}
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Student Loans ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.debtStudent !== undefined ? editingEvent.debtStudent : 0}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, debtStudent: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Credit Cards ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.debtCredit !== undefined ? editingEvent.debtCredit : 0}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, debtCredit: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <span className="input-name">Spouse Other Debt ($)</span>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%' }}
-                      value={editingEvent.debtOther !== undefined ? editingEvent.debtOther : 0}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, debtOther: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
+                <div className="input-wrapper">
+                  <span className="input-name">Partner Assets ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={Number(editingEvent.cash || 0) + Number(editingEvent.investments || 0) + Number(editingEvent.retirement || 0)}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, investments: parseFloat(e.target.value) || 0, cash: 0, retirement: 0 })}
+                  />
                 </div>
-              )}
+                <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                  <span className="input-name">Partner Debt ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={Number(editingEvent.debtStudent || 0) + Number(editingEvent.debtCredit || 0) + Number(editingEvent.debtOther || 0)}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, debtOther: parseFloat(e.target.value) || 0, debtStudent: 0, debtCredit: 0 })}
+                  />
+                </div>
+              </div>
 
               {/* Live Summary Card */}
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
@@ -5375,105 +5384,95 @@ export default function FireSimulator() {
             </div>
           )}
 
-          {/* STEP 2: HOUSEHOLD CHANGES */}
+          {/* STEP 2: LIFE TOGETHER */}
           {stepId === 2 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>How Does Life Change After Marriage?</h4>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Life Together</h4>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Adjust partner personal spending, shared housing changes, and lifestyle changes below.
+                  Review automatic savings estimated from sharing housing, utilities, and services.
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                {/* 1. Partner Personal Spending */}
-                <div className="input-wrapper">
-                  <span className="input-name">Partner Personal Spending ($/month)</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
-                    Default (70% net): {formatCurrency(defaultPartnerSpendingMonthly)}/mo
-                  </span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={editingEvent.spousePersonalSpending !== undefined ? editingEvent.spousePersonalSpending : defaultPartnerSpendingMonthly}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, spousePersonalSpending: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-
-                {/* 2. Shared Housing Savings / Cost */}
-                <div className="input-wrapper">
-                  <span className="input-name">Shared Housing Savings / Cost ($/month)</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
-                    Use negative for savings (e.g. -500), positive for cost
-                  </span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ 
-                      width: '100%',
-                      color: ((editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12) < 0 
-                        ? '#10b981' 
-                        : ((editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12) > 0 
-                          ? '#f43f5e' 
-                          : 'inherit',
-                      fontWeight: (editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) !== 0 ? 'bold' : 'normal'
-                    }}
-                    value={(editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, housingCost: (parseFloat(e.target.value) || 0) * 12 })}
-                  />
-                </div>
-
-                {/* 3. Shared Lifestyle Spending Change */}
-                <div className="input-wrapper">
-                  <span className="input-name">Shared Lifestyle Spending Change ($/month)</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
-                    Use positive for added costs (e.g. travel)
-                  </span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ 
-                      width: '100%',
-                      color: ((editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12) < 0 
-                        ? '#10b981' 
-                        : ((editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12) > 0 
-                          ? '#f43f5e' 
-                          : 'inherit',
-                      fontWeight: (editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) !== 0 ? 'bold' : 'normal'
-                    }}
-                    value={(editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, lifestyleAdjustment: (parseFloat(e.target.value) || 0) * 12 })}
-                  />
-                </div>
-
-                {/* 4. Combined Household Spending */}
-                <div className="input-wrapper">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                    <span className="input-name" style={{ margin: 0 }}>Combined Household Spending</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsBudgetOpenFromMarriageWizard(true);
-                        handleSetBudgetClick('workSave');
-                      }}
-                      className="list-builder-edit-btn"
-                      style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem', height: '20px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', margin: 0 }}
-                    >
-                      📊 Calculate from budget
-                    </button>
+              {/* Shared Household Benefits */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  🏠 Shared Household Benefits
+                </span>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Housing Shared</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                      Estimated Savings: +50% of current housing cost
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    className="input-number-box"
-                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', cursor: 'not-allowed' }}
-                    value={`$${combinedSpendingVal.toLocaleString()}/yr ($${Math.round(combinedSpendingVal / 12).toLocaleString()}/mo)`}
-                    readOnly
-                  />
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Utilities Shared</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                      Estimated Savings: +25% of utilities budget
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Internet Shared</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                      Estimated Savings: +50% of internet budget
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Streaming Shared</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                      Estimated Savings: +50% of streaming budget
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)', gridColumn: 'span 2' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Household Goods Shared</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                      Estimated Savings: +10% of household goods budget
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* One-time Wedding Cost */}
+              {/* Estimated Monthly Household Savings Breakdown Table */}
+              {estimates && estimates.savingsBreakdown && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>
+                    Estimated Monthly Household Savings
+                  </span>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Housing</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.housing)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Utilities</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.utilities)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Internet</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.internet)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Streaming</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.streaming)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Other Shared</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.otherShared)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Total Savings</span>
+                      <strong style={{ color: 'var(--accent-emerald)', fontSize: '0.95rem' }}>
+                        +{formatCurrency(estimates.savingsBreakdown.total)}/mo
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Wedding Cost Section */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input
@@ -5519,60 +5518,171 @@ export default function FireSimulator() {
                   </div>
                 )}
               </div>
+
+              {/* Large CTA - Update Household Budget */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBudgetOpenFromMarriageWizard(true);
+                  handleSetBudgetClick('workSave');
+                }}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold',
+                  marginTop: '0.5rem',
+                  background: 'linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)',
+                  transition: 'all 0.2s ease-in-out',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                📊 Update Household Budget
+              </button>
             </div>
           )}
 
-          {/* STEP 3: BUDGET PREVIEW */}
+          {/* STEP 3: MARRIAGE IMPACT */}
           {stepId === 3 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Household Budget Preview</h4>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Marriage Impact</h4>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Here is a preview of your combined monthly household budget.
+                  Compare your household financials and retirement readiness before and after marriage.
                 </p>
               </div>
 
-              {/* Individual changes grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                <div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Partner Monthly Income</div>
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>+{formatCurrency(spouseIncome / 12)}</strong>
+              {/* Tax Filing Status (if Taxes are included) */}
+              {showTaxesStep && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.01)', padding: '0.75rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Tax Filing Status</span>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="filingStatus"
+                        value="jointly"
+                        checked={editingEvent.filingStatus === 'jointly'}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, filingStatus: e.target.value })}
+                      />
+                      Married Filing Jointly
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="filingStatus"
+                        value="separately"
+                        checked={editingEvent.filingStatus === 'separately'}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, filingStatus: e.target.value })}
+                      />
+                      Married Filing Separately
+                    </label>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Partner Monthly Savings</div>
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(partnerSavings / 12)}</strong>
+              )}
+
+              {/* Comparison Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                {/* Before Marriage Card */}
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'var(--bg-tertiary)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', marginBottom: '0.5rem' }}>
+                    Before Marriage
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Income:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(userIncome / 12)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Savings:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(userSavings)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Spending:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(userSpendingPreRetirement / 12)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Savings Rate:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{Math.round(userSavingsRate)}%</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Surplus:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(Math.max(0, userIncome / 12 - userSavings - userSpendingPreRetirement / 12))}/mo</strong>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Household Expense Change</div>
-                  <strong style={{ fontSize: '0.9rem', color: (housingCostAmount + lifestyleAdjustmentAmount) <= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
-                    {(housingCostAmount + lifestyleAdjustmentAmount) <= 0 ? '-' : '+'}{formatCurrency(Math.abs(housingCostAmount + lifestyleAdjustmentAmount) / 12)}
-                  </strong>
+
+                {/* After Marriage Card */}
+                <div style={{ border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary)', display: 'block', borderBottom: '1px solid var(--primary)', paddingBottom: '0.35rem', marginBottom: '0.5rem' }}>
+                    After Marriage
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Combined Income:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(combinedIncome / 12)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Combined Savings:</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(combinedSavings)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Combined Spending:</span>
+                      <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(combinedSpendingVal / 12)}/mo</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Savings Rate:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{Math.round((combinedSavings / (combinedIncome / 12)) * 100)}%</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--primary)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Surplus:</span>
+                      <strong style={{ color: leftoverGap >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                        {formatCurrency(Math.max(0, leftoverGap))}/mo
+                      </strong>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Combined Monthly Budget Breakdown */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Combined Monthly Budget</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Income</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(combinedIncome / 12)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Savings</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>-{formatCurrency(combinedSavings)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Spending</span>
-                    <strong style={{ color: 'var(--accent-rose)' }}>-{formatCurrency(combinedSpendingVal / 12)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{leftoverGap >= 0 ? 'Leftover Surplus' : 'Monthly Gap'}</span>
-                    <strong style={{ color: leftoverGap >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontSize: '0.95rem' }}>
-                      {leftoverGap >= 0 ? '+' : ''}{formatCurrency(leftoverGap)}
-                    </strong>
+              {/* Retirement Readiness Impact Card */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.2rem', marginTop: '0.2rem' }}>
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Before Retirement Age</span>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+                    {beforeReadyAge ? `Age ${beforeReadyAge}` : 'Never Ready'}
                   </div>
                 </div>
+                <div style={{
+                  border: '1px solid',
+                  borderColor: afterReadyAge && beforeReadyAge && afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : afterReadyAge && beforeReadyAge && afterReadyAge > beforeReadyAge ? 'var(--accent-rose)' : 'var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Retirement Age</span>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', marginTop: '0.2rem' }}>
+                    {afterReadyAge ? `Age ${afterReadyAge}` : 'Never Ready'}
+                  </div>
+                  {afterReadyAge && beforeReadyAge && afterReadyAge !== beforeReadyAge && (
+                    <div style={{ fontSize: '0.65rem', color: afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold', marginTop: '0.1rem' }}>
+                      {afterReadyAge < beforeReadyAge ? `Ready ${beforeReadyAge - afterReadyAge} years earlier! 🎉` : `Ready ${afterReadyAge - beforeReadyAge} years later`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SWR display */}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '-0.5rem' }}>
+                Retirement target calculated at <strong>{inputs.swr || 4.0}% SWR</strong> supporting both spouses.
               </div>
 
               {/* Warnings & Confirmations */}
@@ -5610,159 +5720,6 @@ export default function FireSimulator() {
                     </label>
                   </div>
                 )}
-
-                {/* 3. Savings Higher Than Surplus Warning */}
-                {combinedSavings > surplusMonthly && (
-                  <div style={{ border: '1px solid var(--accent-orange, #f59e0b)', backgroundColor: 'rgba(245, 158, 11, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', margin: 0 }}>
-                      <strong style={{ color: 'var(--accent-orange, #f59e0b)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Savings Exceed Surplus</strong>
-                      Combined savings of {formatCurrency(combinedSavings)}/mo exceed the monthly surplus of {formatCurrency(surplusMonthly)}/mo. This results in a monthly gap of {formatCurrency(combinedSavings - surplusMonthly)}/mo that must be covered by assets.
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: TAXES */}
-          {stepId === 4 && showTaxesStep && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Tax Filing Status</h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Choose how taxes should be filed starting on your marriage date.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: editingEvent.filingStatus === 'jointly' ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
-                  <input
-                    type="radio"
-                    name="marriage-filing-status"
-                    checked={editingEvent.filingStatus === 'jointly'}
-                    onChange={() => setEditingEvent({ ...editingEvent, filingStatus: 'jointly' })}
-                  />
-                  <div>
-                    <strong style={{ display: 'block', fontSize: '0.85rem' }}>Married Filing Jointly</strong>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Calculates progressive taxes using Married brackets and a standard deduction of $32,200 (inflated).</span>
-                  </div>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: editingEvent.filingStatus === 'separately' ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
-                  <input
-                    type="radio"
-                    name="marriage-filing-status"
-                    checked={editingEvent.filingStatus === 'separately'}
-                    onChange={() => setEditingEvent({ ...editingEvent, filingStatus: 'separately' })}
-                  />
-                  <div>
-                    <strong style={{ display: 'block', fontSize: '0.85rem' }}>Married Filing Separately</strong>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Calculates progressive taxes using Single brackets and a standard deduction of $16,100 (inflated).</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5: PREVIEW */}
-          {(stepId === 5 || (!showTaxesStep && stepId === 4)) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Marriage Impact Preview</h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Compare retirement readiness metrics before and after saving this marriage event.
-                </p>
-              </div>
-
-              {/* Ready Age Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Before Marriage</span>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
-                    {beforeReadyAge ? `Age ${beforeReadyAge}` : 'Never Ready'}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    Spending Need: {formatCurrency(beforeSpendingNeed)}/yr
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                    People Supported: 1
-                  </div>
-                </div>
-                <div style={{
-                  border: '1px solid',
-                  borderColor: afterReadyAge && beforeReadyAge && afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : afterReadyAge && beforeReadyAge && afterReadyAge > beforeReadyAge ? 'var(--accent-rose)' : 'var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.85rem',
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
-                  textAlign: 'center'
-                }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Marriage</span>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', marginTop: '0.2rem' }}>
-                    {afterReadyAge ? `Age ${afterReadyAge}` : 'Never Ready'}
-                  </div>
-                  {afterReadyAge && beforeReadyAge && afterReadyAge !== beforeReadyAge && (
-                    <div style={{ fontSize: '0.65rem', color: afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold', marginTop: '0.1rem' }}>
-                      {afterReadyAge < beforeReadyAge ? `Ready ${beforeReadyAge - afterReadyAge} years earlier! 🎉` : `Ready ${afterReadyAge - beforeReadyAge} years later`}
-                    </div>
-                  )}
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    Spending Need: {formatCurrency(afterSpendingNeed)}/yr
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                    People Supported: 2
-                  </div>
-                </div>
-              </div>
-
-              {/* SWR display */}
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '-0.5rem' }}>
-                Retirement target calculated at <strong>{inputs.swr || 4.0}% SWR</strong>.
-              </div>
-
-              {/* Improvement Warning */}
-              {showImprovementWarning && (
-                <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-primary)' }}>
-                  <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Large Readiness Improvement</strong>
-                  Check this result: marriage is adding substantial income/assets. Make sure combined spending and spouse retirement needs are included.
-                </div>
-              )}
-
-              {/* Breakdown Card */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Marriage Impact Breakdown</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Income Added</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(spouseIncome)}/year</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Assets Added</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(spouseAssets)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Debt Added</span>
-                    <strong style={{ color: spouseDebt > 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>
-                      {spouseDebt > 0 ? `-${formatCurrency(spouseDebt)}` : '$0'}
-                    </strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Combined Spending</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(combinedSpendingVal)}/year</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Spouse Retirement Spending</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(spouseRetSpendingVal)}/year</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>People Supported</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>2 Adults</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Net Cash Flow Impact</span>
-                    <strong style={{ color: netCashFlowImpact >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
-                      {netCashFlowImpact >= 0 ? '+' : ''}{formatCurrency(netCashFlowImpact)}/year
-                    </strong>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -5788,13 +5745,12 @@ export default function FireSimulator() {
                   Back
                 </button>
               )}
-              {stepId < (showTaxesStep ? 5 : 4) ? (
+              {stepId < 3 ? (
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={handleNext}
                   style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold' }}
-                  disabled={stepId === 3 && isStep3Invalid}
                 >
                   Next
                 </button>
