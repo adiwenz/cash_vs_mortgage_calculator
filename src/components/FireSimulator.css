@@ -234,130 +234,382 @@
 .timeline-card {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0;
 }
 
 .timeline-wrapper {
   overflow-x: auto;
-  padding: 3.75rem 0.5rem 0.75rem 0.5rem;
+  padding: 0.5rem;
   scrollbar-width: thin;
 }
 
-.timeline-track-container {
-  min-width: 800px;
+/* Layout Wrapper for Timeline + Drawer */
+.timeline-layout-wrapper {
+  display: flex;
   position: relative;
-  padding-bottom: 2rem;
-  height: 145px;
+  width: 100%;
 }
 
-.timeline-line-axis {
+/* Sticky column and track rows */
+.timeline-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.timeline-row-label {
+  position: sticky;
+  left: 0;
+  background: var(--bg-secondary);
+  z-index: 10;
+  width: 150px;
+  min-width: 150px;
+  padding: 0.75rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+[data-theme='light'] .timeline-row-label {
+  background: #f8fafc;
+}
+
+.timeline-row-content {
+  flex-grow: 1;
+  position: relative;
+  padding: 0 24px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+/* Track Inner aligning elements */
+.timeline-track-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Layer 1: Life Phase Spans */
+.life-phase-track {
+  height: 36px;
+}
+
+.life-phase-span {
   position: absolute;
-  top: 120px;
-  left: 70px;
-  right: 70px;
-  height: 4px;
-  background: var(--bg-tertiary);
-  border-radius: 2px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0 12px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
+}
+
+.life-phase-span.work-save {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px dashed rgba(99, 102, 241, 0.35);
+  color: var(--primary);
+}
+
+.life-phase-span.retirement {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px dashed rgba(16, 185, 129, 0.35);
+  color: var(--accent-emerald);
+}
+
+.life-phase-span:hover {
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Layer 2: Assets & Commitments */
+.commitment-track {
+  height: 30px;
+}
+
+.commitment-span {
+  position: absolute;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 8px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
+}
+
+.commitment-span.home {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: var(--primary);
+}
+
+.commitment-span.childcare {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--accent-orange, #f59e0b);
+}
+
+.commitment-span.marriage {
+  background: rgba(236, 72, 153, 0.08);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  color: var(--accent-rose, #ec4899);
+}
+
+/* Layer 3: Events / Milestones Track */
+.events-row-content {
+  min-height: 180px; /* Taller track to prevent overlaps with stacked glowing badges */
+}
+
+.events-axis-line {
+  position: absolute;
+  bottom: 16px;
+  left: 24px;
+  right: 24px;
+  height: 2px;
+  background: var(--border-color);
   z-index: 1;
 }
 
-.timeline-progress-line {
+/* User Milestones (Glowing Circular Badges) */
+.milestone-circle-wrapper {
   position: absolute;
-  top: 120px;
-  left: 70px;
-  height: 4px;
-  background: var(--primary);
-  border-radius: 2px;
-  z-index: 2;
-  transition: width 0.5s ease;
-}
-
-.timeline-events-container {
-  position: relative;
-  z-index: 3;
-  width: 100%;
-  height: 100%;
-}
-
-.timeline-node {
-  position: absolute;
-  top: 83px; /* Position the 33px dot completely above the 120px axis line */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  pointer-events: auto;
   cursor: pointer;
+  z-index: 5;
   transition: transform 0.2s ease;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
-.timeline-node:hover {
-  transform: translateX(-50%) scale(1.1);
-  z-index: 50;
+.milestone-circle-wrapper:hover {
+  transform: translateX(-50%) scale(1.08);
+  z-index: 10;
 }
 
-.timeline-node-dot {
-  width: 33px;
-  height: 33px;
+.milestone-glow-circle {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--bg-secondary);
-  border: 3px solid var(--bg-tertiary);
+  border: 2px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.12rem; /* Clean emoji size inside */
+  font-size: 1.15rem;
   line-height: 1;
-  overflow: hidden;
-  color: var(--text-secondary);
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
-  z-index: 5;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.timeline-node.active .timeline-node-dot {
-  background: var(--primary);
-  border-color: var(--bg-primary);
-  color: #ffffff;
-  box-shadow: 0 0 10px var(--primary);
+/* Specific glows based on event type */
+.milestone-circle-wrapper.standard-milestone .milestone-glow-circle {
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.45);
 }
 
-.timeline-node.milestone .timeline-node-dot {
-  background: var(--accent-emerald);
-  border-color: var(--bg-primary);
-  color: #ffffff;
-  box-shadow: 0 0 10px var(--accent-emerald);
+.milestone-circle-wrapper.milestone-event .milestone-glow-circle {
+  border-color: var(--accent-emerald);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
 }
 
-.timeline-node-label {
-  margin-top: 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 600;
+.milestone-age-label {
+  font-size: 0.65rem;
+  font-weight: 700;
   color: var(--text-secondary);
-  white-space: normal;
-  text-align: center;
-  max-width: 90px;
-  overflow: visible;
-  line-height: 1.25;
-  word-wrap: break-word;
+  margin-top: 4px;
+  background: var(--bg-primary);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
-.timeline-node-connector {
+/* Ticks / Ages Ticks Row */
+.ticks-row-content {
+  min-height: 24px;
+}
+
+.timeline-tick-new {
   position: absolute;
-  top: 32px;
-  left: 50%;
-  width: 1px;
-  border-left: 1px dashed var(--border-color);
-  opacity: 0.65;
-  z-index: 2;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.timeline-node.active .timeline-node-label {
+.timeline-tick-mark-new {
+  width: 1px;
+  height: 4px;
+  background: var(--border-color);
+  opacity: 0.8;
+}
+
+.timeline-tick-label-new {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.financial-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  margin-top: 0.35rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.financial-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--primary);
   color: var(--text-primary);
 }
 
+/* Financial Milestones (Smaller, Less Prominent) */
+.financial-milestone-wrapper {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 4;
+  transition: transform 0.2s ease;
+}
+
+.financial-milestone-wrapper:hover {
+  transform: translateX(-50%) scale(1.08);
+  z-index: 10;
+}
+
+.financial-milestone-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+}
+
+.financial-milestone-wrapper:hover .financial-milestone-dot {
+  opacity: 1;
+  border-color: var(--text-tertiary);
+}
+
+.milestone-connector-line {
+  position: absolute;
+  width: 1px;
+  border-left: 1px dashed var(--border-color);
+  opacity: 0.35;
+  z-index: 1;
+}
+
+/* Details Drawer sliding from right */
+.timeline-details-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  z-index: 20;
+  background: var(--bg-secondary);
+  border-left: none;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-details-drawer.open {
+  width: 320px;
+  border-left: 1px solid var(--border-color);
+}
+
+.timeline-drawer-content {
+  width: 320px;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+  gap: 1rem;
+}
+
+.timeline-drawer-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.timeline-drawer-close:hover {
+  color: var(--text-primary);
+}
+
+/* Tooltip styles */
 .timeline-tooltip {
   position: absolute;
   bottom: 140%;
@@ -390,13 +642,14 @@
   border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
 }
 
-.timeline-node:hover .timeline-tooltip {
+.timeline-event-node-new:hover .timeline-tooltip,
+.milestone-circle-wrapper:hover .timeline-tooltip,
+.financial-milestone-wrapper:hover .timeline-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
 
-/* Align tooltip left when near the start of the timeline */
 .timeline-tooltip.align-left {
   left: -12px;
   transform: translateY(5px);
@@ -407,11 +660,12 @@
   transform: none;
 }
 
-.timeline-node:hover .timeline-tooltip.align-left {
+.timeline-event-node-new:hover .timeline-tooltip.align-left,
+.milestone-circle-wrapper:hover .timeline-tooltip.align-left,
+.financial-milestone-wrapper:hover .timeline-tooltip.align-left {
   transform: translateY(0);
 }
 
-/* Align tooltip right when near the end of the timeline */
 .timeline-tooltip.align-right {
   left: auto;
   right: -12px;
@@ -424,35 +678,92 @@
   transform: none;
 }
 
-.timeline-node:hover .timeline-tooltip.align-right {
+.timeline-event-node-new:hover .timeline-tooltip.align-right,
+.milestone-circle-wrapper:hover .timeline-tooltip.align-right,
+.financial-milestone-wrapper:hover .timeline-tooltip.align-right {
   transform: translateY(0);
 }
 
-/* Dragging active states */
-.timeline-node.dragging {
-  transform: translateX(-50%) scale(1.15) !important;
+
+/* Compact Summary Row styling */
+.timeline-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+.timeline-summary-title {
+  font-size: 0.7rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.timeline-summary-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.plan-chip:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
+
+.timeline-event-node-new.dragging,
+.milestone-circle-wrapper.dragging,
+.financial-milestone-wrapper.dragging {
   z-index: 60 !important;
 }
 
-.timeline-node.dragging .timeline-node-dot {
-  box-shadow: 0 0 15px var(--accent-emerald), var(--shadow-md);
+.timeline-event-node-new.dragging .timeline-event-dot-box,
+.milestone-circle-wrapper.dragging .milestone-glow-circle,
+.financial-milestone-wrapper.dragging .financial-milestone-dot {
   border-color: var(--accent-emerald);
 }
 
-.timeline-node.dragging .timeline-tooltip {
+.timeline-event-node-new.dragging .timeline-tooltip,
+.milestone-circle-wrapper.dragging .timeline-tooltip,
+.financial-milestone-wrapper.dragging .timeline-tooltip {
   opacity: 1 !important;
   visibility: visible !important;
   transform: translateX(-50%) translateY(0) !important;
   pointer-events: none;
 }
 
-.timeline-node.dragging .timeline-tooltip.align-left {
+.timeline-event-node-new.dragging .timeline-tooltip.align-left,
+.milestone-circle-wrapper.dragging .timeline-tooltip.align-left,
+.financial-milestone-wrapper.dragging .timeline-tooltip.align-left {
   opacity: 1 !important;
   visibility: visible !important;
   transform: none !important;
 }
 
-.timeline-node.dragging .timeline-tooltip.align-right {
+.timeline-event-node-new.dragging .timeline-tooltip.align-right,
+.milestone-circle-wrapper.dragging .timeline-tooltip.align-right,
+.financial-milestone-wrapper.dragging .timeline-tooltip.align-right {
   opacity: 1 !important;
   visibility: visible !important;
   transform: none !important;
@@ -596,10 +907,10 @@
 /* Mobile-responsive timeline layout rules */
 @media (max-width: 768px) {
   .timeline-wrapper {
-    display: none;
+    display: block;
   }
   .vertical-timeline-container {
-    display: flex;
+    display: none;
   }
   .scenario-deck {
     grid-template-columns: 1fr;
