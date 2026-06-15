@@ -2646,9 +2646,10 @@ export default function FireSimulator() {
     );
 
     const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
+    const userRetirePercent = Number((inputs?.lifeEvents || []).find(e => e.type === 'retire')?.spendingPercent || 70) / 100;
     const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null 
       ? Number(editingEvent.retirementSpendingNeed) 
-      : Math.round(spousePreRetirementSpending * 0.7);
+      : Math.round(spousePreRetirementSpending * userRetirePercent);
 
     return {
       userSpendingPreRetirement,
@@ -2718,20 +2719,35 @@ export default function FireSimulator() {
         
         // Compute estimated spouse savings (monthly)
         const spouseMonthlySavings = Math.round(estimates.partnerSavings / 12);
-        const trad401kAlloc = Math.min(1958, spouseMonthlySavings);
-        const checkingAlloc = Math.max(0, spouseMonthlySavings - trad401kAlloc);
+        const userSavings = inp.budgetDetails?.savings || {};
+        const userTotalSavings = Object.values(userSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        
         estimatedPartnerSavings = {
-          trad401k: trad401kAlloc,
-          checking: checkingAlloc,
-          rothIra: 0,
-          tradIra: 0,
-          hsa: 0,
-          brokerage: 0,
-          hysa: 0,
-          emergency: 0,
-          debt: 0,
-          other: 0
+          trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
+          checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
         };
+        
+        if (userTotalSavings > 0) {
+          Object.keys(userSavings).forEach(key => {
+            estimatedPartnerSavings[key] = Math.round(spouseMonthlySavings * ((Number(userSavings[key]) || 0) / userTotalSavings));
+          });
+          
+          const partnerTotalSavings = Object.values(estimatedPartnerSavings).reduce((sum, v) => sum + v, 0);
+          const diff = spouseMonthlySavings - partnerTotalSavings;
+          if (diff !== 0) {
+            let maxKey = 'brokerage';
+            Object.keys(estimatedPartnerSavings).forEach(key => {
+              if (estimatedPartnerSavings[key] > (estimatedPartnerSavings[maxKey] || 0)) {
+                maxKey = key;
+              }
+            });
+            estimatedPartnerSavings[maxKey] = Math.max(0, estimatedPartnerSavings[maxKey] + diff);
+          }
+        } else {
+          const trad401kAlloc = Math.min(1958, spouseMonthlySavings);
+          estimatedPartnerSavings.trad401k = trad401kAlloc;
+          estimatedPartnerSavings.checking = Math.max(0, spouseMonthlySavings - trad401kAlloc);
+        }
       }
     }
 
@@ -5637,7 +5653,7 @@ export default function FireSimulator() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Savings Rate:</span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{Math.round((combinedSavings / (combinedIncome / 12)) * 100)}%</strong>
+                      <strong style={{ color: 'var(--text-primary)' }}>{Math.round(((combinedSavings + Math.max(0, leftoverGap)) / (combinedIncome / 12)) * 100)}%</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--primary)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Surplus:</span>

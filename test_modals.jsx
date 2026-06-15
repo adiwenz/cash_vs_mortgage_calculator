@@ -269,7 +269,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Verify Budget modal opens in married mode
     expect(screen.getByText(/Work Phase Budget/i)).toBeDefined();
-    expect(screen.queryAllByText(/\$11,667/).length > 0 || screen.queryAllByText(/\$10,895/).length > 0 || screen.queryAllByText(/\$10,322/).length > 0).toBe(true); // Combined take-home income
+    expect(screen.queryAllByText(/\$11,667/).length > 0 || screen.queryAllByText(/\$10,895/).length > 0 || screen.queryAllByText(/\$10,322/).length > 0 || screen.queryAllByText(/\$10,398/).length > 0).toBe(true); // Combined take-home income
     
     // Expand the Needs section to inspect Housing (Rent/Mortgage)
     const needsHeader = screen.getByText('Needs');

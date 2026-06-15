@@ -3142,7 +3142,25 @@ export function getNormalizedPhases(inputs) {
     };
     if (isMarried && start < targetRetirementAge && !isPartnerRetiredInPhase) {
       const partnerPreTax = Math.round((spouseIncome * 12 * (spouseSavingsRate / 100)) / 12);
-      defaultPartnerSavings.brokerage = partnerPreTax;
+      const userTotalSavings = Object.values(defaultSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      if (userTotalSavings > 0) {
+        Object.keys(defaultSavings).forEach(key => {
+          defaultPartnerSavings[key] = Math.round(partnerPreTax * ((Number(defaultSavings[key]) || 0) / userTotalSavings));
+        });
+        const partnerTotalSavings = Object.values(defaultPartnerSavings).reduce((sum, v) => sum + v, 0);
+        const diff = partnerPreTax - partnerTotalSavings;
+        if (diff !== 0) {
+          let maxKey = 'brokerage';
+          Object.keys(defaultPartnerSavings).forEach(key => {
+            if (defaultPartnerSavings[key] > (defaultPartnerSavings[maxKey] || 0)) {
+              maxKey = key;
+            }
+          });
+          defaultPartnerSavings[maxKey] = Math.max(0, defaultPartnerSavings[maxKey] + diff);
+        }
+      } else {
+        defaultPartnerSavings.brokerage = partnerPreTax;
+      }
     }
 
     const savedPhase = (inputs.budgetDetails?.phases || []).find(p => p.id === id || (Number(p.startAge) === start && p.type === type));
