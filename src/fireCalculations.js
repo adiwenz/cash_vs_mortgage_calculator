@@ -1,6 +1,7 @@
 /**
  * Mathematical Calculation Engine for the FIRE & Retirement Life Simulator (Refined for Cash Flow Planner)
  */
+// Verification comment for playwright only-changed test run
 
 /**
  * Runs a year-by-year simulation from currentAge to lifeExpectancy.
@@ -128,10 +129,8 @@ export function getActiveChildrenCountAtAge(age, lifeEvents) {
 export function runFireSimulation(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
-  
   const lifeEvents = inputs.lifeEvents || [];
   const enabledEvents = lifeEvents.filter(e => e.enabled);
-  
   // Find retirement event dynamically
   const retireEvent = enabledEvents.find(e => e.type === 'retire');
   const targetRetirementAge = retireEvent 
@@ -153,9 +152,78 @@ export function runFireSimulation(inputs) {
 
   const includeTaxes = !!inputs.includeTaxes;
   const enableHealthcareModel = inputs.enableHealthcareModel !== false;
-  const filingStatus = inputs.filingStatus || 'single';
+  let filingStatus = inputs.filingStatus || 'single';
+  if (filingStatus === 'jointly' || filingStatus === 'marriedJointly') {
+    filingStatus = 'married';
+  }
   const enforceEarlyWithdrawalPenalty = true;
-  const isAdvanced = !!inputs.isAdvancedMode;
+  const isAdvanced = inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
+
+  const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
+  let socialSecurityDetails = {
+    claimAge: 67,
+    workingYears: 0,
+    isEligible: false,
+    indexedEarningsHistory: [],
+    top35AnnualEarnings: 0,
+    averageTop35AnnualIncome: 0,
+    aimeMonthly: 0,
+    piaMonthly: 0,
+    claimingAgeMultiplier: 0,
+    monthlyBenefit: 0,
+    annualBenefit: 0,
+    adjustmentType: 'Not eligible'
+  };
+
+  if (ssEvent) {
+    const claimAge = Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67;
+    if (claimAge < 62) {
+      socialSecurityDetails = {
+        claimAge,
+        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
+        isEligible: false,
+        indexedEarningsHistory: [],
+        top35AnnualEarnings: 0,
+        averageTop35AnnualIncome: 0,
+        aimeMonthly: 0,
+        piaMonthly: 0,
+        claimingAgeMultiplier: 0,
+        monthlyBenefit: 0,
+        annualBenefit: 0,
+        adjustmentType: 'Not eligible'
+      };
+    } else if (ssEvent.useEarnings) {
+      const incomeHistory = getIncomeHistory(inputs, ssEvent);
+      socialSecurityDetails = calculateSocialSecurityBenefit({
+        incomeHistory,
+        claimAge,
+        fullRetirementAge: 67,
+        firstBendPoint: ssEvent.firstBendPoint !== undefined ? Number(ssEvent.firstBendPoint) : 1286,
+        secondBendPoint: ssEvent.secondBendPoint !== undefined ? Number(ssEvent.secondBendPoint) : 7749
+      });
+    } else {
+      const monthlyBenefitBase = Number(ssEvent.monthlyBenefit) || 0;
+      const multRes = calculateClaimingAgeMultiplier({
+        claimAge,
+        fullRetirementAge: 67
+      });
+      const monthlyBenefit = monthlyBenefitBase * multRes.multiplier;
+      socialSecurityDetails = {
+        claimAge,
+        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
+        isEligible: true,
+        indexedEarningsHistory: [],
+        top35AnnualEarnings: 0,
+        averageTop35AnnualIncome: 0,
+        aimeMonthly: 0,
+        piaMonthly: monthlyBenefitBase,
+        claimingAgeMultiplier: multRes.multiplier,
+        monthlyBenefit,
+        annualBenefit: monthlyBenefit * 12,
+        adjustmentType: multRes.adjustmentType
+      };
+    }
+  }
 
   let year0Taxes = 0;
   if (includeTaxes) {
@@ -169,6 +237,71 @@ export function runFireSimulation(inputs) {
     const stdDeduction0 = taxConfig.standardDeduction;
     const brackets0 = taxConfig.brackets;
     year0Taxes = calculateUSTax(taxableIncome0, stdDeduction0, brackets0);
+  }
+
+  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
+  const hasMarriage = !!marriageEvent;
+  const marriageAge = marriageEvent ? (Number(marriageEvent.age) || 40) : 999;
+  const weddingAge = marriageEvent ? (Number(marriageEvent.weddingAge) || marriageAge) : 999;
+  const includeWeddingCost = marriageEvent ? !!marriageEvent.includeWeddingCost : false;
+  const weddingCost = marriageEvent ? (Number(marriageEvent.weddingCost) || 0) : 0;
+
+  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined ? Number(spouseMember.currentAge) : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : currentAge);
+  const spouseLifeExpectancy = spouseMember && spouseMember.lifeExpectancy !== undefined ? Number(spouseMember.lifeExpectancy) : (marriageEvent && marriageEvent.spouseLifeExpectancy !== undefined ? Number(marriageEvent.spouseLifeExpectancy) : lifeExpectancy);
+  const userAgeWhenSpouseDies = currentAge + (spouseLifeExpectancy - spouseCurrentAge);
+  const ageDifference = spouseCurrentAge - currentAge; // spouseAge = age + ageDifference
+  
+  let spouseIncome = spouseMember ? (Number(spouseMember.income) || 0) : (marriageEvent ? (Number(marriageEvent.spouseIncome) || 0) : 0);
+  let spouseGrowth = spouseMember 
+    ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
+    : (marriageEvent ? (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0) : 0);
+  if (spouseGrowth > 0.5) spouseGrowth /= 100;
+
+  let spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (marriageEvent ? (Number(marriageEvent.savingsRate) || 0) : 0);
+  let spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (marriageEvent ? (Number(marriageEvent.cash) || 0) : 0);
+  let spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (marriageEvent ? (Number(marriageEvent.investments) || 0) : 0);
+  let spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (marriageEvent ? (Number(marriageEvent.retirement) || 0) : 0);
+
+  const spouseDebtStudent = Number(spouseMember?.debts?.student) || Number(marriageEvent?.debtStudent) || 0;
+  const spouseDebtCredit = Number(spouseMember?.debts?.credit) || Number(marriageEvent?.debtCredit) || 0;
+  const spouseDebtOther = Number(spouseMember?.debts?.other) || Number(marriageEvent?.debtOther) || 0;
+
+  const spouseRetirementSpendingNeed = spouseMember ? (Number(spouseMember.spouseRetirementSpending) || 0) : (marriageEvent ? (Number(marriageEvent.spouseRetirementSpending) || 0) : 0);
+  const combinedSpendingAfterMarriage = marriageEvent ? (Number(marriageEvent.combinedSpendingAfterMarriage) || 0) : 0;
+  const lifestyleAdjustment = marriageEvent ? (Number(marriageEvent.lifestyleAdjustment) || 0) : 0;
+  const housingSavings = marriageEvent ? (Number(marriageEvent.housingSavings) || 0) : 0;
+  const housingCost = marriageEvent ? (Number(marriageEvent.housingCost) || 0) : 0;
+  
+  // Calculate Spouse Social Security details
+  let spouseSocialSecurityDetails = null;
+  const isSpouseEnabled = hasMarriage;
+  if (isSpouseEnabled && spouseMember) {
+    const spouseClaimAge = Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67);
+    if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && spouseMember.spouseEstimatedSocialSecurityBenefit !== null && spouseMember.spouseEstimatedSocialSecurityBenefit !== '' && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
+      const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
+      const factor = getSocialSecurityFactor(spouseClaimAge);
+      spouseSocialSecurityDetails = {
+        claimAge: spouseClaimAge,
+        annualBenefit: baseBenefit * factor * 12,
+        monthlyBenefit: baseBenefit * factor
+      };
+    } else if (spouseMember.income > 0) {
+      const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
+        ? Number(spouseMember.desiredRetirementAge)
+        : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : spouseCurrentAge) - currentAge);
+      const spouseWorkYears = Math.max(0, spouseRetAge - 22);
+      const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
+      spouseSocialSecurityDetails = calculateSocialSecurityBenefit({
+        incomeHistory: spouseIncomeHistory,
+        claimAge: spouseClaimAge
+      });
+    }
+  }
+
+  let maxLifeExpectancy = lifeExpectancy;
+  if (hasMarriage) {
+    maxLifeExpectancy = Math.max(lifeExpectancy, userAgeWhenSpouseDies);
   }
 
   const assets = inputs.assets || {};
@@ -187,6 +320,16 @@ export function runFireSimulation(inputs) {
 
   const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
   let incomeList = inputs.incomeList || [];
+  if (!isAdvanced) {
+    incomeList = incomeList.map(inc => {
+      if (inc.id === 'inc-1' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
+        if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
+          return { ...inc, amount: Number(inputs.simpleIncome) || inc.amount, endAge: targetRetirementAge };
+        }
+      }
+      return inc;
+    });
+  }
   if (!hasActiveChild) {
     incomeList = incomeList
       .filter(inc => inc.id !== 'simple-inc-childcare')
@@ -283,6 +426,15 @@ export function runFireSimulation(inputs) {
   }
 
   let spendingPhases = inputs.spendingPhases || [];
+  if (!isAdvanced) {
+    spendingPhases = spendingPhases.map(p => {
+      if (p.id === 'spend-1' || p.id === 'simple-spend-worksave' || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
+        const amt = Number(inputs.simpleExpenses) || p.amount;
+        return { ...p, amount: amt, annualSpending: amt };
+      }
+      return p;
+    });
+  }
   if (!hasActiveChild) {
     spendingPhases = spendingPhases
       .filter(p => p.id !== 'simple-spend-childcare')
@@ -296,7 +448,7 @@ export function runFireSimulation(inputs) {
   const allocationRules = inputs.allocationRules || [];
   const debtList = inputs.debtList || [];
 
-  const yearsToCompute = Math.max(1, lifeExpectancy - currentAge);
+  const yearsToCompute = Math.max(1, maxLifeExpectancy - currentAge);
 
   // Initialize Debts & Loans Schedule (including custom debts)
   const customDebts = currentConditions
@@ -335,7 +487,10 @@ export function runFireSimulation(inputs) {
   let retirementIncomeSourcesInTodayDollars = 0;
   enabledEvents.forEach(ev => {
     if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
-      const monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+      let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+      if (ev.type === 'socialSecurity') {
+        monthlyBenefit = socialSecurityDetails.monthlyBenefit;
+      }
       retirementIncomeSourcesInTodayDollars += monthlyBenefit * 12;
     }
   });
@@ -368,8 +523,10 @@ export function runFireSimulation(inputs) {
   }
 
   const executeSimulation = (targetRetirementAge, customLifeExpectancy = null) => {
-    const simLifeExpectancy = customLifeExpectancy || lifeExpectancy;
+    const simLifeExpectancy = customLifeExpectancy || maxLifeExpectancy;
     const simYearsToCompute = Math.max(1, simLifeExpectancy - currentAge);
+    const simPhases = getNormalizedPhases(inputs);
+    const preRetirementPhases = simPhases.filter(p => p.type !== 'retire');
     let balances = {
       cash: Number(assets.cash) || 0,
       emergencyFund: Number(assets.emergencyFund) || 0,
@@ -482,6 +639,8 @@ export function runFireSimulation(inputs) {
     }
     
     let lastWorkingYearSpendingNominal = initialSpending;
+    let userLastWorkingSpendingNominal = initialSpending;
+    let lastWorkingYearUserSpendingNominal = initialSpending;
     let purchasedProperties = [];
     let isCoasting = false;
     let coastAge = null;
@@ -641,6 +800,94 @@ export function runFireSimulation(inputs) {
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
     annualEarlyWithdrawalPenalties = 0;
+    const isUserAlive = age <= lifeExpectancy;
+    const spouseAge = age + ageDifference;
+    const isSpouseActive = hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies;
+    const isSpouseAlive = isSpouseActive && spouseAge <= spouseLifeExpectancy;
+    const spouseRetirementAge = spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
+      ? Number(spouseMember.desiredRetirementAge)
+      : (targetRetirementAge + ageDifference);
+    const isSpouseWorking = isSpouseAlive && spouseAge < spouseRetirementAge;
+    const spouseSocialSecurityAge = spouseMember ? (Number(spouseMember.spouseSocialSecurityAge) || 67) : 67;
+
+    // Spouse assets injection
+    if (hasMarriage && age === marriageAge) {
+      balances.cash += spouseCash * nominalFactor;
+      balances.brokerage += spouseInvestments * nominalFactor;
+      balances.trad401k += spouseRetirement * nominalFactor;
+      dynamicMilestones.push({
+        age,
+        label: `Married! Spouse assets injected: +${formatCurrency((spouseCash + spouseInvestments + spouseRetirement) * nominalFactor)}`,
+        type: 'marriage',
+        isMilestone: true
+      });
+    }
+
+    // Wedding cost deduction
+    if (hasMarriage && includeWeddingCost && age === weddingAge) {
+      const leftoverWedding = deductFromLiquidAssets(weddingCost * nominalFactor, age);
+      if (leftoverWedding > 0.01) {
+        hasRunOut = true;
+        if (runOutAge === null) {
+          runOutAge = age;
+        }
+      }
+      dynamicMilestones.push({
+        age,
+        label: `Wedding Cost: -${formatCurrency(weddingCost * nominalFactor)}`,
+        type: 'wedding',
+        isMilestone: false
+      });
+    }
+
+    // Spouse debts injection
+    if (hasMarriage && age === marriageAge) {
+      if (spouseDebtStudent > 0) {
+        activeLoans.push({
+          id: 'spouse-student',
+          name: 'Spouse Student Loan',
+          balance: spouseDebtStudent * nominalFactor,
+          interestRate: 0.05,
+          payment: Math.max(1200, spouseDebtStudent * 0.12) * nominalFactor,
+          extraPayment: 0,
+          frequency: 'monthly',
+          paydownPlanEnabled: false,
+          startAge: marriageAge,
+          totalInterestPaid: 0,
+          payoffAge: null
+        });
+      }
+      if (spouseDebtCredit > 0) {
+        activeLoans.push({
+          id: 'spouse-credit',
+          name: 'Spouse Credit Card',
+          balance: spouseDebtCredit * nominalFactor,
+          interestRate: 0.18,
+          payment: Math.max(600, spouseDebtCredit * 0.24) * nominalFactor,
+          extraPayment: 0,
+          frequency: 'monthly',
+          paydownPlanEnabled: false,
+          startAge: marriageAge,
+          totalInterestPaid: 0,
+          payoffAge: null
+        });
+      }
+      if (spouseDebtOther > 0) {
+        activeLoans.push({
+          id: 'spouse-other',
+          name: 'Spouse Other Loan',
+          balance: spouseDebtOther * nominalFactor,
+          interestRate: 0.07,
+          payment: Math.max(600, spouseDebtOther * 0.12) * nominalFactor,
+          extraPayment: 0,
+          frequency: 'monthly',
+          paydownPlanEnabled: false,
+          startAge: marriageAge,
+          totalInterestPaid: 0,
+          payoffAge: null
+        });
+      }
+    }
 
     // Calculate child costs for this year (in today's dollars, then inflated)
     let yearChildCostsToday = 0;
@@ -678,7 +925,14 @@ export function runFireSimulation(inputs) {
     let yearChildCosts = yearChildCostsToday * nominalFactor;
 
     // Set progressive tax values for this year (adjusted for inflation)
-    const taxConfig = U_S_TAX_DATA[filingStatus] || U_S_TAX_DATA.single;
+    let currentFilingStatus = filingStatus;
+    if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
+      currentFilingStatus = (marriageEvent && marriageEvent.filingStatus) || 'jointly';
+    }
+    if (currentFilingStatus === 'jointly' || currentFilingStatus === 'marriedJointly') {
+      currentFilingStatus = 'married';
+    }
+    const taxConfig = U_S_TAX_DATA[currentFilingStatus] || U_S_TAX_DATA.single;
     standardDeduction = taxConfig.standardDeduction * nominalFactor;
     nominalBrackets = taxConfig.brackets.map(b => ({
       limit: b.limit === Infinity ? Infinity : b.limit * nominalFactor,
@@ -762,8 +1016,14 @@ export function runFireSimulation(inputs) {
     taxableIncome = 0;
 
     combinedIncomeList.forEach(inc => {
-      // Respect endAge if defined, even in simple mode (needed for split budget phases like childcare)
-      const effectiveEndAge = Math.min(inc.endAge !== undefined ? inc.endAge : targetRetirementAge, targetRetirementAge);
+      let effectiveEndAge = Math.min(inc.endAge !== undefined ? inc.endAge : targetRetirementAge, targetRetirementAge);
+      if (!isAdvanced) {
+        if (inc.id === 'inc-1' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
+          if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
+            effectiveEndAge = targetRetirementAge;
+          }
+        }
+      }
       if (age >= inc.startAge && age < effectiveEndAge) {
         // Grow incomes from currentAge instead of startAge so that future-starting phases 
         // maintain their specified purchasing power in today's dollars.
@@ -860,6 +1120,13 @@ export function runFireSimulation(inputs) {
       }
     });
 
+    let spouseIncomeThisYear = 0;
+    if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && age < targetRetirementAge) {
+      spouseIncomeThisYear = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
+      annualIncome += spouseIncomeThisYear;
+      taxableIncome += spouseIncomeThisYear;
+    }
+
 
     // Add Barista FIRE part-time incomes
     enabledEvents.forEach(ev => {
@@ -878,14 +1145,10 @@ export function runFireSimulation(inputs) {
         if (age >= claimingAge) {
           let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
           if (ev.type === 'socialSecurity') {
-            if (claimingAge < 62) {
-              monthlyBenefit = 0;
-            } else {
-              monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
-            }
+            monthlyBenefit = socialSecurityDetails.monthlyBenefit;
           }
           let annualAmt = monthlyBenefit * 12;
-          if (ev.inflationAdjusted) {
+          if (ev.inflationAdjusted || ev.type === 'socialSecurity') {
             annualAmt = annualAmt * nominalFactor;
           }
           annualIncome += annualAmt;
@@ -975,10 +1238,73 @@ export function runFireSimulation(inputs) {
     }
 
     let spendingForYear = adjustedBase * Math.pow(1 + rate + lifestyleUpgrades, age - currentAge);
+    
+    // Check if marriage is active this year (pre-retirement)
+    if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && age < targetRetirementAge) {
+      if (combinedSpendingAfterMarriage > 0) {
+        spendingForYear = combinedSpendingAfterMarriage * Math.pow(1 + rate + lifestyleUpgrades, age - currentAge);
+      } else {
+        // Auto-estimate combined spending
+        const spouseIncomeNominal = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
+        let partnerTax = 0;
+        if (includeTaxes) {
+          const taxConfigSingle = U_S_TAX_DATA.single;
+          const stdDeductionSingleNominal = taxConfigSingle.standardDeduction * nominalFactor;
+          const bracketsSingleNominal = taxConfigSingle.brackets.map(b => ({
+            limit: b.limit === Infinity ? Infinity : b.limit * nominalFactor,
+            rate: b.rate
+          }));
+          partnerTax = calculateUSTax(spouseIncomeNominal, stdDeductionSingleNominal, bracketsSingleNominal);
+        }
+        const partnerTakeHome = spouseIncomeNominal - partnerTax;
+        const partnerPersonalSpending = partnerTakeHome * (1 - spouseSavingsRate / 100);
+        
+        const housingSavingsYearly = housingSavings * nominalFactor;
+        const housingCostYearly = housingCost * nominalFactor;
+        const lifestyleAdjustmentYearly = lifestyleAdjustment * nominalFactor;
+        
+        spendingForYear = spendingForYear + partnerPersonalSpending + housingSavingsYearly + housingCostYearly + lifestyleAdjustmentYearly;
+      }
+    }
+
     if (age >= targetRetirementAge) {
-      spendingForYear = lastWorkingYearSpendingNominal * retirementSpendingPercent * Math.pow(1 + inflationRate, age - Math.max(currentAge, targetRetirementAge - 1));
+      const pct = retirementSpendingPercent;
+      const yearsPostRet = age - Math.max(currentAge, targetRetirementAge - 1);
+      if (hasMarriage && age <= userAgeWhenSpouseDies) {
+        if (spouseRetirementSpendingNeed > 0) {
+          const userPortion = userLastWorkingSpendingNominal * pct * Math.pow(1 + inflationRate, yearsPostRet);
+          const spouseRetNeedNominal = spouseRetirementSpendingNeed * nominalFactor;
+          spendingForYear = userPortion + spouseRetNeedNominal;
+        } else {
+          spendingForYear = lastWorkingYearSpendingNominal * pct * Math.pow(1 + inflationRate, yearsPostRet);
+        }
+      } else {
+        // Spouse is dead (or no marriage) - only user spending
+        spendingForYear = userLastWorkingSpendingNominal * pct * Math.pow(1 + inflationRate, yearsPostRet);
+      }
     } else {
+      // Pre-retirement: save last working year spending
       lastWorkingYearSpendingNominal = spendingForYear;
+      
+      // Track user portion of spending (joint spending minus spouse personal spending)
+      if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
+        const spouseIncomeNominal = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
+        let partnerTax = 0;
+        if (includeTaxes) {
+          const taxConfigSingle = U_S_TAX_DATA.single;
+          const stdDeductionSingleNominal = taxConfigSingle.standardDeduction * nominalFactor;
+          const bracketsSingleNominal = taxConfigSingle.brackets.map(b => ({
+            limit: b.limit === Infinity ? Infinity : b.limit * nominalFactor,
+            rate: b.rate
+          }));
+          partnerTax = calculateUSTax(spouseIncomeNominal, stdDeductionSingleNominal, bracketsSingleNominal);
+        }
+        const partnerTakeHome = spouseIncomeNominal - partnerTax;
+        const partnerPersonalSpending = partnerTakeHome * (1 - spouseSavingsRate / 100);
+        userLastWorkingSpendingNominal = Math.max(0, spendingForYear - partnerPersonalSpending);
+      } else {
+        userLastWorkingSpendingNominal = spendingForYear;
+      }
     }
     annualExpenses += spendingForYear;
 
@@ -1296,49 +1622,73 @@ export function runFireSimulation(inputs) {
 
     // Step 1: Pre-Tax allocations dry run
     let customPreTaxAllocationsThisYear = 0;
-    if (isSavingPeriod && grossSurplus > 0) {
-      customAssets.forEach(ca => {
-        if (ca.endAge !== null && age >= ca.endAge) return;
-        if (ca.monthlyContribution > 0) {
-          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-          if (isPreTax) {
-            const annualContribution = ca.monthlyContribution * 12;
-            customPreTaxAllocationsThisYear += annualContribution;
-          }
+    let simpleUserPreTax = 0;
+    let simpleSpousePreTax = 0;
+
+    if (isSavingPeriod) {
+      if (!isAdvanced) {
+        // User pre-tax savings
+        const userPreTaxRate = Number(inputs.preTaxSavingsRate) || 0;
+        const userIncomeThisYear = annualIncome - spouseIncomeThisYear;
+        simpleUserPreTax = userIncomeThisYear * (userPreTaxRate / 100);
+        
+        // Spouse pre-tax savings
+        if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
+          simpleSpousePreTax = spouseIncomeThisYear * (spouseSavingsRate / 100);
         }
-      });
-      customPreTaxAllocationsThisYear = Math.min(grossSurplus, customPreTaxAllocationsThisYear);
-      totalPreTaxAllocations += customPreTaxAllocationsThisYear;
 
-      let tempGrossSurplus = grossSurplus - customPreTaxAllocationsThisYear;
-
-      sortedAllocations.forEach(rule => {
-        const dest = rule.destination;
-        const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-        if (isPreTax && tempGrossSurplus > 0) {
-          // Determine amount
-          let amt = 0;
-          if (rule.type === 'fixed') {
-            amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
-          } else if (rule.type === 'percentIncome') {
-            amt = annualIncome * (Number(rule.value) / 100);
-          } else if (rule.type === 'percentSurplus') {
-            amt = tempGrossSurplus * (Number(rule.value) / 100);
+        totalPreTaxAllocations += simpleUserPreTax + simpleSpousePreTax;
+      } else if (grossSurplus > 0) {
+        customAssets.forEach(ca => {
+          if (ca.endAge !== null && age >= ca.endAge) return;
+          if (ca.monthlyContribution > 0) {
+            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+            if (isPreTax) {
+              const annualContribution = ca.monthlyContribution * 12;
+              customPreTaxAllocationsThisYear += annualContribution;
+            }
           }
+        });
+        customPreTaxAllocationsThisYear = Math.min(grossSurplus, customPreTaxAllocationsThisYear);
+        totalPreTaxAllocations += customPreTaxAllocationsThisYear;
 
-          // Smart Target cap
-          if (rule.smartRule && rule.smartRule.enabled) {
-            const targetVal = Number(rule.smartRule.targetValue) || 0;
-            const space = Math.max(0, targetVal - (balances[dest] || 0));
-            amt = Math.min(amt, space);
+        let tempGrossSurplus = grossSurplus - customPreTaxAllocationsThisYear;
+
+        sortedAllocations.forEach(rule => {
+          const dest = rule.destination;
+          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
+          if (isPreTax && tempGrossSurplus > 0) {
+            let incomeBase = annualIncome;
+            if (rule.belongsTo === 'spouse') {
+              incomeBase = spouseIncomeThisYear;
+            } else if (rule.belongsTo === 'user') {
+              incomeBase = annualIncome - spouseIncomeThisYear;
+            }
+
+            // Determine amount
+            let amt = 0;
+            if (rule.type === 'fixed') {
+              amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
+            } else if (rule.type === 'percentIncome') {
+              amt = incomeBase * (Number(rule.value) / 100);
+            } else if (rule.type === 'percentSurplus') {
+              amt = tempGrossSurplus * (Number(rule.value) / 100);
+            }
+
+            // Smart Target cap
+            if (rule.smartRule && rule.smartRule.enabled) {
+              const targetVal = Number(rule.smartRule.targetValue) || 0;
+              const space = Math.max(0, targetVal - (balances[dest] || 0));
+              amt = Math.min(amt, space);
+            }
+
+            const allocatedAmt = Math.max(0, Math.min(tempGrossSurplus, amt));
+            tempGrossSurplus -= allocatedAmt;
+            rule.computedPreTaxAmt = allocatedAmt;
+            totalPreTaxAllocations += allocatedAmt;
           }
-
-          const allocatedAmt = Math.max(0, Math.min(tempGrossSurplus, amt));
-          tempGrossSurplus -= allocatedAmt;
-          rule.computedPreTaxAmt = allocatedAmt;
-          totalPreTaxAllocations += allocatedAmt;
-        }
-      });
+        });
+      }
     }
 
     // Step 2: Taxes computation
@@ -1358,37 +1708,42 @@ export function runFireSimulation(inputs) {
     let netCashFlow = netSurplus; // Tracker for total cash flow this year
 
     if (isSavingPeriod) {
-      // Run custom pre-tax allocations for real
-      customAssets.forEach(ca => {
-        if (ca.endAge !== null && age >= ca.endAge) return;
-        if (ca.monthlyContribution > 0) {
-          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-          if (isPreTax) {
-            const annualContribution = ca.monthlyContribution * 12;
-            ca.balance += annualContribution;
-            savingsContribution += annualContribution;
-          }
-        }
-      });
-
-      // Run pre-tax allocations for real
-      sortedAllocations.forEach(rule => {
-        const dest = rule.destination;
-        const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-        if (isPreTax) {
-          const amt = rule.computedPreTaxAmt || 0;
-          if (amt > 0) {
-            balances[dest] += amt;
-            savingsContribution += amt;
-            // Matches
-            if (rule.employerMatch) {
-              const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
-              balances[dest] += matchAmt;
-              employerMatchContribution += matchAmt;
+      if (!isAdvanced) {
+        balances.trad401k += simpleUserPreTax + simpleSpousePreTax;
+        savingsContribution += simpleUserPreTax + simpleSpousePreTax;
+      } else {
+        // Run custom pre-tax allocations for real
+        customAssets.forEach(ca => {
+          if (ca.endAge !== null && age >= ca.endAge) return;
+          if (ca.monthlyContribution > 0) {
+            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+            if (isPreTax) {
+              const annualContribution = ca.monthlyContribution * 12;
+              ca.balance += annualContribution;
+              savingsContribution += annualContribution;
             }
           }
-        }
-      });
+        });
+
+        // Run pre-tax allocations for real
+        sortedAllocations.forEach(rule => {
+          const dest = rule.destination;
+          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
+          if (isPreTax) {
+            const amt = rule.computedPreTaxAmt || 0;
+            if (amt > 0) {
+              balances[dest] += amt;
+              savingsContribution += amt;
+              // Matches
+              if (rule.employerMatch) {
+                const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
+                balances[dest] += matchAmt;
+                employerMatchContribution += matchAmt;
+              }
+            }
+          }
+        });
+      }
 
       // Run custom post-tax allocations
       if (netSurplus > 0) {
@@ -1604,22 +1959,19 @@ export function runFireSimulation(inputs) {
         const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
         let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
         if (ev.type === 'socialSecurity') {
-          if (claimingAge < 62) {
-            monthlyBenefit = 0;
-          } else {
-            monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
-          }
+          monthlyBenefit = socialSecurityDetails.monthlyBenefit;
         }
         let annualAmt = monthlyBenefit * 12;
+        const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted;
         
         if (age >= claimingAge) {
-          if (!ev.inflationAdjusted) {
+          if (!isInflationAdjusted) {
             annualAmt = annualAmt / nominalFactor;
           }
           activeRetirementIncomeThisYearInTodayDollars += annualAmt;
         } else {
           let deflatedAnnualAmt = annualAmt;
-          if (!ev.inflationAdjusted) {
+          if (!isInflationAdjusted) {
             deflatedAnnualAmt = annualAmt / Math.pow(1 + inflationRate, claimingAge - currentAge);
           }
           
@@ -1663,31 +2015,43 @@ export function runFireSimulation(inputs) {
     let plannedPreTaxSavings = 0;
     let plannedPostTaxSavings = 0;
     if (isSavingPeriod) {
-      customAssets.forEach(ca => {
-        if (ca.endAge === null || age < ca.endAge) {
-          const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-          if (isPreTax) {
-            plannedPreTaxSavings += ca.monthlyContribution * 12;
-          } else {
-            plannedPostTaxSavings += ca.monthlyContribution * 12;
+      if (!isAdvanced) {
+        plannedPreTaxSavings += simpleUserPreTax + simpleSpousePreTax;
+      } else {
+        customAssets.forEach(ca => {
+          if (ca.endAge === null || age < ca.endAge) {
+            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
+            if (isPreTax) {
+              plannedPreTaxSavings += ca.monthlyContribution * 12;
+            } else {
+              plannedPostTaxSavings += ca.monthlyContribution * 12;
+            }
           }
-        }
-      });
-      sortedAllocations.forEach(rule => {
-        const dest = rule.destination;
-        const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-        let amt = 0;
-        if (rule.type === 'fixed') {
-          amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
-        } else if (rule.type === 'percentIncome') {
-          amt = annualIncome * (Number(rule.value) / 100);
-        }
-        if (isPreTax) {
-          plannedPreTaxSavings += amt;
-        } else {
-          plannedPostTaxSavings += amt;
-        }
-      });
+        });
+        sortedAllocations.forEach(rule => {
+          const dest = rule.destination;
+          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
+          
+          let incomeBase = annualIncome;
+          if (rule.belongsTo === 'spouse') {
+            incomeBase = spouseIncomeThisYear;
+          } else if (rule.belongsTo === 'user') {
+            incomeBase = annualIncome - spouseIncomeThisYear;
+          }
+          
+          let amt = 0;
+          if (rule.type === 'fixed') {
+            amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
+          } else if (rule.type === 'percentIncome') {
+            amt = incomeBase * (Number(rule.value) / 100);
+          }
+          if (isPreTax) {
+            plannedPreTaxSavings += amt;
+          } else {
+            plannedPostTaxSavings += amt;
+          }
+        });
+      }
     }
     const totalPlannedSavings = plannedPreTaxSavings + plannedPostTaxSavings;
     const incomeAvailable = annualIncome + windfallReceived;
@@ -1889,23 +2253,20 @@ export function runFireSimulation(inputs) {
           const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
           let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
           if (ev.type === 'socialSecurity') {
-            if (claimingAge < 62) {
-              monthlyBenefit = 0;
-            } else {
-              monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
-            }
+            monthlyBenefit = socialSecurityDetails.monthlyBenefit;
           }
           let annualAmt = monthlyBenefit * 12; // in today's dollars
+          const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted;
           
           if (retirementReadyAge >= claimingAge) {
-            if (!ev.inflationAdjusted) {
+            if (!isInflationAdjusted) {
               annualAmt = annualAmt / factor;
             }
             activeRetIncome += annualAmt;
           } else {
             const yearsToClaim = claimingAge - retirementReadyAge;
             let deflatedAnnualAmt = annualAmt;
-            if (!ev.inflationAdjusted) {
+            if (!isInflationAdjusted) {
               deflatedAnnualAmt = annualAmt / Math.pow(1 + inflationRate, claimingAge - currentAge);
             }
             const discountedValue = deflatedAnnualAmt / Math.pow(1 + realReturn, yearsToClaim);
@@ -1949,14 +2310,11 @@ export function runFireSimulation(inputs) {
       const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
       let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
       if (ev.type === 'socialSecurity') {
-        if (claimingAge < 62) {
-          monthlyBenefit = 0;
-        } else {
-          monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
-        }
+        monthlyBenefit = socialSecurityDetails.monthlyBenefit;
       }
       let annualAmt = monthlyBenefit * 12;
-      if (ev.inflationAdjusted !== false) {
+      const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted !== false;
+      if (isInflationAdjusted) {
         const factor = Math.pow(1 + inflationRate, claimingAge - currentAge);
         annualAmt = annualAmt * factor;
       }
@@ -1999,6 +2357,7 @@ export function runFireSimulation(inputs) {
     dynamicMilestones: plannedResults.dynamicMilestones,
     debtSummaries: plannedResults.debtSummaries,
     data: deflatedLogs,
+    socialSecurityDetails,
     
     // Nominal vs Deflated support
     deflatedData: deflatedLogs,
@@ -2014,7 +2373,8 @@ export function runFireSimulation(inputs) {
     nominalEndingSurplusShortfall: plannedResults.endingSurplusShortfall,
     deflatedEndingSurplusShortfall: finalSurplusShortfall,
     nominalRetirementIncomeSources,
-    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars
+    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars,
+    socialSecurityDetails
   };
 }
 
@@ -2126,5 +2486,518 @@ export function validateFireInputs(inputs) {
   return {
     errors,
     warnings
+  };
+}
+
+export function getSavingsPriority(key) {
+  const priorities = {
+    hsa: 1,
+    trad401k: 2,
+    tradIra: 3,
+    rothIra: 4,
+    brokerage: 5,
+    checking: 6,
+    hysa: 7,
+    emergency: 8,
+    debt: 9,
+    other: 10
+  };
+  return priorities[key] || 99;
+}
+
+export function getNormalizedPhases(inputs) {
+  const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
+  const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
+  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled);
+  const retireEvent = enabledEvents.find(e => e.type === 'retire');
+  const targetRetirementAge = retireEvent 
+    ? Math.max(currentAge, Number(retireEvent.age) || 65) 
+    : lifeExpectancy;
+
+  const boundaries = new Set();
+  boundaries.add(currentAge);
+  boundaries.add(targetRetirementAge);
+
+  // A. Career Changes (from incomeList start ages)
+  (inputs.incomeList || []).forEach(inc => {
+    const start = Number(inc.startAge);
+    if (start > currentAge && start < targetRetirementAge) {
+      boundaries.add(start);
+    }
+  });
+
+  // B. Moves (from spendingPhases start ages)
+  (inputs.spendingPhases || []).forEach(sp => {
+    const start = Number(sp.startAge);
+    if (start > currentAge && start < targetRetirementAge) {
+      boundaries.add(start);
+    }
+  });
+
+  // C. Life Events (marriage, divorce, haveChild, buyHouse)
+  enabledEvents.forEach(ev => {
+    const age = Number(ev.age || ev.purchaseAge || ev.birthAge || ev.startAge);
+    if (age > currentAge && age < targetRetirementAge) {
+      if (['marriage', 'divorce', 'haveChild', 'buyHouse'].includes(ev.type)) {
+        boundaries.add(age);
+      }
+    }
+  });
+
+  // D. Child count transitions (when active child count changes)
+  for (let age = currentAge + 1; age < targetRetirementAge; age++) {
+    const prevCount = getActiveChildrenCountAtAge(age - 1, inputs.lifeEvents);
+    const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+    if (count !== prevCount) {
+      boundaries.add(age);
+    }
+  }
+
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+  const phases = [];
+
+  for (let i = 0; i < sortedBoundaries.length - 1; i++) {
+    const start = sortedBoundaries[i];
+    const end = sortedBoundaries[i + 1];
+
+    const childCount = getActiveChildrenCountAtAge(start, inputs.lifeEvents);
+
+    // Identify primary type, name, and icon
+    let type = 'workSave';
+    let name = 'Standard Work Phase';
+    let icon = '💼';
+
+    if (childCount > 0) {
+      type = 'childcare';
+      name = 'Childcare Phase';
+      icon = '👶';
+    } else {
+      const marriageEv = enabledEvents.find(e => e.type === 'marriage' && Number(e.age) === start);
+      const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
+      const childEv = enabledEvents.find(e => e.type === 'haveChild' && Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) === start);
+      const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge) === start);
+      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && inc.id !== 'simple-inc-childcare');
+      const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && sp.id !== 'simple-spend-childcare');
+
+      if (marriageEv) {
+        type = 'marriage';
+        name = 'Marriage Phase';
+        icon = '💍';
+      }
+    }
+
+    const id = `${type}_${start}_${end}`;
+
+    // Defaults calculations
+    // User monthly income
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && inc.id !== 'simple-inc-childcare');
+    let baseSalaryMonthly = 0;
+    let growthRate = 0.03;
+    if (rawIncomeItem) {
+      baseSalaryMonthly = rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12;
+      growthRate = Number(rawIncomeItem.growthRate) || 0.03;
+    } else {
+      baseSalaryMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
+      growthRate = 0.03;
+    }
+
+    let childBoost = 0;
+    if (childCount > 0) {
+      childBoost = 1250 * childCount;
+    }
+    const defaultIncome = baseSalaryMonthly + childBoost;
+
+    // User monthly expenses
+    const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && sp.id !== 'simple-spend-childcare');
+    let baseExpensesMonthly = 0;
+    if (rawSpendingItem) {
+      baseExpensesMonthly = rawSpendingItem.frequency === 'monthly' ? Number(rawSpendingItem.amount) : Number(rawSpendingItem.amount) / 12;
+    } else {
+      baseExpensesMonthly = (Number(inputs.simpleExpenses) || 42500) / 12;
+    }
+
+    const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+    const isMarried = marriageEvent && start >= Number(marriageEvent.age);
+    let spouseIncome = 0;
+    let spouseIncomeGrowthRate = 0;
+    let spouseSavingsRate = 0;
+    let spouseCash = 0;
+    let spouseInvestments = 0;
+    let spouseRetirement = 0;
+
+    if (isMarried) {
+      const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
+      spouseIncome = spouseMember ? (Number(spouseMember.income) || 0) / 12 : (Number(marriageEvent.spouseIncome || 0) / 12);
+      spouseIncomeGrowthRate = spouseMember
+        ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
+        : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
+      if (spouseIncomeGrowthRate > 0.5) spouseIncomeGrowthRate /= 100;
+
+      spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (Number(marriageEvent.savingsRate) || 0);
+      spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (Number(marriageEvent.cash) || 0);
+      spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (Number(marriageEvent.investments) || 0);
+      spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (Number(marriageEvent.retirement) || 0);
+
+      // default combined spending if married
+      if (marriageEvent.combinedSpendingAfterMarriage) {
+        baseExpensesMonthly = Number(marriageEvent.combinedSpendingAfterMarriage) / 12;
+      } else {
+        const spousePersonal = spouseIncome * 12 * (1 - spouseSavingsRate / 100) / 12; // default spouse spending
+        const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
+        const housing = Number(marriageEvent.housingSavings || 0);
+        baseExpensesMonthly = baseExpensesMonthly + spousePersonal + lifestyle + housing;
+      }
+    }
+
+    let defaultExpenses = {
+      housing: Math.round(baseExpensesMonthly * 0.4),
+      utilities: Math.round(baseExpensesMonthly * 0.1),
+      food: Math.round(baseExpensesMonthly * 0.15),
+      transportation: Math.round(baseExpensesMonthly * 0.1),
+      healthcare: Math.round(baseExpensesMonthly * 0.08),
+      leisure: Math.round(baseExpensesMonthly * 0.08),
+      misc: Math.round(baseExpensesMonthly * 0.09)
+    };
+    const sumVal = Object.values(defaultExpenses).reduce((a, b) => a + b, 0);
+    const diff = Math.round(baseExpensesMonthly) - sumVal;
+    defaultExpenses.misc += diff;
+
+    // Default savings
+    let defaultSavingsMonthly = 0;
+    if (inputs.preTaxSavingsRate) {
+      defaultSavingsMonthly = Math.round(((defaultIncome * 12) * (Number(inputs.preTaxSavingsRate) / 100)) / 12);
+    } else {
+      defaultSavingsMonthly = Math.max(0, Math.round(defaultIncome - baseExpensesMonthly));
+    }
+    const defaultSavings = {
+      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: defaultSavingsMonthly, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+    };
+
+    let defaultPartnerSavings = {
+      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+    };
+    if (isMarried) {
+      const partnerPreTax = Math.round((spouseIncome * 12 * (spouseSavingsRate / 100)) / 12);
+      defaultPartnerSavings.brokerage = partnerPreTax;
+    }
+
+    // Lookup saved phase override
+    const savedPhase = (inputs.budgetDetails?.phases || []).find(p => Number(p.startAge) === start || p.id === id);
+
+    const phase = {
+      id,
+      name,
+      icon,
+      type,
+      startAge: start,
+      endAge: end,
+      childCount,
+      income: savedPhase?.income !== undefined ? Number(savedPhase.income) : defaultIncome,
+      incomeGrowthRate: growthRate,
+      savingsAllocMode: savedPhase?.savingsAllocMode || inputs.budgetDetails?.savingsAllocMode || 'fixed',
+      savings: savedPhase?.savings ? { ...savedPhase.savings } : defaultSavings,
+      partnerSavings: savedPhase?.partnerSavings ? { ...savedPhase.partnerSavings } : defaultPartnerSavings,
+      expenses: savedPhase?.expenses ? { ...savedPhase.expenses } : defaultExpenses,
+      
+      // Married details
+      isMarried,
+      spouseIncome,
+      spouseIncomeGrowthRate,
+      spouseSavingsRate,
+      spouseCash,
+      spouseInvestments,
+      spouseRetirement
+    };
+
+    phases.push(phase);
+  }
+
+  // E. Retirement Phase
+  phases.push({
+    id: 'retire',
+    name: 'Retirement',
+    icon: '🌴',
+    type: 'retire',
+    startAge: targetRetirementAge,
+    endAge: lifeExpectancy,
+    childCount: 0,
+    income: 0,
+    incomeGrowthRate: 0,
+    savingsAllocMode: 'fixed',
+    savings: {},
+    partnerSavings: {},
+    expenses: {},
+    isMarried: enabledEvents.some(e => e.type === 'marriage'),
+    spouseIncome: 0,
+    spouseIncomeGrowthRate: 0,
+    spouseSavingsRate: 0,
+    spouseCash: 0,
+    spouseInvestments: 0,
+    spouseRetirement: 0
+  });
+
+  return phases;
+}
+
+export function getIncomeHistory(inputs, overrideEvent = null) {
+  const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
+  const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
+  
+  // Find Social Security event to get start working age info
+  const ssEv = overrideEvent && overrideEvent.type === 'socialSecurity'
+    ? overrideEvent
+    : (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity' && e.enabled);
+  
+  let startWorkingAge = currentAge;
+  if (ssEv) {
+    if (ssEv.ageStartedWorking !== undefined && ssEv.ageStartedWorking !== null && ssEv.ageStartedWorking !== '') {
+      startWorkingAge = Math.min(currentAge, Number(ssEv.ageStartedWorking));
+    } else if (ssEv.yearStartedWorking !== undefined && ssEv.yearStartedWorking !== null && ssEv.yearStartedWorking !== '') {
+      const currentYear = new Date().getFullYear();
+      const yearsWorked = currentYear - Number(ssEv.yearStartedWorking);
+      startWorkingAge = Math.max(0, currentAge - yearsWorked);
+    }
+  }
+
+  // Get normalized phases to know what the income is for each pre-retirement year
+  const phases = getNormalizedPhases(inputs);
+  const preRetirementPhases = phases.filter(p => p.type !== 'retire');
+  
+  // Find current/starting income in today's dollars
+  const currentPhase = preRetirementPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || preRetirementPhases[0];
+  const startingIncomeAnnual = currentPhase ? currentPhase.income * 12 : (Number(inputs.simpleIncome) || 50000);
+  
+  const earnings = [];
+  
+  // 1. Past working years (ages startWorkingAge to currentAge - 1)
+  for (let age = startWorkingAge; age < currentAge; age++) {
+    earnings.push(startingIncomeAnnual);
+  }
+  
+  // 2. Future years (ages currentAge to lifeExpectancy - 1)
+  const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire' && e.enabled);
+  const targetRetirementAge = retireEvent ? Math.max(currentAge, Number(retireEvent.age) || 65) : lifeExpectancy;
+  
+  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled);
+  
+  for (let age = currentAge; age < lifeExpectancy; age++) {
+    if (age >= targetRetirementAge) {
+      earnings.push(0);
+      continue;
+    }
+    
+    // Find active phase for this age
+    const activePhase = preRetirementPhases.find(p => age >= p.startAge && age < p.endAge);
+    
+    let baseIncomeMonthly = 0;
+    let growthRate = 0.03;
+    
+    if (activePhase) {
+      baseIncomeMonthly = activePhase.income;
+      growthRate = activePhase.incomeGrowthRate !== undefined ? activePhase.incomeGrowthRate : 0.03;
+    } else {
+      baseIncomeMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
+      growthRate = 0.03;
+    }
+    
+    // Grow income based on growthRate from start of active phase (real growth rate in today's dollars)
+    const inflationRate = (Number(inputs.inflationRate) || 3) / 100;
+    const realGrowthRate = growthRate - inflationRate;
+    const startOfPhase = activePhase ? activePhase.startAge : currentAge;
+    const yearsGrown = age - startOfPhase;
+    let annualIncome = (baseIncomeMonthly * 12) * Math.pow(1 + realGrowthRate, yearsGrown);
+    
+    // Apply Barista FIRE part-time income overrides
+    const baristaEv = enabledEvents.find(e => e.type === 'baristaFire' && age >= Number(e.startAge));
+    if (baristaEv) {
+      annualIncome = Number(baristaEv.partTimeIncome) || 0;
+    }
+    
+    // Apply Sabbaticals
+    enabledEvents.forEach(ev => {
+      if (ev.type === 'sabbatical') {
+        const start = Number(ev.startAge);
+        const end = Number(ev.endAge);
+        if (age >= start && age < end) {
+          const reduction = Number(ev.incomeReduction) || 0;
+          annualIncome = Math.max(0, annualIncome * (1 - reduction / 100));
+        }
+      }
+    });
+    
+    earnings.push(annualIncome);
+  }
+  
+  return earnings;
+}
+
+export function buildSocialSecurityEarningsRecord({
+  incomeHistory,
+  indexingMode = "simple",
+  wageIndexFactors = null
+}) {
+  return (incomeHistory || []).map(v => Number(v) || 0);
+}
+
+export function calculateAIME(indexedEarningsHistory) {
+  const sorted = [...indexedEarningsHistory].sort((a, b) => b - a);
+  const topYears = sorted.slice(0, 35);
+  while (topYears.length < 35) {
+    topYears.push(0);
+  }
+  const sum = topYears.reduce((a, b) => a + b, 0);
+  const aimeMonthly = sum / 420;
+  const averageTop35AnnualIncome = sum / 35;
+  return {
+    top35AnnualEarnings: sum,
+    aimeMonthly,
+    averageTop35AnnualIncome
+  };
+}
+
+export function calculatePIA({
+  aimeMonthly,
+  firstBendPoint = 1286,
+  secondBendPoint = 7749
+}) {
+  let pia = 0;
+  if (aimeMonthly <= firstBendPoint) {
+    pia = aimeMonthly * 0.90;
+  } else if (aimeMonthly <= secondBendPoint) {
+    pia = firstBendPoint * 0.90 + (aimeMonthly - firstBendPoint) * 0.32;
+  } else {
+    pia = firstBendPoint * 0.90 + (secondBendPoint - firstBendPoint) * 0.32 + (aimeMonthly - secondBendPoint) * 0.15;
+  }
+  return pia;
+}
+
+export function calculateClaimingAgeMultiplier({
+  claimAge,
+  fullRetirementAge = 67
+}) {
+  const age = Math.max(62, Math.min(70, claimAge));
+  let multiplier = 1.0;
+  let adjustmentType = 'full-retirement';
+  let monthsEarly = 0;
+  let monthsDelayed = 0;
+  
+  if (age < fullRetirementAge) {
+    monthsEarly = (fullRetirementAge - age) * 12;
+    adjustmentType = 'early-claiming';
+    
+    let reduction = 0;
+    if (monthsEarly <= 36) {
+      reduction = monthsEarly * (5 / 900);
+    } else {
+      reduction = 36 * (5 / 900) + (monthsEarly - 36) * (5 / 1200);
+    }
+    multiplier = Math.max(0, 1.0 - reduction);
+  } else if (age > fullRetirementAge) {
+    monthsDelayed = (age - fullRetirementAge) * 12;
+    adjustmentType = 'delayed-credit';
+    multiplier = 1.0 + monthsDelayed * (8 / 1200);
+  }
+  
+  return {
+    multiplier,
+    adjustmentType,
+    monthsEarly,
+    monthsDelayed
+  };
+}
+
+export function calculateTop35AverageIncome(incomeHistory) {
+  const aimeRes = calculateAIME(incomeHistory);
+  const workingYears = (incomeHistory || []).filter(v => Number(v) > 0).length;
+  const isEligible = workingYears >= 10;
+  return {
+    workingYears,
+    isEligible,
+    top35AnnualEarnings: aimeRes.top35AnnualEarnings,
+    aimeMonthly: aimeRes.aimeMonthly,
+    averageTop35AnnualIncome: aimeRes.averageTop35AnnualIncome
+  };
+}
+
+export function calculateSocialSecurityBenefit({
+  incomeHistory,
+  claimAge,
+  fullRetirementAge = 67,
+  firstBendPoint = 1286,
+  secondBendPoint = 7749,
+  indexingMode = "simple"
+}) {
+  const workingYears = (incomeHistory || []).filter(v => Number(v) > 0).length;
+  const isEligible = workingYears >= 10;
+  
+  if (!isEligible) {
+    return {
+      claimAge,
+      workingYears,
+      isEligible: false,
+      indexedEarningsHistory: (incomeHistory || []).map(v => Number(v) || 0),
+      top35AnnualEarnings: 0,
+      averageTop35AnnualIncome: 0,
+      aimeMonthly: 0,
+      piaMonthly: 0,
+      claimingAgeMultiplier: 0,
+      monthlyBenefit: 0,
+      annualBenefit: 0,
+      adjustmentType: 'Not eligible'
+    };
+  }
+  
+  const indexedEarningsHistory = (incomeHistory || []).map(v => Number(v) || 0);
+  const aimeRes = calculateAIME(indexedEarningsHistory);
+  const piaMonthly = calculatePIA({
+    aimeMonthly: aimeRes.aimeMonthly,
+    firstBendPoint,
+    secondBendPoint
+  });
+  
+  const multRes = calculateClaimingAgeMultiplier({
+    claimAge,
+    fullRetirementAge
+  });
+  
+  const monthlyBenefit = piaMonthly * multRes.multiplier;
+  const annualBenefit = monthlyBenefit * 12;
+  
+  return {
+    claimAge,
+    workingYears,
+    isEligible,
+    indexedEarningsHistory,
+    top35AnnualEarnings: aimeRes.top35AnnualEarnings,
+    averageTop35AnnualIncome: aimeRes.averageTop35AnnualIncome,
+    aimeMonthly: aimeRes.aimeMonthly,
+    piaMonthly,
+    claimingAgeMultiplier: multRes.multiplier,
+    monthlyBenefit,
+    annualBenefit,
+    adjustmentType: multRes.adjustmentType
+  };
+}
+
+export function validateSocialSecurityClaimAge(claimAge) {
+  const age = Number(claimAge);
+  if (isNaN(age) || age < 62) {
+    return {
+      validAge: 62,
+      wasClamped: true,
+      message: "Social Security must be taken between ages 62 and 70."
+    };
+  }
+  if (age > 70) {
+    return {
+      validAge: 70,
+      wasClamped: true,
+      message: "Social Security must be taken between ages 62 and 70."
+    };
+  }
+  return {
+    validAge: age,
+    wasClamped: false,
+    message: ""
   };
 }

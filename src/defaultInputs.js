@@ -51,6 +51,18 @@ export const DEFAULT_FIRE_INPUTS = {
       debt: 0,
       other: 0
     },
+    partnerSavings: {
+      trad401k: 0,
+      rothIra: 0,
+      tradIra: 0,
+      hsa: 0,
+      brokerage: 0,
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
+      debt: 0,
+      other: 0
+    },
     expenses: {
       housing: 1500,
       utilities: 300,
@@ -117,5 +129,7 @@ export const DEFAULT_FIRE_INPUTS = {
     }
   ],
   debtList: [],
-  currentConditions: []
+  currentConditions: [],
+  householdMembers: []
 };
+

@@ -40,6 +40,18 @@ try {
   console.log(`- Deflated total income at age 67 from simulation: $${Math.round(age67Deflated.income).toLocaleString()}`);
   expect(age67Deflated.income).toBeCloseTo(24000, 0);
 
+  // 5. Verify that setting ageStartedWorking prepends past income correctly and updates benefits
+  const inputsAge = getMappedDefaultInputs();
+  let ssEv = inputsAge.lifeEvents.find(e => e.type === 'socialSecurity');
+  ssEv.enabled = true;
+  ssEv.useEarnings = true;
+  ssEv.ageStartedWorking = 22; // 13 working years before age 35
+
+  const resultsAge = runFireSimulation(inputsAge);
+  expect(resultsAge.socialSecurityDetails.workingYears).toBe(43); // 13 pre + 30 post
+  expect(resultsAge.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.56, 0);
+  console.log('✅ ageStartedWorking prepends past income correctly and updates benefits.');
+
   console.log('✅ test_social_security_start_age passed.');
   process.exit(0);
 } catch (error) {

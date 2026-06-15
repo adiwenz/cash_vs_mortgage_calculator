@@ -13,7 +13,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { runFireSimulation, validateFireInputs, getSocialSecurityFactor } from '../fireCalculations';
+import { runFireSimulation, validateFireInputs, getSocialSecurityFactor, validateSocialSecurityClaimAge, calculateSocialSecurityBenefit, getIncomeHistory, calculateTop35AverageIncome, calculateClaimingAgeMultiplier, getNormalizedPhases } from '../fireCalculations';
 import { 
   calculateRetireAt65Recommendation, 
   calculateSaveMoreRecommendation, 
@@ -494,22 +494,65 @@ const getActiveChildrenCountAtAge = (age, lifeEvents) => {
   return count;
 };
 
-const getChildCountIntervals = (startAge, endAge, lifeEvents) => {
+const getBaseCareerIncomeAtAge = (age, inputs) => {
+  const cleanIncomeList = (inputs.incomeList || []).filter(inc => 
+    inc.id !== 'inc-1' && 
+    !inc.id.startsWith('simple-inc')
+  );
+  let totalAnnual = 0;
+  cleanIncomeList.forEach(inc => {
+    const sAge = Number(inc.startAge);
+    const eAge = Number(inc.endAge);
+    if (age >= sAge && age < eAge) {
+      if (inc.frequency === 'monthly') {
+        totalAnnual += Number(inc.amount) * 12;
+      } else {
+        totalAnnual += Number(inc.amount);
+      }
+    }
+  });
+  if (totalAnnual === 0) {
+    return Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167;
+  }
+  return Math.round(totalAnnual / 12);
+};
+
+const getChildCountIntervals = (startAge, endAge, lifeEvents, incomeList = []) => {
   const intervals = [];
   if (startAge >= endAge) return intervals;
   
-  let currentStart = startAge;
-  let currentCount = getActiveChildrenCountAtAge(startAge, lifeEvents);
+  const boundaries = new Set();
+  boundaries.add(startAge);
+  boundaries.add(endAge);
   
+  // Child count boundaries
   for (let age = startAge + 1; age < endAge; age++) {
+    const prevCount = getActiveChildrenCountAtAge(age - 1, lifeEvents);
     const count = getActiveChildrenCountAtAge(age, lifeEvents);
-    if (count !== currentCount) {
-      intervals.push({ startAge: currentStart, endAge: age, childCount: currentCount });
-      currentStart = age;
-      currentCount = count;
+    if (count !== prevCount) {
+      boundaries.add(age);
     }
   }
-  intervals.push({ startAge: currentStart, endAge: endAge, childCount: currentCount });
+  
+  // Custom career change boundaries
+  const cleanIncomes = (incomeList || []).filter(inc => 
+    inc.id !== 'inc-1' && 
+    !inc.id.startsWith('simple-inc')
+  );
+  cleanIncomes.forEach(inc => {
+    const sAge = Number(inc.startAge);
+    if (sAge > startAge && sAge < endAge) {
+      boundaries.add(sAge);
+    }
+  });
+  
+  const sorted = Array.from(boundaries).sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const sAge = sorted[i];
+    const eAge = sorted[i + 1];
+    const count = getActiveChildrenCountAtAge(sAge, lifeEvents);
+    intervals.push({ startAge: sAge, endAge: eAge, childCount: count });
+  }
   return intervals;
 };
 
@@ -549,172 +592,7 @@ const getChildCostsForInterval = (interval, inputs) => {
 };
 
 const syncChildcarePhasesAndRules = (newInputs) => {
-  const currentAge = Number(newInputs.currentAge) || 30;
-  const targetRetirementAge = Number(newInputs.targetRetirementAge) || 65;
-  const lifeExpectancy = Number(newInputs.lifeExpectancy) || 85;
-
-  const childEvents = (newInputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-  let minChildParentAge = Infinity;
-  let maxChildParentAge = -Infinity;
-  childEvents.forEach(ev => {
-    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-    const maxAge = includeCollege ? 22 : 18;
-    if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-    if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
-  });
-
-  const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
-  const childEndAge = Math.min(lifeExpectancy, Math.max(currentAge, maxChildParentAge));
-
-  // 1. Sync Income List
-  const cleanIncomeList = (newInputs.incomeList || []).filter(inc => inc.id !== 'inc-1' && inc.id !== 'simple-inc' && inc.id !== 'simple-inc-childcare' && inc.id !== 'simple-inc-worksave');
-  const wsIncomeAnnual = (Number(newInputs.budgetDetails?.income) || (Number(newInputs.simpleIncome) / 12) || 4167) * 12;
-  
-  const finalChildcareBudgets = newInputs.budgetDetails?.childcareBudgets || {};
-  let childcareIncome = newInputs.budgetDetails?.childcareIncome;
-  if (Object.keys(finalChildcareBudgets).length > 0) {
-    childcareIncome = finalChildcareBudgets[Math.min(...Object.keys(finalChildcareBudgets).map(Number))].income;
-  }
-  const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12) + 1250) * 12;
-
-  if (hasChildcarePhase) {
-    if (childEndAge > currentAge) {
-      cleanIncomeList.push({
-        id: 'simple-inc-childcare',
-        name: 'Salary / Main Income (Childcare Phase)',
-        amount: ccIncomeAnnual,
-        frequency: 'yearly',
-        startAge: currentAge,
-        endAge: Math.min(targetRetirementAge, childEndAge),
-        growthRate: 0.03,
-        isTaxable: true
-      });
-    }
-    if (childEndAge < targetRetirementAge) {
-      cleanIncomeList.push({
-        id: 'simple-inc-worksave',
-        name: 'Salary / Main Income (Standard Work Phase)',
-        amount: wsIncomeAnnual,
-        frequency: 'yearly',
-        startAge: Math.max(currentAge, childEndAge),
-        endAge: targetRetirementAge,
-        growthRate: 0.03,
-        isTaxable: true
-      });
-    }
-  } else {
-    cleanIncomeList.push({
-      id: 'simple-inc',
-      name: 'Salary / Main Income',
-      amount: wsIncomeAnnual,
-      frequency: 'yearly',
-      startAge: currentAge,
-      endAge: targetRetirementAge,
-      growthRate: 0.03,
-      isTaxable: true
-    });
-  }
-  newInputs.incomeList = cleanIncomeList;
-
-  // 2. Sync Spending Phases
-  const cleanSpendingPhases = (newInputs.spendingPhases || []).filter(p => p.id !== 'spend-1' && p.id !== 'simple-spend' && p.id !== 'simple-spend-childcare' && p.id !== 'simple-spend-worksave');
-  const wsExpensesAnnual = (Number(newInputs.budgetDetails?.expenses ? Object.values(newInputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(newInputs.simpleExpenses) / 12) || 3542) * 12;
-  
-  let childcareExpenses = newInputs.budgetDetails?.childcareExpenses;
-  if (Object.keys(finalChildcareBudgets).length > 0) {
-    childcareExpenses = finalChildcareBudgets[Math.min(...Object.keys(finalChildcareBudgets).map(Number))].expenses;
-  }
-  const ccExpensesAnnual = (Number(childcareExpenses ? Object.values(childcareExpenses).reduce((sum, val) => sum + val, 0) : 0) || (wsExpensesAnnual / 12)) * 12;
-
-  if (hasChildcarePhase) {
-    if (childEndAge > currentAge) {
-      cleanSpendingPhases.push({
-        id: 'simple-spend-childcare',
-        name: 'Lifestyle Spending (Childcare Phase)',
-        amount: ccExpensesAnnual,
-        frequency: 'yearly',
-        startAge: currentAge,
-        endAge: childEndAge,
-        annualSpending: ccExpensesAnnual
-      });
-    }
-    if (childEndAge < lifeExpectancy) {
-      cleanSpendingPhases.push({
-        id: 'simple-spend-worksave',
-        name: 'Lifestyle Spending (Standard Work Phase)',
-        amount: wsExpensesAnnual,
-        frequency: 'yearly',
-        startAge: Math.max(currentAge, childEndAge),
-        endAge: lifeExpectancy,
-        annualSpending: wsExpensesAnnual
-      });
-    }
-  } else {
-    cleanSpendingPhases.push({
-      id: 'simple-spend',
-      name: 'Base Lifestyle Spending',
-      amount: wsExpensesAnnual,
-      frequency: 'yearly',
-      startAge: currentAge,
-      endAge: lifeExpectancy,
-      annualSpending: wsExpensesAnnual
-    });
-  }
-  newInputs.spendingPhases = cleanSpendingPhases;
-
-  // 3. Sync Allocation Rules
-  const nextRules = [];
-  let ruleIndex = 1;
-
-  const finalWorkSaveSavings = newInputs.budgetDetails?.savings || {};
-  const finalWorkSaveAllocMode = newInputs.budgetDetails?.savingsAllocMode || 'percentSurplus';
-  const finalChildcareSavings = newInputs.budgetDetails?.childcareSavings || {};
-  const finalChildcareAllocMode = newInputs.budgetDetails?.childcareSavingsAllocMode || 'percentSurplus';
-
-  const savingIntervals = getChildCountIntervals(currentAge, targetRetirementAge, newInputs.lifeEvents);
-  savingIntervals.forEach(interval => {
-    const C = interval.childCount;
-    const start = interval.startAge;
-    const end = interval.endAge;
-    if (start >= end) return;
-
-    let budgetSavingsMap = {};
-    let budgetAllocMode = 'fixed';
-    if (C === 0) {
-      budgetSavingsMap = finalWorkSaveSavings;
-      budgetAllocMode = finalWorkSaveAllocMode;
-    } else {
-      const ccBudget = finalChildcareBudgets[C] || {};
-      budgetSavingsMap = ccBudget.savings || finalChildcareSavings;
-      budgetAllocMode = ccBudget.allocMode || finalChildcareAllocMode;
-    }
-
-    Object.keys(budgetSavingsMap).forEach(key => {
-      const val = budgetSavingsMap[key] || 0;
-      if (val > 0) {
-        let dest = key;
-        if (key === 'checking') dest = 'cash';
-        else if (key === 'hysa') dest = 'other';
-        else if (key === 'emergency') dest = 'emergencyFund';
-        else if (key === 'debt') dest = 'debtPaydown';
-
-        nextRules.push({
-          id: `budget-alloc-${C > 0 ? 'cc-' + C : 'ws'}-${key}-${start}-${Date.now()}`,
-          destination: dest,
-          type: budgetAllocMode === 'percentSurplus' ? 'percentSurplus' : 'fixed',
-          value: val,
-          frequency: budgetAllocMode === 'percentSurplus' ? 'yearly' : 'monthly',
-          priority: ruleIndex++,
-          startAge: start,
-          endAge: end,
-          smartRule: { enabled: false, targetValue: 0, redirectDestination: 'brokerage' }
-        });
-      }
-    });
-  });
-
-  newInputs.allocationRules = nextRules;
+  // Budget calculations and rules are now built dynamically from getNormalizedPhases
 };
 
 export default function FireSimulator() {
@@ -726,6 +604,9 @@ export default function FireSimulator() {
   const [showAssets, setShowAssets] = useState(true);
   const [showDebt, setShowDebt] = useState(true);
   const [showNetWorth, setShowNetWorth] = useState(true);
+  const [isFullPartnerProfileOpen, setIsFullPartnerProfileOpen] = useState(false);
+  const [isZeroSpendingConfirmed, setIsZeroSpendingConfirmed] = useState(false);
+  const [isPartnerZeroSpendingConfirmed, setIsPartnerZeroSpendingConfirmed] = useState(false);
 
   // 2-Step Wizard Navigation states
   const [activeStep, setActiveStep] = useState(1);
@@ -742,11 +623,14 @@ export default function FireSimulator() {
   });
 
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [isBudgetOpenFromMarriageWizard, setIsBudgetOpenFromMarriageWizard] = useState(false);
   const [activeBudgetPhase, setActiveBudgetPhase] = useState('workSave'); // 'workSave' | 'childcare'
+  const [editedPhases, setEditedPhases] = useState({});
   
   // Storage for standard work phase budget details
   const [workSaveIncome, setWorkSaveIncome] = useState(4167);
   const [workSaveSavings, setWorkSaveSavings] = useState({});
+  const [workSavePartnerSavings, setWorkSavePartnerSavings] = useState({});
   const [workSaveExpenses, setWorkSaveExpenses] = useState({});
   const [workSaveAllocMode, setWorkSaveAllocMode] = useState('fixed');
 
@@ -756,6 +640,7 @@ export default function FireSimulator() {
   const [childcareExpenses, setChildcareExpenses] = useState({});
   const [childcareAllocMode, setChildcareAllocMode] = useState('fixed');
   const [childcareBudgets, setChildcareBudgets] = useState({});
+  const [applyToFutureBudgets, setApplyToFutureBudgets] = useState(true);
 
   const [budgetGrossIncome, setBudgetGrossIncome] = useState(50000);
   const [budgetFilingStatus, setBudgetFilingStatus] = useState('single');
@@ -773,6 +658,15 @@ export default function FireSimulator() {
     debt: 0,
     other: 0
   });
+  const [budgetPartnerSavings, setBudgetPartnerSavings] = useState({
+    trad401k: 0,
+    rothIra: 0,
+    tradIra: 0,
+    hsa: 0,
+    brokerage: 0,
+    cash: 0,
+    debt: 0
+  });
   const [budgetExpenses, setBudgetExpenses] = useState({
     housing: 1500,
     utilities: 300,
@@ -782,6 +676,15 @@ export default function FireSimulator() {
     leisure: 300,
     misc: 141
   });
+  const [activeBudgetTab, setActiveBudgetTab] = useState('userSavings'); // 'userSavings' | 'partnerSavings' | 'householdExpenses'
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [editingEvent, setEditingEvent] = useState(null);
   const [childImpactSummary, setChildImpactSummary] = useState(null);
   const [editingCondition, setEditingCondition] = useState(null);
@@ -791,6 +694,17 @@ export default function FireSimulator() {
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [draggingInfo, setDraggingInfo] = useState(null);
+  const [notification, setNotification] = useState(null);
+  const notificationTimeoutRef = useRef(null);
+  const showNotification = (message) => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    setNotification(message);
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+    }, 2000);
+  };
   const [showImprovementModal, setShowImprovementModal] = useState(false);
   const [wasShortfall, setWasShortfall] = useState(false);
   const [pendingImprovement, setPendingImprovement] = useState(null);
@@ -801,6 +715,7 @@ export default function FireSimulator() {
     setIsBudgetModalOpen(false);
     setPendingImprovement(null);
     setBudgetDiffs(null);
+    setIsBudgetOpenFromMarriageWizard(false);
   };
   const dragOccurredRef = useRef(false);
   const lastNonZeroSavingsRateRef = useRef(15); // default to 15% pre-tax savings rate
@@ -864,6 +779,55 @@ export default function FireSimulator() {
   // Get active inputs
   const activeScenario = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
   const inputs = activeScenario.inputs;
+
+  // Compute temporary Social Security details for real-time modal preview
+  const tempSocialSecurityDetails = useMemo(() => {
+    if (!editingEvent || editingEvent.type !== 'socialSecurity') return null;
+    
+    const claimAge = Number(editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : 67);
+    const useEarnings = editingEvent.useEarnings === true;
+    
+    const incomeHistory = getIncomeHistory(inputs, editingEvent);
+    const { workingYears, isEligible } = calculateTop35AverageIncome(incomeHistory);
+    
+    if (useEarnings) {
+      return calculateSocialSecurityBenefit({
+        incomeHistory,
+        claimAge,
+        fullRetirementAge: 67,
+        firstBendPoint: 1286,
+        secondBendPoint: 7749,
+        indexingMode: "simple"
+      });
+    } else {
+      const fixedAnnual = (Number(editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 2000) || 0) * 12;
+      const claimingMultiplierDetails = calculateClaimingAgeMultiplier({ claimAge, fullRetirementAge: 67 });
+      let annualBenefit = fixedAnnual * claimingMultiplierDetails.multiplier;
+      let adjustmentType = claimingMultiplierDetails.adjustmentType;
+      let adjustmentMultiplier = claimingMultiplierDetails.multiplier;
+      
+      if (!isEligible) {
+        adjustmentType = 'Not eligible';
+        adjustmentMultiplier = 0;
+        annualBenefit = 0;
+      }
+      
+      return {
+        claimAge,
+        workingYears,
+        isEligible,
+        indexedEarningsHistory: [],
+        top35AnnualEarnings: 0,
+        averageTop35AnnualIncome: 0,
+        aimeMonthly: 0,
+        piaMonthly: fixedAnnual / 12,
+        claimingAgeMultiplier: adjustmentMultiplier,
+        monthlyBenefit: annualBenefit / 12,
+        annualBenefit,
+        adjustmentType
+      };
+    }
+  }, [editingEvent, inputs]);
 
   // Track last non-zero savings rate to preserve it during empty/zero income editing states
   useEffect(() => {
@@ -948,7 +912,7 @@ export default function FireSimulator() {
             }
             return ev;
           });
-          if (!hasRetire) {
+          if (!hasRetire && targetRetAgeVal < lifeExpVal) {
             updatedEvents.push({
               id: 'retire-1',
               type: 'retire',
@@ -971,8 +935,8 @@ export default function FireSimulator() {
                 inc.id === 'inc-1' ||
                 inc.name.toLowerCase().includes('salary') ||
                 inc.name.toLowerCase().includes('main income')) &&
-                inc.id !== 'simple-inc-childcare' &&
-                inc.id !== 'simple-inc-worksave'
+                !inc.id.startsWith('simple-inc-childcare') &&
+                !inc.id.startsWith('simple-inc-worksave')
               ) {
                 return {
                   ...inc,
@@ -988,8 +952,8 @@ export default function FireSimulator() {
                 phase.id === 'spend-1' ||
                 phase.name.toLowerCase().includes('lifestyle') ||
                 phase.name.toLowerCase().includes('spending')) &&
-                phase.id !== 'simple-spend-childcare' &&
-                phase.id !== 'simple-spend-worksave'
+                !phase.id.startsWith('simple-spend-childcare') &&
+                !phase.id.startsWith('simple-spend-worksave')
               ) {
                 return {
                   ...phase,
@@ -1224,10 +1188,12 @@ export default function FireSimulator() {
         peakCount = count;
       }
     }
+    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents, inputs.incomeList);
+    const peakIntervalIdx = savingIntervals.findIndex(inv => inv.childCount === peakCount);
     let ccIncomeVal = (Number(inputs.simpleIncome) || 50000) / 12;
     if (inputs.budgetDetails) {
-      if (inputs.budgetDetails.childcareBudgets && inputs.budgetDetails.childcareBudgets[peakCount]) {
-        ccIncomeVal = Number(inputs.budgetDetails.childcareBudgets[peakCount].income);
+      if (inputs.budgetDetails.childcareBudgets && peakIntervalIdx !== -1 && inputs.budgetDetails.childcareBudgets[peakIntervalIdx]) {
+        ccIncomeVal = Number(inputs.budgetDetails.childcareBudgets[peakIntervalIdx].income);
       } else if (inputs.budgetDetails.childcareIncome !== undefined) {
         ccIncomeVal = Number(inputs.budgetDetails.childcareIncome);
       }
@@ -1242,7 +1208,8 @@ export default function FireSimulator() {
     const currentReadyAge = activeResults.retirementReadyAge;
     const hasShortfall = activeResults.endingSurplusShortfall < 0 || 
                          !activeResults.moneyLasts ||
-                         (activeResults.retirementReadyAge && inputs.targetRetirementAge < activeResults.retirementReadyAge);
+                         (activeResults.retirementReadyAge && inputs.targetRetirementAge < activeResults.retirementReadyAge) ||
+                         (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
 
     if (!hasShortfall) return null;
 
@@ -1263,38 +1230,89 @@ export default function FireSimulator() {
 
     const list = [];
 
-    // 1. Retire at 65 Recommendation
-    const retire65Rec = calculateRetireAt65Recommendation(
-      currentAge,
-      targetRetirementAge,
-      currentAssets,
-      annualSavings,
-      rateOfReturn,
-      swr,
-      retirementExpenses
-    );
-
-    if (retire65Rec.applicable) {
+    // 1. Retire at Age 65 (and changes needed to do that)
+    if (currentAge >= 65) {
       list.push({
         type: 'retire65',
         icon: '📅',
         title: 'Retire at Age 65',
-        details: 'Delay your retirement to Age 65 to allow your assets to compound longer and reduce the number of retirement years your portfolio needs to fund.',
+        details: 'You are already age 65 or older.',
+        bulletPoints: [
+          'This option is not applicable because your current age is 65 or older.'
+        ],
+        readyAge: currentAge,
+        yearsImprovement: null,
+        value: 0,
+        savingsFocus: 'Retire at 65',
+        savingsEffortScore: 1
+      });
+    } else {
+      const yearsTo65 = 65 - currentAge;
+      let projectedAssetsAt65 = currentAssets * Math.pow(1 + rateOfReturn, yearsTo65);
+      if (rateOfReturn > 0) {
+        const fvFactor = (Math.pow(1 + rateOfReturn, yearsTo65) - 1) / rateOfReturn;
+        projectedAssetsAt65 += annualSavings * fvFactor;
+      } else {
+        projectedAssetsAt65 += annualSavings * yearsTo65;
+      }
+
+      const targetAssetsAt65 = swr > 0 ? retirementExpenses / swr : 0;
+      const newShortfall = Math.max(0, targetAssetsAt65 - projectedAssetsAt65);
+      const saveMoreAmtAt65 = calculateSaveMoreRecommendation(
+        newShortfall,
+        rateOfReturn,
+        yearsTo65,
+        1.0
+      );
+      const hasShortfallAt65 = newShortfall > 0;
+
+      list.push({
+        type: 'retire65',
+        icon: '📅',
+        title: 'Retire at Age 65',
+        details: hasShortfallAt65
+          ? 'Delay your retirement to Age 65 and adjust your budget to save more to bridge the remaining shortfall.'
+          : 'Delay your retirement to Age 65. Under your current plan, your assets are projected to fully support you at age 65 with no additional savings needed.',
         bulletPoints: [
           `Working until 65 adds ${65 - targetRetirementAge} more working/saving years to your plan.`,
-          retire65Rec.resolvesShortfall
-            ? 'This completely resolves your projected retirement shortfall!'
-            : `This reduces your projected shortfall at 65 to ${formatCurrency(retire65Rec.newShortfall)}.`
+          ...(hasShortfallAt65
+            ? [
+                `Save and invest an additional ${formatCurrency(saveMoreAmtAt65)}/year (approx. ${formatCurrency(Math.round(saveMoreAmtAt65 / 12))}/month) starting now.`,
+                `This will compound over your remaining ${65 - currentAge} working years to bridge the remaining ${formatCurrency(newShortfall)} shortfall at age 65.`
+              ]
+            : [
+                'This completely resolves your projected retirement shortfall with no other changes needed!'
+              ])
         ],
         readyAge: 65,
         yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - 65) : null,
-        value: 65,
-        savingsFocus: 'Work Extension',
+        value: saveMoreAmtAt65,
+        savingsFocus: 'Retire at 65',
         savingsEffortScore: 1
       });
     }
 
-    // 2. Save More (100%) Recommendation
+    // 2. Retire at the retirement ready age
+    if (currentReadyAge) {
+      list.push({
+        type: 'retireReadyAge',
+        icon: '⏳',
+        title: 'Retire at Retirement Ready Age',
+        details: `Delay your retirement to Age ${currentReadyAge} (your Retirement Ready Age) so that your current saving and spending rates are sufficient to support you without any additional changes.`,
+        bulletPoints: [
+          `Working until Age ${currentReadyAge} allows your assets to compound for ${currentReadyAge - targetRetirementAge} more years.`,
+          'No additional savings or income changes are required under your current budget.',
+          'This completely resolves your projected retirement gap.'
+        ],
+        readyAge: currentReadyAge,
+        yearsImprovement: null,
+        value: currentReadyAge,
+        savingsFocus: 'Retire Ready',
+        savingsEffortScore: 2
+      });
+    }
+
+    // 3. Retire at the requested retirement date
     const saveMoreAmt100 = calculateSaveMoreRecommendation(
       shortfall,
       rateOfReturn,
@@ -1302,134 +1320,22 @@ export default function FireSimulator() {
       1.0
     );
 
-    if (saveMoreAmt100 > 0) {
-      list.push({
-        type: 'savings',
-        icon: '📈',
-        title: 'Save More (100%)',
-        details: `Boost your savings rate to bridge 100% of your projected shortfall.`,
-        bulletPoints: [
-          `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before retirement.`,
-          `This will compound over your remaining ${yearsUntilRetirement} working years at an assumed ${(rateOfReturn * 100).toFixed(0)}% annual rate of return.`,
-          `This completely bridges your projected retirement gap.`
-        ],
-        readyAge: targetRetirementAge,
-        yearsImprovement: null,
-        value: saveMoreAmt100,
-        savingsFocus: 'Save More (100%)',
-        savingsEffortScore: 2
-      });
-    }
-
-    // Calculate baseline shortfall (retirement shortfall excluding child-related timeline deficit)
-    const inputsWithoutChild = {
-      ...inputs,
-      lifeEvents: (inputs.lifeEvents || []).map(e => e.type === 'haveChild' ? { ...e, enabled: false } : e)
-    };
-    const resultsWithoutChild = runFireSimulation(inputsWithoutChild);
-    const baselineShortfall = resultsWithoutChild.endingSurplusShortfall < 0 ? -resultsWithoutChild.endingSurplusShortfall : 0;
-
-    // 3. Earn More (100%) Recommendation
-    const earnMoreAmt100 = calculateEarnMoreRecommendation(
-      baselineShortfall,
-      rateOfReturn,
-      yearsUntilRetirement,
-      marginalTaxRate,
-      1.0
-    );
-    const netSavingsAmt100 = calculateSaveMoreRecommendation(
-      baselineShortfall,
-      rateOfReturn,
-      yearsUntilRetirement,
-      1.0
-    );
-
-    if (earnMoreAmt100 > 0 || (hasChildcarePhase && childcarePeakGrossBoost > 0)) {
-      list.push({
-        type: 'income',
-        icon: '💵',
-        title: 'Earn More (100%)',
-        details: baselineShortfall > 0
-          ? `Increase your gross income to bridge 100% of your projected shortfall.`
-          : `Increase your gross income during childcare years to cover the child costs.`,
-        bulletPoints: [
-          ...(hasChildcarePhase && maxChildCostsMonthly > 0 ? [
-            `Increase your gross annual salary:`,
-            `  • Childcare Years: Earn an additional ${formatCurrency(earnMoreAmt100 + childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12) + childcarePeakGrossBoost)}/month) to cover childcare and maintain standard savings.`,
-            ...(earnMoreAmt100 > 0 ? [
-              `  • Standard Work Years: Earn an additional ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month) after childcare ends.`,
-              `💡 Why is the childcare target higher? Earning ${formatCurrency(earnMoreAmt100 + childcarePeakGrossBoost * 12)}/year consists of ${formatCurrency(childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoost)}/month) to cover the child costs, plus ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month) to fund the extra savings needed for retirement.`
-            ] : [
-              `  • Standard Work Years: Earn an additional $0/year (approx. $0/month) after childcare ends, since your standard retirement plan is already fully on track!`
-            ]),
-            `  • If you temporarily reduce savings to $0/month during those years (freeing up ${formatCurrency(standardMonthlySavings)}/month in cash flow), you only need to earn an additional ${formatCurrency(childcarePeakGrossBoostZeroSavings * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoostZeroSavings)}/month) to cover the childcare deficit.`
-          ] : [
-            `Increase your gross annual salary by ${formatCurrency(earnMoreAmt100)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt100 / 12))}/month).`
-          ]),
-          ...(earnMoreAmt100 > 0 ? [
-            `Assuming a marginal tax rate of ${(marginalTaxRate * 100).toFixed(0)}%, this leaves a net savings increase of ${formatCurrency(netSavingsAmt100)}/year.`,
-            `This completely bridges your projected retirement gap.`
-          ] : [
-            `This completely covers your childcare costs and keeps your retirement plan on track.`
-          ])
-        ],
-        readyAge: targetRetirementAge,
-        yearsImprovement: null,
-        value: earnMoreAmt100,
-        netSavingsValue: netSavingsAmt100,
-        savingsFocus: 'Earn More (100%)',
-        savingsEffortScore: 3
-      });
-    }
-
-    // 4. Balanced Plan (50/50) Recommendation
-    const saveMoreAmt50 = calculateSaveMoreRecommendation(
-      baselineShortfall,
-      rateOfReturn,
-      yearsUntilRetirement,
-      0.5
-    );
-    const earnMoreAmt50 = calculateEarnMoreRecommendation(
-      baselineShortfall,
-      rateOfReturn,
-      yearsUntilRetirement,
-      marginalTaxRate,
-      0.5
-    );
-
-    if (saveMoreAmt50 > 0 && earnMoreAmt50 > 0) {
-      list.push({
-        type: 'combined',
-        icon: '⚖️',
-        title: 'Balanced Plan (50/50)',
-        details: `A combination of adjustments that splits the gap: bridge 50% through savings and 50% through earnings.`,
-        bulletPoints: [
-          `Save and invest an additional ${formatCurrency(saveMoreAmt50)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt50 / 12))}/month).`,
-          ...(hasChildcarePhase && maxChildCostsMonthly > 0 ? [
-            `Increase your gross annual salary:`,
-            `  • Childcare Years: Earn an additional ${formatCurrency(earnMoreAmt50 + childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12) + childcarePeakGrossBoost)}/month) to cover childcare and maintain savings.`,
-            `  • Standard Work Years: Earn an additional ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month) after childcare ends.`,
-            `💡 Why is the childcare target higher? Earning ${formatCurrency(earnMoreAmt50 + childcarePeakGrossBoost * 12)}/year consists of ${formatCurrency(childcarePeakGrossBoost * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoost)}/month) to cover the child costs, plus ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month) to fund the extra savings needed for retirement.`,
-            `  • If you temporarily reduce savings to $0/month during those years (freeing up both your base savings of ${formatCurrency(standardMonthlySavings)}/month and the additional ${formatCurrency(Math.round(saveMoreAmt50 / 12))}/month), you only need to earn an additional ${formatCurrency(childcarePeakGrossBoostZeroSavings * 12)}/year (approx. ${formatCurrency(childcarePeakGrossBoostZeroSavings)}/month) to cover the childcare deficit.`
-          ] : [
-            `Increase your gross annual salary by ${formatCurrency(earnMoreAmt50)}/year (approx. ${formatCurrency(Math.round(earnMoreAmt50 / 12))}/month).`
-          ]),
-          `Combined, these adjustments completely resolve your projected retirement gap.`
-        ],
-        readyAge: targetRetirementAge,
-        yearsImprovement: null,
-        value: {
-          savings: saveMoreAmt50,
-          income: earnMoreAmt50,
-          netSavings: saveMoreAmt50
-        },
-        savingsFocus: 'Balanced (50/50)',
-        savingsEffortScore: 4
-      });
-    }
-
-    // Sort all scenarios strictly by savingsEffortScore (aggressiveness) ascending
-    list.sort((a, b) => a.savingsEffortScore - b.savingsEffortScore);
+    list.push({
+      type: 'retireRequestedDate',
+      icon: '🎯',
+      title: 'Retire at Requested Retirement Date',
+      details: `Maintain your target retirement age of Age ${targetRetirementAge} and adjust your budget to save more to bridge the shortfall.`,
+      bulletPoints: [
+        `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before retirement.`,
+        `This will compound over your remaining ${yearsUntilRetirement} working years at an assumed ${(rateOfReturn * 100).toFixed(0)}% annual rate of return.`,
+        `This completely bridges your projected retirement gap at Age ${targetRetirementAge}.`
+      ],
+      readyAge: targetRetirementAge,
+      yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - targetRetirementAge) : null,
+      value: saveMoreAmt100,
+      savingsFocus: 'Save More',
+      savingsEffortScore: 3
+    });
 
     return {
       showImprovementPlan: true,
@@ -1462,6 +1368,8 @@ export default function FireSimulator() {
   const handleApplyImprovementScenario = (scenario) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
+    const currentAgeVal = Number(inp.currentAge) || 30;
+    const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
 
     let targetIncome = Number(inp.simpleIncome) || 50000;
     const targetFilingStatus = inp.filingStatus || 'single';
@@ -1633,8 +1541,8 @@ export default function FireSimulator() {
     const baselineExpensesMap = { ...targetExpensesMap };
 
     // Adjust target values based on our new recommendation types
-    if (scenario.type === 'savings') {
-      // Save More: increase monthly savings by saveMoreAmt / 12
+    if (scenario.type === 'savings' || scenario.type === 'retireRequestedDate' || (scenario.type === 'retire65' && scenario.value > 0)) {
+      // Save More: increase monthly savings by scenario.value / 12
       const additionalSavingsAnnual = scenario.value;
       const additionalSavingsMonthly = Math.round(additionalSavingsAnnual / 12);
       
@@ -1690,7 +1598,9 @@ export default function FireSimulator() {
       const monthlyNetSavings = Math.round(netSavingsAnnual / 12);
       targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyNetSavings;
     } else if (scenario.type === 'retire65') {
-      // Retire at 65 doesn't change current income/expenses
+      // Retire at 65 with no changes needed (scenario.value === 0) doesn't change current income/expenses
+    } else if (scenario.type === 'retireReadyAge') {
+      // Retire at ready age doesn't change current income/expenses
     }
 
     // Calculate differences for glow effect
@@ -1805,108 +1715,39 @@ export default function FireSimulator() {
     const marginalTaxRateForApplied = inp.includeTaxes ? 0.25 : 0.0;
     const childcarePeakGrossBoostForApplied = Math.round(maxChildCostsMonthlyForApplied / (1 - marginalTaxRateForApplied));
 
-    let ccIncome = appliedWsIncome;
-    if (scenario.type === 'income' || scenario.type === 'combined') {
-      ccIncome = appliedWsIncome + childcarePeakGrossBoostForApplied;
-    } else if (inp.budgetDetails && inp.budgetDetails.childcareIncome !== undefined) {
-      ccIncome = inp.budgetDetails.childcareIncome;
-    }
-    let ccSavingsAllocMode = inp.budgetDetails?.savingsAllocMode || 'fixed';
-    let ccSavingsMap = { ...targetSavingsMap };
-    let ccExpensesMap = { ...targetExpensesMap };
-
-    if (inp.budgetDetails && inp.budgetDetails.childcareSavings) {
-      ccSavingsAllocMode = inp.budgetDetails.childcareSavingsAllocMode || ccSavingsAllocMode;
-      ccSavingsMap = { ...inp.budgetDetails.childcareSavings };
-      ccExpensesMap = { ...inp.budgetDetails.childcareExpenses };
-    }
-
-    setChildcareIncome(ccIncome);
-    setChildcareSavings(ccSavingsMap);
-    setChildcareExpenses(ccExpensesMap);
-    setChildcareAllocMode(ccSavingsAllocMode);
-
-    const occurringCounts = [];
-    const currentAgeVal = Number(inp.currentAge) || 30;
-    const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
-    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
-      const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
-      if (count > 0 && !occurringCounts.includes(count)) {
-        occurringCounts.push(count);
-      }
-    }
-    occurringCounts.sort((a, b) => a - b);
-    const C_peak = occurringCounts.length > 0 ? Math.max(...occurringCounts) : 1;
-
-    const initialBudgets = {};
-    occurringCounts.forEach(c => {
-      let derivedIncome = ccIncome;
-      if (scenario.type === 'income' || scenario.type === 'combined') {
-        derivedIncome = appliedWsIncome + Math.round(childcarePeakGrossBoostForApplied * (c / C_peak));
-      } else {
-        const existing = inp.budgetDetails?.childcareBudgets?.[c];
-        if (existing) {
-          derivedIncome = existing.income;
-        } else {
-          derivedIncome = appliedWsIncome + 1250 * c;
-        }
-      }
-
-      initialBudgets[c] = {
-        income: derivedIncome,
-        expenses: ccExpensesMap ? { ...ccExpensesMap } : { ...targetExpensesMap },
-        savings: ccSavingsMap ? { ...ccSavingsMap } : { ...targetSavingsMap },
-        allocMode: ccSavingsAllocMode
-      };
+    const normalizedPhases = getNormalizedPhases(inp);
+    const initialEdited = {};
+    normalizedPhases.forEach(p => {
+      initialEdited[p.id] = { ...p };
     });
-    setChildcareBudgets(initialBudgets);
 
-    let startPhase = 'workSave';
-    if (occurringCounts.length > 0) {
-      const initialCount = getActiveChildrenCountAtAge(currentAgeVal, inp.lifeEvents);
-      if (initialCount > 0) {
-        startPhase = `childcare_${initialCount}`;
-      } else {
-        let firstCcAge = Infinity;
-        let firstCcCount = 1;
-        for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
-          const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
-          if (count > 0) {
-            firstCcAge = age;
-            firstCcCount = count;
-            break;
-          }
-        }
-        if (firstCcAge < Infinity) {
-          startPhase = `childcare_${firstCcCount}`;
-        }
-      }
+    const currentPhase = normalizedPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normalizedPhases[0];
+    if (currentPhase) {
+      initialEdited[currentPhase.id] = {
+        ...currentPhase,
+        income: Math.round(targetIncome / 12),
+        savings: targetSavingsMap,
+        expenses: targetExpensesMap,
+        savingsAllocMode: inp.budgetDetails?.savingsAllocMode || 'fixed'
+      };
     }
-    setActiveBudgetPhase(startPhase);
+    setEditedPhases(initialEdited);
 
-    if (startPhase.startsWith('childcare_')) {
-      const c = Number(startPhase.split('_')[1]);
-      const targetCc = initialBudgets[c];
-      setBudgetMonthlyIncome(targetCc.income);
-      setBudgetSavings(targetCc.savings);
-      setBudgetExpenses(targetCc.expenses);
-      setSavingsAllocMode(targetCc.allocMode);
-      setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
+    let startPhaseId = currentPhase ? currentPhase.id : (normalizedPhases[0]?.id || null);
+    setActiveBudgetPhase(startPhaseId);
+
+    if (startPhaseId) {
+      const startPhase = initialEdited[startPhaseId];
+      setBudgetMonthlyIncome(startPhase.income);
+      setBudgetSavings(startPhase.savings);
+      setBudgetPartnerSavings(startPhase.partnerSavings || {});
+      setBudgetExpenses(startPhase.expenses);
+      setSavingsAllocMode(startPhase.savingsAllocMode);
+      setBudgetMonthlySpending(Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0));
       
-      const totalSavings = targetCc.allocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
-        : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
-      setBudgetMonthlySavings(totalSavings);
-    } else {
-      setBudgetMonthlyIncome(appliedWsIncome);
-      setBudgetSavings(targetSavingsMap);
-      setBudgetExpenses(targetExpensesMap);
-      const allocMode = inp.budgetDetails?.savingsAllocMode || 'fixed';
-      setSavingsAllocMode(allocMode);
-      setBudgetMonthlySpending(Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0));
-      const totalSavings = allocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, appliedWsIncome - Object.values(targetExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
-        : Object.values(targetSavingsMap).reduce((sum, val) => sum + val, 0);
+      const totalSavings = startPhase.savingsAllocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, startPhase.income - Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0);
       setBudgetMonthlySavings(totalSavings);
     }
 
@@ -2609,312 +2450,47 @@ export default function FireSimulator() {
     setActiveStep(1);
   };
 
-  const handleSetBudgetClick = (initialPhase = 'workSave') => {
+  const handleSetBudgetClick = (initialPhaseId = null) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
+
+    const normalizedPhases = getNormalizedPhases(inp);
     
-    // Determine childcare ages
-    const childEvents = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-    let minChildParentAge = Infinity;
-    let maxChildParentAge = -Infinity;
-    childEvents.forEach(ev => {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-      const maxAge = includeCollege ? 22 : 18;
-      if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-      if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+    // Initialize editedPhases mapping
+    const initialEdited = {};
+    normalizedPhases.forEach(p => {
+      initialEdited[p.id] = { ...p };
     });
-    const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > inp.currentAge;
-    
+    setEditedPhases(initialEdited);
 
-
-    // 1. Initialize Standard Work Budget
-    let wsIncome = Math.round((Number(inp.simpleIncome) || 50000) / 12);
-    let wsSavingsAllocMode = 'fixed';
-    let wsSavingsMap = {};
-    let wsExpensesMap = {};
-
-    const currentIncome = Number(inp.simpleIncome) || 0;
-    const currentExpenses = Number(inp.simpleExpenses) || 0;
-    const simMonthlySavings = Math.max(0, currentIncome - currentExpenses) / 12;
-    const monthlyGross = Math.round(currentIncome / 12);
-
-    let detectedAllocMode = 'fixed';
-    if (inp.budgetDetails?.savingsAllocMode) {
-      detectedAllocMode = inp.budgetDetails.savingsAllocMode;
-    } else if (inp.allocationRules && inp.allocationRules.length > 0) {
-      const hasPercentSurplus = inp.allocationRules.some(r => r.type === 'percentSurplus');
-      if (hasPercentSurplus) {
-        detectedAllocMode = 'percentSurplus';
-      }
-    }
-    wsSavingsAllocMode = detectedAllocMode;
-
-    if (inp.budgetDetails) {
-      wsIncome = inp.budgetDetails.income !== undefined ? inp.budgetDetails.income : Math.round(Number(inp.simpleIncome) / 12);
-      wsSavingsAllocMode = inp.budgetDetails.savingsAllocMode || 'fixed';
-      wsSavingsMap = { ...inp.budgetDetails.savings };
-      wsExpensesMap = { ...inp.budgetDetails.expenses };
+    // Determine starting activeBudgetPhase ID
+    let startPhaseId = null;
+    if (initialPhaseId && initialEdited[initialPhaseId]) {
+      startPhaseId = initialPhaseId;
     } else {
-      const defaultSavings = {
-        trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0,
-        checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
-      };
+      // Find phase matching current age
+      const currentAgeVal = Number(inp.currentAge) || 30;
+      const match = normalizedPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge);
+      if (match) {
+        startPhaseId = match.id;
+      } else if (normalizedPhases.length > 0) {
+        startPhaseId = normalizedPhases[0].id;
+      }
+    }
+
+    if (startPhaseId) {
+      const startPhase = initialEdited[startPhaseId];
+      setActiveBudgetPhase(startPhaseId);
+      setBudgetMonthlyIncome(startPhase.income);
+      setBudgetSavings(startPhase.savings);
+      setBudgetPartnerSavings(startPhase.partnerSavings || {});
+      setBudgetExpenses(startPhase.expenses);
+      setSavingsAllocMode(startPhase.savingsAllocMode);
       
-      if (inp.allocationRules && inp.allocationRules.length > 0) {
-        inp.allocationRules.forEach(r => {
-          const key = r.destination === 'cash' ? 'checking' :
-                      r.destination === 'other' ? 'hysa' :
-                      r.destination === 'emergencyFund' ? 'emergency' :
-                      r.destination === 'debtPaydown' ? 'debt' : r.destination;
-          if (defaultSavings[key] !== undefined) {
-            if (detectedAllocMode === 'percentSurplus') {
-              if (r.type === 'percentSurplus') {
-                defaultSavings[key] = Number(r.value);
-              } else {
-                const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
-                defaultSavings[key] = pool > 0 ? Math.round((Number(r.value) / pool) * 100) : 0;
-              }
-            } else {
-              if (r.type === 'fixed') {
-                defaultSavings[key] = r.frequency === 'monthly' ? r.value : Math.round(r.value / 12);
-              } else {
-                const pool = Math.max(0, (Number(inp.simpleIncome) - Number(inp.simpleExpenses)) / 12);
-                defaultSavings[key] = Math.round(pool * (Number(r.value) / 100));
-              }
-            }
-          }
-        });
-      } else {
-        if (detectedAllocMode === 'percentSurplus') {
-          defaultSavings.brokerage = 100;
-        } else {
-          defaultSavings.brokerage = Math.round(simMonthlySavings);
-        }
-      }
-      wsSavingsMap = defaultSavings;
-      
-      const availableMonthlyExpenses = Math.max(0, monthlyGross - (detectedAllocMode === 'percentSurplus' ? simMonthlySavings : Object.values(defaultSavings).reduce((sum, val) => sum + val, 0)));
-      wsExpensesMap = {
-        housing: Math.round(availableMonthlyExpenses * 0.40),
-        utilities: Math.round(availableMonthlyExpenses * 0.10),
-        food: Math.round(availableMonthlyExpenses * 0.15),
-        transportation: Math.round(availableMonthlyExpenses * 0.10),
-        healthcare: Math.round(availableMonthlyExpenses * 0.10),
-        leisure: Math.round(availableMonthlyExpenses * 0.10),
-        misc: Math.round(availableMonthlyExpenses * 0.05)
-      };
-      const scaledExpensesSum = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
-      const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
-      if (expenseDiff !== 0) {
-        wsExpensesMap.housing = Math.max(0, wsExpensesMap.housing + expenseDiff);
-      }
-    }
-
-    const totalExpensesInModal = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
-    const actualSavingsMonthly = wsSavingsAllocMode === 'percentSurplus' 
-      ? Math.round(simMonthlySavings) 
-      : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
-    const availableMonthlyExpenses = Math.max(0, monthlyGross - actualSavingsMonthly);
-
-    if (totalExpensesInModal > 0 && Math.abs(totalExpensesInModal - availableMonthlyExpenses) > 1) {
-      const expensesScale = availableMonthlyExpenses / totalExpensesInModal;
-      Object.keys(wsExpensesMap).forEach(key => {
-        wsExpensesMap[key] = Math.round(wsExpensesMap[key] * expensesScale);
-      });
-    } else if (totalExpensesInModal === 0 && availableMonthlyExpenses > 0) {
-      wsExpensesMap = {
-        housing: Math.round(availableMonthlyExpenses * 0.40),
-        utilities: Math.round(availableMonthlyExpenses * 0.10),
-        food: Math.round(availableMonthlyExpenses * 0.15),
-        transportation: Math.round(availableMonthlyExpenses * 0.10),
-        healthcare: Math.round(availableMonthlyExpenses * 0.10),
-        leisure: Math.round(availableMonthlyExpenses * 0.10),
-        misc: Math.round(availableMonthlyExpenses * 0.05)
-      };
-    }
-
-    const scaledExpensesSum = Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0);
-    const expenseDiff = availableMonthlyExpenses - scaledExpensesSum;
-    if (expenseDiff !== 0 && Object.keys(wsExpensesMap).length > 0) {
-      let maxKey = Object.keys(wsExpensesMap)[0];
-      Object.keys(wsExpensesMap).forEach(key => {
-        if (wsExpensesMap[key] > wsExpensesMap[maxKey]) {
-          maxKey = key;
-        }
-      });
-      wsExpensesMap[maxKey] = Math.max(0, wsExpensesMap[maxKey] + expenseDiff);
-    }
-
-    setWorkSaveIncome(wsIncome);
-    setWorkSaveSavings(wsSavingsMap);
-    setWorkSaveExpenses(wsExpensesMap);
-    setWorkSaveAllocMode(wsSavingsAllocMode);
-
-    // Calculate current childcare cost (from roadmap haveChild events)
-    let currentChildCostsAnnual = 0;
-    const currentAge = Number(inp.currentAge) || 30;
-    const childEventsForCosts = (inp.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-    childEventsForCosts.forEach(ev => {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-      const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
-      const childAge = currentAge - birthAge;
-      if (childAge >= startAge) {
-        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-        const maxAge = includeCollege ? 22 : 18;
-        if (childAge < maxAge) {
-          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inp.childCosts?.ages0to4 !== undefined ? Number(inp.childCosts.ages0to4) : 15000);
-          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inp.childCosts?.ages5to12 !== undefined ? Number(inp.childCosts.ages5to12) : 15000);
-          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inp.childCosts?.ages13to18 !== undefined ? Number(inp.childCosts.ages13to18) : 15000);
-          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inp.childCosts?.ages19to22 !== undefined ? Number(inp.childCosts.ages19to22) : 15000);
-
-          let annualCost = 0;
-          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
-          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
-          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
-          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
-          
-          currentChildCostsAnnual += annualCost;
-        }
-      }
-    });
-    const currentChildCostsMonthly = Math.round(currentChildCostsAnnual / 12);
-
-    // 2. Initialize Childcare Budget
-    let ccIncome = wsIncome;
-    let ccSavingsAllocMode = wsSavingsAllocMode;
-    let ccSavingsMap = { ...wsSavingsMap };
-    let ccExpensesMap = { ...wsExpensesMap };
-
-    if (inp.budgetDetails && inp.budgetDetails.childcareSavings) {
-      ccIncome = inp.budgetDetails.childcareIncome !== undefined ? inp.budgetDetails.childcareIncome : wsIncome;
-      ccSavingsAllocMode = inp.budgetDetails.childcareSavingsAllocMode || wsSavingsAllocMode;
-      ccSavingsMap = { ...inp.budgetDetails.childcareSavings };
-      ccExpensesMap = { ...inp.budgetDetails.childcareExpenses };
-    }
-
-    setChildcareIncome(ccIncome);
-    setChildcareSavings(ccSavingsMap);
-    setChildcareExpenses(ccExpensesMap);
-    setChildcareAllocMode(ccSavingsAllocMode);
-
-    // Determine occurring child counts and populate childcareBudgets
-    const occurringCounts = [];
-    const currentAgeVal = Number(inp.currentAge) || 30;
-    const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
-    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
-      const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
-      if (count > 0 && !occurringCounts.includes(count)) {
-        occurringCounts.push(count);
-      }
-    }
-    occurringCounts.sort((a, b) => a - b);
-
-    const initialBudgets = {};
-    occurringCounts.forEach(c => {
-      if (inp.budgetDetails?.childcareBudgets?.[c]) {
-        initialBudgets[c] = { ...inp.budgetDetails.childcareBudgets[c] };
-      } else {
-        // Fallback/initialization
-        const oldCcIncome = inp.budgetDetails?.childcareIncome;
-        let boostForOne = 1250;
-        if (oldCcIncome !== undefined) {
-          const wsInc = inp.budgetDetails?.income !== undefined ? inp.budgetDetails.income : Math.round(Number(inp.simpleIncome) / 12);
-          if (oldCcIncome > wsInc) {
-            let peakCount = 0;
-            for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
-              const count = getActiveChildrenCountAtAge(age, inp.lifeEvents);
-              if (count > peakCount) {
-                peakCount = count;
-              }
-            }
-            if (peakCount > 0) {
-              boostForOne = (oldCcIncome - wsInc) / peakCount;
-            } else {
-              boostForOne = oldCcIncome - wsInc;
-            }
-          }
-        }
-        const derivedIncome = wsIncome + boostForOne * c;
-        initialBudgets[c] = {
-          income: derivedIncome,
-          expenses: ccExpensesMap ? { ...ccExpensesMap } : { ...wsExpensesMap },
-          savings: ccSavingsMap ? { ...ccSavingsMap } : { ...wsSavingsMap },
-          allocMode: ccSavingsAllocMode || wsSavingsAllocMode
-        };
-      }
-    });
-    setChildcareBudgets(initialBudgets);
-
-    // Set initial active phase
-    let startPhase = 'workSave';
-    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inp.lifeEvents);
-    
-    if (initialPhase && typeof initialPhase === 'string' && (initialPhase.startsWith('interval_') || initialPhase.startsWith('childcare_') || initialPhase === 'workSave')) {
-      startPhase = initialPhase;
-    } else {
-      if (savingIntervals.length > 0) {
-        // Find the interval corresponding to the parent's current age
-        const currentAgeIntIdx = savingIntervals.findIndex(item => currentAgeVal >= item.startAge && currentAgeVal < item.endAge);
-        if (currentAgeIntIdx !== -1) {
-          startPhase = `interval_${currentAgeIntIdx}`;
-        } else {
-          // Fallback to first childcare interval if initialPhase === 'childcare'
-          const firstCcIdx = savingIntervals.findIndex(item => item.childCount > 0);
-          if (firstCcIdx !== -1 && typeof initialPhase === 'string' && initialPhase === 'childcare') {
-            startPhase = `interval_${firstCcIdx}`;
-          } else {
-            startPhase = 'workSave';
-          }
-        }
-      }
-    }
-    setActiveBudgetPhase(startPhase);
-
-    // 3. Load Active Phase into modal inputs
-    if (startPhase.startsWith('interval_') || startPhase.startsWith('childcare_')) {
-      let c = 0;
-      if (startPhase.startsWith('interval_')) {
-        const idx = Number(startPhase.split('_')[1]);
-        c = savingIntervals[idx]?.childCount || 0;
-      } else {
-        c = Number(startPhase.split('_')[1]);
-      }
-      
-      if (c > 0) {
-        const targetCc = initialBudgets[c];
-        setBudgetMonthlyIncome(targetCc.income);
-        setBudgetSavings(targetCc.savings);
-        setBudgetExpenses(targetCc.expenses);
-        setSavingsAllocMode(targetCc.allocMode);
-        setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
-        
-        const totalSavings = targetCc.allocMode === 'percentSurplus'
-          ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
-          : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
-        setBudgetMonthlySavings(totalSavings);
-      } else {
-        setBudgetMonthlyIncome(wsIncome);
-        setBudgetSavings(wsSavingsMap);
-        setBudgetExpenses(wsExpensesMap);
-        setSavingsAllocMode(wsSavingsAllocMode);
-        setBudgetMonthlySpending(Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0));
-        
-        const totalSavings = wsSavingsAllocMode === 'percentSurplus'
-          ? Math.round(Math.max(0, wsIncome - Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
-          : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
-        setBudgetMonthlySavings(totalSavings);
-      }
-    } else {
-      setBudgetMonthlyIncome(wsIncome);
-      setBudgetSavings(wsSavingsMap);
-      setBudgetExpenses(wsExpensesMap);
-      setSavingsAllocMode(wsSavingsAllocMode);
-      setBudgetMonthlySpending(Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0));
-      
-      const totalSavings = wsSavingsAllocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, wsIncome - Object.values(wsExpensesMap).reduce((sum, val) => sum + val, 0)) * (Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0) / 100))
-        : Object.values(wsSavingsMap).reduce((sum, val) => sum + val, 0);
+      setBudgetMonthlySpending(Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0));
+      const totalSavings = startPhase.savingsAllocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, startPhase.income - Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0);
       setBudgetMonthlySavings(totalSavings);
     }
 
@@ -2925,98 +2501,39 @@ export default function FireSimulator() {
     setIsBudgetModalOpen(true);
   };
 
-  const handleSwitchBudgetPhase = (newPhase) => {
-    if (newPhase === activeBudgetPhase) return;
+  const handleSwitchBudgetPhase = (newPhaseId) => {
+    if (newPhaseId === activeBudgetPhase) return;
 
     // Save current modal inputs to the old phase's state
-    if (activeBudgetPhase === 'workSave') {
-      setWorkSaveIncome(budgetMonthlyIncome);
-      setWorkSaveSavings(budgetSavings);
-      setWorkSaveExpenses(budgetExpenses);
-      setWorkSaveAllocMode(savingsAllocMode);
-    } else {
-      let c = 0;
-      if (activeBudgetPhase.startsWith('interval_')) {
-        const idx = Number(activeBudgetPhase.split('_')[1]);
-        const currentAgeVal = Number(inputs.currentAge) || 30;
-        const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
-        const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
-        c = savingIntervals[idx]?.childCount || 0;
-      } else if (activeBudgetPhase.startsWith('childcare_')) {
-        c = Number(activeBudgetPhase.split('_')[1]);
+    setEditedPhases(prev => ({
+      ...prev,
+      [activeBudgetPhase]: {
+        ...prev[activeBudgetPhase],
+        income: budgetMonthlyIncome,
+        savings: budgetSavings,
+        partnerSavings: budgetPartnerSavings,
+        expenses: budgetExpenses,
+        savingsAllocMode: savingsAllocMode
       }
-      
-      if (c > 0) {
-        setChildcareBudgets(prev => ({
-          ...prev,
-          [c]: {
-            income: budgetMonthlyIncome,
-            expenses: { ...budgetExpenses },
-            savings: { ...budgetSavings },
-            allocMode: savingsAllocMode
-          }
-        }));
-      }
-    }
+    }));
 
     // Load new phase inputs
-    if (newPhase === 'workSave') {
-      setBudgetMonthlyIncome(workSaveIncome);
-      setBudgetSavings(workSaveSavings);
-      setBudgetExpenses(workSaveExpenses);
-      setSavingsAllocMode(workSaveAllocMode);
-      setBudgetMonthlySpending(Object.values(workSaveExpenses).reduce((sum, val) => sum + val, 0));
+    const nextPhase = editedPhases[newPhaseId];
+    if (nextPhase) {
+      setBudgetMonthlyIncome(nextPhase.income);
+      setBudgetSavings(nextPhase.savings);
+      setBudgetPartnerSavings(nextPhase.partnerSavings || {});
+      setBudgetExpenses(nextPhase.expenses);
+      setSavingsAllocMode(nextPhase.savingsAllocMode);
+      setBudgetMonthlySpending(Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0));
       
-      const totalSavings = workSaveAllocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, workSaveIncome - Object.values(workSaveExpenses).reduce((sum, val) => sum + val, 0)) * (Object.values(workSaveSavings).reduce((sum, val) => sum + val, 0) / 100))
-        : Object.values(workSaveSavings).reduce((sum, val) => sum + val, 0);
+      const totalSavings = nextPhase.savingsAllocMode === 'percentSurplus'
+        ? Math.round(Math.max(0, nextPhase.income - Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(nextPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
+        : Object.values(nextPhase.savings).reduce((sum, val) => sum + val, 0);
       setBudgetMonthlySavings(totalSavings);
-    } else {
-      let c = 0;
-      if (newPhase.startsWith('interval_')) {
-        const idx = Number(newPhase.split('_')[1]);
-        const currentAgeVal = Number(inputs.currentAge) || 30;
-        const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
-        const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
-        c = savingIntervals[idx]?.childCount || 0;
-      } else if (newPhase.startsWith('childcare_')) {
-        c = Number(newPhase.split('_')[1]);
-      }
-      
-      if (c > 0) {
-        let targetCc = childcareBudgets[c];
-        if (!targetCc) {
-          const wsIncome = activeBudgetPhase === 'workSave' ? budgetMonthlyIncome : workSaveIncome;
-          const wsExpenses = activeBudgetPhase === 'workSave' ? { ...budgetExpenses } : { ...workSaveExpenses };
-          const wsSavings = activeBudgetPhase === 'workSave' ? { ...budgetSavings } : { ...workSaveSavings };
-          const wsAllocMode = activeBudgetPhase === 'workSave' ? savingsAllocMode : workSaveAllocMode;
-          
-          targetCc = {
-            income: wsIncome + 1250 * c,
-            expenses: wsExpenses,
-            savings: wsSavings,
-            allocMode: wsAllocMode
-          };
-          setChildcareBudgets(prev => ({
-            ...prev,
-            [c]: targetCc
-          }));
-        }
-
-        setBudgetMonthlyIncome(targetCc.income);
-        setBudgetSavings(targetCc.savings);
-        setBudgetExpenses(targetCc.expenses);
-        setSavingsAllocMode(targetCc.allocMode);
-        setBudgetMonthlySpending(Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0));
-        
-        const totalSavings = targetCc.allocMode === 'percentSurplus'
-          ? Math.round(Math.max(0, targetCc.income - Object.values(targetCc.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0) / 100))
-          : Object.values(targetCc.savings).reduce((sum, val) => sum + val, 0);
-        setBudgetMonthlySavings(totalSavings);
-      }
     }
 
-    setActiveBudgetPhase(newPhase);
+    setActiveBudgetPhase(newPhaseId);
   };
 
   const handleToggleSavingsAllocMode = (newMode) => {
@@ -3076,162 +2593,70 @@ export default function FireSimulator() {
   };
 
   const handleSaveBudget = () => {
-    // First, capture the current edits for the active phase
-    const finalWorkSaveIncome = activeBudgetPhase === 'workSave' ? budgetMonthlyIncome : workSaveIncome;
-    const finalWorkSaveSavings = activeBudgetPhase === 'workSave' ? { ...budgetSavings } : { ...workSaveSavings };
-    const finalWorkSaveExpenses = activeBudgetPhase === 'workSave' ? { ...budgetExpenses } : { ...workSaveExpenses };
-    const finalWorkSaveAllocMode = activeBudgetPhase === 'workSave' ? savingsAllocMode : workSaveAllocMode;
-
-    let finalChildcareBudgets = { ...childcareBudgets };
-    let activeC = 0;
-    if (activeBudgetPhase.startsWith('interval_')) {
-      const idx = Number(activeBudgetPhase.split('_')[1]);
-      const currentAgeVal = Number(inputs.currentAge) || 30;
-      const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
-      const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
-      activeC = savingIntervals[idx]?.childCount || 0;
-    } else if (activeBudgetPhase.startsWith('childcare_')) {
-      activeC = Number(activeBudgetPhase.split('_')[1]);
-    }
-    
-    if (activeC > 0) {
-      finalChildcareBudgets[activeC] = {
+    // Capture the current edits for the active phase
+    const finalEdited = {
+      ...editedPhases,
+      [activeBudgetPhase]: {
+        ...editedPhases[activeBudgetPhase],
         income: budgetMonthlyIncome,
-        expenses: { ...budgetExpenses },
-        savings: { ...budgetSavings },
-        allocMode: savingsAllocMode
-      };
-    }
-
-    const firstCcKey = Object.keys(finalChildcareBudgets).length > 0 ? Math.min(...Object.keys(finalChildcareBudgets).map(Number)) : null;
-    const firstCc = firstCcKey ? finalChildcareBudgets[firstCcKey] : null;
-
-    const finalChildcareIncome = firstCc ? firstCc.income : (activeC > 0 ? budgetMonthlyIncome : childcareIncome);
-    const finalChildcareSavings = firstCc ? { ...firstCc.savings } : (activeC > 0 ? { ...budgetSavings } : { ...childcareSavings });
-    const finalChildcareExpenses = firstCc ? { ...firstCc.expenses } : (activeC > 0 ? { ...budgetExpenses } : { ...childcareExpenses });
-    const finalChildcareAllocMode = firstCc ? firstCc.allocMode : (activeC > 0 ? savingsAllocMode : childcareAllocMode);
-
-    const totalWorkSaveExpenses = Object.values(finalWorkSaveExpenses).reduce((sum, val) => sum + val, 0);
-    const totalWorkSaveSavings = finalWorkSaveAllocMode === 'percentSurplus'
-      ? Math.round(Math.max(0, finalWorkSaveIncome - totalWorkSaveExpenses) * (Object.values(finalWorkSaveSavings).reduce((sum, val) => sum + val, 0) / 100))
-      : Object.values(finalWorkSaveSavings).reduce((sum, val) => sum + val, 0);
-
-    const totalChildcareExpenses = Object.values(finalChildcareExpenses).reduce((sum, val) => sum + val, 0);
-    const totalChildcareSavings = finalChildcareAllocMode === 'percentSurplus'
-      ? Math.round(Math.max(0, finalChildcareIncome - totalChildcareExpenses) * (Object.values(finalChildcareSavings).reduce((sum, val) => sum + val, 0) / 100))
-      : Object.values(finalChildcareSavings).reduce((sum, val) => sum + val, 0);
-
-    const annualWorkSaveIncome = finalWorkSaveIncome * 12;
-    const annualWorkSaveExpenses = totalWorkSaveExpenses * 12;
-
-    const annualChildcareIncome = finalChildcareIncome * 12;
-    const annualChildcareExpenses = totalChildcareExpenses * 12;
+        savings: budgetSavings,
+        partnerSavings: budgetPartnerSavings,
+        expenses: budgetExpenses,
+        savingsAllocMode: savingsAllocMode
+      }
+    };
 
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
 
       let newInputs = { ...scen.inputs };
       
-      // Set simple mode properties to standard work phase
-      newInputs.simpleIncome = annualWorkSaveIncome;
-      newInputs.simpleExpenses = annualWorkSaveExpenses;
       newInputs.filingStatus = budgetFilingStatus;
+      if (!newInputs.budgetDetails) newInputs.budgetDetails = {};
+      newInputs.budgetDetails.hsaCoverage = budgetHsaCoverage;
+      
+      // Save all phases back to inputs.budgetDetails.phases
+      newInputs.budgetDetails.phases = Object.values(finalEdited).map(p => ({
+        id: p.id,
+        type: p.type,
+        name: p.name,
+        startAge: p.startAge,
+        endAge: p.endAge,
+        income: p.income,
+        savingsAllocMode: p.savingsAllocMode,
+        savings: p.savings,
+        partnerSavings: p.partnerSavings,
+        expenses: p.expenses
+      }));
 
-      // Determine childcare ages range
-      const childEvents = (newInputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-      let minChildParentAge = Infinity;
-      let maxChildParentAge = -Infinity;
-      childEvents.forEach(ev => {
-        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-        const maxAge = includeCollege ? 22 : 18;
-        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+      // Synchronize back to simpleIncome, simpleExpenses, incomeList, and spendingPhases
+      const currentAgeVal = Number(newInputs.currentAge) || 30;
+      const currentPhase = Object.values(finalEdited).find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || Object.values(finalEdited)[0];
+      
+      if (currentPhase) {
+        newInputs.simpleIncome = currentPhase.income * 12;
+        newInputs.simpleExpenses = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
+      }
+
+      // Sync career incomes in incomeList
+      newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+        const matchingPhase = Object.values(finalEdited).find(p => p.startAge === inc.startAge && (p.type === 'careerChange' || p.type === 'current'));
+        if (matchingPhase) {
+          inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;
+        }
+        return inc;
       });
-      
-      const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > newInputs.currentAge;
-      const childEndAge = Math.min(newInputs.lifeExpectancy, Math.max(newInputs.currentAge, maxChildParentAge));
 
-      // Build Income List
-      const cleanIncomeList = (newInputs.incomeList || []).filter(inc => inc.id !== 'inc-1' && inc.id !== 'simple-inc' && inc.id !== 'simple-inc-childcare' && inc.id !== 'simple-inc-worksave');
-      
-      if (hasChildcarePhase) {
-        if (childEndAge > newInputs.currentAge) {
-          cleanIncomeList.push({
-            id: 'simple-inc-childcare',
-            name: 'Salary / Main Income (Childcare Phase)',
-            amount: annualChildcareIncome,
-            frequency: 'yearly',
-            startAge: newInputs.currentAge,
-            endAge: Math.min(newInputs.targetRetirementAge, childEndAge),
-            growthRate: 0.03,
-            isTaxable: true
-          });
+      // Sync spendingPhases
+      newInputs.spendingPhases = (newInputs.spendingPhases || []).map(sp => {
+        const matchingPhase = Object.values(finalEdited).find(p => p.startAge === sp.startAge && p.type === 'move');
+        if (matchingPhase) {
+          const totalMonthlyExpenses = Object.values(matchingPhase.expenses).reduce((sum, v) => sum + v, 0);
+          sp.amount = sp.frequency === 'monthly' ? totalMonthlyExpenses : totalMonthlyExpenses * 12;
+          sp.annualSpending = totalMonthlyExpenses * 12;
         }
-        if (childEndAge < newInputs.targetRetirementAge) {
-          cleanIncomeList.push({
-            id: 'simple-inc-worksave',
-            name: 'Salary / Main Income (Standard Work Phase)',
-            amount: annualWorkSaveIncome,
-            frequency: 'yearly',
-            startAge: Math.max(newInputs.currentAge, childEndAge),
-            endAge: newInputs.targetRetirementAge,
-            growthRate: 0.03,
-            isTaxable: true
-          });
-        }
-      } else {
-        cleanIncomeList.push({
-          id: 'simple-inc',
-          name: 'Salary / Main Income',
-          amount: annualWorkSaveIncome,
-          frequency: 'yearly',
-          startAge: newInputs.currentAge,
-          endAge: newInputs.targetRetirementAge,
-          growthRate: 0.03,
-          isTaxable: true
-        });
-      }
-      newInputs.incomeList = cleanIncomeList;
-
-      // Build Spending Phases
-      const cleanSpendingPhases = (newInputs.spendingPhases || []).filter(p => p.id !== 'spend-1' && p.id !== 'simple-spend' && p.id !== 'simple-spend-childcare' && p.id !== 'simple-spend-worksave');
-      
-      if (hasChildcarePhase) {
-        if (childEndAge > newInputs.currentAge) {
-          cleanSpendingPhases.push({
-            id: 'simple-spend-childcare',
-            name: 'Lifestyle Spending (Childcare Phase)',
-            amount: annualChildcareExpenses,
-            frequency: 'yearly',
-            startAge: newInputs.currentAge,
-            endAge: childEndAge,
-            annualSpending: annualChildcareExpenses
-          });
-        }
-        if (childEndAge < newInputs.lifeExpectancy) {
-          cleanSpendingPhases.push({
-            id: 'simple-spend-worksave',
-            name: 'Lifestyle Spending (Standard Work Phase)',
-            amount: annualWorkSaveExpenses,
-            frequency: 'yearly',
-            startAge: Math.max(newInputs.currentAge, childEndAge),
-            endAge: newInputs.lifeExpectancy,
-            annualSpending: annualWorkSaveExpenses
-          });
-        }
-      } else {
-        cleanSpendingPhases.push({
-          id: 'simple-spend',
-          name: 'Base Lifestyle Spending',
-          amount: annualWorkSaveExpenses,
-          frequency: 'yearly',
-          startAge: newInputs.currentAge,
-          endAge: newInputs.lifeExpectancy,
-          annualSpending: annualWorkSaveExpenses
-        });
-      }
-      newInputs.spendingPhases = cleanSpendingPhases;
+        return sp;
+      });
 
       if (pendingImprovement) {
         const { scenario } = pendingImprovement;
@@ -3241,19 +2666,14 @@ export default function FireSimulator() {
         } else if (scenario.type === 'retire65') {
           const target65Age = newInputs.currentAge < 65 ? 65 : newInputs.currentAge;
           newInputs.targetRetirementAge = target65Age;
+        } else if (scenario.type === 'retireReadyAge') {
+          newInputs.targetRetirementAge = scenario.value;
         } else if (scenario.type === 'combined') {
           const yearsDelay = scenario.value && typeof scenario.value === 'object' ? (scenario.value.delay || 0) : 0;
           newInputs.targetRetirementAge = newInputs.targetRetirementAge + yearsDelay;
         }
 
         const targetRetAge = newInputs.targetRetirementAge;
-        newInputs.incomeList = newInputs.incomeList.map(inc => {
-          if (inc.id === 'simple-inc-childcare') return inc;
-          if (inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || inc.name.toLowerCase().includes('salary')) {
-            return { ...inc, endAge: targetRetAge };
-          }
-          return inc;
-        });
         newInputs.lifeEvents = newInputs.lifeEvents.map(ev => {
           if (ev.type === 'retire') {
             return { ...ev, age: targetRetAge };
@@ -3262,75 +2682,59 @@ export default function FireSimulator() {
         });
       }
 
-      newInputs.budgetDetails = {
-        hsaCoverage: budgetHsaCoverage,
-        
-        // Standard work phase
-        savings: finalWorkSaveSavings,
-        expenses: finalWorkSaveExpenses,
-        savingsAllocMode: finalWorkSaveAllocMode,
-        income: finalWorkSaveIncome,
-        
-        // Childcare budgets
-        childcareBudgets: finalChildcareBudgets,
-        childcareSavings: finalChildcareSavings,
-        childcareExpenses: finalChildcareExpenses,
-        childcareSavingsAllocMode: finalChildcareAllocMode,
-        childcareIncome: finalChildcareIncome
-      };
-
-      const nextRules = [];
-      let ruleIndex = 1;
-
-      const savingIntervals = getChildCountIntervals(newInputs.currentAge, newInputs.targetRetirementAge, newInputs.lifeEvents);
-      savingIntervals.forEach(interval => {
-        const C = interval.childCount;
-        const start = interval.startAge;
-        const end = interval.endAge;
-        if (start >= end) return;
-
-        let budgetSavingsMap = {};
-        let budgetAllocMode = 'fixed';
-        if (C === 0) {
-          budgetSavingsMap = finalWorkSaveSavings;
-          budgetAllocMode = finalWorkSaveAllocMode;
-        } else {
-          const ccBudget = finalChildcareBudgets[C] || {};
-          budgetSavingsMap = ccBudget.savings || finalChildcareSavings;
-          budgetAllocMode = ccBudget.allocMode || finalChildcareAllocMode;
+      // Update active marriage event and spouse household member in inputs
+      const marriageEventIdx = (newInputs.lifeEvents || []).findIndex(e => e.type === 'marriage' && e.enabled);
+      if (marriageEventIdx !== -1 && currentPhase) {
+        const currentPhaseExpensesAnnual = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
+        newInputs.lifeEvents[marriageEventIdx] = {
+          ...newInputs.lifeEvents[marriageEventIdx],
+          combinedSpendingAfterMarriage: currentPhaseExpensesAnnual
+        };
+        const spouseIdx = (newInputs.householdMembers || []).findIndex(m => m.id === 'spouse');
+        if (spouseIdx !== -1) {
+          newInputs.householdMembers[spouseIdx] = {
+            ...newInputs.householdMembers[spouseIdx],
+            combinedSpendingAfterMarriage: currentPhaseExpensesAnnual
+          };
         }
+      }
 
-        Object.keys(budgetSavingsMap).forEach(key => {
-          const val = budgetSavingsMap[key] || 0;
-          if (val > 0) {
-            let dest = key;
-            if (key === 'checking') dest = 'cash';
-            else if (key === 'hysa') dest = 'other';
-            else if (key === 'emergency') dest = 'emergencyFund';
-            else if (key === 'debt') dest = 'debtPaydown';
-
-            nextRules.push({
-              id: `budget-alloc-${C > 0 ? 'cc-' + C : 'ws'}-${key}-${start}-${Date.now()}`,
-              destination: dest,
-              type: budgetAllocMode === 'percentSurplus' ? 'percentSurplus' : 'fixed',
-              value: val,
-              frequency: budgetAllocMode === 'percentSurplus' ? 'yearly' : 'monthly',
-              priority: ruleIndex++,
-              startAge: start,
-              endAge: end,
-              smartRule: { enabled: false, targetValue: 0, redirectDestination: 'brokerage' }
-            });
-          }
-        });
-      });
-
-      newInputs.allocationRules = nextRules;
+      // Let the single source of truth properly build suffix-indexed childcare phases, spending phases and rules
+      syncChildcarePhasesAndRules(newInputs);
 
       return {
         ...scen,
         inputs: newInputs
       };
     }));
+
+    if (isBudgetOpenFromMarriageWizard) {
+      const currentAgeVal = Number(inputs.currentAge) || 30;
+      const currentPhase = Object.values(finalEdited).find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || Object.values(finalEdited)[0];
+      if (currentPhase) {
+        const currentPhaseExpensesAnnual = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
+        setEditingEvent(prev => {
+          if (!prev) return prev;
+          let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
+          const initialPhase = (inputs.spendingPhases || []).find(p => (inputs.currentAge || 30) >= p.startAge && (inputs.currentAge || 30) < p.endAge) || (inputs.spendingPhases || [])[0];
+          if (initialPhase) {
+            if (initialPhase.frequency === 'monthly') {
+              userSpendingPreRetirement = (Number(initialPhase.amount) || 0) * 12;
+            } else if (initialPhase.frequency === 'yearly') {
+              userSpendingPreRetirement = Number(initialPhase.amount) || 0;
+            } else {
+              userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+            }
+          }
+          const spousePersonalSpending = Math.round(Math.max(0, currentPhaseExpensesAnnual - userSpendingPreRetirement - (prev.housingCost !== undefined ? Number(prev.housingCost) : -6000) - (prev.lifestyleAdjustment !== undefined ? Number(prev.lifestyleAdjustment) : 0)) / 12);
+          return {
+            ...prev,
+            combinedSpendingAfterMarriage: currentPhaseExpensesAnnual,
+            spousePersonalSpending: spousePersonalSpending
+          };
+        });
+      }
+    }
 
     handleCloseBudgetModal();
   };
@@ -3484,6 +2888,9 @@ export default function FireSimulator() {
   };
 
   const handleCreateEvent = (type) => {
+    if (type === 'retire' && (inputs.lifeEvents || []).some(e => e.type === 'retire')) {
+      return;
+    }
     let defaults = { type };
     const curAge = inputs.currentAge || 35;
     
@@ -3517,7 +2924,7 @@ export default function FireSimulator() {
     } else if (type === 'custom') {
       defaults = { ...defaults, name: 'Custom Event', age: 45, amount: -15000 };
     } else if (type === 'socialSecurity') {
-      defaults = { ...defaults, claimingAge: 67, monthlyBenefit: 2000, inflationAdjusted: true, name: 'Social Security' };
+      defaults = { ...defaults, claimingAge: 67, monthlyBenefit: 2000, inflationAdjusted: true, name: 'Social Security', ageStartedWorking: 22 };
     } else if (type === 'pension') {
       defaults = { ...defaults, claimingAge: 65, monthlyBenefit: 1000, inflationAdjusted: true, name: 'Pension' };
     } else if (type === 'rentalIncome') {
@@ -3526,8 +2933,39 @@ export default function FireSimulator() {
       defaults = { ...defaults, claimingAge: 65, monthlyBenefit: 500, inflationAdjusted: false, name: 'Annuity' };
     } else if (type === 'otherRetirementIncome') {
       defaults = { ...defaults, claimingAge: 65, monthlyBenefit: 800, inflationAdjusted: true, name: 'Other Income' };
+    } else if (type === 'marriage') {
+      defaults = {
+        ...defaults,
+        age: inputs.currentAge || 35,
+        spouseIncome: 60000,
+        incomeGrowthRate: 3,
+        cash: 10000,
+        investments: 25000,
+        retirement: 50000,
+        debtStudent: 0,
+        debtCredit: 0,
+        debtOther: 0,
+        savingsRate: 15,
+        housingOption: 'savings',
+        housingSavings: -500,
+        housingCost: -6000,
+        lifestyleAdjustment: 0,
+        includeWeddingCost: false,
+        weddingCost: 20000,
+        weddingAge: inputs.currentAge || 35,
+        filingStatus: 'jointly',
+        wizardStep: 1,
+        spouseCurrentAge: inputs.currentAge || 35,
+        spouseLifeExpectancy: inputs.lifeExpectancy || 85,
+        spouseSocialSecurityAge: 67,
+        spouseEstimatedSocialSecurityBenefit: 0,
+        spouseDesiredRetirementAge: '',
+        retirementSpendingNeed: ''
+      };
     }
     
+    setIsFullPartnerProfileOpen(false);
+    setIsZeroSpendingConfirmed(false);
     setEditingEvent(defaults);
   };
 
@@ -3729,7 +3167,11 @@ export default function FireSimulator() {
             startAge: claimingAge,
             age: claimingAge,
             monthlyBenefit: editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000,
-            inflationAdjusted: editingEvent.inflationAdjusted !== false
+            inflationAdjusted: editingEvent.inflationAdjusted !== false,
+            useEarnings: editingEvent.useEarnings === true,
+            ageStartedWorking: editingEvent.ageStartedWorking !== undefined 
+              ? Number(editingEvent.ageStartedWorking) 
+              : 22
           };
         } else if (type === 'custom') {
           newEventObj = {
@@ -3737,6 +3179,89 @@ export default function FireSimulator() {
             age: editingEvent.age,
             amount: editingEvent.amount
           };
+        } else if (type === 'marriage') {
+          let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
+          const initialPhase = (inputs.spendingPhases || []).find(p => (inputs.currentAge || 30) >= p.startAge && (inputs.currentAge || 30) < p.endAge) || (inputs.spendingPhases || [])[0];
+          if (initialPhase) {
+            if (initialPhase.frequency === 'monthly') {
+              userSpendingPreRetirement = (Number(initialPhase.amount) || 0) * 12;
+            } else if (initialPhase.frequency === 'yearly') {
+              userSpendingPreRetirement = Number(initialPhase.amount) || 0;
+            } else {
+              userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+            }
+          }
+
+          const combinedSpendingVal = editingEvent.combinedSpendingAfterMarriage !== undefined ? Number(editingEvent.combinedSpendingAfterMarriage) : Math.round(userSpendingPreRetirement * 1.5);
+          const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
+          const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null ? Number(editingEvent.retirementSpendingNeed) : Math.round(spousePreRetirementSpending * 0.7);
+
+          newEventObj = {
+            ...newEventObj,
+            age: Number(editingEvent.age),
+            spouseIncome: Number(editingEvent.spouseIncome),
+            incomeGrowthRate: Number(editingEvent.incomeGrowthRate),
+            cash: Number(editingEvent.cash),
+            investments: Number(editingEvent.investments),
+            retirement: Number(editingEvent.retirement),
+            debtStudent: Number(editingEvent.debtStudent),
+            debtCredit: Number(editingEvent.debtCredit),
+            debtOther: Number(editingEvent.debtOther),
+            savingsRate: Number(editingEvent.savingsRate),
+            housingOption: editingEvent.housingOption || 'none',
+            housingSavings: Number(editingEvent.housingSavings),
+            housingCost: editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000,
+            lifestyleAdjustment: Number(editingEvent.lifestyleAdjustment),
+            includeWeddingCost: !!editingEvent.includeWeddingCost,
+            weddingCost: Number(editingEvent.weddingCost),
+            weddingAge: Number(editingEvent.weddingAge),
+            filingStatus: editingEvent.filingStatus || 'jointly',
+            spouseCurrentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
+            spouseLifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
+            spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
+            spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
+            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            retirementSpendingNeed: spouseRetSpendingVal,
+            combinedSpendingAfterMarriage: combinedSpendingVal
+          };
+          
+          let nextHouseholdMembers = [...(newInputs.householdMembers || [])];
+          const spouseIdx = nextHouseholdMembers.findIndex(m => m.id === 'spouse');
+          const spouseRecord = {
+            id: 'spouse',
+            name: 'Spouse',
+            activeFromDate: Number(editingEvent.age),
+            activeUntilDate: null,
+            income: Number(editingEvent.spouseIncome),
+            incomeGrowthRate: Number(editingEvent.incomeGrowthRate) / 100,
+            assets: {
+              cash: Number(editingEvent.cash),
+              investments: Number(editingEvent.investments),
+              retirement: Number(editingEvent.retirement)
+            },
+            debts: {
+              student: Number(editingEvent.debtStudent),
+              credit: Number(editingEvent.debtCredit),
+              other: Number(editingEvent.debtOther)
+            },
+            savingsRate: Number(editingEvent.savingsRate),
+            currentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
+            lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
+            spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
+            spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
+            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            retirementSpendingNeed: spouseRetSpendingVal,
+            growthRate: Number(editingEvent.incomeGrowthRate),
+            combinedSpendingAfterMarriage: combinedSpendingVal,
+            housingCost: editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000,
+            lifestyleAdjustment: Number(editingEvent.lifestyleAdjustment)
+          };
+          if (spouseIdx !== -1) {
+            nextHouseholdMembers[spouseIdx] = spouseRecord;
+          } else {
+            nextHouseholdMembers.push(spouseRecord);
+          }
+          newInputs.householdMembers = nextHouseholdMembers;
         }
         
         savedEvent = newEventObj;
@@ -3763,18 +3288,19 @@ export default function FireSimulator() {
       const targetRetAge = Number(currentScenObj?.inputs?.targetRetirementAge) || 65;
       const isStillReady = afterReadyAge !== null && (diff <= 0 || afterReadyAge <= targetRetAge);
 
-      if (!editingEvent.id || !isStillReady) {
-        setChildImpactSummary({
-          beforeAge: beforeReadyAge,
-          afterAge: afterReadyAge,
-          diffYears: diff,
-          annualSpending: avgAnnualChildCost,
-          event: savedEvent
-        });
-      }
+      setChildImpactSummary({
+        beforeAge: beforeReadyAge,
+        afterAge: afterReadyAge,
+        diffYears: diff,
+        annualSpending: avgAnnualChildCost,
+        event: savedEvent
+      });
     }
     
     setEditingEvent(null);
+    setIsFullPartnerProfileOpen(false);
+    setIsZeroSpendingConfirmed(false);
+    setIsPartnerZeroSpendingConfirmed(false);
   };
 
   const handleDeleteRoadmapEvent = (evt) => {
@@ -3792,6 +3318,9 @@ export default function FireSimulator() {
         }
         if (matchEvent.type === 'haveChild') {
           syncChildcarePhasesAndRules(newInputs);
+        }
+        if (matchEvent.type === 'marriage') {
+          newInputs.householdMembers = (scen.inputs.householdMembers || []).filter(m => m.id !== 'spouse');
         }
 
         return {
@@ -3958,8 +3487,13 @@ export default function FireSimulator() {
 
       // Calculate shift in years
       const deltaYears = trackWidth > 0 ? (deltaX / trackWidth) * totalYears : 0;
-      let newAge = Math.round(initialAge + deltaYears);
-      newAge = Math.max(minAge, Math.min(maxAge, newAge));
+      const rawAge = Math.round(initialAge + deltaYears);
+      let newAge = rawAge;
+      if (evt.type === 'socialSecurity') {
+        newAge = Math.max(62, Math.min(70, newAge));
+      } else {
+        newAge = Math.max(minAge, Math.min(maxAge, newAge));
+      }
 
       if (Math.abs(deltaX) > 2) {
         dragOccurredRef.current = true;
@@ -3974,7 +3508,8 @@ export default function FireSimulator() {
         if (!prev) return null;
         return {
           ...prev,
-          currentAge: newAge
+          currentAge: newAge,
+          rawAge: rawAge
         };
       });
     };
@@ -3988,7 +3523,16 @@ export default function FireSimulator() {
       // Read current dragged age to commit
       setDraggingInfo(currentDrag => {
         if (currentDrag && dragOccurredRef.current) {
-          commitEventAgeChange(evt, currentDrag.currentAge);
+          let targetAge = currentDrag.currentAge;
+          if (evt.type === 'socialSecurity') {
+            const rawAge = currentDrag.rawAge !== undefined ? currentDrag.rawAge : targetAge;
+            const validation = validateSocialSecurityClaimAge(rawAge);
+            targetAge = validation.validAge;
+            if (validation.wasClamped) {
+              showNotification(validation.message);
+            }
+          }
+          commitEventAgeChange(evt, targetAge);
         }
         return null;
       });
@@ -4077,7 +3621,10 @@ export default function FireSimulator() {
           ...defaults,
           claimingAge: matchEvent.claimingAge,
           monthlyBenefit: matchEvent.monthlyBenefit,
-          inflationAdjusted: matchEvent.inflationAdjusted
+          inflationAdjusted: matchEvent.inflationAdjusted,
+          useEarnings: matchEvent.useEarnings,
+          ageStartedWorking: matchEvent.ageStartedWorking !== undefined ? matchEvent.ageStartedWorking : 22,
+          yearStartedWorking: matchEvent.yearStartedWorking
         };
       } else if (matchEvent.type === 'custom') {
         defaults = {
@@ -4085,6 +3632,37 @@ export default function FireSimulator() {
           name: matchEvent.name,
           age: matchEvent.age,
           amount: matchEvent.amount
+        };
+      } else if (matchEvent.type === 'marriage') {
+        defaults = {
+          ...defaults,
+          age: matchEvent.age,
+          spouseIncome: matchEvent.spouseIncome,
+          incomeGrowthRate: matchEvent.incomeGrowthRate,
+          cash: matchEvent.cash,
+          investments: matchEvent.investments,
+          retirement: matchEvent.retirement,
+          debtStudent: matchEvent.debtStudent,
+          debtCredit: matchEvent.debtCredit,
+          debtOther: matchEvent.debtOther,
+          savingsRate: matchEvent.savingsRate,
+          housingOption: matchEvent.housingOption || 'none',
+          housingSavings: matchEvent.housingSavings,
+          housingCost: matchEvent.housingCost,
+          lifestyleAdjustment: matchEvent.lifestyleAdjustment,
+          includeWeddingCost: !!matchEvent.includeWeddingCost,
+          weddingCost: matchEvent.weddingCost,
+          weddingAge: matchEvent.weddingAge,
+          filingStatus: matchEvent.filingStatus || 'jointly',
+          spouseCurrentAge: matchEvent.spouseCurrentAge !== undefined ? matchEvent.spouseCurrentAge : matchEvent.age,
+          spouseLifeExpectancy: matchEvent.spouseLifeExpectancy !== undefined ? matchEvent.spouseLifeExpectancy : (inputs.lifeExpectancy || 85),
+          spouseSocialSecurityAge: matchEvent.spouseSocialSecurityAge !== undefined ? matchEvent.spouseSocialSecurityAge : 67,
+          spouseEstimatedSocialSecurityBenefit: matchEvent.spouseEstimatedSocialSecurityBenefit !== undefined ? matchEvent.spouseEstimatedSocialSecurityBenefit : 0,
+          spouseDesiredRetirementAge: matchEvent.spouseDesiredRetirementAge !== undefined ? matchEvent.spouseDesiredRetirementAge : '',
+          retirementSpendingNeed: matchEvent.retirementSpendingNeed !== undefined ? matchEvent.retirementSpendingNeed : '',
+          combinedSpendingAfterMarriage: matchEvent.combinedSpendingAfterMarriage,
+          spousePersonalSpending: matchEvent.spousePersonalSpending,
+          wizardStep: 1
         };
       }
       setEditingEvent(defaults);
@@ -4388,23 +3966,34 @@ export default function FireSimulator() {
             else if (ev.type === 'otherRetirementIncome') { icon = '💵'; label = ev.name || 'Other Income'; }
 
             let desc = `Receiving ${label} of ${formatCurrency(ev.monthlyBenefit)}/month (${formatCurrency(ev.monthlyBenefit * 12)}/year).`;
+            let ssTitle = label;
             if (ev.type === 'socialSecurity') {
-              let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
-              if (age < 62) {
-                desc = `Social Security cannot be claimed before age 62 (Benefit: $0/mo).`;
+              const ss = calc.socialSecurityDetails;
+              const isEligible = ss ? ss.isEligible : true;
+              let annualBenefit = ss ? ss.annualBenefit : (Number(ev.monthlyBenefit) || 0) * 12 * getSocialSecurityFactor(age);
+              let monthlyBenefitVal = annualBenefit / 12;
+              
+              if (!isEligible) {
+                ssTitle = `Social Security starts at ${age}: Not Eligible`;
+                desc = `Not eligible for Social Security benefits. At least 10 working years are required. (Working Years: ${ss ? ss.workingYears : 0} / 10)`;
               } else {
-                const factor = getSocialSecurityFactor(age);
-                monthlyBenefit = monthlyBenefit * factor;
-                const penaltyPct = Math.round((1 - factor) * 100);
-                const bonusPct = Math.round((factor - 1) * 100);
+                ssTitle = `Social Security starts at ${age}: ~$${Math.round(annualBenefit).toLocaleString()}/yr`;
                 
-                desc = `Receiving Social Security of ${formatCurrency(monthlyBenefit)}/month (${formatCurrency(monthlyBenefit * 12)}/year) claimed at age ${age}. `;
-                if (age === 67) {
-                  desc += `Full retirement benefit (100%).`;
-                } else if (age < 67) {
-                  desc += `Benefit is permanently reduced by ${penaltyPct}% from full benefit (at age 67: ${formatCurrency(ev.monthlyBenefit)}/mo) due to early claim.`;
+                if (age < 62) {
+                  desc = `Social Security cannot be claimed before age 62 (Benefit: $0/mo).`;
                 } else {
-                  desc += `Benefit is permanently increased by ${bonusPct}% from full benefit (at age 67: ${formatCurrency(ev.monthlyBenefit)}/mo) due to delayed claim.`;
+                  const factor = getSocialSecurityFactor(age);
+                  const penaltyPct = 30; // 30% early reduction
+                  const bonusPct = Math.round((factor - 1) * 100);
+                  
+                  desc = `Receiving Social Security of ${formatCurrency(monthlyBenefitVal)}/month (${formatCurrency(annualBenefit)}/year) claimed at age ${age}. `;
+                  if (age === 67) {
+                    desc += `Full retirement benefit (100%).`;
+                  } else if (age < 67) {
+                    desc += `Benefit is permanently reduced by ${penaltyPct}% from full benefit due to early claim.`;
+                  } else {
+                    desc += `Benefit is permanently increased by ${bonusPct}% from full benefit due to delayed claim (8% delayed credit per year after 67).`;
+                  }
                 }
               }
             }
@@ -4412,8 +4001,8 @@ export default function FireSimulator() {
             events.push({
               originalId: ev.id,
               age,
-              title: label,
-              label: label,
+              title: ssTitle,
+              label: ssTitle,
               icon: icon,
               type: ev.type,
               description: desc
@@ -4447,6 +4036,35 @@ export default function FireSimulator() {
               icon: '🔄',
               type: 'assetTransfer',
               description: `Moved ${formatCurrency(ev.amount)} from ${getAssetLabel(ev.fromAsset)} to ${getAssetLabel(ev.toAsset)}.`
+            });
+          } else if (ev.type === 'marriage') {
+            const spouseAssets = (Number(ev.cash) || 0) + (Number(ev.investments) || 0) + (Number(ev.retirement) || 0);
+            const spouseDebts = (Number(ev.debtStudent) || 0) + (Number(ev.debtCredit) || 0) + (Number(ev.debtOther) || 0);
+            events.push({
+              originalId: ev.id,
+              age,
+              title: `💍 Get Married`,
+              label: `Get Married`,
+              icon: '💍',
+              type: 'marriage',
+              description: `Married a spouse with ${formatCurrency(ev.spouseIncome)}/yr income, ${formatCurrency(spouseAssets)} starting assets, and ${formatCurrency(spouseDebts)} starting debts. ${ev.includeWeddingCost ? 'Wedding cost: ' + formatCurrency(ev.weddingCost) + ' at Age ' + ev.weddingAge + '.' : ''}`,
+              spouseIncome: ev.spouseIncome,
+              incomeGrowthRate: ev.incomeGrowthRate,
+              cash: ev.cash,
+              investments: ev.investments,
+              retirement: ev.retirement,
+              debtStudent: ev.debtStudent,
+              debtCredit: ev.debtCredit,
+              debtOther: ev.debtOther,
+              savingsRate: ev.savingsRate,
+              housingOption: ev.housingOption,
+              housingSavings: ev.housingSavings,
+              housingCost: ev.housingCost,
+              lifestyleAdjustment: ev.lifestyleAdjustment,
+              includeWeddingCost: ev.includeWeddingCost,
+              weddingCost: ev.weddingCost,
+              weddingAge: ev.weddingAge,
+              filingStatus: ev.filingStatus
             });
           }
         }
@@ -4687,7 +4305,6 @@ export default function FireSimulator() {
             >
               Done
             </button>
-            {!isStillReady && (
               <button 
                 type="button"
                 className="btn-primary" 
@@ -4699,7 +4316,6 @@ export default function FireSimulator() {
               >
                 Adjust Plan
               </button>
-            )}
           </div>
         </div>
       </div>
@@ -4784,8 +4400,901 @@ export default function FireSimulator() {
     );
   };
 
+  const renderMarriageWizard = () => {
+    const stepId = editingEvent.wizardStep || 1;
+    const showTaxesStep = !!inputs.includeTaxes;
+
+    const handleNext = () => {
+      if (stepId === 1) {
+        setEditingEvent({ ...editingEvent, wizardStep: 2 });
+      } else if (stepId === 2) {
+        setEditingEvent({ ...editingEvent, wizardStep: 3 });
+      } else if (stepId === 3) {
+        setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 4 : 5 });
+      } else if (stepId === 4) {
+        setEditingEvent({ ...editingEvent, wizardStep: 5 });
+      }
+    };
+
+    const handleBack = () => {
+      if (stepId === 5) {
+        setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 4 : 3 });
+      } else if (stepId === 4) {
+        setEditingEvent({ ...editingEvent, wizardStep: 3 });
+      } else if (stepId === 3) {
+        setEditingEvent({ ...editingEvent, wizardStep: 2 });
+      } else if (stepId === 2) {
+        setEditingEvent({ ...editingEvent, wizardStep: 1 });
+      }
+    };
+
+    // Calculate Combined Live Summary
+    const userIncome = Number(inputs.simpleIncome) || 50000;
+    const spouseIncome = Number(editingEvent.spouseIncome) || 0;
+    const combinedIncome = userIncome + spouseIncome;
+
+    const userAssets = Number(inputs.assets?.cash || 0) +
+                       Number(inputs.assets?.brokerage || 0) +
+                       Number(inputs.assets?.trad401k || 0) +
+                       Number(inputs.assets?.tradIra || 0) +
+                       Number(inputs.assets?.rothIra || 0) +
+                       Number(inputs.assets?.hsa || 0) +
+                       Number(inputs.assets?.other || 0);
+    const spouseAssets = Number(editingEvent.cash || 0) +
+                         Number(editingEvent.investments || 0) +
+                         Number(editingEvent.retirement || 0);
+    const combinedAssets = userAssets + spouseAssets;
+
+    const userDebt = Number(inputs.assets?.debts || 0) +
+                     (inputs.debtList || []).reduce((sum, d) => sum + Number(d.balance || 0), 0);
+    const spouseDebt = Number(editingEvent.debtStudent || 0) +
+                       Number(editingEvent.debtCredit || 0) +
+                       Number(editingEvent.debtOther || 0);
+    const combinedDebt = userDebt + spouseDebt;
+
+    // Calculate user spending baseline pre-retirement
+    let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
+    const initialPhase = (inputs.spendingPhases || []).find(p => (inputs.currentAge || 30) >= p.startAge && (inputs.currentAge || 30) < p.endAge) || (inputs.spendingPhases || [])[0];
+    if (initialPhase) {
+      if (initialPhase.frequency === 'monthly') {
+        userSpendingPreRetirement = (Number(initialPhase.amount) || 0) * 12;
+      } else if (initialPhase.frequency === 'yearly') {
+        userSpendingPreRetirement = Number(initialPhase.amount) || 0;
+      } else {
+        userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+      }
+    }
+
+    const partnerSavings = spouseIncome * ((editingEvent.savingsRate || 0) / 100);
+    const partnerTax = calculateUSTaxForModal(spouseIncome, partnerSavings, 'single');
+    const partnerTakeHome = spouseIncome - partnerTax;
+    const partnerTakeHomeRemaining = Math.max(0, partnerTakeHome - partnerSavings);
+    const defaultPartnerSpendingAnnual = partnerTakeHomeRemaining * 0.7;
+    const defaultPartnerSpendingMonthly = Math.round(defaultPartnerSpendingAnnual / 12);
+
+    const partnerPersonalSpending = editingEvent.spousePersonalSpending !== undefined ? Number(editingEvent.spousePersonalSpending) : defaultPartnerSpendingMonthly;
+
+    const housingCostAmount = editingEvent.housingCost !== undefined ? Number(editingEvent.housingCost) : -6000;
+    const lifestyleAdjustmentAmount = Number(editingEvent.lifestyleAdjustment || 0);
+    const weddingCostAmount = editingEvent.includeWeddingCost ? Number(editingEvent.weddingCost || 20000) : 0;
+
+    const combinedSpendingVal = Math.round(userSpendingPreRetirement + (partnerPersonalSpending * 12) + housingCostAmount + lifestyleAdjustmentAmount);
+    const spousePreRetirementSpending = Math.max(0, combinedSpendingVal - userSpendingPreRetirement);
+    const spouseRetSpendingVal = editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== '' && editingEvent.retirementSpendingNeed !== null ? Number(editingEvent.retirementSpendingNeed) : Math.round(spousePreRetirementSpending * 0.7);
+
+    // Net Cash Flow Impact = Spouse Income - (Combined Spend - User Spend) - Housing Cost - Lifestyle Cost
+    const netCashFlowImpact = spouseIncome - spousePreRetirementSpending - housingCostAmount - lifestyleAdjustmentAmount;
+
+    const beforeSpendingNeed = userSpendingPreRetirement * (Number((inputs.lifeEvents || []).find(e => e.type === 'retire')?.spendingPercent || 70) / 100);
+    const afterSpendingNeed = beforeSpendingNeed + spouseRetSpendingVal;
+
+    // Monthly budget preview calculations
+    const userSavingsMonthly = Object.values(inputs.budgetDetails?.savings || {}).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const userFlatSavings = (Number(inputs.simpleIncome) || 50000) * ((Number(inputs.preTaxSavingsRate) || 15) / 100) / 12;
+    const userSavings = userSavingsMonthly > 0 ? userSavingsMonthly : Math.round(userFlatSavings);
+
+    const partnerSavingsMonthly = partnerSavings / 12;
+    const combinedSavings = userSavings + partnerSavingsMonthly;
+    const surplusMonthly = combinedIncome / 12 - combinedSpendingVal / 12;
+    const leftoverGap = surplusMonthly - combinedSavings;
+
+    const isStep3Invalid = (combinedSpendingVal <= userSpendingPreRetirement && !isZeroSpendingConfirmed) || (partnerPersonalSpending === 0 && !isPartnerZeroSpendingConfirmed);
+
+    // Simulation Previews (Step 5 with Taxes, or Step 4 without Taxes)
+    const isPreviewStep = stepId === (showTaxesStep ? 5 : 4);
+    let beforeReadyAge = null;
+    let afterReadyAge = null;
+    if (isPreviewStep) {
+      const beforeInputs = {
+        ...inputs,
+        lifeEvents: (inputs.lifeEvents || []).filter(e => e.type !== 'marriage')
+      };
+      const beforeRes = runFireSimulation(beforeInputs);
+      beforeReadyAge = beforeRes.retirementReadyAge;
+
+      const afterInputs = {
+        ...inputs,
+        lifeEvents: [
+          ...(inputs.lifeEvents || []).filter(e => e.type !== 'marriage'),
+          {
+            ...editingEvent,
+            enabled: true,
+            retirementSpendingNeed: spouseRetSpendingVal,
+            combinedSpendingAfterMarriage: combinedSpendingVal,
+            housingCost: housingCostAmount
+          }
+        ],
+        householdMembers: [
+          ...(inputs.householdMembers || []).filter(m => m.id !== 'spouse'),
+          {
+            id: 'spouse',
+            name: 'Spouse',
+            activeFromDate: Number(editingEvent.age),
+            activeUntilDate: null,
+            income: Number(editingEvent.spouseIncome),
+            incomeGrowthRate: Number(editingEvent.incomeGrowthRate) / 100,
+            assets: {
+              cash: Number(editingEvent.cash),
+              investments: Number(editingEvent.investments),
+              retirement: Number(editingEvent.retirement)
+            },
+            debts: {
+              student: Number(editingEvent.debtStudent),
+              credit: Number(editingEvent.debtCredit),
+              other: Number(editingEvent.debtOther)
+            },
+            savingsRate: Number(editingEvent.savingsRate),
+            currentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
+            lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
+            spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
+            spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
+            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            retirementSpendingNeed: spouseRetSpendingVal,
+            growthRate: Number(editingEvent.incomeGrowthRate),
+            combinedSpendingAfterMarriage: combinedSpendingVal,
+            housingCost: housingCostAmount,
+            lifestyleAdjustment: lifestyleAdjustmentAmount
+          }
+        ]
+      };
+      const afterRes = runFireSimulation(afterInputs);
+      afterReadyAge = afterRes.retirementReadyAge;
+    }
+
+    const showImprovementWarning = beforeReadyAge && afterReadyAge && (beforeReadyAge - afterReadyAge > 10);
+
+    return (
+      <div className="modal-backdrop" onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}>
+        <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1.25rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            💍 Get Married
+          </h3>
+
+          {/* Stepper Headers */}
+          <div className="wizard-steps-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+            {/* Step 1: Partner Finances */}
+            <div className={`wizard-step-node ${stepId === 1 ? 'active' : ''} ${stepId > 1 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 1 })}>
+              <div className="wizard-step-icon">1</div>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Partner Finances</span>
+            </div>
+
+            <div className={`wizard-step-divider ${stepId >= 2 ? 'active' : ''}`} />
+
+            {/* Step 2: Changes */}
+            <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => {
+              setEditingEvent({ ...editingEvent, wizardStep: 2 });
+            }}>
+              <div className="wizard-step-icon">2</div>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Changes</span>
+            </div>
+
+            <div className={`wizard-step-divider ${stepId >= 3 ? 'active' : ''}`} />
+
+            {/* Step 3: Budget Preview */}
+            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''} ${stepId > 3 ? 'completed' : ''}`} onClick={() => {
+              if (stepId > 3 || stepId === 2) {
+                setEditingEvent({ ...editingEvent, wizardStep: 3 });
+              }
+            }}>
+              <div className="wizard-step-icon">3</div>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Budget Preview</span>
+            </div>
+
+            {/* Step 4: Taxes (Only shown if showTaxesStep is true) */}
+            {showTaxesStep && (
+              <>
+                <div className={`wizard-step-divider ${stepId >= 4 ? 'active' : ''}`} />
+                <div className={`wizard-step-node ${stepId === 4 ? 'active' : ''} ${stepId > 4 ? 'completed' : ''}`} onClick={() => {
+                  if (!isStep3Invalid) {
+                    setEditingEvent({ ...editingEvent, wizardStep: 4 });
+                  }
+                }}>
+                  <div className="wizard-step-icon">4</div>
+                  <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Taxes</span>
+                </div>
+              </>
+            )}
+
+            <div className={`wizard-step-divider ${stepId === (showTaxesStep ? 5 : 4) ? 'active' : ''}`} />
+
+            {/* Step 5 / 4: Preview */}
+            <div className={`wizard-step-node ${stepId === 5 || (!showTaxesStep && stepId === 4) ? 'active' : ''}`} onClick={() => {
+              if (!isStep3Invalid) {
+                setEditingEvent({ ...editingEvent, wizardStep: showTaxesStep ? 5 : 4 });
+              }
+            }}>
+              <div className="wizard-step-icon">{showTaxesStep ? 5 : 4}</div>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Preview</span>
+            </div>
+          </div>
+
+          {/* STEP 1: PARTNER FINANCES */}
+          {stepId === 1 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Tell Us About Your Partner</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Marriage can improve or reduce retirement readiness depending on income, assets, debts, taxes, and spending.
+                </p>
+              </div>
+
+              {/* Basic Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="input-wrapper">
+                  <span className="input-name">Marriage Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.age}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, age: parseInt(e.target.value) || inputs.currentAge })}
+                  />
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-name">Spouse Income ($/year)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.spouseIncome}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, spouseIncome: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-name">Savings Rate (%)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.savingsRate}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, savingsRate: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              {/* Collapsible toggle */}
+              <button
+                type="button"
+                className="list-builder-edit-btn"
+                onClick={() => setIsFullPartnerProfileOpen(!isFullPartnerProfileOpen)}
+                style={{ width: '100%', margin: '0.5rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem', fontSize: '0.8rem' }}
+              >
+                👤 {isFullPartnerProfileOpen ? 'Hide Full Partner Profile' : 'Show Full Partner Profile'}
+              </button>
+
+              {isFullPartnerProfileOpen && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', border: '1px dashed var(--border-color)', padding: '0.85rem', borderRadius: '6px', background: 'rgba(255,255,255,0.01)', maxHeight: '240px', overflowY: 'auto' }}>
+                  <div className="input-wrapper">
+                    <span className="input-name">Income Growth Rate (%)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.incomeGrowthRate !== undefined ? editingEvent.incomeGrowthRate : 3}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, incomeGrowthRate: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Current Age</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.spouseCurrentAge !== undefined ? editingEvent.spouseCurrentAge : (inputs.currentAge || 30)}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseCurrentAge: parseInt(e.target.value) || (inputs.currentAge || 30) })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Desired Retirement Age</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== null ? editingEvent.spouseDesiredRetirementAge : ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseDesiredRetirementAge: e.target.value !== '' ? parseInt(e.target.value) : '' })}
+                      placeholder="e.g. 65 (optional)"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Life Expectancy</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.spouseLifeExpectancy !== undefined ? editingEvent.spouseLifeExpectancy : (inputs.lifeExpectancy || 85)}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseLifeExpectancy: parseInt(e.target.value) || (inputs.lifeExpectancy || 85) })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse SS Claim Age</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.spouseSocialSecurityAge !== undefined ? editingEvent.spouseSocialSecurityAge : 67}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseSocialSecurityAge: parseInt(e.target.value) || 67 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Est. SS Benefit ($/month)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined ? editingEvent.spouseEstimatedSocialSecurityBenefit : 0}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, spouseEstimatedSocialSecurityBenefit: parseFloat(e.target.value) || 0 })}
+                      placeholder="0 (auto-calculate)"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Retirement Spending Need ($/year)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.retirementSpendingNeed !== undefined && editingEvent.retirementSpendingNeed !== null ? editingEvent.retirementSpendingNeed : ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, retirementSpendingNeed: e.target.value !== '' ? parseFloat(e.target.value) : '' })}
+                      placeholder="optional"
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2', height: '1px', borderBottom: '1px solid var(--border-color)', margin: '0.4rem 0' }} />
+
+                  {/* Assets */}
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Cash Savings ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.cash !== undefined ? editingEvent.cash : 10000}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, cash: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Investments ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.investments !== undefined ? editingEvent.investments : 25000}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, investments: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Retirement ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.retirement !== undefined ? editingEvent.retirement : 50000}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, retirement: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2', height: '1px', borderBottom: '1px solid var(--border-color)', margin: '0.4rem 0' }} />
+
+                  {/* Debts */}
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Student Loans ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.debtStudent !== undefined ? editingEvent.debtStudent : 0}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, debtStudent: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Credit Cards ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.debtCredit !== undefined ? editingEvent.debtCredit : 0}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, debtCredit: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <span className="input-name">Spouse Other Debt ($)</span>
+                    <input
+                      type="number"
+                      className="input-number-box"
+                      style={{ width: '100%' }}
+                      value={editingEvent.debtOther !== undefined ? editingEvent.debtOther : 0}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, debtOther: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Live Summary Card */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Live Household Summary</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Income</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary)' }}>{formatCurrency(combinedIncome)}</strong>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Assets</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-emerald)' }}>{formatCurrency(combinedAssets)}</strong>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Debt</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-rose)' }}>{formatCurrency(combinedDebt)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: HOUSEHOLD CHANGES */}
+          {stepId === 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>How Does Life Change After Marriage?</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Adjust partner personal spending, shared housing changes, and lifestyle changes below.
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                {/* 1. Partner Personal Spending */}
+                <div className="input-wrapper">
+                  <span className="input-name">Partner Personal Spending ($/month)</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
+                    Default (70% net): {formatCurrency(defaultPartnerSpendingMonthly)}/mo
+                  </span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.spousePersonalSpending !== undefined ? editingEvent.spousePersonalSpending : defaultPartnerSpendingMonthly}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, spousePersonalSpending: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+
+                {/* 2. Shared Housing Savings / Cost */}
+                <div className="input-wrapper">
+                  <span className="input-name">Shared Housing Savings / Cost ($/month)</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
+                    Use negative for savings (e.g. -500), positive for cost
+                  </span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ 
+                      width: '100%',
+                      color: ((editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12) < 0 
+                        ? '#10b981' 
+                        : ((editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12) > 0 
+                          ? '#f43f5e' 
+                          : 'inherit',
+                      fontWeight: (editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) !== 0 ? 'bold' : 'normal'
+                    }}
+                    value={(editingEvent.housingCost !== undefined ? editingEvent.housingCost : -6000) / 12}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, housingCost: (parseFloat(e.target.value) || 0) * 12 })}
+                  />
+                </div>
+
+                {/* 3. Shared Lifestyle Spending Change */}
+                <div className="input-wrapper">
+                  <span className="input-name">Shared Lifestyle Spending Change ($/month)</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
+                    Use positive for added costs (e.g. travel)
+                  </span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ 
+                      width: '100%',
+                      color: ((editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12) < 0 
+                        ? '#10b981' 
+                        : ((editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12) > 0 
+                          ? '#f43f5e' 
+                          : 'inherit',
+                      fontWeight: (editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) !== 0 ? 'bold' : 'normal'
+                    }}
+                    value={(editingEvent.lifestyleAdjustment !== undefined ? editingEvent.lifestyleAdjustment : 0) / 12}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, lifestyleAdjustment: (parseFloat(e.target.value) || 0) * 12 })}
+                  />
+                </div>
+
+                {/* 4. Combined Household Spending */}
+                <div className="input-wrapper">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <span className="input-name" style={{ margin: 0 }}>Combined Household Spending</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsBudgetOpenFromMarriageWizard(true);
+                        handleSetBudgetClick('workSave');
+                      }}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem', height: '20px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', margin: 0 }}
+                    >
+                      📊 Calculate from budget
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    className="input-number-box"
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', cursor: 'not-allowed' }}
+                    value={`$${combinedSpendingVal.toLocaleString()}/yr ($${Math.round(combinedSpendingVal / 12).toLocaleString()}/mo)`}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              {/* One-time Wedding Cost */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="include-wedding-cost"
+                    checked={editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : false}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, includeWeddingCost: e.target.checked })}
+                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="include-wedding-cost" className="input-name" style={{ margin: 0, cursor: 'pointer' }}>
+                    Include One-time Wedding Cost
+                  </label>
+                </div>
+
+                {(editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : false) && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.4rem' }}>
+                    <div className="input-wrapper">
+                      <span className="input-name">Wedding Cost ($)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ 
+                          width: '100%',
+                          color: (editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000) > 0 
+                            ? '#f43f5e' 
+                            : 'inherit',
+                          fontWeight: (editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000) > 0 ? 'bold' : 'normal'
+                        }}
+                        value={editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, weddingCost: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Wedding Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.weddingAge !== undefined ? editingEvent.weddingAge : editingEvent.age}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, weddingAge: parseInt(e.target.value) || editingEvent.age })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: BUDGET PREVIEW */}
+          {stepId === 3 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Household Budget Preview</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Here is a preview of your combined monthly household budget.
+                </p>
+              </div>
+
+              {/* Individual changes grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Partner Monthly Income</div>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>+{formatCurrency(spouseIncome / 12)}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Partner Monthly Savings</div>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)' }}>-{formatCurrency(partnerSavings / 12)}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Household Expense Change</div>
+                  <strong style={{ fontSize: '0.9rem', color: (housingCostAmount + lifestyleAdjustmentAmount) <= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                    {(housingCostAmount + lifestyleAdjustmentAmount) <= 0 ? '-' : '+'}{formatCurrency(Math.abs(housingCostAmount + lifestyleAdjustmentAmount) / 12)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Combined Monthly Budget Breakdown */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Combined Monthly Budget</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Income</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(combinedIncome / 12)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Savings</span>
+                    <strong style={{ color: 'var(--accent-emerald)' }}>-{formatCurrency(combinedSavings)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Combined Monthly Spending</span>
+                    <strong style={{ color: 'var(--accent-rose)' }}>-{formatCurrency(combinedSpendingVal / 12)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{leftoverGap >= 0 ? 'Leftover Surplus' : 'Monthly Gap'}</span>
+                    <strong style={{ color: leftoverGap >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontSize: '0.95rem' }}>
+                      {leftoverGap >= 0 ? '+' : ''}{formatCurrency(leftoverGap)}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warnings & Confirmations */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {/* 1. Low Combined Spending Warning */}
+                {combinedSpendingVal <= userSpendingPreRetirement && (
+                  <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      id="confirm-zero-spending-preview"
+                      checked={isZeroSpendingConfirmed}
+                      onChange={(e) => setIsZeroSpendingConfirmed(e.target.checked)}
+                      style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', marginTop: '0.1rem' }}
+                    />
+                    <label htmlFor="confirm-zero-spending-preview" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', margin: 0 }}>
+                      <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Low Combined Spending</strong>
+                      I confirm that combined household spending after marriage is less than or equal to my single spending (meaning my spouse has no additional spending needs).
+                    </label>
+                  </div>
+                )}
+
+                {/* 2. Zero Partner Personal Spending Warning */}
+                {partnerPersonalSpending === 0 && (
+                  <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      id="confirm-partner-zero-spending"
+                      checked={isPartnerZeroSpendingConfirmed}
+                      onChange={(e) => setIsPartnerZeroSpendingConfirmed(e.target.checked)}
+                      style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', marginTop: '0.1rem' }}
+                    />
+                    <label htmlFor="confirm-partner-zero-spending" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', margin: 0 }}>
+                      <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Zero Partner Personal Spending</strong>
+                      I confirm that partner personal spending is set to $0/month.
+                    </label>
+                  </div>
+                )}
+
+                {/* 3. Savings Higher Than Surplus Warning */}
+                {combinedSavings > surplusMonthly && (
+                  <div style={{ border: '1px solid var(--accent-orange, #f59e0b)', backgroundColor: 'rgba(245, 158, 11, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', margin: 0 }}>
+                      <strong style={{ color: 'var(--accent-orange, #f59e0b)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Savings Exceed Surplus</strong>
+                      Combined savings of {formatCurrency(combinedSavings)}/mo exceed the monthly surplus of {formatCurrency(surplusMonthly)}/mo. This results in a monthly gap of {formatCurrency(combinedSavings - surplusMonthly)}/mo that must be covered by assets.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: TAXES */}
+          {stepId === 4 && showTaxesStep && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Tax Filing Status</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Choose how taxes should be filed starting on your marriage date.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: editingEvent.filingStatus === 'jointly' ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
+                  <input
+                    type="radio"
+                    name="marriage-filing-status"
+                    checked={editingEvent.filingStatus === 'jointly'}
+                    onChange={() => setEditingEvent({ ...editingEvent, filingStatus: 'jointly' })}
+                  />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.85rem' }}>Married Filing Jointly</strong>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Calculates progressive taxes using Married brackets and a standard deduction of $32,200 (inflated).</span>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: editingEvent.filingStatus === 'separately' ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
+                  <input
+                    type="radio"
+                    name="marriage-filing-status"
+                    checked={editingEvent.filingStatus === 'separately'}
+                    onChange={() => setEditingEvent({ ...editingEvent, filingStatus: 'separately' })}
+                  />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.85rem' }}>Married Filing Separately</strong>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Calculates progressive taxes using Single brackets and a standard deduction of $16,100 (inflated).</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: PREVIEW */}
+          {(stepId === 5 || (!showTaxesStep && stepId === 4)) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Marriage Impact Preview</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Compare retirement readiness metrics before and after saving this marriage event.
+                </p>
+              </div>
+
+              {/* Ready Age Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Before Marriage</span>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+                    {beforeReadyAge ? `Age ${beforeReadyAge}` : 'Never Ready'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Spending Need: {formatCurrency(beforeSpendingNeed)}/yr
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                    People Supported: 1
+                  </div>
+                </div>
+                <div style={{
+                  border: '1px solid',
+                  borderColor: afterReadyAge && beforeReadyAge && afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : afterReadyAge && beforeReadyAge && afterReadyAge > beforeReadyAge ? 'var(--accent-rose)' : 'var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Marriage</span>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', marginTop: '0.2rem' }}>
+                    {afterReadyAge ? `Age ${afterReadyAge}` : 'Never Ready'}
+                  </div>
+                  {afterReadyAge && beforeReadyAge && afterReadyAge !== beforeReadyAge && (
+                    <div style={{ fontSize: '0.65rem', color: afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold', marginTop: '0.1rem' }}>
+                      {afterReadyAge < beforeReadyAge ? `Ready ${beforeReadyAge - afterReadyAge} years earlier! 🎉` : `Ready ${afterReadyAge - beforeReadyAge} years later`}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    Spending Need: {formatCurrency(afterSpendingNeed)}/yr
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                    People Supported: 2
+                  </div>
+                </div>
+              </div>
+
+              {/* SWR display */}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '-0.5rem' }}>
+                Retirement target calculated at <strong>{inputs.swr || 4.0}% SWR</strong>.
+              </div>
+
+              {/* Improvement Warning */}
+              {showImprovementWarning && (
+                <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-primary)' }}>
+                  <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Large Readiness Improvement</strong>
+                  Check this result: marriage is adding substantial income/assets. Make sure combined spending and spouse retirement needs are included.
+                </div>
+              )}
+
+              {/* Breakdown Card */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Marriage Impact Breakdown</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Income Added</span>
+                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(spouseIncome)}/year</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Assets Added</span>
+                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(spouseAssets)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Debt Added</span>
+                    <strong style={{ color: spouseDebt > 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>
+                      {spouseDebt > 0 ? `-${formatCurrency(spouseDebt)}` : '$0'}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Combined Spending</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(combinedSpendingVal)}/year</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Spouse Retirement Spending</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(spouseRetSpendingVal)}/year</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>People Supported</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>2 Adults</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Net Cash Flow Impact</span>
+                    <strong style={{ color: netCashFlowImpact >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                      {netCashFlowImpact >= 0 ? '+' : ''}{formatCurrency(netCashFlowImpact)}/year
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+            <button
+              type="button"
+              className="list-builder-remove-btn"
+              onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+              style={{ alignSelf: 'center', margin: 0 }}
+            >
+              Cancel
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {stepId > 1 && (
+                <button
+                  type="button"
+                  className="list-builder-edit-btn"
+                  onClick={handleBack}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1rem' }}
+                >
+                  Back
+                </button>
+              )}
+              {stepId < (showTaxesStep ? 5 : 4) ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleNext}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold' }}
+                  disabled={stepId === 3 && isStep3Invalid}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleSaveEvent}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
+                  disabled={isStep3Invalid}
+                >
+                  Save Marriage Event
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderEventForm = (event) => {
     const type = event.type;
+    if (type === 'marriage') {
+      return renderMarriageWizard();
+    }
     return (
       <div className="modal-backdrop" onClick={() => setEditingEvent(null)}>
         <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()}>
@@ -5101,28 +5610,91 @@ export default function FireSimulator() {
                   onChange={(e) => setEditingEvent({ ...editingEvent, claimingAge: parseInt(e.target.value) || 62, startAge: parseInt(e.target.value) || 62, age: parseInt(e.target.value) || 62 })}
                 />
               </div>
-              <div className="input-wrapper">
-                <span className="input-name">Monthly Amount ($)</span>
-                <input
-                  type="number"
-                  className="input-number-box"
-                  style={{ width: '100%' }}
-                  value={editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, monthlyBenefit: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <input
-                  type="checkbox"
-                  id="ret-inflation-adj"
-                  checked={editingEvent.inflationAdjusted !== false}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, inflationAdjusted: e.target.checked })}
-                  style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
-                />
-                <label htmlFor="ret-inflation-adj" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
-                  Inflation Adjusted (increases with cost of living)
-                </label>
-              </div>
+              {type === 'socialSecurity' && editingEvent.useEarnings === true && (
+                <div className="input-wrapper">
+                  <span className="input-name">Age Started Working</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.ageStartedWorking !== undefined ? editingEvent.ageStartedWorking : 22}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, ageStartedWorking: parseInt(e.target.value) || 22 })}
+                  />
+                </div>
+              )}
+              {(!editingEvent.useEarnings || type !== 'socialSecurity') ? (
+                <div className="input-wrapper">
+                  <span className="input-name">Monthly Amount ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, monthlyBenefit: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              ) : (
+                <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                  <span className="input-name">Estimated Monthly Amount ($)</span>
+                  <div style={{ 
+                    height: '2.5rem', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    padding: '0 0.75rem', 
+                    background: 'var(--bg-primary, #111827)', 
+                    borderRadius: 'var(--radius-sm, 6px)', 
+                    border: '1px solid var(--border-color, #374151)', 
+                    fontSize: '0.85rem', 
+                    fontWeight: 'bold', 
+                    color: tempSocialSecurityDetails?.isEligible ? 'var(--text-primary)' : 'var(--accent-rose, #f43f5e)'
+                  }}>
+                    <span>
+                      {tempSocialSecurityDetails?.isEligible 
+                        ? formatCurrency(tempSocialSecurityDetails.annualBenefit / 12) 
+                        : '$0 (Not Eligible)'}
+                    </span>
+                    {tempSocialSecurityDetails?.isEligible && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>
+                        ({formatCurrency((tempSocialSecurityDetails.annualBenefit / 12) * Math.pow(1 + (Number(inputs.inflationRate || 3) / 100), tempSocialSecurityDetails.claimAge - (Number(inputs.currentAge) || 35)))}/mo in future nominal dollars at age {tempSocialSecurityDetails.claimAge})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {type === 'socialSecurity' && (
+                <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                  <label htmlFor="ret-use-earnings" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                    Calculate from earning years
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="ret-use-earnings"
+                    checked={editingEvent.useEarnings === true}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, useEarnings: e.target.checked })}
+                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                  />
+                </div>
+              )}
+              {type !== 'socialSecurity' && (
+                <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                  <label htmlFor="ret-inflation-adj" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                    Inflation Adjusted (increases with cost of living)
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="ret-inflation-adj"
+                    checked={editingEvent.inflationAdjusted !== false}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, inflationAdjusted: e.target.checked })}
+                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                  />
+                </div>
+              )}
+              {type === 'socialSecurity' && (
+                <div style={{ gridColumn: 'span 2', fontSize: '0.75rem', color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: '0.25rem' }}>
+                  💡 Calculated in Today's Dollars (purchasing power). In future dollars (nominal mode), the benefit is adjusted for inflation (currently {Number(inputs.inflationRate || 3)}% yearly) starting from your current age.
+                </div>
+              )}
             </>
           )}
 
@@ -5702,58 +6274,51 @@ export default function FireSimulator() {
   };
 
   const renderBudgetModal = () => {
+    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
+    const isMarriedMode = !!marriageEvent;
+    const partnerMonthlyIncome = isMarriedMode ? Math.round(Number(marriageEvent.spouseIncome || 0) / 12) : 0;
+    const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
+
     const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
-    const surplusMonthly = Math.max(0, budgetMonthlyIncome - totalExpensesMonthly);
-    const totalAllocationPct = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
+
+    const totalUserAllocationPct = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
+    const totalPartnerAllocationPct = isMarriedMode ? Object.values(budgetPartnerSavings).reduce((sum, val) => sum + val, 0) : 0;
+    const totalAllocationPct = totalUserAllocationPct + totalPartnerAllocationPct;
+
     const currentAgeVal = Number(inputs.currentAge) || 30;
     const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
-    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents);
-    
-    let activeC = 0;
-    let activeInterval = null;
-    if (activeBudgetPhase.startsWith('interval_')) {
-      const idx = Number(activeBudgetPhase.split('_')[1]);
-      activeInterval = savingIntervals[idx];
-      activeC = activeInterval ? activeInterval.childCount : 0;
-    } else if (activeBudgetPhase.startsWith('childcare_')) {
-      activeC = Number(activeBudgetPhase.split('_')[1]);
-      activeInterval = savingIntervals.find(item => item.childCount === activeC);
-    } else if (activeBudgetPhase === 'workSave') {
-      activeC = 0;
-    }
 
-    const activeChildBoost = activeC > 0 ? Math.max(0, budgetMonthlyIncome - workSaveIncome) : 0;
+    // Get normalized phases
+    const normalizedPhases = getNormalizedPhases(inputs);
+    const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
+    const isRetirementPhase = activePhaseObj?.type === 'retire';
 
-    const occurringCounts = [];
-    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
-      const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
-      if (count > 0 && !occurringCounts.includes(count)) {
-        occurringCounts.push(count);
-      }
-    }
-    occurringCounts.sort((a, b) => a - b);
-
-    const childEventsForPhase = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-    let minChildParentAge = Infinity;
-    let maxChildParentAge = -Infinity;
-    childEventsForPhase.forEach(ev => {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-      const maxAge = includeCollege ? 22 : 18;
-      if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-      if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
-    });
-    const hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > inputs.currentAge;
-    
-    let currentChildCostsMonthly = 0;
-    if (activeC > 0) {
-      if (activeInterval) {
-        currentChildCostsMonthly = getChildCostsForInterval(activeInterval, inputs);
+    let activeC = activePhaseObj?.childCount || 0;
+    let activeChildBoost = 0;
+    if (activeC > 0 && activePhaseObj) {
+      const rawIncomeItem = (inputs.incomeList || []).find(inc => 
+        activePhaseObj.startAge >= inc.startAge && 
+        activePhaseObj.startAge < inc.endAge && 
+        inc.id !== 'simple-inc-childcare' && 
+        !inc.id.startsWith('simple-inc-childcare-') && 
+        inc.id !== 'simple-inc-worksave' && 
+        !inc.id.startsWith('simple-inc-worksave-')
+      );
+      let baseSalaryMonthly = 0;
+      if (rawIncomeItem) {
+        baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
       } else {
-        currentChildCostsMonthly = activeC * 1250;
+        baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
       }
+      activeChildBoost = Math.max(0, budgetMonthlyIncome - baseSalaryMonthly);
     }
-    const surplusWithChild = Math.max(0, budgetMonthlyIncome - totalExpensesMonthly - currentChildCostsMonthly);
+
+    let currentChildCostsMonthly = 0;
+    if (activeC > 0 && activePhaseObj) {
+      currentChildCostsMonthly = activeC * 1250;
+    }
+    const surplusWithChild = Math.max(0, combinedIncome - totalExpensesMonthly - currentChildCostsMonthly);
 
     const est401kMonthly = savingsAllocMode === 'percentSurplus' 
       ? Math.round(surplusMonthly * ((budgetSavings.trad401k || 0) / 100)) 
@@ -5771,29 +6336,49 @@ export default function FireSimulator() {
     const capped401k = Math.min(23500, est401kMonthly * 12);
     const cappedTradIra = Math.min(7000, estTradIraMonthly * 12);
     const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, estHsaMonthly * 12);
-    const preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+    let preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
+
+    let partnerCapped401k = 0;
+    let partnerCappedTradIra = 0;
+    let partnerCappedHsa = 0;
+    if (isMarriedMode) {
+      const estPartner401k = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.trad401k || 0) / 100)) : (budgetPartnerSavings.trad401k || 0);
+      const estPartnerTradIra = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.tradIra || 0) / 100)) : (budgetPartnerSavings.tradIra || 0);
+      const estPartnerHsa = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.hsa || 0) / 100)) : (budgetPartnerSavings.hsa || 0);
+
+      partnerCapped401k = Math.min(23500, estPartner401k * 12);
+      partnerCappedTradIra = Math.min(7000, estPartnerTradIra * 12);
+      partnerCappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, estPartnerHsa * 12);
+      preTaxDeductionsAnnual += partnerCapped401k + partnerCappedTradIra + partnerCappedHsa;
+    }
+
+    const filingStatusForModal = isMarriedMode ? (marriageEvent.filingStatus || 'jointly') : budgetFilingStatus;
     const annualTax = inputs.includeTaxes
-      ? calculateUSTaxForModal(budgetMonthlyIncome * 12, preTaxDeductionsAnnual, budgetFilingStatus)
+      ? calculateUSTaxForModal(combinedIncome * 12, preTaxDeductionsAnnual, filingStatusForModal)
       : 0;
     const monthlyTax = Math.round(annualTax / 12);
     
-    const totalSavingsMonthly = savingsAllocMode === 'percentSurplus'
-      ? Math.round(surplusMonthly * (totalAllocationPct / 100))
+    const userSavingsMonthly = savingsAllocMode === 'percentSurplus'
+      ? Math.round(surplusMonthly * (totalUserAllocationPct / 100))
       : Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
-    
-    const activeSavings = savingsAllocMode === 'percentSurplus'
-      ? totalSavingsMonthly
-      : (Object.values(budgetSavings).reduce((sum, val) => sum + val, 0) > 0 ? Object.values(budgetSavings).reduce((sum, val) => sum + val, 0) : budgetMonthlySavings);
+
+    const partnerSavingsMonthly = isMarriedMode 
+      ? (savingsAllocMode === 'percentSurplus'
+         ? Math.round(surplusMonthly * (totalPartnerAllocationPct / 100))
+         : Object.values(budgetPartnerSavings).reduce((sum, val) => sum + val, 0))
+      : 0;
+
+    const combinedSavingsMonthly = userSavingsMonthly + partnerSavingsMonthly;
+    const totalSavingsMonthly = combinedSavingsMonthly;
+    const activeSavings = combinedSavingsMonthly;
     const activeSpending = totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending;
     
     const remainingMonthly = savingsAllocMode === 'percentSurplus'
       ? 100 - totalAllocationPct
-      : budgetMonthlyIncome - activeSavings - activeSpending - monthlyTax;
+      : combinedIncome - activeSavings - activeSpending - monthlyTax;
     
-    const childAdjustedSavings = savingsAllocMode === 'percentSurplus'
-      ? Math.round(surplusWithChild * (totalAllocationPct / 100))
-      : activeSavings;
-    const netRemaining = budgetMonthlyIncome - childAdjustedSavings - activeSpending - currentChildCostsMonthly - monthlyTax;
+    const childAdjustedSavings = combinedSavingsMonthly;
+    const netRemaining = combinedIncome - childAdjustedSavings - activeSpending - currentChildCostsMonthly - monthlyTax;
     
     const handleAllocateRemaining = (categoryKey) => {
       setBudgetSavings(prev => ({
@@ -5803,37 +6388,58 @@ export default function FireSimulator() {
     };
     
     const handleAdjustGrossIncome = () => {
-      if (savingsAllocMode === 'percentSurplus') {
-        setBudgetMonthlyIncome(activeSpending + currentChildCostsMonthly);
-      } else {
-        setBudgetMonthlyIncome(activeSavings + activeSpending + currentChildCostsMonthly);
-      }
+      setBudgetMonthlyIncome(Math.max(0, activeSavings + activeSpending + currentChildCostsMonthly + monthlyTax - partnerMonthlyIncome));
     };
 
     const handleAutoReduceSavingsToBalance = () => {
-      const priority = ['brokerage', 'other', 'checking', 'hysa', 'emergency', 'rothIra', 'tradIra', 'hsa', 'trad401k', 'debt'];
+      const priority = ['brokerage', 'other', 'checking', 'hysa', 'emergency', 'rothIra', 'tradIra', 'hsa', 'trad401k', 'debt', 'cash'];
       const newSavings = { ...budgetSavings };
+      const newPartnerSavings = { ...budgetPartnerSavings };
 
       if (savingsAllocMode === 'percentSurplus') {
         let pctDeficit = totalAllocationPct - 100;
         if (pctDeficit <= 0) return;
         
-        for (const key of priority) {
-          const currentVal = newSavings[key] || 0;
-          if (currentVal > 0) {
-            const reduceAmount = Math.min(currentVal, pctDeficit);
-            newSavings[key] = Math.max(0, parseFloat((currentVal - reduceAmount).toFixed(4)));
-            pctDeficit -= reduceAmount;
-            if (pctDeficit <= 0) break;
+        if (isMarriedMode) {
+          for (const key of priority) {
+            const val = newPartnerSavings[key] || 0;
+            if (val > 0) {
+              const reduceAmount = Math.min(val, pctDeficit);
+              newPartnerSavings[key] = Math.max(0, parseFloat((val - reduceAmount).toFixed(4)));
+              pctDeficit -= reduceAmount;
+              if (pctDeficit <= 0) break;
+            }
+          }
+        }
+        if (pctDeficit > 0) {
+          for (const key of priority) {
+            const currentVal = newSavings[key] || 0;
+            if (currentVal > 0) {
+              const reduceAmount = Math.min(currentVal, pctDeficit);
+              newSavings[key] = Math.max(0, parseFloat((currentVal - reduceAmount).toFixed(4)));
+              pctDeficit -= reduceAmount;
+              if (pctDeficit <= 0) break;
+            }
           }
         }
         setBudgetSavings(newSavings);
+        if (isMarriedMode) setBudgetPartnerSavings(newPartnerSavings);
       } else {
         let deficitAmount = Math.abs(netRemaining);
         if (deficitAmount <= 0) return;
 
-        const totalSaved = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
-        if (totalSaved > 0) {
+        if (isMarriedMode) {
+          for (const key of priority) {
+            const val = newPartnerSavings[key] || 0;
+            if (val > 0) {
+              const reduceAmount = Math.min(val, deficitAmount);
+              newPartnerSavings[key] = Math.max(0, Math.round(val - reduceAmount));
+              deficitAmount -= reduceAmount;
+              if (deficitAmount <= 0) break;
+            }
+          }
+        }
+        if (deficitAmount > 0) {
           for (const key of priority) {
             const currentVal = newSavings[key] || 0;
             if (currentVal > 0) {
@@ -5843,13 +6449,9 @@ export default function FireSimulator() {
               if (deficitAmount <= 0) break;
             }
           }
-          setBudgetSavings(newSavings);
-          const newTotalSaved = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
-          setBudgetMonthlySavings(newTotalSaved);
-        } else {
-          // If no detailed savings are allocated, reduce the simple monthly savings target
-          setBudgetMonthlySavings(prev => Math.max(0, Math.round(prev - deficitAmount)));
         }
+        setBudgetSavings(newSavings);
+        if (isMarriedMode) setBudgetPartnerSavings(newPartnerSavings);
       }
     };
 
@@ -5870,26 +6472,6 @@ export default function FireSimulator() {
     const handleMonthlyIncomeChange = (val) => {
       const newIncome = Math.max(0, val);
       setBudgetMonthlyIncome(newIncome);
-
-      if (activeBudgetPhase === 'workSave') {
-        const oldIncome = budgetMonthlyIncome;
-        const factor = oldIncome > 0 ? (newIncome / oldIncome) : 1;
-        if (factor > 0 && isFinite(factor)) {
-          setChildcareBudgets(prev => {
-            const next = { ...prev };
-            Object.keys(next).forEach(cKey => {
-              const c = Number(cKey);
-              next[c] = {
-                ...next[c],
-                income: Math.round(next[c].income * factor)
-              };
-            });
-            return next;
-          });
-        }
-        const boost = Math.max(0, childcareIncome - workSaveIncome);
-        setChildcareIncome(newIncome + boost);
-      }
 
       if (totalSavingsMonthly === 0) {
         setBudgetMonthlySavings(Math.max(0, newIncome - activeSpending));
@@ -5921,10 +6503,10 @@ export default function FireSimulator() {
       const currentExpenses = Number(originalInputs.simpleExpenses) || 0;
       const currentSavingsRate = currentIncome > 0 ? Math.round((1 - currentExpenses / currentIncome) * 100) : 0;
       
-      if (scenario.type === 'savings') {
+      if (scenario.type === 'savings' || scenario.type === 'retireRequestedDate' || (scenario.type === 'retire65' && scenario.value > 0)) {
         const savingsPercent = currentIncome > 0 ? (scenario.value / currentIncome) * 100 : 0;
         targetSavingsRate = currentSavingsRate + savingsPercent;
-      } else if (scenario.type === 'retire65') {
+      } else if (scenario.type === 'retireReadyAge' || scenario.type === 'retire65') {
         targetSavingsRate = currentSavingsRate;
       } else if (scenario.type === 'combined') {
         const savingsPercent = scenario.value && typeof scenario.value === 'object' 
@@ -5944,6 +6526,27 @@ export default function FireSimulator() {
       ? Math.round((activeSavings / budgetMonthlyIncome) * 100) 
       : 0;
 
+    let modalTitle = 'Work Phase Budget';
+    if (activePhaseObj) {
+      if (activePhaseObj.type === 'careerChange') {
+        modalTitle = 'Career Change Budget';
+      } else if (activePhaseObj.type === 'marriage') {
+        modalTitle = 'Marriage Phase Budget';
+      } else if (activePhaseObj.type === 'divorce') {
+        modalTitle = 'Divorce Phase Budget';
+      } else if (activePhaseObj.type === 'child') {
+        modalTitle = `Childcare Phase Budget (${activePhaseObj.childCount} Child${activePhaseObj.childCount === 1 ? '' : 'ren'})`;
+      } else if (activePhaseObj.type === 'move') {
+        modalTitle = `Move Phase Budget (${activePhaseObj.name})`;
+      } else if (activePhaseObj.type === 'buyHouse') {
+        modalTitle = `Home Purchase Phase Budget (${activePhaseObj.name})`;
+      } else if (activePhaseObj.type === 'retire') {
+        modalTitle = 'Retirement Phase Budget';
+      } else {
+        modalTitle = 'Work Phase Budget';
+      }
+    }
+
     return (
       <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
         <style>{`
@@ -5959,7 +6562,7 @@ export default function FireSimulator() {
         <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', display: 'flex', flexDirection: 'column' }}>
           <div className="budget-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
-              🎯 Set Monthly Budget {hasChildcarePhase && (activeC > 0 ? `— Childcare (${activeC} Child${activeC === 1 ? '' : 'ren'}) Phase 👶` : '— Standard Work Phase 💼')}
+              🎯 {modalTitle} {activePhaseObj && `(${activePhaseObj.startAge}-${activePhaseObj.endAge})`}
             </h3>
             <button 
               type="button" 
@@ -5991,22 +6594,19 @@ export default function FireSimulator() {
             </div>
           )}
 
-          {hasChildcarePhase && (
-            <div className="segmented-control-container" style={{ margin: '0 0 1.25rem 0', width: '100%' }}>
-              <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%', overflowX: 'auto' }}>
-                {savingIntervals.map((interval, idx) => {
-                  if (interval.childCount === 0) return null;
-                  const c = interval.childCount;
-                  const isActive = activeBudgetPhase === `interval_${idx}` || (activeBudgetPhase === `childcare_${c}` && idx === savingIntervals.findIndex(item => item.childCount === c));
+          {normalizedPhases.length > 1 && (
+            <div className="segmented-control-container" style={{ margin: '0 0 1.25rem 0', width: '100%', overflowX: 'auto' }}>
+              <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: 'max-content', gap: '4px' }}>
+                {normalizedPhases.map((phase) => {
+                  const isActive = activeBudgetPhase === phase.id;
                   return (
                     <button
-                      key={idx}
+                      key={phase.id}
                       type="button"
                       className={`segmented-control-btn ${isActive ? 'active' : ''}`}
                       style={{
-                        flex: 1,
-                        fontSize: '0.8rem',
-                        padding: '0.5rem',
+                        fontSize: '0.78rem',
+                        padding: '0.45rem 0.65rem',
                         borderRadius: '6px',
                         background: isActive ? 'var(--primary)' : 'transparent',
                         color: isActive ? '#fff' : 'var(--text-secondary)',
@@ -6017,461 +6617,775 @@ export default function FireSimulator() {
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '0.35rem',
-                        minWidth: '90px'
+                        gap: '0.3rem',
+                        whiteSpace: 'nowrap'
                       }}
-                      onClick={() => handleSwitchBudgetPhase(`interval_${idx}`)}
+                      onClick={() => handleSwitchBudgetPhase(phase.id)}
                     >
-                      👶 {c === 1 ? '1 Child' : `${c} Kids`}
+                      <span>{phase.icon}</span>
+                      <span>{phase.name.split(':')[0]} ({phase.startAge}-{phase.endAge})</span>
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  className={`segmented-control-btn ${activeBudgetPhase === 'workSave' ? 'active' : ''}`}
-                  style={{
-                    flex: 1,
-                    fontSize: '0.8rem',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    background: activeBudgetPhase === 'workSave' ? 'var(--primary)' : 'transparent',
-                    color: activeBudgetPhase === 'workSave' ? '#fff' : 'var(--text-secondary)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    transition: 'all 0.2s',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.35rem',
-                    minWidth: '150px'
-                  }}
-                  onClick={() => handleSwitchBudgetPhase('workSave')}
-                >
-                  💼 Standard Work Phase
-                </button>
               </div>
             </div>
           )}
           
           {/* Top Parameters */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-            
-            {/* Monthly Take-home Income */}
-            <div className="input-wrapper" style={{ position: 'relative' }}>
-              <span className="input-name" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', width: '100%' }}>
-                Monthly Take-home Income ($)
-                {activeC > 0 && activeChildBoost > 0 && (
-                  <span style={{ 
-                    marginLeft: 'auto', 
-                    fontSize: '0.65rem', 
-                    padding: '0.1rem 0.35rem', 
-                    background: 'rgba(245, 158, 11, 0.15)', 
-                    border: '1px solid rgba(245, 158, 11, 0.35)', 
-                    borderRadius: '4px', 
-                    color: '#f59e0b',
-                    fontWeight: '700'
-                  }}>
-                    +{formatCurrency(activeChildBoost)}/mo child boost
+          {isMarriedMode ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              {/* User Income */}
+              <div className="input-wrapper" style={{ position: 'relative' }}>
+                <span className="input-name" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', width: '100%' }}>
+                  User Income ($)
+                  {activeC > 0 && activeChildBoost > 0 && (
+                    <span style={{ 
+                      marginLeft: 'auto', 
+                      fontSize: '0.65rem', 
+                      padding: '0.1rem 0.35rem', 
+                      background: 'rgba(245, 158, 11, 0.15)', 
+                      border: '1px solid rgba(245, 158, 11, 0.35)', 
+                      borderRadius: '4px', 
+                      color: '#f59e0b',
+                      fontWeight: '700'
+                    }}>
+                      +{formatCurrency(activeChildBoost)}/mo child boost
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                  }}
+                  value={budgetMonthlyIncome}
+                  onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
+                  disabled={isRetirementPhase}
+                />
+                {activePhaseObj && activePhaseObj.incomeGrowthRate > 0 && !isRetirementPhase && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '0.2rem', display: 'block' }}>
+                    📈 Income grows {(activePhaseObj.incomeGrowthRate * 100).toFixed(1)}%/yr
                   </span>
                 )}
-              </span>
-              <input
-                type="number"
-                className="input-number-box"
-                disabled={activeC > 0 && currentChildCostsMonthly > 0}
-                style={{ 
-                  width: '100%', 
-                  fontSize: '0.9rem', 
-                  padding: '0.35rem 0.5rem',
-                  ...(activeC > 0 && currentChildCostsMonthly > 0 ? {
-                    border: '1.5px solid rgba(245, 158, 11, 0.4)',
-                    boxShadow: 'none',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-secondary)',
-                    cursor: 'not-allowed',
-                    opacity: 0.7
-                  } : {})
-                }}
-                value={budgetMonthlyIncome}
-                onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-
-            {/* Monthly Spending */}
-            <div className="input-wrapper">
-              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Spending ($)</span>
-              <input
-                type="number"
-                className="input-number-box"
-                style={{ 
-                  width: '100%', 
-                  fontSize: '0.9rem', 
-                  padding: '0.35rem 0.5rem',
-                  opacity: totalExpensesMonthly > 0 ? 0.6 : 1,
-                  cursor: totalExpensesMonthly > 0 ? 'not-allowed' : 'auto'
-                }}
-                disabled={totalExpensesMonthly > 0}
-                value={totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending}
-                onChange={(e) => handleMonthlySpendingChange(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-
-            {/* Monthly Savings */}
-            <div className="input-wrapper">
-              <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Savings ($)</span>
-              <input
-                type="number"
-                className="input-number-box"
-                style={{ 
-                  width: '100%', 
-                  fontSize: '0.9rem', 
-                  padding: '0.35rem 0.5rem',
-                  opacity: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0) ? 0.6 : 1,
-                  cursor: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0) ? 'not-allowed' : 'auto'
-                }}
-                disabled={savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0}
-                value={savingsAllocMode === 'percentSurplus' ? totalSavingsMonthly : (totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings)}
-                onChange={(e) => handleMonthlySavingsChange(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-
-            {/* Savings Rate Card */}
-            <div style={{ display: 'flex', flexDirection: 'column', justifycontent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Savings Rate</span>
-              <strong style={{ fontSize: '1.25rem', color: '#c084fc', marginTop: '0.15rem' }}>
-                {activeSavingsRate}%
-              </strong>
-              {targetSavingsRate !== null && (
-                <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.1rem' }}>
-                  Target: {targetSavingsRate}%
-                </span>
-              )}
-            </div>
-
-          </div>
-          
-          {/* Sections Container */}
-          <div className="budget-sections-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.25rem' }}>
-            
-            {/* Savings Allocation Column */}
-            <div className="budget-section-col">
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>💰 Monthly Savings Allocation</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
-                    {savingsAllocMode === 'percentSurplus' 
-                      ? `${totalAllocationPct}% (Est. ${formatCurrency(totalSavingsMonthly)}/mo)` 
-                      : `${formatCurrency(totalSavingsMonthly)}/mo`}
-                  </span>
-                  {savingsAllocMode === 'percentSurplus' && totalAllocationPct !== 100 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const sum = totalAllocationPct;
-                        if (sum === 0) {
-                          setBudgetSavings(prev => ({ ...prev, brokerage: 100 }));
-                          return;
-                        }
-                        const newSavings = {};
-                        let newSum = 0;
-                        Object.keys(budgetSavings).forEach(k => {
-                          const val = budgetSavings[k] || 0;
-                          const scaled = Math.round((val / sum) * 100);
-                          newSavings[k] = scaled;
-                          newSum += scaled;
-                        });
-                        const diff = 100 - newSum;
-                        if (diff !== 0) {
-                          const keys = Object.keys(newSavings);
-                          let maxKey = 'brokerage';
-                          keys.forEach(k => {
-                            if (newSavings[k] > (newSavings[maxKey] || 0)) {
-                              maxKey = k;
-                            }
-                          });
-                          newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
-                        }
-                        setBudgetSavings(newSavings);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: '0.7rem', padding: 0 }}
-                    >
-                      (Auto-Balance to 100%)
-                    </button>
-                  )}
-                  {totalSavingsMonthly > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearDetailedSavings}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
-                    >
-                      (Clear)
-                    </button>
-                  )}
-                </div>
-              </h4>
-
-              {/* Toggle Card */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '0.5rem', 
-                marginBottom: '1rem', 
-                padding: '0.6rem 0.75rem', 
-                background: 'rgba(255, 255, 255, 0.02)', 
-                borderRadius: '6px', 
-                border: '1px solid var(--border-color)' 
-              }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Savings Allocation Mode:</span>
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleSavingsAllocMode('fixed')}
-                    style={{ 
-                      flex: 1, 
-                      background: savingsAllocMode === 'fixed' ? 'var(--primary)' : 'transparent', 
-                      border: 'none', 
-                      color: savingsAllocMode === 'fixed' ? '#ffffff' : 'var(--text-secondary)',
-                      fontSize: '0.75rem', 
-                      fontWeight: '700',
-                      padding: '0.35rem 0.25rem', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    Fixed Amount ($)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleSavingsAllocMode('percentSurplus')}
-                    style={{ 
-                      flex: 1, 
-                      background: savingsAllocMode === 'percentSurplus' ? 'var(--primary)' : 'transparent', 
-                      border: 'none', 
-                      color: savingsAllocMode === 'percentSurplus' ? '#ffffff' : 'var(--text-secondary)',
-                      fontSize: '0.75rem', 
-                      fontWeight: '700',
-                      padding: '0.35rem 0.25rem', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    Percent of Surplus (%)
-                  </button>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-tertiary)', lineHeight: '1.35' }}>
-                  {savingsAllocMode === 'fixed' 
-                    ? '💰 Saves fixed dollar amounts monthly. If expenses (like childcare daycare) increase, you will draw from your brokerage/savings to fund these savings targets.' 
-                    : '📊 Dynamically saves a percentage of your monthly surplus. If expenses (like childcare) rise and wipe out your surplus, savings automatically drop to 0% during those years to prevent running out of money.'}
-                </p>
               </div>
 
-              <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {[
-                  { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
-                  { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
-                  { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr combined' },
-                  { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
-                  { key: 'brokerage', label: 'Taxable Brokerage' },
-                  { key: 'checking', label: 'Checking Account' },
-                  { key: 'hysa', label: 'High-Yield Savings' },
-                  { key: 'emergency', label: 'Emergency Fund' },
-                  { key: 'debt', label: 'Debt Payoff' },
-                  { key: 'other', label: 'Other Savings' }
-                ].map(item => {
-                  const diff = budgetDiffs?.savings?.[item.key];
-                  const hasDiff = diff && diff !== 0;
-                  return (
-                    <div 
-                      key={item.key} 
-                      className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
-                      style={{ 
+              {/* Partner Income */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0.35rem 0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Partner Income</span>
+                <strong style={{ fontSize: '1.05rem', color: 'var(--accent-emerald)', marginTop: '0.25rem' }}>
+                  +{formatCurrency(partnerMonthlyIncome)}/mo
+                </strong>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                  ({formatCurrency(marriageEvent.spouseIncome || 0)}/yr)
+                </span>
+              </div>
+
+              {/* Combined Income */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0.35rem 0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Combined Income</span>
+                <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', marginTop: '0.25rem' }}>
+                  {formatCurrency(combinedIncome)}/mo
+                </strong>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                  ({formatCurrency(combinedIncome * 12)}/yr)
+                </span>
+              </div>
+
+              {/* Combined Spending */}
+              <div className="input-wrapper">
+                <span className="input-name" style={{ fontSize: '0.8rem' }}>Combined Spending ($)</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                    opacity: totalExpensesMonthly > 0 ? 0.6 : 1,
+                    cursor: totalExpensesMonthly > 0 ? 'not-allowed' : 'auto',
+                    borderColor: 'rgba(244, 63, 94, 0.35)'
+                  }}
+                  disabled={totalExpensesMonthly > 0}
+                  value={totalExpensesMonthly > 0 ? totalExpensesMonthly : budgetMonthlySpending}
+                  onChange={(e) => handleMonthlySpendingChange(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              {/* Combined Savings */}
+              <div className="input-wrapper">
+                <span className="input-name" style={{ fontSize: '0.8rem' }}>Combined Savings ($)</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                    opacity: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 0.6 : 1,
+                    cursor: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 'not-allowed' : 'auto',
+                    borderColor: 'rgba(16, 185, 129, 0.35)'
+                  }}
+                  disabled={savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase}
+                  value={isRetirementPhase ? 0 : (savingsAllocMode === 'percentSurplus' ? totalSavingsMonthly : (totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings))}
+                  onChange={(e) => handleMonthlySavingsChange(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              {/* Savings Rate Card */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Household Savings Rate</span>
+                <strong style={{ fontSize: '1.25rem', color: 'var(--accent-emerald)', marginTop: '0.15rem' }}>
+                  {activeSavingsRate}%
+                </strong>
+                {targetSavingsRate !== null && (
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.1rem' }}>
+                    Target: {targetSavingsRate}%
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              
+              {/* Monthly Take-home Income */}
+              <div className="input-wrapper" style={{ position: 'relative' }}>
+                <span className="input-name" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', width: '100%' }}>
+                  Monthly Take-home Income ($)
+                  {activeC > 0 && activeChildBoost > 0 && (
+                    <span style={{ 
+                      marginLeft: 'auto', 
+                      fontSize: '0.65rem', 
+                      padding: '0.1rem 0.35rem', 
+                      background: 'rgba(245, 158, 11, 0.15)', 
+                      border: '1px solid rgba(245, 158, 11, 0.35)', 
+                      borderRadius: '4px', 
+                      color: '#f59e0b',
+                      fontWeight: '700'
+                    }}>
+                      +{formatCurrency(activeChildBoost)}/mo child boost
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                  }}
+                  value={budgetMonthlyIncome}
+                  onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
+                  disabled={isRetirementPhase}
+                />
+                {activePhaseObj && activePhaseObj.incomeGrowthRate > 0 && !isRetirementPhase && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '0.2rem', display: 'block' }}>
+                    📈 Income grows {(activePhaseObj.incomeGrowthRate * 100).toFixed(1)}%/yr
+                  </span>
+                )}
+              </div>
+
+              {/* Monthly Spending */}
+              <div className="input-wrapper">
+                <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Spending ($)</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                    opacity: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 0.6 : 1,
+                    cursor: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 'not-allowed' : 'auto'
+                  }}
+                  disabled={savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase}
+                  value={isRetirementPhase ? 0 : (savingsAllocMode === 'percentSurplus' ? totalSavingsMonthly : (totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySpending))}
+                  onChange={(e) => handleMonthlySpendingChange(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              {/* Monthly Savings */}
+              <div className="input-wrapper">
+                <span className="input-name" style={{ fontSize: '0.8rem' }}>Monthly Savings ($)</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ 
+                    width: '100%', 
+                    fontSize: '0.9rem', 
+                    padding: '0.35rem 0.5rem',
+                    opacity: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 0.6 : 1,
+                    cursor: (savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase) ? 'not-allowed' : 'auto'
+                  }}
+                  disabled={savingsAllocMode === 'percentSurplus' || totalSavingsMonthly > 0 || isRetirementPhase}
+                  value={isRetirementPhase ? 0 : (savingsAllocMode === 'percentSurplus' ? totalSavingsMonthly : (totalSavingsMonthly > 0 ? totalSavingsMonthly : budgetMonthlySavings))}
+                  onChange={(e) => handleMonthlySavingsChange(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              {/* Savings Rate Card */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(124, 58, 237, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(124, 58, 237, 0.25)', padding: '0.5rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Savings Rate</span>
+                <strong style={{ fontSize: '1.25rem', color: '#c084fc', marginTop: '0.15rem' }}>
+                  {activeSavingsRate}%
+                </strong>
+                {targetSavingsRate !== null && (
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.1rem' }}>
+                    Target: {targetSavingsRate}%
+                  </span>
+                )}
+              </div>
+
+            </div>
+          )}
+          
+          {/* Mobile Tabs for Married mode */}
+          {isMarriedMode && isMobile && (
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem', width: '100%' }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '0.6rem',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeBudgetTab === 'userSavings' ? '2px solid var(--primary)' : 'none',
+                  color: activeBudgetTab === 'userSavings' ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: activeBudgetTab === 'userSavings' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+                onClick={() => setActiveBudgetTab('userSavings')}
+              >
+                👤 User Savings
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '0.6rem',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeBudgetTab === 'partnerSavings' ? '2px solid var(--primary)' : 'none',
+                  color: activeBudgetTab === 'partnerSavings' ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: activeBudgetTab === 'partnerSavings' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+                onClick={() => setActiveBudgetTab('partnerSavings')}
+              >
+                👥 Partner Savings
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '0.6rem',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeBudgetTab === 'householdExpenses' ? '2px solid var(--accent-emerald)' : 'none',
+                  color: activeBudgetTab === 'householdExpenses' ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+                  fontWeight: activeBudgetTab === 'householdExpenses' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+                onClick={() => setActiveBudgetTab('householdExpenses')}
+              >
+                🏠 Combined Expenses
+              </button>
+            </div>
+          )}
+
+          {/* Sections Container */}
+          <div className="budget-sections-container" style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMarriedMode ? (isMobile ? '1fr' : '1fr 1fr 1fr') : '1fr 1fr', 
+            gap: '1.5rem', 
+            maxHeight: '400px', 
+            overflowY: 'auto', 
+            paddingRight: '0.5rem', 
+            marginBottom: '1.25rem' 
+          }}>
+            
+            {/* Savings Allocation Column (User) */}
+            {(!isMarriedMode || !isMobile || activeBudgetTab === 'userSavings') && (
+              <div className="budget-section-col">
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>💰 {isMarriedMode ? 'User Savings Allocation' : 'Monthly Savings Allocation'}</span>
+                  {!isRetirementPhase && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
+                        {savingsAllocMode === 'percentSurplus' 
+                          ? `${totalUserAllocationPct}% (Est. ${formatCurrency(userSavingsMonthly)}/mo)` 
+                          : `${formatCurrency(userSavingsMonthly)}/mo`}
+                      </span>
+                      {savingsAllocMode === 'percentSurplus' && totalUserAllocationPct !== 100 && !isMarriedMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sum = totalUserAllocationPct;
+                            if (sum === 0) {
+                              setBudgetSavings(prev => ({ ...prev, brokerage: 100 }));
+                              return;
+                            }
+                            const newSavings = {};
+                            let newSum = 0;
+                            Object.keys(budgetSavings).forEach(k => {
+                              const val = budgetSavings[k] || 0;
+                              const scaled = Math.round((val / sum) * 100);
+                              newSavings[k] = scaled;
+                              newSum += scaled;
+                            });
+                            const diff = 100 - newSum;
+                            if (diff !== 0) {
+                              const keys = Object.keys(newSavings);
+                              let maxKey = 'brokerage';
+                              keys.forEach(k => {
+                                if (newSavings[k] > (newSavings[maxKey] || 0)) {
+                                  maxKey = k;
+                                }
+                              });
+                              newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
+                            }
+                            setBudgetSavings(newSavings);
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: '0.7rem', padding: 0 }}
+                        >
+                          (Auto-Balance to 100%)
+                        </button>
+                      )}
+                      {userSavingsMonthly > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearDetailedSavings}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                        >
+                          (Clear)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </h4>
+
+                {isRetirementPhase ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2.5rem 1rem',
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px dashed var(--border-color)',
+                    textAlign: 'center',
+                    height: '100%',
+                    minHeight: '200px'
+                  }}>
+                    <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏖️</span>
+                    <h5 style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>Retirement Phase Active</h5>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      Savings are disabled during retirement. You are now drawing down from your portfolio to fund your living expenses.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Toggle Card */}
+                    {!isMarriedMode && (
+                      <div style={{ 
                         display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        gap: '0.5rem',
-                        transition: 'all 0.3s ease',
-                        padding: hasDiff ? '0.25rem 0.5rem' : '0',
-                        borderRadius: hasDiff ? '6px' : '0',
-                        border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                          {hasDiff && (
-                            <span style={{ 
-                              fontSize: '0.7rem', 
-                              fontWeight: 'bold', 
-                              color: diff > 0 ? '#10b981' : '#f43f5e',
-                              background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                              padding: '0.1rem 0.35rem',
+                        flexDirection: 'column', 
+                        gap: '0.5rem', 
+                        marginBottom: '1rem', 
+                        padding: '0.6rem 0.75rem', 
+                        background: 'rgba(255, 255, 255, 0.02)', 
+                        borderRadius: '6px', 
+                        border: '1px solid var(--border-color)' 
+                      }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Savings Allocation Mode:</span>
+                        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSavingsAllocMode('fixed')}
+                            style={{ 
+                              flex: 1, 
+                              background: savingsAllocMode === 'fixed' ? 'var(--primary)' : 'transparent', 
+                              border: 'none', 
+                              color: savingsAllocMode === 'fixed' ? '#ffffff' : 'var(--text-secondary)',
+                              fontSize: '0.75rem', 
+                              fontWeight: '700',
+                              padding: '0.35rem 0.25rem', 
                               borderRadius: '4px',
-                              display: 'inline-flex',
-                              alignItems: 'center'
-                            }}>
-                              {savingsAllocMode === 'percentSurplus'
-                                ? (diff > 0 ? `+${diff}%` : `${diff}%`)
-                                : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
-                            </span>
-                          )}
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            Fixed Amount ($)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSavingsAllocMode('percentSurplus')}
+                            style={{ 
+                              flex: 1, 
+                              background: savingsAllocMode === 'percentSurplus' ? 'var(--primary)' : 'transparent', 
+                              border: 'none', 
+                              color: savingsAllocMode === 'percentSurplus' ? '#ffffff' : 'var(--text-secondary)',
+                              fontSize: '0.75rem', 
+                              fontWeight: '700',
+                              padding: '0.35rem 0.25rem', 
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            Percent of Surplus (%)
+                          </button>
                         </div>
-                        {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                        <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-tertiary)', lineHeight: '1.35' }}>
+                          {savingsAllocMode === 'fixed' 
+                            ? '💰 Saves fixed dollar amounts monthly. If expenses increase, you will draw from your brokerage/savings to fund these savings targets.' 
+                            : '📊 Dynamically saves a percentage of your monthly surplus. If expenses rise and wipe out your surplus, savings automatically drop to 0%.'}
+                        </p>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                    )}
+
+                    <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {(isMarriedMode ? [
+                        { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                        { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr' },
+                        { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr' },
+                        { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                        { key: 'brokerage', label: 'Taxable Brokerage' },
+                        { key: 'cash', label: 'Cash Savings' },
+                        { key: 'debt', label: 'Debt Paydown' }
+                      ] : [
+                        { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                        { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
+                        { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr combined' },
+                        { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                        { key: 'brokerage', label: 'Taxable Brokerage' },
+                        { key: 'checking', label: 'Checking Account' },
+                        { key: 'hysa', label: 'High-Yield Savings' },
+                        { key: 'emergency', label: 'Emergency Fund' },
+                        { key: 'debt', label: 'Debt Payoff' },
+                        { key: 'other', label: 'Other Savings' }
+                      ]).map(item => {
+                        const diff = budgetDiffs?.savings?.[item.key];
+                        const hasDiff = diff && diff !== 0;
+                        return (
+                          <div 
+                            key={item.key} 
+                            className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                            style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              gap: '0.5rem',
+                              transition: 'all 0.3s ease',
+                              padding: hasDiff ? '0.25rem 0.5rem' : '0',
+                              borderRadius: hasDiff ? '6px' : '0',
+                              border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                                {hasDiff && (
+                                  <span style={{ 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 'bold', 
+                                    color: diff > 0 ? '#10b981' : '#f43f5e',
+                                    background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                                    padding: '0.1rem 0.35rem',
+                                    borderRadius: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center'
+                                  }}>
+                                    {savingsAllocMode === 'percentSurplus'
+                                      ? (diff > 0 ? `+${diff}%` : `${diff}%`)
+                                      : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
+                                  </span>
+                                )}
+                              </div>
+                              {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                              <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                                <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                <input
+                                  type="number"
+                                  className="input-number-box"
+                                  style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                                  value={budgetSavings[item.key] || 0}
+                                  onChange={(e) => setBudgetSavings({
+                                    ...budgetSavings,
+                                    [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                                  })}
+                                />
+                              </div>
+                              {savingsAllocMode === 'percentSurplus' && (
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
+                                  Est. {formatCurrency(Math.round(surplusMonthly * ((budgetSavings[item.key] || 0) / 100)))}/mo
+                                  {currentChildCostsMonthly > 0 && (
+                                    <>
+                                      <br />
+                                      <span style={{ color: 'var(--accent-orange, #f59e0b)' }}>
+                                        ({formatCurrency(Math.round(surplusWithChild * ((budgetSavings[item.key] || 0) / 100)))}/mo during child years)
+                                      </span>
+                                    </>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Savings Allocation Column (Partner) */}
+            {isMarriedMode && (!isMobile || activeBudgetTab === 'partnerSavings') && (
+              <div className="budget-section-col">
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>💰 Partner Savings Allocation</span>
+                  {!isRetirementPhase && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
+                        {savingsAllocMode === 'percentSurplus' 
+                          ? `${totalPartnerAllocationPct}% (Est. ${formatCurrency(partnerSavingsMonthly)}/mo)` 
+                          : `${formatCurrency(partnerSavingsMonthly)}/mo`}
+                      </span>
+                      {partnerSavingsMonthly > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setBudgetPartnerSavings({ trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, cash: 0, debt: 0 })}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                        >
+                          (Clear)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </h4>
+
+                {isRetirementPhase ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2.5rem 1rem',
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px dashed var(--border-color)',
+                    textAlign: 'center',
+                    height: '100%',
+                    minHeight: '200px'
+                  }}>
+                    <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏖️</span>
+                    <h5 style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>Retirement Phase Active</h5>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      Savings are disabled during retirement. You are now drawing down from your portfolio to fund your living expenses.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {[
+                      { key: 'trad401k', label: 'Partner 401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                      { key: 'rothIra', label: 'Partner Roth IRA', desc: 'Limit $7,000/yr' },
+                      { key: 'tradIra', label: 'Partner Traditional IRA', desc: 'Limit $7,000/yr' },
+                      { key: 'hsa', label: 'Partner HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                      { key: 'brokerage', label: 'Partner Brokerage' },
+                      { key: 'cash', label: 'Partner Cash Savings' },
+                      { key: 'debt', label: 'Partner Debt Paydown' }
+                    ].map(item => {
+                      const diff = budgetDiffs?.partnerSavings?.[item.key];
+                      const hasDiff = diff && diff !== 0;
+                      return (
+                        <div 
+                          key={item.key} 
+                          className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            gap: '0.5rem',
+                            transition: 'all 0.3s ease',
+                            padding: hasDiff ? '0.25rem 0.5rem' : '0',
+                            borderRadius: hasDiff ? '6px' : '0',
+                            border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                              {hasDiff && (
+                                <span style={{ 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 'bold', 
+                                  color: diff > 0 ? '#10b981' : '#f43f5e',
+                                  background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center'
+                                }}>
+                                  {savingsAllocMode === 'percentSurplus'
+                                    ? (diff > 0 ? `+${diff}%` : `${diff}%`)
+                                    : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
+                                </span>
+                              )}
+                            </div>
+                            {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                            <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                              <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                                value={budgetPartnerSavings[item.key] || 0}
+                                onChange={(e) => setBudgetPartnerSavings({
+                                  ...budgetPartnerSavings,
+                                  [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                                })}
+                              />
+                            </div>
+                            {savingsAllocMode === 'percentSurplus' && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
+                                Est. {formatCurrency(Math.round(surplusMonthly * ((budgetPartnerSavings[item.key] || 0) / 100)))}/mo
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Expenses Column */}
+            {(!isMarriedMode || !isMobile || activeBudgetTab === 'householdExpenses') && (
+              <div className="budget-section-col">
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>🏠 {isMarriedMode ? 'Combined Expenses' : 'Monthly Expenses'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
+                    {totalExpensesMonthly > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearDetailedExpenses}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                      >
+                        (Clear)
+                      </button>
+                    )}
+                  </div>
+                </h4>
+                <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {(isMarriedMode ? [
+                    { key: 'housing', label: 'Housing (Rent/Mortgage)' },
+                    { key: 'utilities', label: 'Utilities & Subscriptions' },
+                    { key: 'food', label: 'Food & Dining Out' },
+                    { key: 'transportation', label: 'Transportation / Gas / Car' },
+                    { key: 'healthcare', label: 'Healthcare & Insurance' },
+                    { key: 'leisure', label: 'Leisure & Leisure Travel' },
+                    { key: 'misc', label: 'Miscellaneous Expenses' },
+                    { key: 'debt', label: 'Debt Payments' }
+                  ] : [
+                    { key: 'housing', label: 'Housing (Rent/Mortgage)' },
+                    { key: 'utilities', label: 'Utilities & Subscriptions' },
+                    { key: 'food', label: 'Food & Dining Out' },
+                    { key: 'transportation', label: 'Transportation / Gas / Car' },
+                    { key: 'healthcare', label: 'Healthcare & Insurance' },
+                    { key: 'leisure', label: 'Leisure & Leisure Travel' },
+                    { key: 'misc', label: 'Miscellaneous Expenses' }
+                  ]).map(item => {
+                    const diff = budgetDiffs?.expenses?.[item.key];
+                    const hasDiff = diff && diff !== 0;
+                    return (
+                      <div 
+                        key={item.key} 
+                        className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                        style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          gap: '0.5rem',
+                          transition: 'all 0.3s ease',
+                          padding: hasDiff ? '0.25rem 0.5rem' : '0',
+                          borderRadius: hasDiff ? '6px' : '0',
+                          border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                          </div>
+                        </div>
                         <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                          <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                          <span className="currency-symbol">$</span>
                           <input
                             type="number"
                             className="input-number-box"
                             style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                            value={budgetSavings[item.key] || 0}
-                            onChange={(e) => setBudgetSavings({
-                              ...budgetSavings,
+                            value={budgetExpenses[item.key] || 0}
+                            onChange={(e) => setBudgetExpenses({
+                              ...budgetExpenses,
                               [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
                             })}
                           />
                         </div>
-                        {savingsAllocMode === 'percentSurplus' && (
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
-                            Est. {formatCurrency(Math.round(surplusMonthly * ((budgetSavings[item.key] || 0) / 100)))}/mo
-                            {currentChildCostsMonthly > 0 && (
-                              <>
-                                <br />
-                                <span style={{ color: 'var(--accent-orange, #f59e0b)' }}>
-                                  ({formatCurrency(Math.round(surplusWithChild * ((budgetSavings[item.key] || 0) / 100)))}/mo during child years)
-                                </span>
-                              </>
-                            )}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* Expenses Column */}
-            <div className="budget-section-col">
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🏠 Monthly Expenses</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
-                  {totalExpensesMonthly > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearDetailedExpenses}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
-                    >
-                      (Clear)
-                    </button>
-                  )}
-                </div>
-              </h4>
-              <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {[
-                  { key: 'housing', label: 'Housing (Rent/Mortgage)' },
-                  { key: 'utilities', label: 'Utilities & Subscriptions' },
-                  { key: 'food', label: 'Food & Dining Out' },
-                  { key: 'transportation', label: 'Transportation / Gas / Car' },
-                  { key: 'healthcare', label: 'Healthcare & Insurance' },
-                  { key: 'leisure', label: 'Leisure & Leisure Travel' },
-                  { key: 'misc', label: 'Miscellaneous Expenses' }
-                ].map(item => {
-                  const diff = budgetDiffs?.expenses?.[item.key];
-                  const hasDiff = diff && diff !== 0;
-                  return (
+                    );
+                  })}
+                  {currentChildCostsMonthly > 0 && (
                     <div 
-                      key={item.key} 
-                      className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                      className="budget-input-row" 
                       style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between', 
                         alignItems: 'center', 
                         gap: '0.5rem',
-                        transition: 'all 0.3s ease',
-                        padding: hasDiff ? '0.25rem 0.5rem' : '0',
-                        borderRadius: hasDiff ? '6px' : '0',
-                        border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                        padding: '0.35rem 0.5rem',
+                        background: 'rgba(245, 158, 11, 0.04)',
+                        borderRadius: '6px',
+                        border: '1px dashed rgba(245, 158, 11, 0.25)',
+                        marginTop: '0.75rem'
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                          {hasDiff && (
-                            <span style={{ 
-                              fontSize: '0.7rem', 
-                              fontWeight: 'bold', 
-                              color: diff > 0 ? '#10b981' : '#f43f5e',
-                              background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                              padding: '0.1rem 0.35rem',
-                              borderRadius: '4px',
-                              display: 'inline-flex',
-                              alignItems: 'center'
-                            }}>
-                              {diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff)}
-                            </span>
-                          )}
+                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0, fontWeight: '700', color: 'var(--accent-orange, #f59e0b)' }}>
+                            👶 Childcare & Support (Temporary)
+                          </span>
                         </div>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                          Roadmap child event cost (Age {inputs.currentAge})
+                        </span>
                       </div>
-                      <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                        <span className="currency-symbol">$</span>
+                      <div className="input-prefix-wrapper" style={{ width: '110px', opacity: 0.85 }}>
+                        <span className="currency-symbol" style={{ color: 'var(--accent-orange, #f59e0b)' }}>$</span>
                         <input
-                          type="number"
+                          type="text"
+                          disabled
                           className="input-number-box"
-                          style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                          value={budgetExpenses[item.key] || 0}
-                          onChange={(e) => setBudgetExpenses({
-                            ...budgetExpenses,
-                            [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                          })}
+                          style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem', background: 'transparent', border: 'none', color: 'var(--accent-orange, #f59e0b)', fontWeight: 'bold' }}
+                          value={currentChildCostsMonthly}
                         />
                       </div>
                     </div>
-                  );
-                })}
-                {currentChildCostsMonthly > 0 && (
-                  <div 
-                    className="budget-input-row" 
-                    style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      gap: '0.5rem',
-                      padding: '0.35rem 0.5rem',
-                      background: 'rgba(245, 158, 11, 0.04)',
-                      borderRadius: '6px',
-                      border: '1px dashed rgba(245, 158, 11, 0.25)',
-                      marginTop: '0.75rem'
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span className="input-name" style={{ fontSize: '0.8rem', margin: 0, fontWeight: '700', color: 'var(--accent-orange, #f59e0b)' }}>
-                          👶 Childcare & Support (Temporary)
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-                        Roadmap child event cost (Age {inputs.currentAge})
-                      </span>
-                    </div>
-                    <div className="input-prefix-wrapper" style={{ width: '110px', opacity: 0.85 }}>
-                      <span className="currency-symbol" style={{ color: 'var(--accent-orange, #f59e0b)' }}>$</span>
-                      <input
-                        type="text"
-                        disabled
-                        className="input-number-box"
-                        style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem', background: 'transparent', border: 'none', color: 'var(--accent-orange, #f59e0b)', fontWeight: 'bold' }}
-                        value={currentChildCostsMonthly}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             
           </div>
           
@@ -7212,32 +8126,6 @@ export default function FireSimulator() {
             );
           })()}
           
-          {/* Things You’re Currently Managing Section */}
-          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1, minWidth: '280px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                  📋 Things You’re Currently Managing
-                </h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-                  Many people have student loans, car loans, mortgages, or credit card balances. Adding them helps make your plan more accurate.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0, height: '32px' }}
-                onClick={handleCreateCurrentCondition}
-              >
-                ➕ Add Current Condition
-              </button>
-            </div>
-            
-            <div style={{ marginTop: '0.25rem' }}>
-              {renderCurrentConditionsList()}
-            </div>
-          </div>
-
           {/* Centerpiece Timeline */}
           <div className="glass-card timeline-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.4rem' }}>
@@ -7280,11 +8168,14 @@ export default function FireSimulator() {
                     defaultValue=""
                   >
                     <option value="" disabled>➕ Add Life Decision...</option>
+                    <option value="marriage">💍 Get Married</option>
                     <option value="buyHouse">🏠 Buy a House</option>
                     <option value="haveChild">👶 Have a Child</option>
                     <option value="careerChange">💼 Career Change</option>
                     <option value="move">📍 Move / Relocate</option>
-                    <option value="retire">🏖 Retire</option>
+                    <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
+                      🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
+                    </option>
                     <option value="socialSecurity">💰 Social Security</option>
                     <option value="pension">📜 Pension</option>
                     <option value="rentalIncome">🏢 Rental Income</option>
@@ -7311,145 +8202,224 @@ export default function FireSimulator() {
                   cursor: pointer;
                 }
               `}</style>
-              <div className="timeline-track-container" style={{ height: '160px' }}>
-                {/* Budget Buckets (Bands) representing lifecycle phases */}
+              <div className="timeline-track-container" style={{ height: '220px' }}>
+                {/* Household Phases Swimlanes */}
                 {(() => {
                   const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                   if (totalYears <= 0) return null;
 
+                  const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+                  const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
+                  
+                  const marriageAge = marriageEvent ? Number(marriageEvent.age) : null;
+                  const divorceAge = divorceEvent ? Number(divorceEvent.age) : null;
+
+                  // Relationship swimlane intervals
+                  const relIntervals = [];
+                  if (!marriageAge) {
+                    relIntervals.push({ label: '👤 Single', start: inputs.currentAge, end: inputs.lifeExpectancy, style: { background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' } });
+                  } else {
+                    if (marriageAge > inputs.currentAge) {
+                      relIntervals.push({ label: '👤 Single', start: inputs.currentAge, end: marriageAge, style: { background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' } });
+                    }
+                    
+                    const endOfMarried = divorceAge || inputs.lifeExpectancy;
+                    if (endOfMarried > marriageAge) {
+                      relIntervals.push({ label: '💍 Married', start: marriageAge, end: endOfMarried, style: { background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)', border: '1px solid rgba(99, 102, 241, 0.35)', color: '#a5b4fc' } });
+                    }
+                    
+                    if (divorceAge && inputs.lifeExpectancy > divorceAge) {
+                      relIntervals.push({ label: '👤 Single', start: divorceAge, end: inputs.lifeExpectancy, style: { background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' } });
+                    }
+                  }
+
+                  // Child support interval
+                  const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+                  let childBand = null;
+                  if (childEvents.length > 0) {
+                    const minChildAge = Math.min(...childEvents.map(ev => Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30));
+                    const maxChildAge = Math.max(...childEvents.map(ev => (Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30) + (ev.includeCollege ? 22 : 18)));
+                    if (minChildAge < maxChildAge && maxChildAge > inputs.currentAge) {
+                      childBand = {
+                        start: Math.max(inputs.currentAge, minChildAge),
+                        end: Math.min(inputs.lifeExpectancy, maxChildAge)
+                      };
+                    }
+                  }
+
+                  // Determine lifecycle phases
                   const retAge = activeResults.targetRetirementAge || inputs.lifeExpectancy;
                   const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
-                  
-                  // Determine child years range
-                  const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-                  let minChildParentAge = Infinity;
-                  let maxChildParentAge = -Infinity;
-                  childEvents.forEach(ev => {
-                    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-                    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-                    const maxAge = includeCollege ? 22 : 18;
-                    
-                    if (birthAge < minChildParentAge) minChildParentAge = birthAge;
-                    if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
-                  });
-
-                  const showChildBand = minChildParentAge < maxChildParentAge && maxChildParentAge > inputs.currentAge;
-                  
-                  const childStartPct = showChildBand 
-                    ? Math.max(0, Math.min(100, ((minChildParentAge - inputs.currentAge) / totalYears) * 100))
-                    : 0;
-                  const childEndPct = showChildBand
-                    ? Math.max(0, Math.min(100, ((maxChildParentAge - inputs.currentAge) / totalYears) * 100))
-                    : 0;
-
                   const savingIntervals = getChildCountIntervals(inputs.currentAge, retAge, inputs.lifeEvents);
 
                   return (
-                    <div style={{ position: 'absolute', top: '102px', left: '70px', right: '70px', height: '22px', display: 'flex', gap: '2px', pointerEvents: 'none', userSelect: 'none', zIndex: 10 }}>
-                      {/* Work & Save Band */}
-                      {workPct > 0 && (
-                        <div 
-                          className="timeline-phase-band"
-                          title="Click to adjust working budget & savings"
-                          onClick={() => handleSetBudgetClick('workSave')}
-                          style={{
-                            width: `${workPct}%`,
-                            background: 'rgba(99, 102, 241, 0.08)',
-                            border: '1px solid rgba(99, 102, 241, 0.2)',
-                            borderRadius: '4px 0 0 4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.68rem',
-                            color: '#a5b4fc',
-                            fontWeight: '700',
-                            pointerEvents: 'auto',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          💼 Work & Save Phase
-                        </div>
-                      )}
-                      {/* Retirement Band */}
-                      {workPct < 100 && (
-                        <div 
-                          className="timeline-phase-band"
-                          title="Click to adjust retirement age & spending"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire' && e.enabled);
-                            if (retireEvent) {
-                              setSelectedTimelineEvent(retireEvent);
-                              setSelectedYear(Number(retireEvent.age));
-                            }
-                          }}
-                          style={{
-                            width: `${100 - workPct}%`,
-                            background: 'rgba(16, 185, 129, 0.08)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            borderRadius: '0 4px 4px 0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.68rem',
-                            color: '#6ee7b7',
-                            fontWeight: '700',
-                            pointerEvents: 'auto',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          🎉 Retirement Phase
-                        </div>
-                      )}
+                    <div style={{ position: 'absolute', bottom: '30px', left: '70px', right: '70px', pointerEvents: 'none', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Household Phases</div>
+                      
+                      {/* Relationship Swimlane */}
+                      <div style={{ position: 'relative', width: '100%', height: '24px', display: 'flex', gap: '2px' }}>
+                        {relIntervals.map((interval, idx) => {
+                          const widthPct = Math.max(0, Math.min(100, ((interval.end - interval.start) / totalYears) * 100));
+                          if (widthPct <= 0) return null;
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                width: `${widthPct}%`,
+                                height: '100%',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.68rem',
+                                fontWeight: '700',
+                                ...interval.style
+                              }}
+                            >
+                              {interval.label}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                      {/* Childcare overlay bands */}
-                      {savingIntervals.map((interval, idx) => {
-                        if (interval.childCount === 0) return null;
-                        const startPct = Math.max(0, Math.min(100, ((interval.startAge - inputs.currentAge) / totalYears) * 100));
-                        const endPct = Math.max(0, Math.min(100, ((interval.endAge - inputs.currentAge) / totalYears) * 100));
+                      {/* Child Swimlane */}
+                      {childBand && (() => {
+                        const startPct = Math.max(0, Math.min(100, ((childBand.start - inputs.currentAge) / totalYears) * 100));
+                        const endPct = Math.max(0, Math.min(100, ((childBand.end - inputs.currentAge) / totalYears) * 100));
                         const widthPct = endPct - startPct;
                         if (widthPct <= 0) return null;
-                        
                         return (
+                          <div style={{ position: 'relative', width: '100%', height: '24px' }}>
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: `${startPct}%`,
+                                width: `${widthPct}%`,
+                                height: '100%',
+                                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(251, 191, 36, 0.12) 100%)',
+                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                color: '#fde047',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.68rem',
+                                fontWeight: '700'
+                              }}
+                            >
+                              👶 Child
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Budget Buckets (Bands) representing lifecycle phases */}
+                      <div style={{ position: 'relative', width: '100%', height: '22px', display: 'flex', gap: '2px', userSelect: 'none' }}>
+                        {/* Work & Save Band */}
+                        {workPct > 0 && (
                           <div 
-                            key={idx}
                             className="timeline-phase-band"
-                            title={`Click to adjust budget for ${interval.childCount === 1 ? '1 Child' : interval.childCount + ' Kids'} childcare phase`}
-                            onClick={() => handleSetBudgetClick(`interval_${idx}`)}
+                            title="Click to adjust working budget & savings"
+                            onClick={() => handleSetBudgetClick('workSave')}
                             style={{
-                              position: 'absolute',
-                              left: `${startPct}%`,
-                              width: `${widthPct}%`,
-                              top: '0',
-                              bottom: '0',
-                              background: 'rgba(245, 158, 11, 0.06)',
-                              border: '1.5px dashed rgba(245, 158, 11, 0.45)',
-                              borderRadius: '3px',
+                              width: `${workPct}%`,
+                              background: 'rgba(99, 102, 241, 0.08)',
+                              border: '1px solid rgba(99, 102, 241, 0.2)',
+                              borderRadius: '4px 0 0 4px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '0.65rem',
-                              color: '#f59e0b',
-                              fontWeight: '800',
-                              zIndex: 2,
-                              boxShadow: '0 0 4px rgba(245, 158, 11, 0.1)',
+                              fontSize: '0.68rem',
+                              color: '#a5b4fc',
+                              fontWeight: '700',
                               pointerEvents: 'auto',
                               cursor: 'pointer'
                             }}
                           >
-                            👶 {interval.childCount === 1 ? '1 Child' : `${interval.childCount} Kids`}
+                            💼 Work & Save Phase
                           </div>
-                        );
-                      })}
+                        )}
+                        {/* Retirement Band */}
+                        {workPct < 100 && (
+                          <div 
+                            className="timeline-phase-band"
+                            title="Click to adjust retirement age & spending"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire' && e.enabled);
+                              if (retireEvent) {
+                                setSelectedTimelineEvent(retireEvent);
+                                setSelectedYear(Number(retireEvent.age));
+                              }
+                            }}
+                            style={{
+                              width: `${100 - workPct}%`,
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1px solid rgba(16, 185, 129, 0.2)',
+                              borderRadius: '0 4px 4px 0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.68rem',
+                              color: '#6ee7b7',
+                              fontWeight: '700',
+                              pointerEvents: 'auto',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🎉 Retirement Phase
+                          </div>
+                        )}
+
+                        {/* Childcare overlay bands */}
+                        {savingIntervals.map((interval, idx) => {
+                          if (interval.childCount === 0) return null;
+                          const startPct = Math.max(0, Math.min(100, ((interval.startAge - inputs.currentAge) / totalYears) * 100));
+                          const endPct = Math.max(0, Math.min(100, ((interval.endAge - inputs.currentAge) / totalYears) * 100));
+                          const widthPct = endPct - startPct;
+                          if (widthPct <= 0) return null;
+                          
+                          return (
+                            <div 
+                              key={idx}
+                              className="timeline-phase-band"
+                              title={`Click to adjust budget for ${interval.childCount === 1 ? '1 Child' : interval.childCount + ' Kids'} childcare phase`}
+                              onClick={() => handleSetBudgetClick(`interval_${idx}`)}
+                              style={{
+                                position: 'absolute',
+                                left: `${startPct}%`,
+                                width: `${widthPct}%`,
+                                top: '0',
+                                bottom: '0',
+                                background: 'rgba(245, 158, 11, 0.06)',
+                                border: '1.5px dashed rgba(245, 158, 11, 0.45)',
+                                borderRadius: '3px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.65rem',
+                                color: '#f59e0b',
+                                fontWeight: '800',
+                                zIndex: 2,
+                                boxShadow: '0 0 4px rgba(245, 158, 11, 0.1)',
+                                pointerEvents: 'auto',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              👶 {interval.childCount === 1 ? '1 Child' : `${interval.childCount} Kids`}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })()}
 
-                <div className="timeline-line-axis" style={{ top: '130px' }} />
+                <div className="timeline-line-axis" style={{ top: '190px' }} />
                 <div
                   className="timeline-progress-line"
                   style={{
-                    top: '130px',
+                    top: '190px',
                     width: activeResults.targetRetirementAge 
                       ? `calc((100% - 140px) * ${Math.max(0, Math.min(100, (((activeResults.targetRetirementAge) - inputs.currentAge) / (inputs.lifeExpectancy - inputs.currentAge)) * 100))} / 100)`
                       : '0px'
@@ -7457,7 +8427,7 @@ export default function FireSimulator() {
                 />
 
                 {/* Chronological Axis Number Line Ticks */}
-                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '130px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
+                <div className="timeline-ticks-container" style={{ position: 'absolute', top: '190px', left: 0, right: 0, height: '30px', zIndex: 1, pointerEvents: 'none' }}>
                   {(() => {
                     const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                     const ticks = [];
@@ -7498,7 +8468,7 @@ export default function FireSimulator() {
                         className={`timeline-node ${evt.isMilestone ? 'milestone' : ''} ${evt.age <= activeResults.targetRetirementAge ? 'active' : ''} ${isDraggingThis ? 'dragging' : ''}`}
                         style={{ 
                           left: leftOffset, 
-                          top: `${85 - (evt.stackIndex * 36)}px`, 
+                          top: `${145 - (evt.stackIndex * 36)}px`, 
                           transform: 'translateX(-50%)',
                           cursor: isDraggingThis ? 'grabbing' : isEditableEvent(evt) ? 'grab' : 'pointer',
                           pointerEvents: 'auto'
@@ -7561,6 +8531,168 @@ export default function FireSimulator() {
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                   {selectedTimelineEvent.description}
                 </p>
+                {selectedTimelineEvent.type === 'socialSecurity' && (() => {
+                  const ss = displayedResults.socialSecurityDetails;
+                  if (!ss) return null;
+                  
+                  if (!ss.isEligible) {
+                    return (
+                      <div style={{ 
+                        marginTop: '0.75rem', 
+                        padding: '0.75rem', 
+                        background: 'rgba(244, 63, 94, 0.1)', 
+                        borderRadius: 'var(--radius-sm, 4px)', 
+                        border: '1px solid rgba(244, 63, 94, 0.3)', 
+                        fontSize: '0.75rem',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ fontWeight: 'bold', color: 'var(--accent-rose, #f43f5e)', marginBottom: '0.25rem' }}>
+                          Estimated Social Security
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)' }}>
+                          Not eligible yet. Social Security retirement benefits generally require about 10 years of work.
+                        </div>
+                        <div style={{ marginTop: '0.35rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>
+                          Working years: {ss.workingYears} / 10
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  let adjustmentText = "Full retirement age benefit";
+                  if (ss.claimAge < 67) {
+                    const monthsEarly = (67 - ss.claimAge) * 12;
+                    let reduction = 0;
+                    if (monthsEarly <= 36) {
+                      reduction = monthsEarly * (5 / 9);
+                    } else {
+                      reduction = 36 * (5 / 9) + (monthsEarly - 36) * (5 / 12);
+                    }
+                    adjustmentText = `${Math.round(reduction)}% early-claiming reduction`;
+                  } else if (ss.claimAge === 67) {
+                    adjustmentText = "Full retirement age benefit";
+                  } else {
+                    const monthsDelayed = (ss.claimAge - 67) * 12;
+                    const creditPct = Math.round(monthsDelayed * (2 / 3));
+                    adjustmentText = `${creditPct}% delayed credit`;
+                  }
+                  
+                  return (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                        Estimated Social Security
+                      </div>
+                      <div style={{ 
+                        padding: '0.75rem', 
+                        background: 'var(--bg-primary, rgba(0,0,0,0.15))', 
+                        borderRadius: 'var(--radius-sm, 4px)', 
+                        border: '1px solid var(--border-color)', 
+                        display: 'grid', 
+                        gridTemplateColumns: '1fr 1fr', 
+                        gap: '0.5rem', 
+                        fontSize: '0.75rem' 
+                      }}>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Claiming Age:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{ss.claimAge}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Monthly Benefit:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(ss.monthlyBenefit)}/mo</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Annual Benefit:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(ss.annualBenefit)}/yr</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Working Years:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{ss.workingYears}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Average of highest 35 earning years:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>
+                            {ss.averageTop35AnnualIncome > 0 ? `${formatCurrency(ss.averageTop35AnnualIncome)}/yr` : 'N/A (Fixed SS)'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>AIME:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>
+                            {ss.aimeMonthly > 0 ? `${formatCurrency(ss.aimeMonthly)}/mo` : 'N/A (Fixed SS)'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>PIA at full retirement age:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>
+                            {ss.piaMonthly > 0 ? `${formatCurrency(ss.piaMonthly)}/mo` : 'N/A'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Claiming Adjustment:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--accent-emerald, #10b981)' }}>{adjustmentText}</strong>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: '0.35rem' }}>
+                        Estimated from your simulated earnings history, highest 35 earning years, and claiming age.
+                      </div>
+                    </div>
+                  );
+                })()}
+                {selectedTimelineEvent.type === 'marriage' && (() => {
+                  const ev = selectedTimelineEvent;
+                  const spouseAssets = (Number(ev.cash) || 0) + (Number(ev.investments) || 0) + (Number(ev.retirement) || 0);
+                  const spouseDebt = (Number(ev.debtStudent) || 0) + (Number(ev.debtCredit) || 0) + (Number(ev.debtOther) || 0);
+                  
+                  return (
+                    <div style={{ 
+                      marginTop: '0.75rem', 
+                      padding: '0.75rem', 
+                      background: 'var(--bg-primary, rgba(0,0,0,0.15))', 
+                      borderRadius: 'var(--radius-sm, 4px)', 
+                      border: '1px solid var(--border-color)', 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '0.75rem', 
+                      fontSize: '0.75rem' 
+                    }}>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Spouse Income:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--accent-emerald)' }}>{formatCurrency(ev.spouseIncome)}/yr</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Income Growth:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{ev.incomeGrowthRate}%</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Spouse Assets:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--accent-emerald)' }}>{formatCurrency(spouseAssets)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Spouse Debt:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: spouseDebt > 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>{formatCurrency(spouseDebt)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Filing Status:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{ev.filingStatus === 'jointly' ? 'Jointly' : 'Separately'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Savings Rate:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{ev.savingsRate}%</strong>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <span style={{ color: 'var(--text-tertiary)' }}>Adjustments:</span>
+                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>
+                          Lifestyle: {ev.lifestyleAdjustment >= 0 ? '+' : ''}{formatCurrency(ev.lifestyleAdjustment)}/mo | Housing: {ev.housingOption === 'savings' ? `Save ${formatCurrency(Math.abs(ev.housingSavings))}/mo` : ev.housingOption === 'expensive' ? `Cost ${formatCurrency(ev.housingCost)}/mo` : 'No Change'}
+                        </strong>
+                      </div>
+                      {ev.includeWeddingCost && (
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <span style={{ color: 'var(--text-tertiary)' }}>Wedding Cost:</span>
+                          <strong style={{ marginLeft: '0.25rem', color: 'var(--accent-rose)' }}>{formatCurrency(ev.weddingCost)} at Age {ev.weddingAge}</strong>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                   {isEditableEvent(selectedTimelineEvent) && (
                     <button
@@ -7826,6 +8958,32 @@ export default function FireSimulator() {
               )}
             </div>
           )}
+
+          {/* Things You’re Currently Managing Section */}
+          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1, minWidth: '280px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                  📋 Things You’re Currently Managing
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                  Many people have student loans, car loans, mortgages, or credit card balances. Adding them helps make your plan more accurate.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: '700', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0, height: '32px' }}
+                onClick={handleCreateCurrentCondition}
+              >
+                ➕ Add Current Condition
+              </button>
+            </div>
+            
+            <div style={{ marginTop: '0.25rem' }}>
+              {renderCurrentConditionsList()}
+            </div>
+          </div>
 
           <div className="roadmap-grid-layout">
             
@@ -8294,17 +9452,17 @@ export default function FireSimulator() {
                     Target retirement spending defaults to <strong>{inputs.isAdvancedMode ? 'your customized spending phases' : '70% of pre-retirement lifestyle spending'}</strong> (not final salary), ensuring SWR targets scale with actual lifestyle costs rather than gross income.
                   </p>
                 </div>
-                <div>
+                 <div>
                   <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    💰 Social Security Claiming Scale
+                    💰 Social Security & PIA Formula
                   </h4>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-                    Benefits scale dynamically based on the claiming age relative to Full Retirement Age (FRA, age 67):
+                    Calculates benefits dynamically from your simulated earnings history using the official-style formula:
                     <span style={{ display: 'block', marginTop: '0.25rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-color)' }}>
-                      • Age 62 (Early Claiming): <strong>70%</strong> of full benefit.<br />
-                      • Age 67 (Full Retirement): <strong>100%</strong> of benefit.<br />
-                      • Age 70 (Delayed Credits): <strong>124%</strong> of benefit.<br />
-                      • Prior to claiming age, benefit is <strong>$0</strong>.
+                      • <strong>Eligibility:</strong> Requires at least <strong>10 working years</strong> (earned income &gt; 0) to qualify; otherwise, benefits are $0.<br />
+                      • <strong>AIME:</strong> Computes Average Indexed Monthly Earnings from your highest 35 earning years (padded with $0 if fewer) divided by 420 months.<br />
+                      • <strong>PIA Bend Points (2026):</strong> Full retirement benefit (PIA) uses 2026 bend points: 90% of AIME up to $1,286 + 32% of AIME between $1,286 and $7,749 + 15% of AIME above $7,749.<br />
+                      • <strong>Claiming Adjustments:</strong> FRA is 67. Claiming early (62–66) reduces benefit by 5/9% per month for the first 36 months and 5/12% per month thereafter (30% reduction at 62). Delaying (68–70) adds 8% per year (24% increase at 70).
                     </span>
                   </p>
                 </div>
@@ -8470,6 +9628,27 @@ export default function FireSimulator() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          backgroundColor: 'var(--bg-secondary, #1f2937)',
+          borderLeft: '4px solid var(--accent-rose, #f43f5e)',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+          color: 'var(--text-primary, #f3f4f6)',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '0.375rem',
+          zIndex: 9999,
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          ⚠️ {notification}
         </div>
       )}
 

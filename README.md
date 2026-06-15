@@ -56,16 +56,42 @@ To verify input conditions, see the comprehensive [Test Cases Checklist](file://
    npm run build
    ```
 
-4. **Run End-to-End (E2E) Browser Tests**:
-   Ensure Playwright browsers are installed first:
-   ```bash
-   npx playwright install
-   ```
-   Run all E2E tests headlessly (Chromium, Firefox, WebKit):
-   ```bash
-   npm run test:e2e
-   ```
-   To run tests in the interactive UI mode:
-   ```bash
-   npm run test:e2e:ui
-   ```
+## Testing Policy & Commands
+
+The project uses **Vitest** for unit testing of calculations and simulation logic, and **Playwright** for end-to-end user flow tests.
+
+### 1. Unit Testing (Vitest)
+
+To minimize developer feedback loops, Vitest should be kept running in changed watch mode during active development:
+```bash
+npx vitest --changed
+```
+*(or `npm run test:watch`)*
+Vitest will monitor the codebase and only rerun the unit tests affected by your edits using Vite's module graph.
+
+*   **One-time Related Run**: If a persistent watcher is not desired, execute:
+    ```bash
+    npx vitest related <changed files>
+    ```
+    (or `npm run test:unit:related <changed files>`).
+*   **One-time Full Run**: To run all unit tests once:
+    ```bash
+    npm run test:unit
+    ```
+
+### 2. End-to-End Testing (Playwright)
+
+To save execution time, E2E validation defaults to running only tests impacted by changes relative to the `main` branch:
+```bash
+npm run test:e2e:changed
+```
+*(Runs: `npx playwright test --only-changed=main`)*
+
+*   **Full Suite Run**: Before merging into `main` or when doing a release build validation, run the full E2E suite:
+    ```bash
+    npm run test:e2e:full
+    ```
+*   **E2E UI Runner**:
+    ```bash
+    npm run test:e2e:ui
+    ```

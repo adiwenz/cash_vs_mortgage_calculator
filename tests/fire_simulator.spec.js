@@ -73,9 +73,9 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Click Adjust Plan to open Retirement Improvement Plan
     await page.getByRole('button', { name: 'Adjust Plan', exact: true }).click();
 
-    // Verify Improvement Plan modal is open and apply the "Earn More" scenario
-    const earnMoreCard = page.locator('.improvement-plan-card:has-text("Earn More")');
-    await earnMoreCard.getByRole('button', { name: 'Apply Scenario' }).click();
+    // Verify Improvement Plan modal is open and apply the "Retire at Requested Retirement Date" scenario
+    const requestedDateCard = page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")');
+    await requestedDateCard.getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Verify Budget Builder modal opens and childcare phase toggle is visible
     const childcarePhaseBtn = page.getByRole('button', { name: '👶 1 Child' });
@@ -144,10 +144,10 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await expect(page.getByText('💡 Action Plan Available:')).toBeVisible();
     await page.getByRole('button', { name: 'View Action Plan' }).click();
 
-    // Verify only the intended recommendation cards (specifically Retire at 65) appear
+    // Verify only the intended recommendation cards appear
     await expect(page.locator('.improvement-plan-card:has-text("Retire at Age 65")')).toBeVisible();
-    await expect(page.locator('.improvement-plan-card:has-text("Save More")')).toBeVisible();
-    await expect(page.locator('.improvement-plan-card:has-text("Earn More")')).toBeVisible();
+    await expect(page.locator('.improvement-plan-card:has-text("Retire at Retirement Ready Age")')).toBeVisible();
+    await expect(page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")')).toBeVisible();
 
     // Close the Action Plan modal
     await page.getByRole('button', { name: 'Done', exact: true }).click();
@@ -202,8 +202,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Earn More
-    await page.locator('.improvement-plan-card:has-text("Earn More")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Retire at Requested Retirement Date
+    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: '👶 1 Child' }).click();
@@ -233,8 +233,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open again
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Earn More again
-    await page.locator('.improvement-plan-card:has-text("Earn More")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Retire at Requested Retirement Date again
+    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: '👶 2 Kids' }).click();
@@ -264,8 +264,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open again
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Earn More again
-    await page.locator('.improvement-plan-card:has-text("Earn More")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Retire at Requested Retirement Date again
+    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: '👶 3 Kids' }).click();

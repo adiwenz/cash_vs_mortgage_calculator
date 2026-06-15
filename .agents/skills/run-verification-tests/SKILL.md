@@ -8,18 +8,31 @@ This skill ensures that whenever you modify, create, or delete any source code, 
 
 ## Instructions
 
-1. **When to run**:
-   - Immediately after making any code edit using `replace_file_content`, `multi_replace_file_content`, or `write_to_file`.
-   - Before completing a task or submitting an implementation plan walkthrough.
-
-2. **Command to run**:
-   - Run the npm test command from the repository root:
+1. **Active Development Mode (Continuous Watch)**:
+   - During active development, keep Vitest running persistently in changed watch mode:
      ```bash
-     npm test
+     npx vitest --changed
      ```
-   - This executes the standard test suite:
-     `node test_defaults.js && node test_child_costs.js && node test_recommendations.js && ... && node test_display_mode_does_not_change_results.js`
-   
-3. **If tests fail**:
-   - Do not end your turn or present broken results.
-   - Inspect the console/table output, diagnose the failure, fix the underlying code, and re-run the tests.
+     (or `npm run test:watch`).
+   - After each code edit, inspect the existing Vitest watch output instead of launching a new full unit test run. Vitest will detect changed files automatically and rerun only affected tests.
+
+2. **One-Time Related Unit Validation**:
+   - If a persistent terminal session is not available, run Vitest targeting only the modified files:
+     ```bash
+     npx vitest related <changed files>
+     ```
+     (or `npm run test:unit:related <changed files>`). Avoid running the full suite `npm run test:unit` during development iterations.
+
+3. **E2E Changed Validation (Playwright)**:
+   - For Playwright end-to-end tests, default to running only changed tests relative to the main branch:
+     ```bash
+     npx playwright test --only-changed=main
+     ```
+     (or `npm run test:e2e:changed`).
+
+4. **Broader/Full-Suite Validation**:
+   - Only run the full E2E suite (`npm run test:e2e:full` / `npx playwright test`) or full unit test suite (`npm run test:unit`) when:
+     - Explicitly requested by the user.
+     - Preparing a final release/build verification.
+     - The branch is about to be merged into `main`.
+     - The changed-test command indicates broader validation is required.

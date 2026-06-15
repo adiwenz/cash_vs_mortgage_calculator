@@ -15,19 +15,14 @@ This skill ensures that whenever you implement a new feature, add a new calculat
 2. **Test File Conventions**:
    - Write tests in standard ES modules format, matching the pattern of existing tests (e.g., [test_recommendations.js](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/test_recommendations.js)).
    - Name new test files with the prefix `test_`, e.g., `test_<feature_name>.js`.
-   - Include a simple assertion mechanism (such as an `assert(condition, message)` function) and run via standard `node <test_file>.js`. If a test fails, log the failure and exit with `process.exit(1)`. On success, exit with `process.exit(0)`.
+   - Include a simple assertion mechanism (such as an `assert(condition, message)` function) and run via standard `node <test_file>.js` or `npx vitest run test_<feature_name>.js`.
 
 3. **Integrate into Verification Suite**:
-   - When a new test file is created, append it to the `test` script in [package.json](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/package.json) using `&& node test_<feature_name>.js`.
-   - Update the command description in the `run-verification-tests` skill to include the new test.
+   - When a new test file is created, append it to the legacy `test` script in [package.json](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/package.json) using `&& node test_<feature_name>.js`.
+   - Ensure it is matched by the Vitest configuration (`test_*.js`).
 
 4. **Verify Locally**:
-   - Run the new test individually first to ensure its correct execution:
-     ```bash
-     node test_<feature_name>.js
-     ```
-   - Run the full verification suite via:
-     ```bash
-     npm test
-     ```
-   - Ensure all tests pass before finishing your task or presenting results to the user.
+   - Rely on Vitest in changed watch mode (`npx vitest --changed` or `npm run test:watch`) during development to automatically run the new/modified test files.
+   - If watch mode is not active, run a targeted run using `npx vitest run test_<feature_name>.js` or `npx vitest related <changed files>`.
+   - For Playwright E2E tests, run targeted changed tests: `npx playwright test --only-changed=main`.
+   - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e:full`) unless verifying final changes before branch merge or explicitly requested by the user.
