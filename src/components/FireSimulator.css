@@ -391,7 +391,7 @@
 
 /* Layer 3: Events / Milestones Track */
 .events-row-content {
-  min-height: 180px; /* Taller track to prevent overlaps with stacked glowing badges */
+  height: 180px; /* Taller track to prevent overlaps with stacked glowing badges */
 }
 
 .events-axis-line {
