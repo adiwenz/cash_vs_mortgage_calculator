@@ -17,7 +17,8 @@ import { runFireSimulation, validateFireInputs, getSocialSecurityFactor, validat
 import { 
   calculateRetireAt65Recommendation, 
   calculateSaveMoreRecommendation, 
-  calculateEarnMoreRecommendation 
+  calculateEarnMoreRecommendation,
+  getChildCostOffsetRecommendations
 } from '../recommendations';
 import './FireSimulator.css';
 
@@ -1357,6 +1358,37 @@ export default function FireSimulator() {
       savingsEffortScore: 3
     });
 
+    // 4. Temporary Childcare Offset Recommendation
+    const childRecommendations = getChildCostOffsetRecommendations(inputs);
+    childRecommendations.forEach(rec => {
+      const clonedInputs = JSON.parse(JSON.stringify(inputs));
+      clonedInputs.incomeList = [...(clonedInputs.incomeList || []), ...rec.incomeBoosts];
+      
+      const boostResults = runFireSimulation(clonedInputs);
+      const readyAge = boostResults.retirementReadyAge;
+      
+      const currentReadyAge = recResults.retirementReadyAge;
+      const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
+      
+      list.push({
+        type: `childOffset-${rec.childEventId}`,
+        icon: '👶',
+        title: 'Offset child costs with temporary income',
+        details: `Your plan includes about ${formatCurrency(rec.peakCost)}/year in child-related costs for ${rec.duration} years. One way to keep your retirement plan on track is to earn an extra ${formatCurrency(rec.peakCost)}/year during those years.`,
+        bulletPoints: [
+          `Earn an extra ${formatCurrency(rec.peakCost)}/year from parent age ${rec.parentStartAge} to ${rec.parentEndAge}.`,
+          `This temporary income boost is designed to align precisely with your child-rearing years.`,
+          `This recommendation improves or preserves your retirement readiness without requiring a permanent budget cut.`
+        ],
+        readyAge: readyAge || targetRetirementAge,
+        yearsImprovement: yearsImprovement,
+        value: rec.peakCost,
+        incomeBoosts: rec.incomeBoosts,
+        savingsFocus: 'Earn More',
+        savingsEffortScore: 2
+      });
+    });
+
     return {
       showImprovementPlan: true,
       rankedPlan: list,
@@ -1621,6 +1653,8 @@ export default function FireSimulator() {
       // Retire at 65 with no changes needed (scenario.value === 0) doesn't change current income/expenses
     } else if (scenario.type === 'retireReadyAge') {
       // Retire at ready age doesn't change current income/expenses
+    } else if (scenario.type.startsWith('childOffset')) {
+      // Offset child costs with temporary income doesn't change current base income/expenses/savings
     }
 
     // Calculate differences for glow effect
@@ -2693,6 +2727,9 @@ export default function FireSimulator() {
         } else if (scenario.type === 'combined') {
           const yearsDelay = scenario.value && typeof scenario.value === 'object' ? (scenario.value.delay || 0) : 0;
           newInputs.targetRetirementAge = newInputs.targetRetirementAge + yearsDelay;
+        } else if (scenario.type.startsWith('childOffset')) {
+          const boosts = scenario.incomeBoosts || [];
+          newInputs.incomeList = [...(newInputs.incomeList || []), ...boosts];
         }
 
         const targetRetAge = newInputs.targetRetirementAge;
