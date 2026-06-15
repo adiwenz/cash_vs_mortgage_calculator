@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ['test_*.js'],
+    include: ['test_*.js', 'test_*.jsx'],
     exclude: ['tests/**', 'node_modules/**'],
     setupFiles: ['./vitest.setup.js']
   }
