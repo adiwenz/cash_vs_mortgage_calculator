@@ -257,6 +257,48 @@ try {
   assert(Math.round(deflatedIncome8) === 65004, `Expected deflated simulated income to be $65,004, got ${Math.round(deflatedIncome8)} (double-counting check)`);
   console.log('✅ Test 8 Passed: Simulated income is not double-counted (remains $65,000/yr).');
 
+  // Test 9: Verify child-income-boost continues past targetRetirementAge if childcare years extend into retirement
+  const testInputs9 = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  testInputs9.currentAge = 55;
+  testInputs9.targetRetirementAge = 60; // Retires at 60
+  testInputs9.lifeEvents = [
+    {
+      id: 'retire-event',
+      type: 'retire',
+      enabled: true,
+      age: 60, // Retires at 60
+      spendingPercent: 70
+    },
+    {
+      id: 'child-test-9',
+      type: 'haveChild',
+      enabled: true,
+      name: 'Late Child',
+      birthAge: 50, // Born when parent was 50, active 50-68
+      childStartAge: 0,
+      costMethod: 'custom',
+      customAges0to4: 15000,
+      customAges5to12: 15000,
+      customAges13to18: 15000,
+      customAges19to22: 15000,
+      includeCollege: false
+    }
+  ];
+
+  // Get recommendations and inject the incomeBoosts
+  const recs9 = getChildCostOffsetRecommendations(testInputs9);
+  testInputs9.incomeList = [...(testInputs9.incomeList || []), ...recs9[0].incomeBoosts];
+
+  const results9 = runFireSimulation(testInputs9);
+  // Find simulated income at age 62 (retired but child is 12 years old)
+  const age62Data9 = results9.data.find(d => d.age === 62);
+  assert(age62Data9 !== undefined, 'Should have simulated data at age 62');
+  
+  // Deflated income at age 62 should be exactly $15,000/yr (since they are retired, base salary is 0)
+  const deflatedIncome9 = age62Data9.income;
+  assert(Math.round(deflatedIncome9) === 15000, `Expected deflated simulated income in retirement to be $15,000, got ${Math.round(deflatedIncome9)}`);
+  console.log('✅ Test 9 Passed: Child income boost continues past targetRetirementAge during retirement.');
+
   console.log('--- ALL test_child_recommendations PASSED ---');
   process.exit(0);
 } catch (err) {

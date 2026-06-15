@@ -1162,7 +1162,9 @@ export function runFireSimulation(inputs) {
 
     combinedIncomeList.forEach(inc => {
       let effectiveEndAge = Math.min(inc.endAge !== undefined ? inc.endAge : targetRetirementAge, targetRetirementAge);
-      if (!isAdvanced) {
+      if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
+        effectiveEndAge = inc.endAge;
+      } else if (!isAdvanced) {
         if (inc.id === 'inc-1' || inc.id === 'simple-inc-worksave' || inc.id === 'simple-inc-prechild' || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
           if (!inc.id.includes('childcare') && !inc.id.includes('prechild') && !inc.name.toLowerCase().includes('childcare')) {
             effectiveEndAge = targetRetirementAge;
