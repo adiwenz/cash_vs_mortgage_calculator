@@ -1788,7 +1788,7 @@ export default function FireSimulator() {
       let childBoostForCurrent = 0;
       (inp.incomeList || []).forEach(inc => {
         if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
-          if (inc.startAge < currentPhase.endAge && inc.endAge > currentPhase.startAge) {
+          if (currentPhase.startAge >= inc.startAge && currentPhase.startAge < inc.endAge) {
             const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
             childBoostForCurrent += boostYearly / 12;
           }
