@@ -62,14 +62,17 @@ The project uses **Vitest** for unit testing of calculations and simulation logi
 
 ### 1. Unit Testing (Vitest)
 
-To minimize developer feedback loops, Vitest should be kept running in changed watch mode during active development:
+To minimize feedback loops during development, run Vitest targeting only the changed files:
 ```bash
 npx vitest --changed
 ```
-*(or `npm run test:watch`)*
-Vitest will monitor the codebase and only rerun the unit tests affected by your edits using Vite's module graph.
+*(or `npm run test:changed`)*
 
-*   **One-time Related Run**: If a persistent watcher is not desired, execute:
+*   **Persistent Watch Mode**: To run Vitest continuously in watch mode:
+    ```bash
+    npm run test:watch
+    ```
+*   **One-time Related Run**: To run Vitest targeting only the modified files:
     ```bash
     npx vitest related <changed files>
     ```

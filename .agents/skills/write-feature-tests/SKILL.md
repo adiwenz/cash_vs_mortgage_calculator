@@ -22,7 +22,11 @@ This skill ensures that whenever you implement a new feature, add a new calculat
    - Ensure it is matched by the Vitest configuration (`test_*.js`).
 
 4. **Verify Locally**:
-   - Rely on Vitest in changed watch mode (`npx vitest --changed` or `npm run test:watch`) during development to automatically run the new/modified test files.
-   - If watch mode is not active, run a targeted run using `npx vitest run test_<feature_name>.js` or `npx vitest related <changed files>`.
+   - Run a one-time execution of Vitest targeting only the changed files:
+     ```bash
+     npx vitest --changed
+     ```
+     (or `npm run test:changed`).
+   - If git changes are not staged/committed, run a targeted run using `npx vitest run test_<feature_name>.js` or `npx vitest related <changed files>`.
    - For Playwright E2E tests, run targeted changed tests: `npx playwright test --only-changed=main`.
    - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e:full`) unless verifying final changes before branch merge or explicitly requested by the user.

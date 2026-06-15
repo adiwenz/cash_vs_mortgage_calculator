@@ -8,16 +8,15 @@ This skill ensures that whenever you modify, create, or delete any source code, 
 
 ## Instructions
 
-1. **Active Development Mode (Continuous Watch)**:
-   - During active development, keep Vitest running persistently in changed watch mode:
+1. **Active Development Unit Validation**:
+   - After each code edit, run a one-time execution of Vitest targeting only the changed files:
      ```bash
      npx vitest --changed
      ```
-     (or `npm run test:watch`).
-   - After each code edit, inspect the existing Vitest watch output instead of launching a new full unit test run. Vitest will detect changed files automatically and rerun only affected tests.
+     (or `npm run test:changed`). Inspect the output to ensure the affected tests pass. Do not run Vitest in watch mode.
 
 2. **One-Time Related Unit Validation**:
-   - If a persistent terminal session is not available, run Vitest targeting only the modified files:
+   - If git changes are not staged/committed, run Vitest targeting only the modified files:
      ```bash
      npx vitest related <changed files>
      ```
