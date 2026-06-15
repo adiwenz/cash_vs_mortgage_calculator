@@ -6433,7 +6433,9 @@ export default function FireSimulator() {
         !inc.id.startsWith('child-income-boost')
       );
       let baseSalaryMonthly = 0;
-      if (rawIncomeItem) {
+      if (isRetirementPhase) {
+        baseSalaryMonthly = 0;
+      } else if (rawIncomeItem) {
         baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
       } else {
         baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
@@ -7495,7 +7497,7 @@ export default function FireSimulator() {
                           </span>
                         </div>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-                          Roadmap child event cost (Age {inputs.currentAge})
+                          Roadmap child event cost (Age {activePhaseObj?.startAge || inputs.currentAge})
                         </span>
                       </div>
                       <div className="input-prefix-wrapper" style={{ width: '110px', opacity: 0.85 }}>
@@ -7569,8 +7571,8 @@ export default function FireSimulator() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                         <span style={{ fontSize: '0.78rem', color: netRemaining < 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 'bold' }}>
                           {netRemaining < 0 
-                            ? `🔴 Cash Flow Deficit: ${formatCurrency(Math.abs(netRemaining))}/mo deficit at parent age ${inputs.currentAge}.`
-                            : `🟢 Cash Flow Balanced: ${formatCurrency(netRemaining)}/mo surplus at parent age ${inputs.currentAge}.`}
+                            ? `🔴 Cash Flow Deficit: ${formatCurrency(Math.abs(netRemaining))}/mo deficit at parent age ${activePhaseObj?.startAge || inputs.currentAge}.`
+                            : `🟢 Cash Flow Balanced: ${formatCurrency(netRemaining)}/mo surplus at parent age ${activePhaseObj?.startAge || inputs.currentAge}.`}
                         </span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                           {savingsAllocMode === 'percentSurplus'
