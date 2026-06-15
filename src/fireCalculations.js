@@ -2701,6 +2701,15 @@ export function getNormalizedPhases(inputs) {
   boundaries.add(targetRetirementAge);
   boundaries.add(lifeExpectancy);
 
+  // Social Security Claiming Age Boundary
+  const ssEv = enabledEvents.find(e => e.type === 'socialSecurity');
+  if (ssEv) {
+    const claimAge = Number(ssEv.claimingAge !== undefined ? ssEv.claimingAge : 67);
+    if (claimAge > currentAge && claimAge < lifeExpectancy) {
+      boundaries.add(claimAge);
+    }
+  }
+
   // A. Career Changes (from incomeList start ages)
   (inputs.incomeList || []).forEach(inc => {
     if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
@@ -2750,21 +2759,37 @@ export function getNormalizedPhases(inputs) {
 
     const childCount = getActiveChildrenCountAtAge(start, inputs.lifeEvents);
 
+    const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
+    const ssClaimingAge = ssEvent ? (Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67) : 67;
+    const isReceivingSS = ssEvent && start >= ssClaimingAge;
+
     // Identify primary type, name, and icon
     let type = 'workSave';
-    let name = 'Standard Work Phase';
-    let icon = '💼';
+    let name = isReceivingSS ? 'Working (Receiving SS)' : 'Standard Work Phase';
+    let icon = isReceivingSS ? '🇺🇸' : '💼';
 
     if (start >= targetRetirementAge) {
       type = 'retire';
-      icon = childCount > 0 ? '👶' : '🌴';
-      name = childCount > 0 
-        ? (childCount === 1 ? '1 Child (Retired)' : `${childCount} Kids (Retired)`)
-        : 'Retirement';
+      if (isReceivingSS) {
+        icon = '🇺🇸';
+        name = childCount > 0
+          ? (childCount === 1 ? '1 Child (Receiving SS)' : `${childCount} Kids (Receiving SS)`)
+          : 'Receiving SS';
+      } else {
+        icon = childCount > 0 ? '👶' : '🌴';
+        name = childCount > 0 
+          ? (childCount === 1 ? '1 Child (Retired)' : `${childCount} Kids (Retired)`)
+          : 'Retirement';
+      }
     } else if (childCount > 0) {
       type = 'childcare';
-      name = childCount === 1 ? '1 Child' : `${childCount} Kids`;
-      icon = '👶';
+      if (isReceivingSS) {
+        icon = '🇺🇸';
+        name = childCount === 1 ? '1 Child (Receiving SS)' : `${childCount} Kids (Receiving SS)`;
+      } else {
+        name = childCount === 1 ? '1 Child' : `${childCount} Kids`;
+        icon = '👶';
+      }
     } else {
       const marriageEv = enabledEvents.find(e => e.type === 'marriage' && Number(e.age) === start);
       const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
@@ -2775,8 +2800,8 @@ export function getNormalizedPhases(inputs) {
 
       if (marriageEv) {
         type = 'marriage';
-        name = 'Marriage Phase';
-        icon = '💍';
+        name = isReceivingSS ? 'Marriage Phase (Receiving SS)' : 'Marriage Phase';
+        icon = isReceivingSS ? '🇺🇸' : '💍';
       }
     }
 
@@ -2802,7 +2827,26 @@ export function getNormalizedPhases(inputs) {
     if (childCount > 0) {
       childBoost = 1250 * childCount;
     }
-    const defaultIncome = baseSalaryMonthly + childBoost;
+
+    // Add Social Security monthly benefit if receiving SS
+    let ssMonthlyIncome = 0;
+    if (isReceivingSS && ssEvent) {
+      if (ssEvent.useEarnings) {
+        const incomeHistory = getIncomeHistory(inputs, ssEvent, true);
+        const ssCalculated = calculateSocialSecurityBenefit({
+          incomeHistory,
+          claimAge: ssClaimingAge,
+          fullRetirementAge: 67
+        });
+        ssMonthlyIncome = Math.round(ssCalculated.monthlyBenefit);
+      } else {
+        const baseBenefit = Number(ssEvent.monthlyBenefit !== undefined ? ssEvent.monthlyBenefit : 2000);
+        const factor = getSocialSecurityFactor(ssClaimingAge);
+        ssMonthlyIncome = Math.round(baseBenefit * factor);
+      }
+    }
+
+    const defaultIncome = baseSalaryMonthly + childBoost + ssMonthlyIncome;
 
     // User monthly expenses
     const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && sp.id !== 'simple-spend-childcare');
@@ -2824,34 +2868,66 @@ export function getNormalizedPhases(inputs) {
     let spouseInvestments = 0;
     let spouseRetirement = 0;
 
-    if (isMarried && start < targetRetirementAge) {
+    let partnerSSMonthlyIncome = 0;
+    if (isMarried) {
       const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
-      spouseIncome = spouseMember ? Math.round((Number(spouseMember.income) || 0) / 12) : Math.round(Number(marriageEvent.spouseIncome || 0) / 12);
-      spouseIncomeGrowthRate = spouseMember
-        ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
-        : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
-      if (spouseIncomeGrowthRate > 0.5) spouseIncomeGrowthRate /= 100;
+      if (spouseMember) {
+        const spouseClaimAge = Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67);
+        if (start >= spouseClaimAge) {
+          if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && spouseMember.spouseEstimatedSocialSecurityBenefit !== null && spouseMember.spouseEstimatedSocialSecurityBenefit !== '' && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
+            const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
+            const factor = getSocialSecurityFactor(spouseClaimAge);
+            partnerSSMonthlyIncome = Math.round(baseBenefit * factor);
+          } else if (spouseMember.income > 0) {
+            const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
+              ? Number(spouseMember.desiredRetirementAge)
+              : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : (marriageEvent.spouseCurrentAge !== undefined ? marriageEvent.spouseCurrentAge : currentAge)) - currentAge);
+            const spouseWorkYears = Math.max(0, spouseRetAge - 22);
+            const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
+            const spouseSSCalc = calculateSocialSecurityBenefit({
+              incomeHistory: spouseIncomeHistory,
+              claimAge: spouseClaimAge
+            });
+            partnerSSMonthlyIncome = Math.round(spouseSSCalc.monthlyBenefit);
+          }
+        }
+      }
+    }
 
-      spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (Number(marriageEvent.savingsRate) || 0);
-      spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (Number(marriageEvent.cash) || 0);
-      spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (Number(marriageEvent.investments) || 0);
-      spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (Number(marriageEvent.retirement) || 0);
+    if (isMarried) {
+      if (start < targetRetirementAge) {
+        const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
+        spouseIncome = spouseMember ? Math.round((Number(spouseMember.income) || 0) / 12) : Math.round(Number(marriageEvent.spouseIncome || 0) / 12);
+        spouseIncomeGrowthRate = spouseMember
+          ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
+          : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
+        if (spouseIncomeGrowthRate > 0.5) spouseIncomeGrowthRate /= 100;
 
-      // default combined spending if married
-      if (marriageEvent.combinedSpendingAfterMarriage) {
-        baseExpensesMonthly = Math.round(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
+        spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (Number(marriageEvent.savingsRate) || 0);
+        spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (Number(marriageEvent.cash) || 0);
+        spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (Number(marriageEvent.investments) || 0);
+        spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (Number(marriageEvent.retirement) || 0);
+
+        // default combined spending if married
+        if (marriageEvent.combinedSpendingAfterMarriage) {
+          baseExpensesMonthly = Math.round(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
+        } else {
+          const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100)); // default spouse spending
+          const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
+          const housing = Number(marriageEvent.housingSavings || 0);
+          baseExpensesMonthly = baseExpensesMonthly + spousePersonal + lifestyle + housing;
+        }
       } else {
-        const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100)); // default spouse spending
-        const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
-        const housing = Number(marriageEvent.housingSavings || 0);
-        baseExpensesMonthly = baseExpensesMonthly + spousePersonal + lifestyle + housing;
+        // Spouse is retired, set spouseIncome to spouse's SS benefit
+        spouseIncome = partnerSSMonthlyIncome;
       }
     }
 
     let defaultExpenses = {
       housing: Math.round(baseExpensesMonthly * 0.4),
       utilities: Math.round(baseExpensesMonthly * 0.1),
-      food: Math.round(baseExpensesMonthly * 0.15),
+      food: Math.round(baseExpensesMonthly * 0.1),
+      diningOut: Math.round(baseExpensesMonthly * 0.05),
       transportation: Math.round(baseExpensesMonthly * 0.1),
       healthcare: Math.round(baseExpensesMonthly * 0.08),
       leisure: Math.round(baseExpensesMonthly * 0.08),
@@ -2981,7 +3057,7 @@ export function getNormalizedPhases(inputs) {
   return phases;
 }
 
-export function getIncomeHistory(inputs, overrideEvent = null) {
+export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPhases = false) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
   
@@ -3001,13 +3077,23 @@ export function getIncomeHistory(inputs, overrideEvent = null) {
     }
   }
 
-  // Get normalized phases to know what the income is for each pre-retirement year
-  const phases = getNormalizedPhases(inputs);
-  const preRetirementPhases = phases.filter(p => p.type !== 'retire');
+  let startingIncomeAnnual = Number(inputs.simpleIncome) || 50000;
+  let preRetirementPhases = [];
   
-  // Find current/starting income in today's dollars
-  const currentPhase = preRetirementPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || preRetirementPhases[0];
-  const startingIncomeAnnual = currentPhase ? currentPhase.income * 12 : (Number(inputs.simpleIncome) || 50000);
+  if (!skipNormalizedPhases) {
+    // Get normalized phases to know what the income is for each pre-retirement year
+    const phases = getNormalizedPhases(inputs);
+    preRetirementPhases = phases.filter(p => p.type !== 'retire');
+    
+    // Find current/starting income in today's dollars
+    const currentPhase = preRetirementPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || preRetirementPhases[0];
+    startingIncomeAnnual = currentPhase ? currentPhase.income * 12 : (Number(inputs.simpleIncome) || 50000);
+  } else {
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => inc.startAge <= currentAge && inc.endAge > currentAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
+    startingIncomeAnnual = rawIncomeItem 
+      ? (rawIncomeItem.frequency === 'monthly' ? rawIncomeItem.amount * 12 : rawIncomeItem.amount) 
+      : (Number(inputs.simpleIncome) || 50000);
+  }
   
   const earnings = [];
   
@@ -3028,24 +3114,36 @@ export function getIncomeHistory(inputs, overrideEvent = null) {
       continue;
     }
     
-    // Find active phase for this age
-    const activePhase = preRetirementPhases.find(p => age >= p.startAge && age < p.endAge);
-    
     let baseIncomeMonthly = 0;
     let growthRate = 0.03;
+    let startOfPhase = currentAge;
     
-    if (activePhase) {
-      baseIncomeMonthly = activePhase.income;
-      growthRate = activePhase.incomeGrowthRate !== undefined ? activePhase.incomeGrowthRate : 0.03;
+    if (!skipNormalizedPhases) {
+      // Find active phase for this age
+      const activePhase = preRetirementPhases.find(p => age >= p.startAge && age < p.endAge);
+      if (activePhase) {
+        baseIncomeMonthly = activePhase.income;
+        growthRate = activePhase.incomeGrowthRate !== undefined ? activePhase.incomeGrowthRate : 0.03;
+        startOfPhase = activePhase.startAge;
+      } else {
+        baseIncomeMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
+        growthRate = 0.03;
+      }
     } else {
-      baseIncomeMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
-      growthRate = 0.03;
+      const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && inc.id !== 'simple-inc-childcare' && !inc.id.startsWith('child-income-boost'));
+      if (activeIncomeItem) {
+        baseIncomeMonthly = activeIncomeItem.frequency === 'monthly' ? Number(activeIncomeItem.amount) : Number(activeIncomeItem.amount) / 12;
+        growthRate = Number(activeIncomeItem.growthRate) || 0.03;
+        startOfPhase = activeIncomeItem.startAge;
+      } else {
+        baseIncomeMonthly = (Number(inputs.simpleIncome) || 50000) / 12;
+        growthRate = 0.03;
+      }
     }
     
     // Grow income based on growthRate from start of active phase (real growth rate in today's dollars)
     const inflationRate = (Number(inputs.inflationRate) || 3) / 100;
     const realGrowthRate = growthRate - inflationRate;
-    const startOfPhase = activePhase ? activePhase.startAge : currentAge;
     const yearsGrown = age - startOfPhase;
     let annualIncome = (baseIncomeMonthly * 12) * Math.pow(1 + realGrowthRate, yearsGrown);
     

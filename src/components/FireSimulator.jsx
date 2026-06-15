@@ -629,6 +629,11 @@ export default function FireSimulator() {
   const [isBudgetOpenFromMarriageWizard, setIsBudgetOpenFromMarriageWizard] = useState(false);
   const [activeBudgetPhase, setActiveBudgetPhase] = useState('workSave'); // 'workSave' | 'childcare'
   const [editedPhases, setEditedPhases] = useState({});
+  const [expandedCategories, setExpandedCategories] = useState({
+    needs: false,
+    wants: false,
+    savings: false
+  });
   
   // Storage for standard work phase budget details
   const [workSaveIncome, setWorkSaveIncome] = useState(4167);
@@ -673,7 +678,8 @@ export default function FireSimulator() {
   const [budgetExpenses, setBudgetExpenses] = useState({
     housing: 1500,
     utilities: 300,
-    food: 600,
+    food: 400,
+    diningOut: 200,
     transportation: 400,
     healthcare: 300,
     leisure: 300,
@@ -1498,7 +1504,8 @@ export default function FireSimulator() {
         targetExpensesMap = {
           housing: Math.round(availableMonthlyExpenses * 0.40),
           utilities: Math.round(availableMonthlyExpenses * 0.10),
-          food: Math.round(availableMonthlyExpenses * 0.15),
+          food: Math.round(availableMonthlyExpenses * 0.10),
+          diningOut: Math.round(availableMonthlyExpenses * 0.05),
           transportation: Math.round(availableMonthlyExpenses * 0.10),
           healthcare: Math.round(availableMonthlyExpenses * 0.10),
           leisure: Math.round(availableMonthlyExpenses * 0.10),
@@ -1575,7 +1582,8 @@ export default function FireSimulator() {
       targetExpensesMap = {
         housing: Math.round(availableMonthlyExpenses * 0.40),
         utilities: Math.round(availableMonthlyExpenses * 0.10),
-        food: Math.round(availableMonthlyExpenses * 0.15),
+        food: Math.round(availableMonthlyExpenses * 0.10),
+        diningOut: Math.round(availableMonthlyExpenses * 0.05),
         transportation: Math.round(availableMonthlyExpenses * 0.10),
         healthcare: Math.round(availableMonthlyExpenses * 0.10),
         leisure: Math.round(availableMonthlyExpenses * 0.10),
@@ -1607,7 +1615,7 @@ export default function FireSimulator() {
       // Reduce monthly expenses by the same amount to keep it balanced
       if (targetExpensesMap && Object.keys(targetExpensesMap).length > 0) {
         let remainingReduction = additionalSavingsMonthly;
-        const keysToReduce = ['leisure', 'misc', 'housing', 'food', 'utilities', 'transportation'];
+        const keysToReduce = ['leisure', 'misc', 'diningOut', 'housing', 'food', 'utilities', 'transportation'];
         for (const key of keysToReduce) {
           if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
             const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
@@ -1635,7 +1643,7 @@ export default function FireSimulator() {
       // Reduce monthly expenses by the savings portion
       if (targetExpensesMap && Object.keys(targetExpensesMap).length > 0) {
         let remainingReduction = additionalSavingsMonthly;
-        const keysToReduce = ['leisure', 'misc', 'housing', 'food', 'utilities', 'transportation'];
+        const keysToReduce = ['leisure', 'misc', 'diningOut', 'housing', 'food', 'utilities', 'transportation'];
         for (const key of keysToReduce) {
           if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
             const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
@@ -6382,6 +6390,15 @@ export default function FireSimulator() {
     const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
 
     const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+    const needsTotal = (Number(budgetExpenses.housing) || 0) +
+                       (Number(budgetExpenses.utilities) || 0) +
+                       (Number(budgetExpenses.food) || 0) +
+                       (Number(budgetExpenses.transportation) || 0) +
+                       (Number(budgetExpenses.healthcare) || 0) +
+                       (isMarriedMode ? (Number(budgetExpenses.debt) || 0) : 0);
+    const wantsTotal = (Number(budgetExpenses.leisure) || 0) +
+                       (Number(budgetExpenses.diningOut) || 0) +
+                       (Number(budgetExpenses.misc) || 0);
     const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
 
     const totalUserAllocationPct = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
@@ -6570,7 +6587,7 @@ export default function FireSimulator() {
 
     const handleClearDetailedExpenses = () => {
       setBudgetExpenses({
-        housing: 0, utilities: 0, food: 0, transportation: 0, healthcare: 0, leisure: 0, misc: 0
+        housing: 0, utilities: 0, food: 0, diningOut: 0, transportation: 0, healthcare: 0, leisure: 0, misc: 0
       });
     };
 
@@ -6664,7 +6681,7 @@ export default function FireSimulator() {
             animation: budgetGlow 2.5s infinite ease-in-out;
           }
         `}</style>
-        <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', display: 'flex', flexDirection: 'column' }}>
+        <div className="budget-modal-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1100px', width: '95%', display: 'flex', flexDirection: 'column' }}>
           <div className="budget-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
               🎯 {modalTitle} {activePhaseObj && `(${activePhaseObj.startAge}-${activePhaseObj.endAge})`}
@@ -6947,67 +6964,10 @@ export default function FireSimulator() {
             </div>
           )}
           
-          {/* Mobile Tabs for Married mode */}
-          {isMarriedMode && isMobile && (
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem', width: '100%' }}>
-              <button
-                type="button"
-                style={{
-                  flex: 1,
-                  padding: '0.6rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeBudgetTab === 'userSavings' ? '2px solid var(--primary)' : 'none',
-                  color: activeBudgetTab === 'userSavings' ? 'var(--primary)' : 'var(--text-secondary)',
-                  fontWeight: activeBudgetTab === 'userSavings' ? 'bold' : 'normal',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-                onClick={() => setActiveBudgetTab('userSavings')}
-              >
-                👤 User Savings
-              </button>
-              <button
-                type="button"
-                style={{
-                  flex: 1,
-                  padding: '0.6rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeBudgetTab === 'partnerSavings' ? '2px solid var(--primary)' : 'none',
-                  color: activeBudgetTab === 'partnerSavings' ? 'var(--primary)' : 'var(--text-secondary)',
-                  fontWeight: activeBudgetTab === 'partnerSavings' ? 'bold' : 'normal',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-                onClick={() => setActiveBudgetTab('partnerSavings')}
-              >
-                👥 Partner Savings
-              </button>
-              <button
-                type="button"
-                style={{
-                  flex: 1,
-                  padding: '0.6rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeBudgetTab === 'householdExpenses' ? '2px solid var(--accent-emerald)' : 'none',
-                  color: activeBudgetTab === 'householdExpenses' ? 'var(--accent-emerald)' : 'var(--text-secondary)',
-                  fontWeight: activeBudgetTab === 'householdExpenses' ? 'bold' : 'normal',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-                onClick={() => setActiveBudgetTab('householdExpenses')}
-              >
-                🏠 Combined Expenses
-              </button>
-            </div>
-          )}
-
           {/* Sections Container */}
           <div className="budget-sections-container" style={{ 
             display: 'grid', 
-            gridTemplateColumns: isMarriedMode ? (isMobile ? '1fr' : '1fr 1fr 1fr') : '1fr 1fr', 
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', 
             gap: '1.5rem', 
             maxHeight: '400px', 
             overflowY: 'auto', 
@@ -7015,425 +6975,108 @@ export default function FireSimulator() {
             marginBottom: '1.25rem' 
           }}>
             
-            {/* Savings Allocation Column (User) */}
-            {(!isMarriedMode || !isMobile || activeBudgetTab === 'userSavings') && (
-              <div className="budget-section-col">
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>💰 {isMarriedMode ? 'User Savings Allocation' : 'Monthly Savings Allocation'}</span>
-                  {!isRetirementPhase && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
-                        {savingsAllocMode === 'percentSurplus' 
-                          ? `${totalUserAllocationPct}% (Est. ${formatCurrency(userSavingsMonthly)}/mo)` 
-                          : `${formatCurrency(userSavingsMonthly)}/mo`}
-                      </span>
-                      {savingsAllocMode === 'percentSurplus' && totalUserAllocationPct !== 100 && !isMarriedMode && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const sum = totalUserAllocationPct;
-                            if (sum === 0) {
-                              setBudgetSavings(prev => ({ ...prev, brokerage: 100 }));
-                              return;
-                            }
-                            const newSavings = {};
-                            let newSum = 0;
-                            Object.keys(budgetSavings).forEach(k => {
-                              const val = budgetSavings[k] || 0;
-                              const scaled = Math.round((val / sum) * 100);
-                              newSavings[k] = scaled;
-                              newSum += scaled;
-                            });
-                            const diff = 100 - newSum;
-                            if (diff !== 0) {
-                              const keys = Object.keys(newSavings);
-                              let maxKey = 'brokerage';
-                              keys.forEach(k => {
-                                if (newSavings[k] > (newSavings[maxKey] || 0)) {
-                                  maxKey = k;
-                                }
-                              });
-                              newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
-                            }
-                            setBudgetSavings(newSavings);
-                          }}
-                          style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: '0.7rem', padding: 0 }}
-                        >
-                          (Auto-Balance to 100%)
-                        </button>
-                      )}
-                      {userSavingsMonthly > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleClearDetailedSavings}
-                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
-                        >
-                          (Clear)
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </h4>
-
-                {isRetirementPhase ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2.5rem 1rem',
-                    background: 'rgba(255, 255, 255, 0.01)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px dashed var(--border-color)',
-                    textAlign: 'center',
-                    height: '100%',
-                    minHeight: '200px'
-                  }}>
-                    <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏖️</span>
-                    <h5 style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>Retirement Phase Active</h5>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      Savings are disabled during retirement. You are now drawing down from your portfolio to fund your living expenses.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Toggle Card */}
-                    {!isMarriedMode && (
-                      <div style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '0.5rem', 
-                        marginBottom: '1rem', 
-                        padding: '0.6rem 0.75rem', 
-                        background: 'rgba(255, 255, 255, 0.02)', 
-                        borderRadius: '6px', 
-                        border: '1px solid var(--border-color)' 
-                      }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Savings Allocation Mode:</span>
-                        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSavingsAllocMode('fixed')}
-                            style={{ 
-                              flex: 1, 
-                              background: savingsAllocMode === 'fixed' ? 'var(--primary)' : 'transparent', 
-                              border: 'none', 
-                              color: savingsAllocMode === 'fixed' ? '#ffffff' : 'var(--text-secondary)',
-                              fontSize: '0.75rem', 
-                              fontWeight: '700',
-                              padding: '0.35rem 0.25rem', 
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            Fixed Amount ($)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSavingsAllocMode('percentSurplus')}
-                            style={{ 
-                              flex: 1, 
-                              background: savingsAllocMode === 'percentSurplus' ? 'var(--primary)' : 'transparent', 
-                              border: 'none', 
-                              color: savingsAllocMode === 'percentSurplus' ? '#ffffff' : 'var(--text-secondary)',
-                              fontSize: '0.75rem', 
-                              fontWeight: '700',
-                              padding: '0.35rem 0.25rem', 
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            Percent of Surplus (%)
-                          </button>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-tertiary)', lineHeight: '1.35' }}>
-                          {savingsAllocMode === 'fixed' 
-                            ? '💰 Saves fixed dollar amounts monthly. If expenses increase, you will draw from your brokerage/savings to fund these savings targets.' 
-                            : '📊 Dynamically saves a percentage of your monthly surplus. If expenses rise and wipe out your surplus, savings automatically drop to 0%.'}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {(isMarriedMode ? [
-                        { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
-                        { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr' },
-                        { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr' },
-                        { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
-                        { key: 'brokerage', label: 'Taxable Brokerage' },
-                        { key: 'cash', label: 'Cash Savings' },
-                        { key: 'debt', label: 'Debt Paydown' }
-                      ] : [
-                        { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
-                        { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
-                        { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr combined' },
-                        { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
-                        { key: 'brokerage', label: 'Taxable Brokerage' },
-                        { key: 'checking', label: 'Checking Account' },
-                        { key: 'hysa', label: 'High-Yield Savings' },
-                        { key: 'emergency', label: 'Emergency Fund' },
-                        { key: 'debt', label: 'Debt Payoff' },
-                        { key: 'other', label: 'Other Savings' }
-                      ]).map(item => {
-                        const diff = budgetDiffs?.savings?.[item.key];
-                        const hasDiff = diff && diff !== 0;
-                        return (
-                          <div 
-                            key={item.key} 
-                            className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              gap: '0.5rem',
-                              transition: 'all 0.3s ease',
-                              padding: hasDiff ? '0.25rem 0.5rem' : '0',
-                              borderRadius: hasDiff ? '6px' : '0',
-                              border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
-                            }}
-                          >
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                                {hasDiff && (
-                                  <span style={{ 
-                                    fontSize: '0.7rem', 
-                                    fontWeight: 'bold', 
-                                    color: diff > 0 ? '#10b981' : '#f43f5e',
-                                    background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                                    padding: '0.1rem 0.35rem',
-                                    borderRadius: '4px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center'
-                                  }}>
-                                    {savingsAllocMode === 'percentSurplus'
-                                      ? (diff > 0 ? `+${diff}%` : `${diff}%`)
-                                      : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
-                                  </span>
-                                )}
-                              </div>
-                              {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
-                              <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                                <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                <input
-                                  type="number"
-                                  className="input-number-box"
-                                  style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                                  value={budgetSavings[item.key] || 0}
-                                  onChange={(e) => setBudgetSavings({
-                                    ...budgetSavings,
-                                    [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                                  })}
-                                />
-                              </div>
-                              {savingsAllocMode === 'percentSurplus' && (
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
-                                  Est. {formatCurrency(Math.round(surplusMonthly * ((budgetSavings[item.key] || 0) / 100)))}/mo
-                                  {currentChildCostsMonthly > 0 && (
-                                    <>
-                                      <br />
-                                      <span style={{ color: 'var(--accent-orange, #f59e0b)' }}>
-                                        ({formatCurrency(Math.round(surplusWithChild * ((budgetSavings[item.key] || 0) / 100)))}/mo during child years)
-                                      </span>
-                                    </>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Savings Allocation Column (Partner) */}
-            {isMarriedMode && (!isMobile || activeBudgetTab === 'partnerSavings') && (
-              <div className="budget-section-col">
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--primary)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>💰 Partner Savings Allocation</span>
-                  {!isRetirementPhase && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
-                        {savingsAllocMode === 'percentSurplus' 
-                          ? `${totalPartnerAllocationPct}% (Est. ${formatCurrency(partnerSavingsMonthly)}/mo)` 
-                          : `${formatCurrency(partnerSavingsMonthly)}/mo`}
-                      </span>
-                      {partnerSavingsMonthly > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setBudgetPartnerSavings({ trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, cash: 0, debt: 0 })}
-                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
-                        >
-                          (Clear)
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </h4>
-
-                {isRetirementPhase ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2.5rem 1rem',
-                    background: 'rgba(255, 255, 255, 0.01)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px dashed var(--border-color)',
-                    textAlign: 'center',
-                    height: '100%',
-                    minHeight: '200px'
-                  }}>
-                    <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏖️</span>
-                    <h5 style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>Retirement Phase Active</h5>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      Savings are disabled during retirement. You are now drawing down from your portfolio to fund your living expenses.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {[
-                      { key: 'trad401k', label: 'Partner 401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
-                      { key: 'rothIra', label: 'Partner Roth IRA', desc: 'Limit $7,000/yr' },
-                      { key: 'tradIra', label: 'Partner Traditional IRA', desc: 'Limit $7,000/yr' },
-                      { key: 'hsa', label: 'Partner HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
-                      { key: 'brokerage', label: 'Partner Brokerage' },
-                      { key: 'cash', label: 'Partner Cash Savings' },
-                      { key: 'debt', label: 'Partner Debt Paydown' }
-                    ].map(item => {
-                      const diff = budgetDiffs?.partnerSavings?.[item.key];
-                      const hasDiff = diff && diff !== 0;
-                      return (
-                        <div 
-                          key={item.key} 
-                          className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
-                          style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center', 
-                            gap: '0.5rem',
-                            transition: 'all 0.3s ease',
-                            padding: hasDiff ? '0.25rem 0.5rem' : '0',
-                            borderRadius: hasDiff ? '6px' : '0',
-                            border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                              {hasDiff && (
-                                <span style={{ 
-                                  fontSize: '0.7rem', 
-                                  fontWeight: 'bold', 
-                                  color: diff > 0 ? '#10b981' : '#f43f5e',
-                                  background: diff > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                                  padding: '0.1rem 0.35rem',
-                                  borderRadius: '4px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center'
-                                }}>
-                                  {savingsAllocMode === 'percentSurplus'
-                                    ? (diff > 0 ? `+${diff}%` : `${diff}%`)
-                                    : (diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff))}
-                                </span>
-                              )}
-                            </div>
-                            {item.desc && <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
-                            <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                              <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                                value={budgetPartnerSavings[item.key] || 0}
-                                onChange={(e) => setBudgetPartnerSavings({
-                                  ...budgetPartnerSavings,
-                                  [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                                })}
-                              />
-                            </div>
-                            {savingsAllocMode === 'percentSurplus' && (
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', paddingRight: '0.25rem', textAlign: 'right' }}>
-                                Est. {formatCurrency(Math.round(surplusMonthly * ((budgetPartnerSavings[item.key] || 0) / 100)))}/mo
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Expenses Column */}
-            {(!isMarriedMode || !isMobile || activeBudgetTab === 'householdExpenses') && (
-              <div className="budget-section-col">
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', borderBottom: '2px solid var(--accent-emerald)', paddingBottom: '0.4rem', marginBottom: '0.75rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>🏠 {isMarriedMode ? 'Combined Expenses' : 'Monthly Expenses'}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>{formatCurrency(totalExpensesMonthly)}/mo</span>
-                    {totalExpensesMonthly > 0 && (
+            {/* Needs Card */}
+            <div className="budget-section-col" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div 
+                style={{ 
+                  background: expandedCategories.needs ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.05)', 
+                  border: expandedCategories.needs ? '1px solid rgba(16, 185, 129, 0.45)' : '1px solid rgba(16, 185, 129, 0.25)', 
+                  borderRadius: '8px', 
+                  padding: '0.75rem 1rem', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  transition: 'all 0.2s ease',
+                  userSelect: 'none'
+                }}
+                onClick={() => setExpandedCategories(prev => ({ ...prev, needs: !prev.needs }))}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = expandedCategories.needs ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.09)';
+                  e.currentTarget.style.borderColor = expandedCategories.needs ? 'rgba(16, 185, 129, 0.55)' : 'rgba(16, 185, 129, 0.35)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = expandedCategories.needs ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.05)';
+                  e.currentTarget.style.borderColor = expandedCategories.needs ? 'rgba(16, 185, 129, 0.45)' : 'rgba(16, 185, 129, 0.25)';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🏠</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Needs</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)', fontWeight: '700' }}>
+                    {formatCurrency(needsTotal + (Number(currentChildCostsMonthly) || 0))}/mo
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {needsTotal > 0 && (
                       <button
                         type="button"
-                        onClick={handleClearDetailedExpenses}
-                        style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBudgetExpenses(prev => ({
+                            ...prev,
+                            housing: 0,
+                            utilities: 0,
+                            food: 0,
+                            transportation: 0,
+                            healthcare: 0,
+                            debt: 0
+                          }));
+                        }}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: 'var(--accent-rose)', 
+                          cursor: 'pointer', 
+                          fontSize: '0.75rem', 
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
                       >
                         (Clear)
                       </button>
                     )}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      {expandedCategories.needs ? '▲' : '▼'}
+                    </span>
                   </div>
-                </h4>
-                <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                </div>
+              </div>
+              
+              {expandedCategories.needs && (
+                <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                   {(isMarriedMode ? [
                     { key: 'housing', label: 'Housing (Rent/Mortgage)' },
                     { key: 'utilities', label: 'Utilities & Subscriptions' },
-                    { key: 'food', label: 'Food & Dining Out' },
+                    { key: 'food', label: 'Food (Groceries)' },
                     { key: 'transportation', label: 'Transportation / Gas / Car' },
                     { key: 'healthcare', label: 'Healthcare & Insurance' },
-                    { key: 'leisure', label: 'Leisure & Leisure Travel' },
-                    { key: 'misc', label: 'Miscellaneous Expenses' },
                     { key: 'debt', label: 'Debt Payments' }
                   ] : [
                     { key: 'housing', label: 'Housing (Rent/Mortgage)' },
                     { key: 'utilities', label: 'Utilities & Subscriptions' },
-                    { key: 'food', label: 'Food & Dining Out' },
+                    { key: 'food', label: 'Food (Groceries)' },
                     { key: 'transportation', label: 'Transportation / Gas / Car' },
-                    { key: 'healthcare', label: 'Healthcare & Insurance' },
-                    { key: 'leisure', label: 'Leisure & Leisure Travel' },
-                    { key: 'misc', label: 'Miscellaneous Expenses' }
+                    { key: 'healthcare', label: 'Healthcare & Insurance' }
                   ]).map(item => {
-                    const diff = budgetDiffs?.expenses?.[item.key];
-                    const hasDiff = diff && diff !== 0;
                     return (
                       <div 
                         key={item.key} 
-                        className={`budget-input-row ${hasDiff ? 'budget-row-glow' : ''}`} 
+                        className="budget-input-row" 
                         style={{ 
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           alignItems: 'center', 
-                          gap: '0.5rem',
-                          transition: 'all 0.3s ease',
-                          padding: hasDiff ? '0.25rem 0.5rem' : '0',
-                          borderRadius: hasDiff ? '6px' : '0',
-                          border: hasDiff ? '1px solid rgba(124, 58, 237, 0.3)' : '1px solid transparent'
+                          gap: '0.5rem'
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
-                          </div>
+                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
                         </div>
                         <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                           <span className="currency-symbol">$</span>
@@ -7463,13 +7106,13 @@ export default function FireSimulator() {
                         background: 'rgba(245, 158, 11, 0.04)',
                         borderRadius: '6px',
                         border: '1px dashed rgba(245, 158, 11, 0.25)',
-                        marginTop: '0.75rem'
+                        marginTop: '0.25rem'
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <span className="input-name" style={{ fontSize: '0.8rem', margin: 0, fontWeight: '700', color: 'var(--accent-orange, #f59e0b)' }}>
-                            👶 Childcare & Support (Temporary)
+                            👶 Childcare & Support (Temp)
                           </span>
                         </div>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
@@ -7489,9 +7132,435 @@ export default function FireSimulator() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* Wants Card */}
+            <div className="budget-section-col" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div 
+                style={{ 
+                  background: expandedCategories.wants ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.05)', 
+                  border: expandedCategories.wants ? '1px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(245, 158, 11, 0.25)', 
+                  borderRadius: '8px', 
+                  padding: '0.75rem 1rem', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  transition: 'all 0.2s ease',
+                  userSelect: 'none'
+                }}
+                onClick={() => setExpandedCategories(prev => ({ ...prev, wants: !prev.wants }))}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = expandedCategories.wants ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.09)';
+                  e.currentTarget.style.borderColor = expandedCategories.wants ? 'rgba(245, 158, 11, 0.55)' : 'rgba(245, 158, 11, 0.35)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = expandedCategories.wants ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.05)';
+                  e.currentTarget.style.borderColor = expandedCategories.wants ? 'rgba(245, 158, 11, 0.45)' : 'rgba(245, 158, 11, 0.25)';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🎉</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Wants</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--accent-orange, #f59e0b)', fontWeight: '700' }}>
+                    {formatCurrency(wantsTotal)}/mo
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {wantsTotal > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBudgetExpenses(prev => ({
+                            ...prev,
+                            leisure: 0,
+                            diningOut: 0,
+                            misc: 0
+                          }));
+                        }}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: 'var(--accent-rose)', 
+                          cursor: 'pointer', 
+                          fontSize: '0.75rem', 
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                      >
+                        (Clear)
+                      </button>
+                    )}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      {expandedCategories.wants ? '▲' : '▼'}
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
-            
+              
+              {expandedCategories.wants && (
+                <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                  {[
+                    { key: 'leisure', label: 'Leisure & Leisure Travel' },
+                    { key: 'diningOut', label: 'Dining Out' },
+                    { key: 'misc', label: 'Miscellaneous Expenses' }
+                  ].map(item => {
+                    return (
+                      <div 
+                        key={item.key} 
+                        className="budget-input-row" 
+                        style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span className="input-name" style={{ fontSize: '0.8rem', margin: 0 }}>{item.label}</span>
+                        </div>
+                        <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                          <span className="currency-symbol">$</span>
+                          <input
+                            type="number"
+                            className="input-number-box"
+                            style={{ width: '100%', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                            value={budgetExpenses[item.key] || 0}
+                            onChange={(e) => setBudgetExpenses({
+                              ...budgetExpenses,
+                              [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                            })}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Savings Card */}
+            <div className="budget-section-col" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div 
+                style={{ 
+                  background: expandedCategories.savings ? 'rgba(124, 58, 237, 0.12)' : 'rgba(124, 58, 237, 0.05)', 
+                  border: expandedCategories.savings ? '1px solid rgba(124, 58, 237, 0.45)' : '1px solid rgba(124, 58, 237, 0.25)', 
+                  borderRadius: '8px', 
+                  padding: '0.75rem 1rem', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  transition: 'all 0.2s ease',
+                  userSelect: 'none'
+                }}
+                onClick={() => setExpandedCategories(prev => ({ ...prev, savings: !prev.savings }))}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = expandedCategories.savings ? 'rgba(124, 58, 237, 0.15)' : 'rgba(124, 58, 237, 0.09)';
+                  e.currentTarget.style.borderColor = expandedCategories.savings ? 'rgba(124, 58, 237, 0.55)' : 'rgba(124, 58, 237, 0.35)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = expandedCategories.savings ? 'rgba(124, 58, 237, 0.12)' : 'rgba(124, 58, 237, 0.05)';
+                  e.currentTarget.style.borderColor = expandedCategories.savings ? 'rgba(124, 58, 237, 0.45)' : 'rgba(124, 58, 237, 0.25)';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>💰</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Savings</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#c084fc', fontWeight: '700' }}>
+                    {isRetirementPhase ? '$0/mo' : (savingsAllocMode === 'percentSurplus' ? `${totalAllocationPct}%` : `${formatCurrency(combinedSavingsMonthly)}/mo`)}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {!isRetirementPhase && combinedSavingsMonthly > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearDetailedSavings();
+                          if (isMarriedMode) {
+                            setBudgetPartnerSavings({ trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, cash: 0, debt: 0 });
+                          }
+                        }}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: 'var(--accent-rose)', 
+                          cursor: 'pointer', 
+                          fontSize: '0.75rem', 
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                      >
+                        (Clear)
+                      </button>
+                    )}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                      {expandedCategories.savings ? '▲' : '▼'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {expandedCategories.savings && (
+                <div className="budget-inputs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                  {isRetirementPhase ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1.5rem 1rem',
+                      background: 'rgba(255, 255, 255, 0.01)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px dashed var(--border-color)',
+                      textAlign: 'center'
+                    }}>
+                      <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🏖️</span>
+                      <h5 style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>Retirement Phase Active</h5>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                        Savings are disabled during retirement. You are now drawing down from your portfolio to fund your living expenses.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Toggle Card */}
+                      {!isMarriedMode && (
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '0.4rem', 
+                          padding: '0.5rem 0.6rem', 
+                          background: 'rgba(255, 255, 255, 0.02)', 
+                          borderRadius: '6px', 
+                          border: '1px solid var(--border-color)' 
+                        }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-secondary)' }}>Savings Allocation Mode:</span>
+                          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSavingsAllocMode('fixed')}
+                              style={{ 
+                                flex: 1, 
+                                background: savingsAllocMode === 'fixed' ? 'var(--primary)' : 'transparent', 
+                                border: 'none', 
+                                color: savingsAllocMode === 'fixed' ? '#ffffff' : 'var(--text-secondary)',
+                                fontSize: '0.72rem', 
+                                fontWeight: '700',
+                                padding: '0.3rem 0.25rem', 
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              Fixed Amount ($)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSavingsAllocMode('percentSurplus')}
+                              style={{ 
+                                flex: 1, 
+                                background: savingsAllocMode === 'percentSurplus' ? 'var(--primary)' : 'transparent', 
+                                border: 'none', 
+                                color: savingsAllocMode === 'percentSurplus' ? '#ffffff' : 'var(--text-secondary)',
+                                fontSize: '0.72rem', 
+                                fontWeight: '700',
+                                padding: '0.3rem 0.25rem', 
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              Percent of Surplus (%)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* User Savings Sub-column */}
+                      <div>
+                        <h5 style={{ fontSize: '0.8rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{isMarriedMode ? '👤 Your Savings Allocation' : 'Monthly Savings Allocation'}</span>
+                          <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 'normal' }}>
+                            <span style={{ color: 'var(--primary)' }}>
+                              {savingsAllocMode === 'percentSurplus' 
+                                ? `${totalUserAllocationPct}% (Est. ${formatCurrency(userSavingsMonthly)}/mo)` 
+                                : `${formatCurrency(userSavingsMonthly)}/mo`}
+                            </span>
+                            {userSavingsMonthly > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleClearDetailedSavings();
+                                }}
+                                style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: 0 }}
+                              >
+                                (Clear)
+                              </button>
+                            )}
+                          </div>
+                        </h5>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          {(isMarriedMode ? [
+                            { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                            { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr' },
+                            { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr' },
+                            { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                            { key: 'brokerage', label: 'Taxable Brokerage' },
+                            { key: 'cash', label: 'Cash Savings' },
+                            { key: 'debt', label: 'Debt Paydown' }
+                          ] : [
+                            { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                            { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
+                            { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr combined' },
+                            { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                            { key: 'brokerage', label: 'Taxable Brokerage' },
+                            { key: 'checking', label: 'Checking Account' },
+                            { key: 'hysa', label: 'High-Yield Savings' },
+                            { key: 'emergency', label: 'Emergency Fund' },
+                            { key: 'debt', label: 'Debt Payoff' },
+                            { key: 'other', label: 'Other Savings' }
+                          ]).map(item => {
+                            const diff = budgetDiffs?.savings?.[item.key];
+                            const hasDiff = diff && diff !== 0;
+                            return (
+                              <div 
+                                key={item.key} 
+                                className="budget-input-row"
+                                style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  gap: '0.5rem',
+                                  padding: '0.4rem 0.5rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span className="input-name" style={{ fontSize: '0.78rem', margin: 0 }}>{item.label}</span>
+                                  {item.desc && <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
+                                  <div className="input-prefix-wrapper" style={{ width: '100px' }}>
+                                    <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                    <input
+                                      type="number"
+                                      className="input-number-box"
+                                      style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
+                                      value={budgetSavings[item.key] || 0}
+                                      onChange={(e) => setBudgetSavings({
+                                        ...budgetSavings,
+                                        [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                                      })}
+                                    />
+                                  </div>
+                                  {savingsAllocMode === 'percentSurplus' && (
+                                    <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', paddingRight: '0.2rem' }}>
+                                      Est. {formatCurrency(Math.round(surplusMonthly * ((budgetSavings[item.key] || 0) / 100)))}/mo
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Partner Savings Sub-column (if married) */}
+                      {isMarriedMode && (
+                        <div style={{ marginTop: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.75rem' }}>
+                          <h5 style={{ fontSize: '0.8rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>👥 Partner Savings Allocation</span>
+                            <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 'normal' }}>
+                              <span style={{ color: 'var(--primary)' }}>
+                                {savingsAllocMode === 'percentSurplus' 
+                                  ? `${totalPartnerAllocationPct}% (Est. ${formatCurrency(partnerSavingsMonthly)}/mo)` 
+                                  : `${formatCurrency(partnerSavingsMonthly)}/mo`}
+                              </span>
+                              {partnerSavingsMonthly > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBudgetPartnerSavings({ trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, cash: 0, debt: 0 });
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: 0 }}
+                                >
+                                  (Clear)
+                                </button>
+                              )}
+                            </div>
+                          </h5>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {[
+                              { key: 'trad401k', label: 'Partner 401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
+                              { key: 'rothIra', label: 'Partner Roth IRA', desc: 'Limit $7,000/yr' },
+                              { key: 'tradIra', label: 'Partner Traditional IRA', desc: 'Limit $7,000/yr' },
+                              { key: 'hsa', label: 'Partner HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
+                              { key: 'brokerage', label: 'Partner Brokerage' },
+                              { key: 'cash', label: 'Partner Cash Savings' },
+                              { key: 'debt', label: 'Partner Debt Paydown' }
+                            ].map(item => {
+                              return (
+                                <div 
+                                  key={item.key} 
+                                  className="budget-input-row"
+                                  style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between', 
+                                    alignItems: 'center', 
+                                    gap: '0.5rem',
+                                    padding: '0.4rem 0.5rem'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span className="input-name" style={{ fontSize: '0.78rem', margin: 0 }}>{item.label}</span>
+                                    {item.desc && <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>{item.desc}</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
+                                    <div className="input-prefix-wrapper" style={{ width: '100px' }}>
+                                      <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                      <input
+                                        type="number"
+                                        className="input-number-box"
+                                        style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
+                                        value={budgetPartnerSavings[item.key] || 0}
+                                        onChange={(e) => setBudgetPartnerSavings({
+                                          ...budgetPartnerSavings,
+                                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                                        })}
+                                      />
+                                    </div>
+                                    {savingsAllocMode === 'percentSurplus' && (
+                                      <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', paddingRight: '0.2rem' }}>
+                                        Est. {formatCurrency(Math.round(surplusMonthly * ((budgetPartnerSavings[item.key] || 0) / 100)))}/mo
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
           
           {/* Live Reconciliation Panel */}

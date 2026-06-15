@@ -66,7 +66,8 @@ export const DEFAULT_FIRE_INPUTS = {
     expenses: {
       housing: 1500,
       utilities: 300,
-      food: 600,
+      food: 400,
+      diningOut: 200,
       transportation: 400,
       healthcare: 300,
       leisure: 300,

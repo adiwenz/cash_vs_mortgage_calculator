@@ -26,7 +26,8 @@ try {
   const expenses = inputs.budgetDetails.expenses;
   expect(expenses.housing).toBe(1500);
   expect(expenses.utilities).toBe(300);
-  expect(expenses.food).toBe(600);
+  expect(expenses.food).toBe(400);
+  expect(expenses.diningOut).toBe(200);
   expect(expenses.transportation).toBe(400);
   expect(expenses.healthcare).toBe(300);
   expect(expenses.leisure).toBe(300);

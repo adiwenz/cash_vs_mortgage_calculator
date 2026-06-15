@@ -91,6 +91,7 @@ const inputs = {
       housing: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.housing,
       utilities: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.utilities,
       food: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.food,
+      diningOut: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.diningOut,
       transportation: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.transportation,
       healthcare: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.healthcare,
       leisure: DEFAULT_FIRE_INPUTS.budgetDetails.expenses.leisure,
@@ -173,7 +174,8 @@ try {
   // Verify Default Monthly Expense Template
   expect(inputs.budgetDetails.expenses.housing).toBe(1500);
   expect(inputs.budgetDetails.expenses.utilities).toBe(300);
-  expect(inputs.budgetDetails.expenses.food).toBe(600);
+  expect(inputs.budgetDetails.expenses.food).toBe(400);
+  expect(inputs.budgetDetails.expenses.diningOut).toBe(200);
   expect(inputs.budgetDetails.expenses.transportation).toBe(400);
   expect(inputs.budgetDetails.expenses.healthcare).toBe(300);
   expect(inputs.budgetDetails.expenses.leisure).toBe(300);
