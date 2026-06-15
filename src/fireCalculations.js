@@ -1238,6 +1238,21 @@ export function runFireSimulation(inputs) {
             baseCcIncome = wsIncome;
           }
           
+          // Subtract any child-income-boost items already in combinedIncomeList to prevent double counting
+          let activeBoostMonthly = 0;
+          combinedIncomeList.forEach(otherInc => {
+            if (otherInc.id && typeof otherInc.id === 'string' && otherInc.id.startsWith('child-income-boost')) {
+              let otherEffectiveEndAge = Math.min(otherInc.endAge !== undefined ? otherInc.endAge : targetRetirementAge, targetRetirementAge);
+              if (age >= otherInc.startAge && age < otherEffectiveEndAge) {
+                const boostYearly = otherInc.frequency === 'monthly' ? Number(otherInc.amount) * 12 : Number(otherInc.amount);
+                activeBoostMonthly += boostYearly / 12;
+              }
+            }
+          });
+          const boostAlreadyIncluded = Math.max(0, baseCcIncome - wsIncome);
+          const overlap = Math.min(activeBoostMonthly, boostAlreadyIncluded);
+          baseCcIncome = Math.max(0, baseCcIncome - overlap);
+
           const baseIncomeAnnual = baseCcIncome * 12;
           amount = baseIncomeAnnual * Math.pow(1 + (Number(inc.growthRate) || 0), yearsGrown);
         } else {

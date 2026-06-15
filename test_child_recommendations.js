@@ -204,6 +204,59 @@ try {
 
   console.log('✅ Test 7 Passed: Child income boosts are successfully excluded from budget tab splits and base income lookups.');
 
+  // Test 8: Verify that when the recommendation is applied, the simulated income is not double-counted (remains $65,000/yr, not $80,000/yr)
+  const testInputs8 = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  testInputs8.currentAge = 35;
+  testInputs8.targetRetirementAge = 60;
+  testInputs8.lifeEvents = [
+    {
+      id: 'child-test-8',
+      type: 'haveChild',
+      enabled: true,
+      name: 'Test Child',
+      birthAge: 35,
+      childStartAge: 0,
+      costMethod: 'custom',
+      customAges0to4: 15000,
+      customAges5to12: 15000,
+      customAges13to18: 15000,
+      customAges19to22: 15000,
+      includeCollege: false
+    }
+  ];
+
+  // We save the budget phases in budgetDetails.phases as it happens in the UI.
+  // getNormalizedPhases will return the childcare phase with boosted income (5417 = 4167 + 1250).
+  const normPhases8 = getNormalizedPhases(testInputs8);
+  testInputs8.budgetDetails = {
+    income: 4167,
+    phases: normPhases8.map(p => ({
+      id: p.id,
+      type: p.type,
+      name: p.name,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      income: p.income, // has the boost (5417)
+      savings: p.savings,
+      expenses: p.expenses
+    }))
+  };
+
+  // Get recommendation & apply the boosts
+  const recs8 = getChildCostOffsetRecommendations(testInputs8);
+  testInputs8.incomeList = [...(testInputs8.incomeList || []), ...recs8[0].incomeBoosts];
+
+  const results8 = runFireSimulation(testInputs8);
+  // Find simulated income at age 40 (inside childcare phase)
+  const age40Data8 = results8.data.find(d => d.age === 40);
+  assert(age40Data8 !== undefined, 'Should have simulated data at age 40');
+  
+  // Deflated income at age 40 should be $65,000/yr (base $50,000 + $15,000 boost), NOT $80,000/yr!
+  // Note: results8.data is already deflated to today's dollars
+  const deflatedIncome8 = age40Data8.income;
+  assert(Math.round(deflatedIncome8) === 65004, `Expected deflated simulated income to be $65,004, got ${Math.round(deflatedIncome8)} (double-counting check)`);
+  console.log('✅ Test 8 Passed: Simulated income is not double-counted (remains $65,000/yr).');
+
   console.log('--- ALL test_child_recommendations PASSED ---');
   process.exit(0);
 } catch (err) {
