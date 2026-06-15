@@ -9,59 +9,15 @@
  * @param {Object} inputs - All parameters entered by the user
  * @returns {Object} Results containing year-by-year breakdown and summary metrics
  */
-const U_S_TAX_DATA = {
-  single: {
-    standardDeduction: 16100,
-    brackets: [
-      { limit: 12400, rate: 0.10 },
-      { limit: 50400, rate: 0.12 },
-      { limit: 105700, rate: 0.22 },
-      { limit: 201775, rate: 0.24 },
-      { limit: 256225, rate: 0.32 },
-      { limit: 640600, rate: 0.35 },
-      { limit: Infinity, rate: 0.37 }
-    ]
-  },
-  married: {
-    standardDeduction: 32200,
-    brackets: [
-      { limit: 24800, rate: 0.10 },
-      { limit: 100800, rate: 0.12 },
-      { limit: 211400, rate: 0.22 },
-      { limit: 403550, rate: 0.24 },
-      { limit: 512450, rate: 0.32 },
-      { limit: 768700, rate: 0.35 },
-      { limit: Infinity, rate: 0.37 }
-    ]
-  }
-};
+import {
+  U_S_TAX_DATA,
+  calculateUSTax,
+  getMarginalTaxRate,
+  getActiveChildrenCountAtAge
+} from './simulatorMathUtils.js';
 
-function calculateUSTax(grossIncome, standardDeduction, brackets) {
-  const taxable = Math.max(0, grossIncome - standardDeduction);
-  let tax = 0;
-  let prevLimit = 0;
-  for (const bracket of brackets) {
-    if (taxable > bracket.limit) {
-      tax += (bracket.limit - prevLimit) * bracket.rate;
-      prevLimit = bracket.limit;
-    } else {
-      tax += (taxable - prevLimit) * bracket.rate;
-      break;
-    }
-  }
-  return tax;
-}
+export { getActiveChildrenCountAtAge };
 
-function getMarginalTaxRate(grossIncome, standardDeduction, brackets) {
-  const taxable = Math.max(0, grossIncome - standardDeduction);
-  if (taxable <= 0) return 0;
-  for (const bracket of brackets) {
-    if (taxable <= bracket.limit) {
-      return bracket.rate;
-    }
-  }
-  return 0.37;
-}
 
 function solveTraditionalWithdrawal(remainingDeficit, maxPreTaxAvailable, I_0, standardDeduction, nominalBrackets, penaltyRate = 0.0) {
   const P = penaltyRate;
@@ -108,150 +64,243 @@ export function getSocialSecurityFactor(claimingAge) {
   }
 }
 
-export function getActiveChildrenCountAtAge(age, lifeEvents) {
-  let count = 0;
-  const childEvents = (lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-  childEvents.forEach(ev => {
-    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-    const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
-    const childAge = age - birthAge;
-    if (childAge >= startAge) {
-      const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-      const maxAge = includeCollege ? 22 : 18;
-      if (childAge < maxAge) {
-        count++;
-      }
-    }
-  });
-  return count;
+
+
+function formatCurrency(val) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(val);
 }
 
-export function runFireSimulation(inputs) {
-  const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
-  const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
-  const lifeEvents = inputs.lifeEvents || [];
-  const enabledEvents = lifeEvents.filter(e => e.enabled);
-  // Find retirement event dynamically
-  const retireEvent = enabledEvents.find(e => e.type === 'retire');
-  const targetRetirementAge = retireEvent 
-    ? Math.max(currentAge, Number(retireEvent.age) || 65) 
-    : lifeExpectancy; // default to lifeExpectancy if no retirement event
-    
-  const retirementSpendingPercent = retireEvent
-    ? Number(retireEvent.spendingPercent !== undefined ? retireEvent.spendingPercent : 70) / 100
-    : 0.7;
-
-  const expectedReturn = (Number(inputs.expectedReturn) || 7) / 100;
-  const postRetirementReturn = inputs.postRetirementReturn !== undefined
-    ? (Number(inputs.postRetirementReturn) || 0) / 100
-    : expectedReturn;
-  const inflationRate = (Number(inputs.inflationRate) || 3) / 100;
-  const lifestyleUpgrades = (Number(inputs.lifestyleUpgrades) || 0) / 100;
-  const swr = (Number(inputs.swr) || 4) / 100;
-  const fireMode = inputs.fireMode || 'traditional'; // 'traditional' | 'coast' | 'barista' | 'lean' | 'fat'
-
-  const includeTaxes = !!inputs.includeTaxes;
-  const enableHealthcareModel = inputs.enableHealthcareModel !== false;
-  let filingStatus = inputs.filingStatus || 'single';
-  if (filingStatus === 'jointly' || filingStatus === 'marriedJointly') {
-    filingStatus = 'married';
-  }
-  const enforceEarlyWithdrawalPenalty = true;
-  const isAdvanced = inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
-
-  const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
-  let socialSecurityDetails = {
-    claimAge: 67,
-    workingYears: 0,
-    isEligible: false,
-    indexedEarningsHistory: [],
-    top35AnnualEarnings: 0,
-    averageTop35AnnualIncome: 0,
-    aimeMonthly: 0,
-    piaMonthly: 0,
-    claimingAgeMultiplier: 0,
-    monthlyBenefit: 0,
-    annualBenefit: 0,
-    adjustmentType: 'Not eligible'
+function getAssetLabel(key) {
+  const labels = {
+    cash: 'Cash',
+    emergencyFund: 'Emergency Fund',
+    brokerage: 'Taxable Brokerage',
+    trad401k: 'Traditional 401k',
+    tradIra: 'Traditional IRA',
+    rothIra: 'Roth IRA',
+    hsa: 'HSA',
+    other: 'Other Assets'
   };
+  return labels[key] || key;
+}
 
-  if (ssEvent) {
-    const claimAge = Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67;
-    if (claimAge < 62) {
-      socialSecurityDetails = {
-        claimAge,
-        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
-        isEligible: false,
-        indexedEarningsHistory: [],
-        top35AnnualEarnings: 0,
-        averageTop35AnnualIncome: 0,
-        aimeMonthly: 0,
-        piaMonthly: 0,
-        claimingAgeMultiplier: 0,
-        monthlyBenefit: 0,
-        annualBenefit: 0,
-        adjustmentType: 'Not eligible'
-      };
-    } else if (ssEvent.useEarnings) {
-      const incomeHistory = getIncomeHistory(inputs, ssEvent);
-      socialSecurityDetails = calculateSocialSecurityBenefit({
-        incomeHistory,
-        claimAge,
-        fullRetirementAge: 67,
-        firstBendPoint: ssEvent.firstBendPoint !== undefined ? Number(ssEvent.firstBendPoint) : 1286,
-        secondBendPoint: ssEvent.secondBendPoint !== undefined ? Number(ssEvent.secondBendPoint) : 7749
-      });
-    } else {
-      const monthlyBenefitBase = Number(ssEvent.monthlyBenefit) || 0;
-      const multRes = calculateClaimingAgeMultiplier({
-        claimAge,
-        fullRetirementAge: 67
-      });
-      const monthlyBenefit = monthlyBenefitBase * multRes.multiplier;
-      socialSecurityDetails = {
-        claimAge,
-        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
-        isEligible: true,
-        indexedEarningsHistory: [],
-        top35AnnualEarnings: 0,
-        averageTop35AnnualIncome: 0,
-        aimeMonthly: 0,
-        piaMonthly: monthlyBenefitBase,
-        claimingAgeMultiplier: multRes.multiplier,
-        monthlyBenefit,
-        annualBenefit: monthlyBenefit * 12,
-        adjustmentType: multRes.adjustmentType
-      };
-    }
-  }
+export function projectYearlyBalances(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
+  const currentAge = profile.currentAge;
+  const lifeExpectancy = profile.lifeExpectancy;
+  const expectedReturn = profile.expectedReturn;
+  const postRetirementReturn = profile.postRetirementReturn;
+  const inflationRate = profile.inflationRate;
+  const lifestyleUpgrades = profile.lifestyleUpgrades;
+  const swr = profile.swr;
+  const fireMode = profile.fireMode;
+  const includeTaxes = profile.includeTaxes;
+  const enableHealthcareModel = profile.enableHealthcareModel;
+  const filingStatus = profile.filingStatus;
+  const enforceEarlyWithdrawalPenalty = true;
+  const allocationRules = profile.allocationRules || [];
+  const assets = profile.assets || {};
+  const currentConditions = events.filter(e => e.type === 'conditionItem');
+  
+  const customAssetsStartingValue = currentConditions
+    .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const customHousesStartingValue = currentConditions
+    .filter(c => c.type === 'house')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
 
-  let year0Taxes = 0;
-  if (includeTaxes) {
-    const simpleIncome = Number(inputs.simpleIncome) || 50000;
-    const simpleExpenses = Number(inputs.simpleExpenses) || 42500;
-    const rate = simpleIncome > 0 ? ((simpleIncome - simpleExpenses) / simpleIncome) : 0.15;
-    const preTaxSavings = simpleIncome * rate;
-    const taxableIncome0 = Math.max(0, simpleIncome - preTaxSavings);
-    
-    const taxConfig = U_S_TAX_DATA[filingStatus] || U_S_TAX_DATA.single;
-    const stdDeduction0 = taxConfig.standardDeduction;
-    const brackets0 = taxConfig.brackets;
-    year0Taxes = calculateUSTax(taxableIncome0, stdDeduction0, brackets0);
-  }
-
-  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
-  const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
+  const marriageEvent = events.find(e => e.type === 'marriage');
+  const spouseMember = events.find(e => e.type === 'spouseMember');
   const hasMarriage = !!marriageEvent;
   const marriageAge = marriageEvent ? (Number(marriageEvent.age) || 40) : 999;
   const weddingAge = marriageEvent ? (Number(marriageEvent.weddingAge) || marriageAge) : 999;
   const includeWeddingCost = marriageEvent ? !!marriageEvent.includeWeddingCost : false;
   const weddingCost = marriageEvent ? (Number(marriageEvent.weddingCost) || 0) : 0;
 
-  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined ? Number(spouseMember.currentAge) : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : currentAge);
-  const spouseLifeExpectancy = spouseMember && spouseMember.lifeExpectancy !== undefined ? Number(spouseMember.lifeExpectancy) : (marriageEvent && marriageEvent.spouseLifeExpectancy !== undefined ? Number(marriageEvent.spouseLifeExpectancy) : lifeExpectancy);
+  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+    ? Number(spouseMember.currentAge)
+    : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : currentAge);
+  const spouseLifeExpectancy = spouseMember && spouseMember.spouseLifeExpectancy !== undefined && spouseMember.spouseLifeExpectancy !== null && spouseMember.spouseLifeExpectancy !== ''
+    ? Number(spouseMember.spouseLifeExpectancy)
+    : (spouseMember && spouseMember.lifeExpectancy !== undefined && spouseMember.lifeExpectancy !== null && spouseMember.lifeExpectancy !== ''
+      ? Number(spouseMember.lifeExpectancy)
+      : (marriageEvent && marriageEvent.spouseLifeExpectancy !== undefined ? Number(marriageEvent.spouseLifeExpectancy) : lifeExpectancy));
   const userAgeWhenSpouseDies = currentAge + (spouseLifeExpectancy - spouseCurrentAge);
-  const ageDifference = spouseCurrentAge - currentAge; // spouseAge = age + ageDifference
+  const ageDifference = spouseCurrentAge - currentAge;
+
+  const maxLifeExpectancy = hasMarriage ? Math.max(lifeExpectancy, userAgeWhenSpouseDies) : lifeExpectancy;
+
+  const simLifeExpectancy = customLifeExpectancy || maxLifeExpectancy;
+  const simYearsToCompute = Math.max(1, simLifeExpectancy - currentAge);
   
+  const simPhases = targetRetirementAge === profile.targetRetirementAge
+    ? phases
+    : derivePhasesFromEvents({ ...profile, targetRetirementAge }, events, profile.budgetDetails?.phases || []);
+
+  const preRetirementPhases = simPhases.filter(p => p.type !== 'retire');
+
+  let balances = {
+    cash: Number(assets.cash) || 0,
+    emergencyFund: Number(assets.emergencyFund) || 0,
+    brokerage: Number(assets.brokerage) || 0,
+    trad401k: Number(assets.trad401k) || 0,
+    tradIra: Number(assets.tradIra) || 0,
+    rothIra: Number(assets.rothIra) || 0,
+    hsa: Number(assets.hsa) || 0,
+    other: Number(assets.other) || 0
+  };
+
+  currentConditions.forEach(cond => {
+    const val = Number(cond.value) || 0;
+    if (val <= 0) return;
+    if (cond.type === 'checkingSavings') {
+      balances.cash += val;
+    } else if (cond.type === 'brokerage') {
+      balances.brokerage += val;
+    } else if (cond.type === 'retirement') {
+      const sub = cond.subtype || 'trad401k';
+      if (balances[sub] !== undefined) {
+        balances[sub] += val;
+      }
+    } else if (cond.type === 'asset') {
+      balances.other += val;
+    }
+  });
+
+  const customDebts = currentConditions
+    .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
+    .map(c => ({
+      id: c.id || `custom-debt-${Date.now()}`,
+      name: c.name || c.subtype || 'Debt',
+      balance: Number(c.value) || 0,
+      interestRate: (Number(c.rate) || 0) / 100,
+      payment: Number(c.monthlyAmount || 0) * 12,
+      extraPayment: 0,
+      frequency: 'monthly',
+      paydownPlanEnabled: false,
+      startAge: currentAge,
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let baseActiveLoans = (profile.debtList || []).map(d => ({
+    id: d.id,
+    name: d.name || 'Loan',
+    balance: Number(d.balance) || 0,
+    interestRate: (Number(d.interestRate) || 0) / 100,
+    payment: d.frequency === 'monthly' ? (Number(d.payment) || 0) * 12 : (Number(d.payment) || 0),
+    extraPayment: d.frequency === 'monthly' ? (Number(d.extraPayment) || 0) * 12 : (Number(d.extraPayment) || 0),
+    frequency: d.frequency || 'monthly',
+    paydownPlanEnabled: !!d.paydownPlanEnabled,
+    startAge: d.startAge !== undefined ? Number(d.startAge) : currentAge
+  }));
+
+  const startingLoans = [...baseActiveLoans, ...customDebts];
+  let activeLoans = startingLoans.map(l => ({
+    ...l,
+    totalInterestPaid: 0,
+    payoffAge: null
+  }));
+
+  let customAssets = currentConditions
+    .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+    .map(c => ({
+      id: c.id,
+      type: c.type,
+      subtype: c.subtype,
+      name: c.name,
+      balance: Number(c.value) || 0,
+      growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : null,
+      monthlyContribution: Number(c.monthlyAmount) || 0,
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let customHouses = currentConditions
+    .filter(c => c.type === 'house')
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      value: Number(c.value) || 0,
+      growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : 0.03,
+      monthlyCost: Number(c.monthlyAmount) || 0,
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let customChildren = currentConditions
+    .filter(c => c.type === 'child')
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      monthlyCost: Number(c.monthlyAmount) || 0,
+      growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate,
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let customObligations = currentConditions
+    .filter(c => c.type === 'obligation' || (c.type === 'debt' && (c.creditCardHandling === 'payoff' || !(Number(c.value) > 0))))
+    .map(c => ({
+      id: c.id,
+      name: c.name || (c.type === 'debt' ? `${c.subtype || 'Debt'} Payment` : 'Obligation'),
+      monthlyCost: Number(c.monthlyAmount) || 0,
+      growthRate: (c.type === 'debt') ? 0 : (c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate),
+      endAge: c.endAge ? Number(c.endAge) : null
+    }));
+
+  let hasRunOut = false;
+  let runOutAge = null;
+  let endingSurplusShortfall = 0;
+  let cumulativeShortfall = 0;
+  let debtBalance = 0;
+  let initialSpending;
+  
+  const spendingPhases = profile.spendingPhases || [];
+  const incomeList = profile.incomeList || [];
+
+  const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge);
+  if (initialPhase) {
+    if (initialPhase.frequency === 'monthly') {
+      initialSpending = (Number(initialPhase.amount) || 0) * 12;
+    } else if (initialPhase.frequency === 'yearly') {
+      initialSpending = Number(initialPhase.amount) || 0;
+    } else {
+      initialSpending = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+    }
+  } else if (spendingPhases.length > 0) {
+    const firstPhase = spendingPhases[0];
+    if (firstPhase.frequency === 'monthly') {
+      initialSpending = (Number(firstPhase.amount) || 0) * 12;
+    } else if (firstPhase.frequency === 'yearly') {
+      initialSpending = Number(firstPhase.amount) || 0;
+    } else {
+      initialSpending = Number(firstPhase.annualSpending) || Number(firstPhase.amount) || 0;
+    }
+  } else {
+    initialSpending = Number(profile.simpleExpenses) || 42500;
+  }
+
+  const isAdvanced = !!profile.isAdvancedMode;
+  if (!isAdvanced && includeTaxes) {
+    initialSpending = Math.max(0, initialSpending - (profile.year0Taxes || 0));
+  }
+  
+  let lastWorkingYearSpendingNominal = initialSpending;
+  let userLastWorkingSpendingNominal = initialSpending;
+  let purchasedProperties = [];
+  let isCoasting = false;
+  let coastAge = null;
+  let logs = [];
+  let dynamicMilestones = [];
+  let retirementReadyReached = false;
+  let retirementReadyAge = null;
+
+  let standardDeduction = 0;
+  let nominalBrackets = [];
+  let taxableIncome = 0;
+  let annualEarlyWithdrawalPenalties = 0;
+
   let spouseIncome = spouseMember ? (Number(spouseMember.income) || 0) : (marriageEvent ? (Number(marriageEvent.spouseIncome) || 0) : 0);
   let spouseGrowth = spouseMember 
     ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
@@ -272,239 +321,10 @@ export function runFireSimulation(inputs) {
   const lifestyleAdjustment = marriageEvent ? (Number(marriageEvent.lifestyleAdjustment) || 0) : 0;
   const housingSavings = marriageEvent ? (Number(marriageEvent.housingSavings) || 0) : 0;
   const housingCost = marriageEvent ? (Number(marriageEvent.housingCost) || 0) : 0;
-  
-  // Calculate Spouse Social Security details
-  let spouseSocialSecurityDetails = null;
-  const isSpouseEnabled = hasMarriage;
-  if (isSpouseEnabled && spouseMember) {
-    const spouseClaimAge = Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67);
-    if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && spouseMember.spouseEstimatedSocialSecurityBenefit !== null && spouseMember.spouseEstimatedSocialSecurityBenefit !== '' && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
-      const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
-      const factor = getSocialSecurityFactor(spouseClaimAge);
-      spouseSocialSecurityDetails = {
-        claimAge: spouseClaimAge,
-        annualBenefit: baseBenefit * factor * 12,
-        monthlyBenefit: baseBenefit * factor
-      };
-    } else if (spouseMember.income > 0) {
-      const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
-        ? Number(spouseMember.desiredRetirementAge)
-        : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : spouseCurrentAge) - currentAge);
-      const spouseWorkYears = Math.max(0, spouseRetAge - 22);
-      const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
-      spouseSocialSecurityDetails = calculateSocialSecurityBenefit({
-        incomeHistory: spouseIncomeHistory,
-        claimAge: spouseClaimAge
-      });
-    }
-  }
 
-  let maxLifeExpectancy = lifeExpectancy;
-  if (hasMarriage) {
-    maxLifeExpectancy = Math.max(lifeExpectancy, userAgeWhenSpouseDies);
-  }
+  const socialSecurityDetails = profile.socialSecurityDetails || { monthlyBenefit: 0 };
+  const spouseSocialSecurityDetails = profile.spouseSocialSecurityDetails;
 
-  const assets = inputs.assets || {};
-  const currentConditions = inputs.currentConditions || [];
-  
-  const customHousesStartingValue = currentConditions
-    .filter(c => c.type === 'house')
-    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
-
-  const customAssetsStartingValue = currentConditions
-    .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
-    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
-    
-  let homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
-  let debtBalance = 0; // Removed from starting assets, tracked dynamically via debtList
-
-  const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
-  let incomeList = inputs.incomeList || [];
-  let spendingPhases = inputs.spendingPhases || [];
-
-  if (hasActiveChild) {
-    const incomeSegments = getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents);
-    const spendingSegments = getPartitionedPhases(currentAge, maxLifeExpectancy, enabledEvents);
-
-    const hasChildcarePhase = incomeSegments.some(seg => seg.type === 'childcare') || spendingSegments.some(seg => seg.type === 'childcare');
-
-    if (hasChildcarePhase) {
-      const existingAutoIncomes = incomeList.filter(inc => 
-        inc.id.startsWith('simple-inc-prechild') ||
-        inc.id.startsWith('simple-inc-childcare') ||
-        inc.id.startsWith('simple-inc-worksave')
-      );
-      const needsIncomeRegen = existingAutoIncomes.length !== incomeSegments.length ||
-        incomeSegments.some(seg => {
-          const expectedId = seg.type === 'childcare' 
-            ? `simple-inc-childcare-${seg.startAge}-${seg.endAge}`
-            : (seg.startAge === currentAge ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}` : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
-          const match = existingAutoIncomes.find(inc => inc.id === expectedId);
-          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
-        });
-
-      const existingAutoSpending = spendingPhases.filter(p => 
-        p.id.startsWith('simple-spend-prechild') ||
-        p.id.startsWith('simple-spend-childcare') ||
-        p.id.startsWith('simple-spend-worksave')
-      );
-      const needsSpendingRegen = existingAutoSpending.length !== spendingSegments.length ||
-        spendingSegments.some(seg => {
-          const expectedId = seg.type === 'childcare'
-            ? `simple-spend-childcare-${seg.startAge}-${seg.endAge}`
-            : (seg.startAge === currentAge ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}` : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`);
-          const match = existingAutoSpending.find(p => p.id === expectedId);
-          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
-        });
-
-      const needsRegen = needsIncomeRegen || needsSpendingRegen;
-
-      if (needsRegen) {
-        // Splitting incomeList
-        const cleanIncomeList = incomeList.filter(inc => 
-          inc.id !== 'inc-1' && 
-          inc.id !== 'simple-inc' && 
-          !inc.id.startsWith('simple-inc-prechild') &&
-          !inc.id.startsWith('simple-inc-childcare') && 
-          !inc.id.startsWith('simple-inc-worksave')
-        );
-        const wsIncomeAnnual = (Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167) * 12;
-        const finalChildcareBudgets = inputs.budgetDetails?.childcareBudgets || {};
-        
-        incomeSegments.forEach(seg => {
-          if (seg.type === 'childcare') {
-            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
-            let childcareIncome = inputs.budgetDetails?.childcareIncome;
-            if (finalChildcareBudgets[C]) {
-              childcareIncome = finalChildcareBudgets[C].income;
-            } else if (Object.keys(finalChildcareBudgets).length > 0) {
-              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
-              childcareIncome = finalChildcareBudgets[minC].income;
-            }
-            const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
-
-            const existingChildcareInc = incomeList.find(inc => 
-              inc.id === 'simple-inc-childcare' || inc.id.startsWith('simple-inc-childcare-')
-            );
-            const growthRate = existingChildcareInc && existingChildcareInc.growthRate !== undefined 
-              ? existingChildcareInc.growthRate 
-              : 0.03;
-
-            cleanIncomeList.push({
-              id: `simple-inc-childcare-${seg.startAge}-${seg.endAge}`,
-              name: 'Salary / Main Income (Childcare Phase)',
-              amount: ccIncomeAnnual,
-              frequency: 'yearly',
-              startAge: seg.startAge,
-              endAge: seg.endAge,
-              growthRate: growthRate,
-              isTaxable: true
-            });
-          } else {
-            const expectedId = seg.startAge === currentAge
-              ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}`
-              : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`;
-
-            const existingStandardInc = incomeList.find(inc => 
-              inc.id === 'simple-inc-worksave' || inc.id.startsWith('simple-inc-worksave-') ||
-              inc.id === 'simple-inc-prechild' || inc.id.startsWith('simple-inc-prechild-') ||
-              inc.id === 'simple-inc' || inc.id === 'inc-1'
-            );
-            const growthRate = existingStandardInc && existingStandardInc.growthRate !== undefined
-              ? existingStandardInc.growthRate
-              : 0.03;
-
-            cleanIncomeList.push({
-              id: expectedId,
-              name: 'Salary / Main Income (Standard Work Phase)',
-              amount: wsIncomeAnnual,
-              frequency: 'yearly',
-              startAge: seg.startAge,
-              endAge: seg.endAge,
-              growthRate: growthRate,
-              isTaxable: true
-            });
-          }
-        });
-        incomeList = cleanIncomeList;
-
-        // Splitting spendingPhases
-        const cleanSpendingPhases = spendingPhases.filter(p => 
-          p.id !== 'spend-1' && 
-          p.id !== 'simple-spend' && 
-          !p.id.startsWith('simple-spend-prechild') &&
-          !p.id.startsWith('simple-spend-childcare') && 
-          !p.id.startsWith('simple-spend-worksave')
-        );
-        const wsExpensesAnnual = (Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542) * 12;
-
-        spendingSegments.forEach(seg => {
-          if (seg.type === 'childcare') {
-            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
-            let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
-            if (finalChildcareBudgets[C]) {
-              childcareExpensesVal = finalChildcareBudgets[C].expenses;
-            } else if (Object.keys(finalChildcareBudgets).length > 0) {
-              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
-              childcareExpensesVal = finalChildcareBudgets[minC].expenses;
-            }
-            const ccExpensesAnnual = childcareExpensesVal
-              ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
-              : wsExpensesAnnual;
-
-            cleanSpendingPhases.push({
-              id: `simple-spend-childcare-${seg.startAge}-${seg.endAge}`,
-              name: 'Lifestyle Spending (Childcare Phase)',
-              amount: ccExpensesAnnual,
-              frequency: 'yearly',
-              startAge: seg.startAge,
-              endAge: seg.endAge,
-              annualSpending: ccExpensesAnnual
-            });
-          } else {
-            const expectedId = seg.startAge === currentAge
-              ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}`
-              : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`;
-            cleanSpendingPhases.push({
-              id: expectedId,
-              name: 'Lifestyle Spending (Standard Work Phase)',
-              amount: wsExpensesAnnual,
-              frequency: 'yearly',
-              startAge: seg.startAge,
-              endAge: seg.endAge,
-              annualSpending: wsExpensesAnnual
-            });
-          }
-        });
-        spendingPhases = cleanSpendingPhases;
-      }
-    }
-  }
-
-  if (!isAdvanced) {
-    const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
-    incomeList = incomeList.map(inc => {
-      if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
-        if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
-          const isGapPhase = inc.id.startsWith('simple-inc-worksave') && 
-            incomeSegments.some(seg => seg.type === 'standard' && seg.endAge < targetRetirementAge && inc.id === `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
-          const end = (inc.id.startsWith('simple-inc-prechild') || isGapPhase) ? inc.endAge : targetRetirementAge;
-          return { ...inc, amount: Number(inputs.simpleIncome) || inc.amount, endAge: end };
-        }
-      }
-      return inc;
-    });
-  }
-  if (!hasActiveChild) {
-    incomeList = incomeList
-      .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'))
-      .map(inc => {
-        if (inc.id.startsWith('simple-inc-worksave')) {
-          return { ...inc, startAge: currentAge };
-        }
-        return inc;
-      });
-  }
   const customIncomes = currentConditions
     .filter(c => c.type === 'income')
     .map(c => ({
@@ -519,450 +339,140 @@ export function runFireSimulation(inputs) {
     }));
   const combinedIncomeList = [...incomeList, ...customIncomes];
 
-  // Calculate initial child costs at parent's currentAge in today's dollars
-  let initialChildCostsAnnual = 0;
-  enabledEvents.forEach(ev => {
-    if (ev.type === 'haveChild') {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-      const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
-      const childAge = currentAge - birthAge;
+  const enabledEvents = events.filter(e => e.enabled !== false);
 
-      if (childAge >= childStartAge) {
-        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-        const maxAge = includeCollege ? 22 : 18;
-
-        if (childAge < maxAge) {
-          const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
-          const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
-          const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
-          const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
-
-          let annualCost = 0;
-          if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
-          else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
-          else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
-          else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
-          initialChildCostsAnnual += annualCost;
-        }
-      }
-    }
-  });
-
-  // Calculate excess childcare income boost above standard income
-  let excessBoost = 0;
-  if (inputs.budgetDetails && inputs.budgetDetails.childcareIncome !== undefined) {
-    const ccIncomeAnnual = (Number(inputs.budgetDetails.childcareIncome) || 0) * 12;
-    const wsIncomeAnnual = (Number(inputs.budgetDetails.income) || 0) * 12;
-    excessBoost = Math.max(0, ccIncomeAnnual - wsIncomeAnnual);
-  }
-
-  // Calculate peak childcare cost across the timeline in today's dollars
-  let maxChildCostsAnnual = 0;
-  const childEventsForPeak = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-  if (childEventsForPeak.length > 0) {
-    for (let age = currentAge; age < targetRetirementAge; age++) {
-      let yearCost = 0;
-      childEventsForPeak.forEach(ev => {
-        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-        const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
-        const childAge = age - birthAge;
-        if (childAge >= childStartAge) {
-          const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-          const maxAge = includeCollege ? 22 : 18;
-          if (childAge < maxAge) {
-            const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
-            const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
-            const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
-            const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
-
-            let annualCost = 0;
-            if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
-            else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
-            else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
-            else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
-            yearCost += annualCost;
-          }
-        }
-      });
-      if (yearCost > maxChildCostsAnnual) {
-        maxChildCostsAnnual = yearCost;
-      }
-    }
-  }
-
-  // spendingPhases is already defined and split above if hasActiveChild was true
-  if (!isAdvanced) {
-    spendingPhases = spendingPhases.map(p => {
-      if (p.id === 'spend-1' || p.id.startsWith('simple-spend-worksave') || p.id.startsWith('simple-spend-prechild') || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
-        if (!p.id.includes('childcare') && !p.name.toLowerCase().includes('childcare')) {
-          const amt = Number(inputs.simpleExpenses) || p.amount;
-          return { ...p, amount: amt, annualSpending: amt };
-        }
-      }
-      return p;
-    });
-  }
-  if (!hasActiveChild) {
-    spendingPhases = spendingPhases
-      .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'))
-      .map(p => {
-        if (p.id.startsWith('simple-spend-worksave')) {
-          return { ...p, startAge: currentAge };
-        }
-        return p;
-      });
-  }
-  const allocationRules = inputs.allocationRules || [];
-  const debtList = inputs.debtList || [];
-
-  const yearsToCompute = Math.max(1, maxLifeExpectancy - currentAge);
-
-  // Initialize Debts & Loans Schedule (including custom debts)
-  const customDebts = currentConditions
-    .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
-    .map(c => ({
-      id: c.id || `custom-debt-${Date.now()}`,
-      name: c.name || c.subtype || 'Debt',
-      balance: Number(c.value) || 0,
-      interestRate: (Number(c.rate) || 0) / 100,
-      payment: Number(c.monthlyAmount || 0) * 12,
-      extraPayment: 0,
-      frequency: 'monthly',
-      paydownPlanEnabled: false,
-      startAge: currentAge,
-      endAge: c.endAge ? Number(c.endAge) : null
-    }));
-
-  let baseActiveLoans = debtList.map(d => ({
-    id: d.id,
-    name: d.name || 'Loan',
-    balance: Number(d.balance) || 0,
-    interestRate: (Number(d.interestRate) || 0) / 100,
-    payment: d.frequency === 'monthly' ? (Number(d.payment) || 0) * 12 : (Number(d.payment) || 0),
-    extraPayment: d.frequency === 'monthly' ? (Number(d.extraPayment) || 0) * 12 : (Number(d.extraPayment) || 0),
-    frequency: d.frequency || 'monthly',
-    paydownPlanEnabled: !!d.paydownPlanEnabled,
-    startAge: d.startAge !== undefined ? Number(d.startAge) : currentAge
-  }));
-
-  const startingLoans = [...baseActiveLoans, ...customDebts];
-
-  // Initial sum of loan balances
-  let initialDebtSum = startingLoans.reduce((sum, l) => sum + l.balance, 0);
-
-  // Track Milestones state
-  let retirementIncomeSourcesInTodayDollars = 0;
-  enabledEvents.forEach(ev => {
-    if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
-      let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
-      if (ev.type === 'socialSecurity') {
-        monthlyBenefit = socialSecurityDetails.monthlyBenefit;
-      }
-      retirementIncomeSourcesInTodayDollars += monthlyBenefit * 12;
-    }
-  });
-
-  let retirementReadyAge = null;
-
-  const cashReturnRate = 0.025; // 2.5% conservative growth rate for cash and emergency fund
-
-  // Helper to format currency
-  function formatCurrency(val) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(val);
-  }
-
-  function getAssetLabel(key) {
-    const labels = {
-      cash: 'Cash',
-      emergencyFund: 'Emergency Fund',
-      brokerage: 'Taxable Brokerage',
-      trad401k: 'Traditional 401k',
-      tradIra: 'Traditional IRA',
-      rothIra: 'Roth IRA',
-      hsa: 'HSA',
-      other: 'Other Assets'
-    };
-    return labels[key] || key;
-  }
-
-  const executeSimulation = (targetRetirementAge, customLifeExpectancy = null) => {
-    const simLifeExpectancy = customLifeExpectancy || maxLifeExpectancy;
-    const simYearsToCompute = Math.max(1, simLifeExpectancy - currentAge);
-    const simPhases = getNormalizedPhases(inputs);
-    const preRetirementPhases = simPhases.filter(p => p.type !== 'retire');
-    let balances = {
-      cash: Number(assets.cash) || 0,
-      emergencyFund: Number(assets.emergencyFund) || 0,
-      brokerage: Number(assets.brokerage) || 0,
-      trad401k: Number(assets.trad401k) || 0,
-      tradIra: Number(assets.tradIra) || 0,
-      rothIra: Number(assets.rothIra) || 0,
-      hsa: Number(assets.hsa) || 0,
-      other: Number(assets.other) || 0
-    };
-
-    // Add starting balances from currentConditions
-    currentConditions.forEach(cond => {
-      const val = Number(cond.value) || 0;
-      if (val <= 0) return;
-      if (cond.type === 'checkingSavings') {
-        balances.cash += val;
-      } else if (cond.type === 'brokerage') {
-        balances.brokerage += val;
-      } else if (cond.type === 'retirement') {
-        const sub = cond.subtype || 'trad401k';
-        if (balances[sub] !== undefined) {
-          balances[sub] += val;
-        }
-      } else if (cond.type === 'asset') {
-        balances.other += val;
-      }
+  const withdrawFromCategory = (category, amountNeeded) => {
+    let remaining = amountNeeded;
+    const matchingCustoms = customAssets.filter(ca => {
+      if (category === 'cash') return ca.type === 'checkingSavings';
+      if (category === 'emergencyFund') return ca.type === 'emergencyFund';
+      if (category === 'brokerage') return ca.type === 'brokerage';
+      if (category === 'other') return ca.type === 'asset';
+      if (ca.type === 'retirement') return ca.subtype === category;
+      return false;
     });
 
-    let activeLoans = startingLoans.map(l => ({
-      ...l,
-      totalInterestPaid: 0,
-      payoffAge: null
-    }));
+    const baseBal = balances[category] || 0;
+    const customSum = matchingCustoms.reduce((sum, ca) => sum + ca.balance, 0);
+    const totalCategoryVal = baseBal + customSum;
 
-    // Set up custom conditions lists
-    let customAssets = currentConditions
-      .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
-      .map(c => ({
-        id: c.id,
-        type: c.type,
-        subtype: c.subtype,
-        name: c.name,
-        balance: Number(c.value) || 0,
-        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : null,
-        monthlyContribution: Number(c.monthlyAmount) || 0,
-        endAge: c.endAge ? Number(c.endAge) : null
-      }));
+    if (totalCategoryVal <= 0) return 0;
 
-    let customHouses = currentConditions
-      .filter(c => c.type === 'house')
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        value: Number(c.value) || 0,
-        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : 0.03, // 3% default appreciation
-        monthlyCost: Number(c.monthlyAmount) || 0,
-        endAge: c.endAge ? Number(c.endAge) : null
-      }));
-
-    let customChildren = currentConditions
-      .filter(c => c.type === 'child')
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        monthlyCost: Number(c.monthlyAmount) || 0,
-        growthRate: c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate,
-        endAge: c.endAge ? Number(c.endAge) : null
-      }));
-
-    let customObligations = currentConditions
-      .filter(c => c.type === 'obligation' || (c.type === 'debt' && (c.creditCardHandling === 'payoff' || !(Number(c.value) > 0))))
-      .map(c => ({
-        id: c.id,
-        name: c.name || (c.type === 'debt' ? `${c.subtype || 'Debt'} Payment` : 'Obligation'),
-        monthlyCost: Number(c.monthlyAmount) || 0,
-        growthRate: (c.type === 'debt') ? 0 : (c.rate !== undefined && c.rate !== null && c.rate !== '' ? (Number(c.rate) / 100) : inflationRate),
-        endAge: c.endAge ? Number(c.endAge) : null
-      }));
-
-    let hasRunOut = false;
-    let runOutAge = null;
-    let endingSurplusShortfall = 0;
-    let cumulativeShortfall = 0;
-    let initialSpending;
-    const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge);
-    if (initialPhase) {
-      if (initialPhase.frequency === 'monthly') {
-        initialSpending = (Number(initialPhase.amount) || 0) * 12;
-      } else if (initialPhase.frequency === 'yearly') {
-        initialSpending = Number(initialPhase.amount) || 0;
-      } else {
-        initialSpending = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
-      }
-    } else if (spendingPhases.length > 0) {
-      const firstPhase = spendingPhases[0];
-      if (firstPhase.frequency === 'monthly') {
-        initialSpending = (Number(firstPhase.amount) || 0) * 12;
-      } else if (firstPhase.frequency === 'yearly') {
-        initialSpending = Number(firstPhase.amount) || 0;
-      } else {
-        initialSpending = Number(firstPhase.annualSpending) || Number(firstPhase.amount) || 0;
-      }
-    } else {
-      initialSpending = Number(inputs.currentExpenses) || Number(inputs.simpleExpenses) || 42500;
+    const totalToWithdraw = Math.min(totalCategoryVal, remaining);
+    const baseRatio = totalCategoryVal > 0 ? (baseBal / totalCategoryVal) : 0;
+    const withdrawnBase = totalToWithdraw * baseRatio;
+    if (balances[category] !== undefined) {
+      balances[category] = Math.max(0, balances[category] - withdrawnBase);
     }
 
-    if (!isAdvanced && includeTaxes) {
-      initialSpending = Math.max(0, initialSpending - year0Taxes);
+    matchingCustoms.forEach(ca => {
+      const caRatio = totalCategoryVal > 0 ? (ca.balance / totalCategoryVal) : 0;
+      ca.balance = Math.max(0, ca.balance - (totalToWithdraw * caRatio));
+    });
+
+    remaining -= totalToWithdraw;
+    return totalToWithdraw;
+  };
+
+  const coverShortfall = (amountToDeduct, age) => {
+    let remaining = amountToDeduct;
+    const drawdownSequence = ['cash', 'emergencyFund', 'brokerage'];
+  
+    for (const key of drawdownSequence) {
+      const withdrawn = withdrawFromCategory(key, remaining);
+      remaining -= withdrawn;
+      if (remaining <= 0) return 0;
     }
-    
-    let lastWorkingYearSpendingNominal = initialSpending;
-    let userLastWorkingSpendingNominal = initialSpending;
-    let lastWorkingYearUserSpendingNominal = initialSpending;
-    let purchasedProperties = [];
-    let isCoasting = false;
-    let coastAge = null;
-    let logs = [];
-    let dynamicMilestones = [];
-    let retirementReadyReached = false;
 
-    let standardDeduction = 0;
-    let nominalBrackets = [];
-    let taxableIncome = 0;
-    let annualEarlyWithdrawalPenalties = 0;
+    if (includeTaxes) {
+      const customPreTaxSum = customAssets
+        .filter(ca => ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra'))
+        .reduce((sum, ca) => sum + ca.balance, 0);
+      const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0) + customPreTaxSum;
+      if (maxPreTaxAvailable > 0 && remaining > 0) {
+        const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+        const totalGrossPreTaxWithdrawal = solveTraditionalWithdrawal(
+          remaining,
+          maxPreTaxAvailable,
+          taxableIncome,
+          standardDeduction,
+          nominalBrackets,
+          pRate
+        );
 
-    const withdrawFromCategory = (category, amountNeeded) => {
-      let remaining = amountNeeded;
-      
-      const matchingCustoms = customAssets.filter(ca => {
-        if (category === 'cash') return ca.type === 'checkingSavings';
-        if (category === 'emergencyFund') return ca.type === 'emergencyFund';
-        if (category === 'brokerage') return ca.type === 'brokerage';
-        if (category === 'other') return ca.type === 'asset';
-        if (ca.type === 'retirement') return ca.subtype === category;
-        return false;
-      });
+        const T_0 = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
+        const T_final = calculateUSTax(taxableIncome + totalGrossPreTaxWithdrawal, standardDeduction, nominalBrackets);
+        const penalty = totalGrossPreTaxWithdrawal * pRate;
+        const actualNetProceeds = totalGrossPreTaxWithdrawal - (T_final - T_0) - penalty;
+        annualEarlyWithdrawalPenalties += penalty;
 
-      const baseBal = balances[category] || 0;
-      const customSum = matchingCustoms.reduce((sum, ca) => sum + ca.balance, 0);
-      const totalCategoryVal = baseBal + customSum;
-
-      if (totalCategoryVal <= 0) return 0;
-
-      const totalToWithdraw = Math.min(totalCategoryVal, remaining);
-
-      // Proportional deduction
-      const baseRatio = totalCategoryVal > 0 ? (baseBal / totalCategoryVal) : 0;
-      const withdrawnBase = totalToWithdraw * baseRatio;
-      if (balances[category] !== undefined) {
-        balances[category] = Math.max(0, balances[category] - withdrawnBase);
-      }
-
-      matchingCustoms.forEach(ca => {
-        const caRatio = totalCategoryVal > 0 ? (ca.balance / totalCategoryVal) : 0;
-        ca.balance = Math.max(0, ca.balance - (totalToWithdraw * caRatio));
-      });
-
-      remaining -= totalToWithdraw;
-      return totalToWithdraw;
-    };
-
-    // Drawdowns / Shortfall coverage order
-    const coverShortfall = (amountToDeduct, age) => {
-      let remaining = amountToDeduct;
-      
-      // Withdrawal order: Cash -> Emergency Fund -> Brokerage -> Trad accounts (grossed for taxes) -> Roth IRA -> HSA -> Other
-      const drawdownSequence = ['cash', 'emergencyFund', 'brokerage'];
-    
-      for (const key of drawdownSequence) {
-        const withdrawn = withdrawFromCategory(key, remaining);
-        remaining -= withdrawn;
-        if (remaining <= 0) return 0;
-      }
-
-      // Pre-tax accounts (Traditional 401k & IRA) withdrawals are taxable post-retirement
-      if (includeTaxes) {
-        const customPreTaxSum = customAssets
-          .filter(ca => ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra'))
-          .reduce((sum, ca) => sum + ca.balance, 0);
-        const maxPreTaxAvailable = (balances.trad401k || 0) + (balances.tradIra || 0) + customPreTaxSum;
-        if (maxPreTaxAvailable > 0 && remaining > 0) {
-          const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
-          const totalGrossPreTaxWithdrawal = solveTraditionalWithdrawal(
-            remaining,
-            maxPreTaxAvailable,
-            taxableIncome,
-            standardDeduction,
-            nominalBrackets,
-            pRate
-          );
-
-          const T_0 = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
-          const T_final = calculateUSTax(taxableIncome + totalGrossPreTaxWithdrawal, standardDeduction, nominalBrackets);
-          const penalty = totalGrossPreTaxWithdrawal * pRate;
-          const actualNetProceeds = totalGrossPreTaxWithdrawal - (T_final - T_0) - penalty;
-          annualEarlyWithdrawalPenalties += penalty;
-
-          let withdrawalRemaining = totalGrossPreTaxWithdrawal;
-          const preTaxSequence = ['trad401k', 'tradIra'];
-          for (const key of preTaxSequence) {
-            const withdrawn = withdrawFromCategory(key, withdrawalRemaining);
-            withdrawalRemaining -= withdrawn;
-          }
-
-          remaining -= actualNetProceeds;
-          taxableIncome += totalGrossPreTaxWithdrawal;
-        }
-      } else {
+        let withdrawalRemaining = totalGrossPreTaxWithdrawal;
         const preTaxSequence = ['trad401k', 'tradIra'];
         for (const key of preTaxSequence) {
-          const customPreTaxSum = customAssets
-            .filter(ca => ca.type === 'retirement' && ca.subtype === key)
-            .reduce((sum, ca) => sum + ca.balance, 0);
-          const totalAvail = (balances[key] || 0) + customPreTaxSum;
-          if (totalAvail > 0) {
-            const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
-            const grossNeeded = remaining / (1 - pRate);
-            const withdrawn = withdrawFromCategory(key, grossNeeded);
-            const penalty = withdrawn * pRate;
-            const netProceeds = withdrawn - penalty;
-            remaining -= netProceeds;
-            annualEarlyWithdrawalPenalties += penalty;
-            if (remaining <= 0.01) return 0;
-          }
+          const withdrawn = withdrawFromCategory(key, withdrawalRemaining);
+          withdrawalRemaining -= withdrawn;
         }
+
+        remaining -= actualNetProceeds;
+        taxableIncome += totalGrossPreTaxWithdrawal;
       }
-
-      // Roth IRA, HSA, Other
-      const taxFreeSequence = ['rothIra', 'hsa', 'other'];
-      for (const key of taxFreeSequence) {
-        const withdrawn = withdrawFromCategory(key, remaining);
-        remaining -= withdrawn;
-        if (remaining <= 0) return 0;
-      }
-
-      return remaining; // Leftover shortfall
-    };
-
-    // Helper to withdraw for down payments
-    const deductFromLiquidAssets = (amountToDeduct, age) => {
-      let remaining = amountToDeduct;
-      // Prefer cash / emergency fund / brokerage / other for large capital expenditures
-      const order = ['cash', 'emergencyFund', 'brokerage', 'other', 'rothIra', 'tradIra', 'trad401k', 'hsa'];
-      for (const assetKey of order) {
+    } else {
+      const preTaxSequence = ['trad401k', 'tradIra'];
+      for (const key of preTaxSequence) {
         const customPreTaxSum = customAssets
-          .filter(ca => ca.type === 'retirement' && ca.subtype === assetKey)
+          .filter(ca => ca.type === 'retirement' && ca.subtype === key)
           .reduce((sum, ca) => sum + ca.balance, 0);
-        const totalAvail = (balances[assetKey] || 0) + customPreTaxSum;
+        const totalAvail = (balances[key] || 0) + customPreTaxSum;
         if (totalAvail > 0) {
-          if (assetKey === 'tradIra' || assetKey === 'trad401k') {
-            const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
-            const grossNeeded = remaining / (1 - pRate);
-            const withdrawn = withdrawFromCategory(assetKey, grossNeeded);
-            const penalty = withdrawn * pRate;
-            const netProceeds = withdrawn - penalty;
-            remaining -= netProceeds;
-            annualEarlyWithdrawalPenalties += penalty;
-          } else {
-            const withdrawn = withdrawFromCategory(assetKey, remaining);
-            remaining -= withdrawn;
-          }
-          if (remaining <= 0.01) break;
+          const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+          const grossNeeded = remaining / (1 - pRate);
+          const withdrawn = withdrawFromCategory(key, grossNeeded);
+          const penalty = withdrawn * pRate;
+          const netProceeds = withdrawn - penalty;
+          remaining -= netProceeds;
+          annualEarlyWithdrawalPenalties += penalty;
+          if (remaining <= 0.01) return 0;
         }
       }
-      return remaining;
-    };
+    }
 
-  // Run simulation year-by-year
+    const taxFreeSequence = ['rothIra', 'hsa', 'other'];
+    for (const key of taxFreeSequence) {
+      const withdrawn = withdrawFromCategory(key, remaining);
+      remaining -= withdrawn;
+      if (remaining <= 0) return 0;
+    }
+
+    return remaining;
+  };
+
+  const deductFromLiquidAssets = (amountToDeduct, age) => {
+    let remaining = amountToDeduct;
+    const order = ['cash', 'emergencyFund', 'brokerage', 'other', 'rothIra', 'tradIra', 'trad401k', 'hsa'];
+    for (const assetKey of order) {
+      const customPreTaxSum = customAssets
+        .filter(ca => ca.type === 'retirement' && ca.subtype === assetKey)
+        .reduce((sum, ca) => sum + ca.balance, 0);
+      const totalAvail = (balances[assetKey] || 0) + customPreTaxSum;
+      if (totalAvail > 0) {
+        if (assetKey === 'tradIra' || assetKey === 'trad401k') {
+          const pRate = (enforceEarlyWithdrawalPenalty && age < 59.5) ? 0.10 : 0.0;
+          const grossNeeded = remaining / (1 - pRate);
+          const withdrawn = withdrawFromCategory(assetKey, grossNeeded);
+          const penalty = withdrawn * pRate;
+          const netProceeds = withdrawn - penalty;
+          remaining -= netProceeds;
+          annualEarlyWithdrawalPenalties += penalty;
+        } else {
+          const withdrawn = withdrawFromCategory(assetKey, remaining);
+          remaining -= withdrawn;
+        }
+        if (remaining <= 0.01) break;
+      }
+    }
+    return remaining;
+  };
+
   for (let year = 0; year <= simYearsToCompute; year++) {
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
@@ -971,15 +481,15 @@ export function runFireSimulation(inputs) {
     const spouseAge = age + ageDifference;
     const isSpouseActive = hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies;
     const isSpouseAlive = isSpouseActive && spouseAge <= spouseLifeExpectancy;
-    const spouseRetirementAge = (spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== '')
-      ? Number(spouseMember.desiredRetirementAge)
-      : (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== ''
-         ? Number(marriageEvent.spouseDesiredRetirementAge)
-         : (targetRetirementAge + ageDifference));
+    const spouseRetirementAge = (spouseMember && spouseMember.spouseDesiredRetirementAge !== undefined && spouseMember.spouseDesiredRetirementAge !== null && spouseMember.spouseDesiredRetirementAge !== '')
+      ? Number(spouseMember.spouseDesiredRetirementAge)
+      : ((spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== '')
+        ? Number(spouseMember.desiredRetirementAge)
+        : (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== ''
+           ? Number(marriageEvent.spouseDesiredRetirementAge)
+           : (targetRetirementAge + ageDifference)));
     const isSpouseWorking = isSpouseAlive && spouseAge < spouseRetirementAge;
-    const spouseSocialSecurityAge = spouseMember ? (Number(spouseMember.spouseSocialSecurityAge) || 67) : 67;
 
-    // Spouse assets injection
     if (hasMarriage && age === marriageAge) {
       balances.cash += spouseCash * nominalFactor;
       balances.brokerage += spouseInvestments * nominalFactor;
@@ -992,11 +502,9 @@ export function runFireSimulation(inputs) {
       });
     }
 
-    // Wedding cost deduction
     if (hasMarriage && includeWeddingCost && age === weddingAge) {
       const leftoverWedding = deductFromLiquidAssets(weddingCost * nominalFactor, age);
       if (leftoverWedding > 0.01) {
-        // A wedding cost funding gap is treated as a funding problem (debt/shortfall), not a retirement failure.
         cumulativeShortfall += leftoverWedding;
       }
       dynamicMilestones.push({
@@ -1007,7 +515,6 @@ export function runFireSimulation(inputs) {
       });
     }
 
-    // Spouse debts injection
     if (hasMarriage && age === marriageAge) {
       if (spouseDebtStudent > 0) {
         activeLoans.push({
@@ -1056,7 +563,6 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Calculate child costs for this year (in today's dollars, then inflated)
     let yearChildCostsToday = 0;
     enabledEvents.forEach(ev => {
       if (ev.type === 'haveChild') {
@@ -1069,10 +575,10 @@ export function runFireSimulation(inputs) {
           const maxAge = includeCollege ? 22 : 18;
 
           if (childAge < maxAge) {
-            const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
-            const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
-            const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
-            const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+            const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (profile.childCosts?.ages0to4 !== undefined ? Number(profile.childCosts.ages0to4) : 15000);
+            const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (profile.childCosts?.ages5to12 !== undefined ? Number(profile.childCosts.ages5to12) : 15000);
+            const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (profile.childCosts?.ages13to18 !== undefined ? Number(profile.childCosts.ages13to18) : 15000);
+            const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (profile.childCosts?.ages19to22 !== undefined ? Number(profile.childCosts.ages19to22) : 15000);
 
             let annualCost = 0;
             if (childAge >= 0 && childAge <= 4) {
@@ -1091,7 +597,6 @@ export function runFireSimulation(inputs) {
     });
     let yearChildCosts = yearChildCostsToday * nominalFactor;
 
-    // Set progressive tax values for this year (adjusted for inflation)
     let currentFilingStatus = filingStatus;
     if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
       currentFilingStatus = (marriageEvent && marriageEvent.filingStatus) || 'jointly';
@@ -1106,9 +611,6 @@ export function runFireSimulation(inputs) {
       rate: b.rate
     }));
 
-    // ----------------------------------------------------
-    // 0. Asset Compounding (only from year > 0)
-    // ----------------------------------------------------
     if (year > 0) {
       const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
       balances.brokerage *= (1 + activeReturnRate);
@@ -1121,11 +623,9 @@ export function runFireSimulation(inputs) {
       balances.emergencyFund *= (1 + activeReturnRate);
 
       if (cumulativeShortfall > 0) {
-        const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
         cumulativeShortfall *= (1 + activeReturnRate);
       }
 
-      // Compound custom assets
       customAssets.forEach(ca => {
         if (ca.balance <= 0) return;
         if (ca.endAge !== null && age > ca.endAge) {
@@ -1134,13 +634,11 @@ export function runFireSimulation(inputs) {
         }
         let rateToApply = ca.growthRate;
         if (rateToApply === null) {
-          if (ca.type === 'checkingSavings') rateToApply = activeReturnRate;
-          else rateToApply = activeReturnRate;
+          rateToApply = activeReturnRate;
         }
         ca.balance *= (1 + rateToApply);
       });
 
-      // Compound custom houses
       customHouses.forEach(h => {
         if (h.value <= 0) return;
         if (h.endAge !== null && age > h.endAge) {
@@ -1151,9 +649,6 @@ export function runFireSimulation(inputs) {
       });
     }
 
-    // ----------------------------------------------------
-    // 0.5. One-time Asset Transfers
-    // ----------------------------------------------------
     enabledEvents.forEach(ev => {
       if (ev.type === 'assetTransfer' && age === Number(ev.transferAge)) {
         const fromAsset = ev.fromAsset;
@@ -1176,9 +671,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // ----------------------------------------------------
-    // 1. Incomes Calculations
-    // ----------------------------------------------------
     let annualIncome = 0;
     taxableIncome = 0;
 
@@ -1194,34 +686,32 @@ export function runFireSimulation(inputs) {
         }
       }
       if (age >= inc.startAge && age < effectiveEndAge) {
-        // Grow incomes from currentAge instead of startAge so that future-starting phases 
-        // maintain their specified purchasing power in today's dollars.
         const yearsGrown = age - currentAge;
         let amount;
         if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc-childcare')) {
-          const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
-          const wsIncome = Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167;
-          let baseCcIncome = wsIncome; // DEFAULT: NO AUTO-BUMP
+          const C = getActiveChildrenCountAtAge(age, events);
+          const wsIncome = Number(profile.budgetDetails?.income) || (Number(profile.simpleIncome) / 12) || 4167;
+          let baseCcIncome = wsIncome;
           
           const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge && p.type === 'childcare');
           let hasSavedPhase = false;
-          if (activePhaseForAge && inputs.budgetDetails?.phases) {
-            hasSavedPhase = inputs.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
+          if (activePhaseForAge && profile.budgetDetails?.phases) {
+            hasSavedPhase = profile.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
           }
           if (activePhaseForAge && hasSavedPhase) {
             baseCcIncome = activePhaseForAge.income;
-          } else if (inputs.budgetDetails?.childcareBudgets?.[C]) {
-            baseCcIncome = Number(inputs.budgetDetails.childcareBudgets[C].income);
-          } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
+          } else if (profile.budgetDetails?.childcareBudgets?.[C]) {
+            baseCcIncome = Number(profile.budgetDetails.childcareBudgets[C].income);
+          } else if (profile.budgetDetails?.childcareBudgets && Object.keys(profile.budgetDetails.childcareBudgets).length > 0) {
             if (C > 0) {
-              const occurringCounts = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
+              const occurringCounts = Object.keys(profile.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
               if (occurringCounts.length > 0) {
                 const bestC = Math.max(...occurringCounts);
-                baseCcIncome = Number(inputs.budgetDetails.childcareBudgets[bestC].income);
+                baseCcIncome = Number(profile.budgetDetails.childcareBudgets[bestC].income);
               } else {
-                const configuredKeys = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number);
+                const configuredKeys = Object.keys(profile.budgetDetails.childcareBudgets).map(Number);
                 const refC = configuredKeys[0];
-                const refIncome = Number(inputs.budgetDetails.childcareBudgets[refC].income);
+                const refIncome = Number(profile.budgetDetails.childcareBudgets[refC].income);
                 let boostPerChild = 0;
                 if (refC > 0 && refIncome > wsIncome) {
                   boostPerChild = (refIncome - wsIncome) / refC;
@@ -1231,16 +721,14 @@ export function runFireSimulation(inputs) {
             } else {
               baseCcIncome = wsIncome;
             }
-          } else if (C > 0 && inputs.budgetDetails?.childcareIncome !== undefined) {
-            // Keep backwards compatibility for old childcareIncome
-            const oldCcIncome = Number(inputs.budgetDetails.childcareIncome);
+          } else if (C > 0 && profile.budgetDetails?.childcareIncome !== undefined) {
+            const oldCcIncome = Number(profile.budgetDetails.childcareIncome);
             if (oldCcIncome > wsIncome) {
               let initialCount = 0;
-              const currentAgeVal = Number(inputs.currentAge) || 30;
-              (inputs.lifeEvents || []).forEach(ev => {
+              events.forEach(ev => {
                 if (ev.type === 'haveChild' && ev.enabled) {
                   const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-                  const childAge = currentAgeVal - birthAge;
+                  const childAge = currentAge - birthAge;
                   const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
                   const maxAge = includeCollege ? 22 : 18;
                   if (childAge >= 0 && childAge < maxAge) {
@@ -1262,7 +750,6 @@ export function runFireSimulation(inputs) {
             baseCcIncome = wsIncome;
           }
           
-          // Subtract any child-income-boost items already in combinedIncomeList to prevent double counting
           let activeBoostMonthly = 0;
           combinedIncomeList.forEach(otherInc => {
             if (otherInc.id && typeof otherInc.id === 'string' && otherInc.id.startsWith('child-income-boost')) {
@@ -1284,7 +771,6 @@ export function runFireSimulation(inputs) {
           amount = baseAmount * Math.pow(1 + (Number(inc.growthRate) || 0), yearsGrown);
         }
 
-        // Apply Barista FIRE salary overrides: job salary drops to 0
         const hasBaristaActive = enabledEvents.some(e => e.type === 'baristaFire' && age >= Number(e.startAge));
         if (hasBaristaActive) {
           if (inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
@@ -1292,7 +778,6 @@ export function runFireSimulation(inputs) {
           }
         }
 
-        // Apply Sabbaticals
         enabledEvents.forEach(ev => {
           if (ev.type === 'sabbatical') {
             const start = Number(ev.startAge);
@@ -1318,8 +803,6 @@ export function runFireSimulation(inputs) {
       taxableIncome += spouseIncomeThisYear;
     }
 
-
-    // Add Barista FIRE part-time incomes
     enabledEvents.forEach(ev => {
       if (ev.type === 'baristaFire' && age >= Number(ev.startAge)) {
         const partTimeInc = Number(ev.partTimeIncome) || 0;
@@ -1329,7 +812,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add retirement income sources (Social Security, pension, rentalIncome, annuity, otherRetirementIncome)
     enabledEvents.forEach(ev => {
       if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
         const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
@@ -1348,14 +830,12 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add spouse Social Security if married and spouse is alive and claiming age is reached
     if (isSpouseAlive && spouseSocialSecurityDetails && spouseAge >= spouseSocialSecurityDetails.claimAge) {
       const spouseSSAmt = spouseSocialSecurityDetails.annualBenefit * nominalFactor;
       annualIncome += spouseSSAmt;
       taxableIncome += spouseSSAmt;
     }
 
-    // Add windfalls/inheritances / business sales
     let windfallReceived = 0;
     enabledEvents.forEach(ev => {
       if ((ev.type === 'windfall' || ev.type === 'inheritance' || ev.type === 'sellBusiness') && age === Number(ev.ageReceived || ev.age)) {
@@ -1365,48 +845,43 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // ----------------------------------------------------
-    // 2. Expenses Calculations
-    // ----------------------------------------------------
     let annualExpenses = 0;
-
-    // Load spending phase
     const activePhase = spendingPhases.find(p => age >= p.startAge && age < p.endAge);
     let baseSpending;
     if (activePhase) {
       if (activePhase.id && typeof activePhase.id === 'string' && activePhase.id.startsWith('simple-spend-childcare')) {
-        const C = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
-        const wsExpenses = Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542;
+        const C = getActiveChildrenCountAtAge(age, events);
+        const wsExpenses = Number(profile.budgetDetails?.expenses ? Object.values(profile.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(profile.simpleExpenses) / 12) || 3542;
         let baseCcExpenses = wsExpenses;
         
         const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge && p.type === 'childcare');
         let hasSavedPhase = false;
-        if (activePhaseForAge && inputs.budgetDetails?.phases) {
-          hasSavedPhase = inputs.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
+        if (activePhaseForAge && profile.budgetDetails?.phases) {
+          hasSavedPhase = profile.budgetDetails.phases.some(p => p.id === activePhaseForAge.id || Number(p.startAge) === activePhaseForAge.startAge);
         }
         if (activePhaseForAge && hasSavedPhase && activePhaseForAge.expenses) {
           baseCcExpenses = Object.values(activePhaseForAge.expenses).reduce((sum, val) => sum + val, 0);
-        } else if (inputs.budgetDetails?.childcareBudgets?.[C]) {
-          const ccExp = inputs.budgetDetails.childcareBudgets[C].expenses;
+        } else if (profile.budgetDetails?.childcareBudgets?.[C]) {
+          const ccExp = profile.budgetDetails.childcareBudgets[C].expenses;
           baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
-        } else if (inputs.budgetDetails?.childcareBudgets && Object.keys(inputs.budgetDetails.childcareBudgets).length > 0) {
+        } else if (profile.budgetDetails?.childcareBudgets && Object.keys(profile.budgetDetails.childcareBudgets).length > 0) {
           if (C > 0) {
-            const occurringCounts = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
+            const occurringCounts = Object.keys(profile.budgetDetails.childcareBudgets).map(Number).filter(k => k <= C);
             if (occurringCounts.length > 0) {
               const bestC = Math.max(...occurringCounts);
-              const ccExp = inputs.budgetDetails.childcareBudgets[bestC].expenses;
+              const ccExp = profile.budgetDetails.childcareBudgets[bestC].expenses;
               baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
             } else {
-              const configuredKeys = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number);
+              const configuredKeys = Object.keys(profile.budgetDetails.childcareBudgets).map(Number);
               const refC = configuredKeys[0];
-              const ccExp = inputs.budgetDetails.childcareBudgets[refC].expenses;
+              const ccExp = profile.budgetDetails.childcareBudgets[refC].expenses;
               baseCcExpenses = Object.values(ccExp).reduce((sum, val) => sum + val, 0);
             }
           } else {
             baseCcExpenses = wsExpenses;
           }
-        } else if (C > 0 && inputs.budgetDetails?.childcareExpenses) {
-          baseCcExpenses = Object.values(inputs.budgetDetails.childcareExpenses).reduce((sum, val) => sum + val, 0);
+        } else if (C > 0 && profile.budgetDetails?.childcareExpenses) {
+          baseCcExpenses = Object.values(profile.budgetDetails.childcareExpenses).reduce((sum, val) => sum + val, 0);
         } else if (C === 0) {
           baseCcExpenses = wsExpenses;
         }
@@ -1430,7 +905,7 @@ export function runFireSimulation(inputs) {
         baseSpending = Number(firstPhase.annualSpending) || Number(firstPhase.amount) || 0;
       }
     } else {
-      baseSpending = Number(inputs.currentExpenses) || Number(inputs.simpleExpenses) || 42500;
+      baseSpending = Number(profile.simpleExpenses) || 42500;
     }
 
     const rate = (activePhase && activePhase.inflationOverride !== null && activePhase.inflationOverride !== undefined && activePhase.inflationOverride !== '')
@@ -1439,17 +914,15 @@ export function runFireSimulation(inputs) {
 
     let adjustedBase = baseSpending;
     if (!isAdvanced && includeTaxes) {
-      adjustedBase = Math.max(0, baseSpending - year0Taxes);
+      adjustedBase = Math.max(0, baseSpending - (profile.year0Taxes || 0));
     }
 
     let spendingForYear = adjustedBase * Math.pow(1 + rate + lifestyleUpgrades, age - currentAge);
     
-    // Check if marriage is active this year (pre-retirement)
     if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && age < targetRetirementAge) {
       if (!isAdvanced && combinedSpendingAfterMarriage > 0) {
         spendingForYear = combinedSpendingAfterMarriage * Math.pow(1 + rate + lifestyleUpgrades, age - currentAge);
       } else if (!isAdvanced) {
-        // Auto-estimate combined spending
         const spouseIncomeNominal = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
         let partnerTax = 0;
         if (includeTaxes) {
@@ -1472,6 +945,10 @@ export function runFireSimulation(inputs) {
       }
     }
 
+    const retirementSpendingPercent = (events.find(e => e.type === 'retire' && e.enabled)?.spendingPercent !== undefined
+      ? Number(events.find(e => e.type === 'retire' && e.enabled).spendingPercent)
+      : 70) / 100;
+
     if (age >= targetRetirementAge) {
       const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge);
       if (activePhaseForAge && activePhaseForAge.expenses && Object.keys(activePhaseForAge.expenses).length > 0) {
@@ -1489,15 +966,11 @@ export function runFireSimulation(inputs) {
             spendingForYear = lastWorkingYearSpendingNominal * pct * Math.pow(1 + inflationRate, yearsPostRet);
           }
         } else {
-          // Spouse is dead (or no marriage) - only user spending
           spendingForYear = userLastWorkingSpendingNominal * pct * Math.pow(1 + inflationRate, yearsPostRet);
         }
       }
     } else {
-      // Pre-retirement: save last working year spending
       lastWorkingYearSpendingNominal = spendingForYear;
-      
-      // Track user portion of spending (joint spending minus spouse personal spending)
       if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
         const spouseIncomeNominal = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
         let partnerTax = 0;
@@ -1519,11 +992,9 @@ export function runFireSimulation(inputs) {
     }
     annualExpenses += spendingForYear;
 
-    // Add Healthcare Bridge & Medicare costs if enabled and retired
     if (enableHealthcareModel && age >= targetRetirementAge) {
-      const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
-      const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
-      
+      const preMedicarePremium = profile.preMedicarePremium || 10000;
+      const medicarePremium = profile.medicarePremium || 4000;
       if (age < 65) {
         annualExpenses += preMedicarePremium * nominalFactor;
       } else {
@@ -1531,10 +1002,6 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Child costs for this year calculated at the top of the year loop
-
-
-    // Add custom children expenses (legacy currentCondition type)
     customChildren.forEach(c => {
       if (age >= currentAge && (c.endAge === null || age < c.endAge)) {
         const yearsElapsed = age - currentAge;
@@ -1542,10 +1009,8 @@ export function runFireSimulation(inputs) {
         yearChildCosts += costForYear;
       }
     });
-
     annualExpenses += yearChildCosts;
 
-    // Add colleges events
     enabledEvents.forEach(ev => {
       if (ev.type === 'college' && age >= Number(ev.startAge)) {
         const start = Number(ev.startAge);
@@ -1556,14 +1021,12 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add medical / windfall custom expenses
     enabledEvents.forEach(ev => {
       if (ev.type === 'medicalExpense' && age === Number(ev.age)) {
         annualExpenses += (Number(ev.amount) || 0) * nominalFactor;
       }
     });
 
-    // Add Sabbaticals
     enabledEvents.forEach(ev => {
       if (ev.type === 'sabbatical') {
         const start = Number(ev.startAge);
@@ -1575,7 +1038,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add Barista FIRE overrides
     enabledEvents.forEach(ev => {
       if (ev.type === 'baristaFire' && age >= Number(ev.startAge)) {
         const baristaExp = Number(ev.annualExpenses) || 42500;
@@ -1584,9 +1046,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Custom children handled above in yearChildCosts
-
-    // Add custom obligations expenses
     customObligations.forEach(o => {
       if (age >= currentAge && (o.endAge === null || age < o.endAge)) {
         const yearsElapsed = age - currentAge;
@@ -1595,7 +1054,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Add custom houses expenses
     customHouses.forEach(h => {
       if (age >= currentAge && (h.endAge === null || age < h.endAge)) {
         const costForYear = h.monthlyCost * 12;
@@ -1603,11 +1061,10 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Resolve property buying events down payments
     enabledEvents.forEach(ev => {
       if (ev.type === 'buyHouse' && age === Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age)) {
-        const asset = (ev.houseId && inputs.houseAssets)
-          ? inputs.houseAssets.find(h => h.id === ev.houseId)
+        const asset = (ev.houseId && profile.houseAssets)
+          ? profile.houseAssets.find(h => h.id === ev.houseId)
           : ev;
 
         if (!asset) return;
@@ -1696,7 +1153,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Sell properties if they reach their sale age
     const activeProperties = [];
     purchasedProperties.forEach(prop => {
       let shouldSell = false;
@@ -1704,7 +1160,6 @@ export function runFireSimulation(inputs) {
       let proceedsDestination = 'investments';
       let sellEvId = null;
 
-      // Check linked SellHouseEvent
       const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && e.houseId === prop.id && age === Number(e.age));
       if (sellEv) {
         shouldSell = true;
@@ -1716,7 +1171,6 @@ export function runFireSimulation(inputs) {
         }
         sellEvId = sellEv.id;
       } else {
-        // Fallback to old format yearsUntilSale/move-out age
         let saleAge = null;
         if (prop.yearsUntilSale !== undefined && prop.yearsUntilSale !== null && prop.yearsUntilSale !== '') {
           const val = Number(prop.yearsUntilSale);
@@ -1757,7 +1211,6 @@ export function runFireSimulation(inputs) {
     });
     purchasedProperties = activeProperties;
 
-    // Appreciate home values and compile mortgage payments / property costs
     let totalHomeValue = homeEquityBaseline * nominalFactor;
     customHouses.forEach(h => {
       if (age >= currentAge && (h.endAge === null || age < h.endAge)) {
@@ -1770,40 +1223,32 @@ export function runFireSimulation(inputs) {
       prop.currentValue = prop.currentValue * (1 + prop.appreciationRate);
       totalHomeValue += prop.currentValue;
 
-      // Mortgage payments
       if (prop.purchaseType === 'mortgage') {
         if (age >= prop.purchaseAge && age < prop.purchaseAge + prop.loanTerm) {
           annualExpenses += prop.annualPI;
-
-          // Amortize
           const elapsedYears = age - prop.purchaseAge;
           const r = prop.mortgageRate / 12;
           const n = prop.loanTerm * 12;
           const elapsedMonths = elapsedYears * 12;
           const remainingMonths = n - elapsedMonths;
           const pmt = prop.annualPI / 12;
-
           prop.mortgageBalance = r === 0 ? pmt * remainingMonths : pmt * (1 - Math.pow(1 + r, -remainingMonths)) / r;
         } else {
           prop.mortgageBalance = 0;
         }
-
         totalMortgageBalance += prop.mortgageBalance;
       }
 
-      // Taxes, Insurance, Maintenance (applies to both cash and mortgage purchases)
       const propTax = prop.currentValue * prop.propertyTaxRate;
       const ins = prop.currentValue * prop.insuranceRate;
       const maint = prop.currentValue * prop.maintenanceRate;
       annualExpenses += propTax + ins + maint;
 
-      // HOA & Utilities (inflated)
       const propInflationRate = prop.inflation !== undefined ? (prop.inflation / 100) : inflationRate;
       const hoaCost = (prop.hoa || 0) * 12 * Math.pow(1 + propInflationRate, age - prop.purchaseAge);
       const utilitiesCost = (prop.utilitiesIncrease || 0) * 12 * Math.pow(1 + propInflationRate, age - prop.purchaseAge);
       annualExpenses += hoaCost + utilitiesCost;
 
-      // PMI: 0.5% (or custom) annually if down payment < 20%, drops off when LTV <= 80%
       if (prop.purchaseType === 'mortgage' && prop.downPayment < prop.homePrice * 0.2) {
         if (prop.mortgageBalance > prop.homePrice * 0.8) {
           const pmiCost = prop.mortgageBalance * ((prop.pmiRate || 0.5) / 100);
@@ -1812,7 +1257,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Amortize ongoing debts (minimum payments + extra paydown plans)
     let annualDebtPayments = 0;
     activeLoans.forEach(loan => {
       if (loan.balance > 0) {
@@ -1825,7 +1269,6 @@ export function runFireSimulation(inputs) {
         }
 
         let actualPaid;
-
         if (loan.balance + interest <= totalPayment) {
           actualPaid = loan.balance + interest;
           loan.balance = 0;
@@ -1840,14 +1283,11 @@ export function runFireSimulation(inputs) {
           actualPaid = totalPayment;
           loan.balance = loan.balance + interest - actualPaid;
         }
-
         annualDebtPayments += actualPaid;
       }
     });
-
     annualExpenses += annualDebtPayments;
 
-    // Debt payoff event (legacy template option - reduces portfolio, sets debtBalance to 0)
     enabledEvents.forEach(ev => {
       if (ev.type === 'debtPayoff' && age === Number(ev.payoffAge)) {
         const amt = Number(ev.remainingBalance !== undefined ? ev.remainingBalance : ev.amount) || 0;
@@ -1862,9 +1302,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // ----------------------------------------------------
-    // 3. Coast FIRE targets
-    // ----------------------------------------------------
     let isCoastAchieved = false;
     let coastFireNumber = 0;
     const currentLiquidWorth = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other;
@@ -1879,7 +1316,6 @@ export function runFireSimulation(inputs) {
           limit: b.limit === Infinity ? Infinity : b.limit * factor,
           rate: b.rate
         }));
-
         const pRateAtRetirement = (enforceEarlyWithdrawalPenalty && targetRetirementAge < 59.5) ? 0.10 : 0.0;
         projectedExpensesAtRetirement = solveTraditionalWithdrawal(
           projectedExpensesAtRetirement,
@@ -1905,16 +1341,12 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // ----------------------------------------------------
-    // 4. Allocation Rules & Surplus Cash Flows
-    // ----------------------------------------------------
     let totalPreTaxAllocations = 0;
     let savingsContribution = 0;
     let employerMatchContribution = 0;
     let taxes = 0;
     let grossSurplus = annualIncome - annualExpenses;
 
-    // Sort allocation rules by priority and filter by active age range
     const sortedAllocations = [...allocationRules]
       .filter(rule => {
         const start = rule.startAge !== undefined ? Number(rule.startAge) : 0;
@@ -1924,26 +1356,21 @@ export function runFireSimulation(inputs) {
       .map(r => ({ ...r, priority: Number(r.priority) || 99 }))
       .sort((a, b) => a.priority - b.priority);
 
-    // Only save/allocate if not coasting and not retired
     const isSavingPeriod = !isCoasting && age < targetRetirementAge;
 
-    // Step 1: Pre-Tax allocations dry run
     let customPreTaxAllocationsThisYear = 0;
     let simpleUserPreTax = 0;
     let simpleSpousePreTax = 0;
 
     if (isSavingPeriod) {
       if (!isAdvanced) {
-        // User pre-tax savings
-        const userPreTaxRate = Number(inputs.preTaxSavingsRate) || 0;
+        const userPreTaxRate = Number(profile.preTaxSavingsRate) || 0;
         const userIncomeThisYear = annualIncome - spouseIncomeThisYear;
         simpleUserPreTax = userIncomeThisYear * (userPreTaxRate / 100);
         
-        // Spouse pre-tax savings
         if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
           simpleSpousePreTax = spouseIncomeThisYear * (spouseSavingsRate / 100);
         }
-
         totalPreTaxAllocations += simpleUserPreTax + simpleSpousePreTax;
       } else if (grossSurplus > 0) {
         customAssets.forEach(ca => {
@@ -1972,7 +1399,6 @@ export function runFireSimulation(inputs) {
               incomeBase = annualIncome - spouseIncomeThisYear;
             }
 
-            // Determine amount
             let amt = 0;
             if (rule.type === 'fixed') {
               amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
@@ -1982,7 +1408,6 @@ export function runFireSimulation(inputs) {
               amt = tempGrossSurplus * (Number(rule.value) / 100);
             }
 
-            // Smart Target cap
             if (rule.smartRule && rule.smartRule.enabled) {
               const targetVal = Number(rule.smartRule.targetValue) || 0;
               const space = Math.max(0, targetVal - (balances[dest] || 0));
@@ -1998,28 +1423,24 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Step 2: Taxes computation
     if (includeTaxes) {
       const isPostRet = age >= targetRetirementAge;
       if (!isPostRet) {
         const adjustedTaxable = Math.max(0, taxableIncome - totalPreTaxAllocations);
         taxes = calculateUSTax(adjustedTaxable, standardDeduction, nominalBrackets);
       } else {
-        // Post-retirement base tax (on Social Security and part-time income before withdrawals)
         taxes = calculateUSTax(taxableIncome, standardDeduction, nominalBrackets);
       }
     }
 
-    // Step 3: Cash allocation execution
     let netSurplus = grossSurplus - taxes + windfallReceived - totalPreTaxAllocations;
-    let netCashFlow = netSurplus; // Tracker for total cash flow this year
+    let netCashFlow = netSurplus;
 
     if (isSavingPeriod) {
       if (!isAdvanced) {
         balances.trad401k += simpleUserPreTax + simpleSpousePreTax;
         savingsContribution += simpleUserPreTax + simpleSpousePreTax;
       } else {
-        // Run custom pre-tax allocations for real
         customAssets.forEach(ca => {
           if (ca.endAge !== null && age >= ca.endAge) return;
           if (ca.monthlyContribution > 0) {
@@ -2032,7 +1453,6 @@ export function runFireSimulation(inputs) {
           }
         });
 
-        // Run pre-tax allocations for real
         sortedAllocations.forEach(rule => {
           const dest = rule.destination;
           const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
@@ -2041,7 +1461,6 @@ export function runFireSimulation(inputs) {
             if (amt > 0) {
               balances[dest] += amt;
               savingsContribution += amt;
-              // Matches
               if (rule.employerMatch) {
                 const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
                 balances[dest] += matchAmt;
@@ -2052,7 +1471,6 @@ export function runFireSimulation(inputs) {
         });
       }
 
-      // Run custom post-tax allocations
       if (netSurplus > 0) {
         customAssets.forEach(ca => {
           if (ca.endAge !== null && age >= ca.endAge) return;
@@ -2069,7 +1487,6 @@ export function runFireSimulation(inputs) {
         });
       }
 
-      // Run post-tax allocations
       sortedAllocations.forEach(rule => {
         const dest = rule.destination;
         const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
@@ -2086,12 +1503,10 @@ export function runFireSimulation(inputs) {
           let finalDest = dest;
           let spaceLimit = Infinity;
 
-          // Goal-based Smart redirects
           if (rule.smartRule && rule.smartRule.enabled) {
             const targetVal = Number(rule.smartRule.targetValue) || 0;
             
             if (dest === 'extraMortgage') {
-              // Redirect if no mortgage active
               const activeMortgageSum = purchasedProperties.reduce((sum, p) => sum + p.mortgageBalance, 0);
               if (activeMortgageSum <= 0) {
                 finalDest = rule.smartRule.redirectDestination || 'brokerage';
@@ -2099,7 +1514,6 @@ export function runFireSimulation(inputs) {
                 spaceLimit = activeMortgageSum;
               }
             } else if (dest.startsWith('loan-') || dest === 'debtPaydown') {
-              // Redirect if loan paid off
               const loanId = dest.startsWith('loan-') ? dest.replace('loan-', '') : null;
               const targetLoan = activeLoans.find(l => l.id === loanId || l.id === dest);
               if (!targetLoan || targetLoan.balance <= 0) {
@@ -2108,7 +1522,6 @@ export function runFireSimulation(inputs) {
                 spaceLimit = targetLoan.balance;
               }
             } else {
-              // Standard asset target limit redirect
               const currentBal = balances[dest] || 0;
               if (currentBal >= targetVal) {
                 finalDest = rule.smartRule.redirectDestination || 'brokerage';
@@ -2120,7 +1533,6 @@ export function runFireSimulation(inputs) {
 
           let allocatedAmt = Math.max(0, Math.min(netSurplus, amt));
           if (allocatedAmt > spaceLimit) {
-            // Redirect remainder
             const spillOver = allocatedAmt - spaceLimit;
             allocatedAmt = spaceLimit;
             
@@ -2139,7 +1551,6 @@ export function runFireSimulation(inputs) {
               balances[finalDest] += allocatedAmt;
               savingsContribution += allocatedAmt;
             } else if (finalDest === 'extraMortgage') {
-              // Pay extra mortgage
               let mortgageRemaining = allocatedAmt;
               for (const prop of purchasedProperties) {
                 if (prop.purchaseType === 'mortgage' && prop.mortgageBalance > 0) {
@@ -2150,7 +1561,6 @@ export function runFireSimulation(inputs) {
                 }
               }
             } else {
-              // Specific loan paydown
               const loanId = finalDest.startsWith('loan-') ? finalDest.replace('loan-', '') : null;
               const targetLoan = activeLoans.find(l => l.id === loanId || l.id === finalDest);
               if (targetLoan) {
@@ -2166,15 +1576,12 @@ export function runFireSimulation(inputs) {
         cumulativeShortfall -= payDown;
         netSurplus -= payDown;
       }
-      // Leftover Surplus Sweep into Brokerage
       if (netSurplus > 0) {
         balances.brokerage += netSurplus;
         savingsContribution += netSurplus;
         netSurplus = 0;
       }
     } else {
-      // In retirement or coasting: we do not save new contributions.
-      // Leftover surplus (if positive, e.g. from SS or pensions) is swept into Brokerage.
       if (cumulativeShortfall > 0 && netSurplus > 0) {
         const payDown = Math.min(cumulativeShortfall, netSurplus);
         cumulativeShortfall -= payDown;
@@ -2186,9 +1593,6 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // ----------------------------------------------------
-    // 5. Drawdowns & Deficit Funding
-    // ----------------------------------------------------
     let withdrawal = 0;
     let shortfall = 0;
 
@@ -2216,21 +1620,14 @@ export function runFireSimulation(inputs) {
         taxes = calculateUSTax(adjustedTaxable, standardDeduction, nominalBrackets);
       }
     }
-
     taxes += annualEarlyWithdrawalPenalties;
 
-    // Sum of remaining loan balances
     const currentDebtSum = activeLoans.reduce((sum, l) => sum + l.balance, 0) + debtBalance;
 
-    // ----------------------------------------------------
-    // 6. Net Worth & FI Targets
-    // ----------------------------------------------------
-    // Net Worth = Liquid Assets + Real Estate Value - Mortgage Balances - Debt balances
     const customAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
     const liquidNW = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
     const netWorth = liquidNW + totalHomeValue - totalMortgageBalance - currentDebtSum;
 
-    // Apply FIRE Mode Multipliers for retirement spending target
     let retirementBaseExpenses = spendingForYear + taxes;
     if (age < targetRetirementAge) {
       const estRetSpending = spendingForYear * retirementSpendingPercent;
@@ -2244,11 +1641,9 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Add Healthcare Bridge & Medicare costs to retirement base expenses if enabled
     if (enableHealthcareModel) {
-      const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
-      const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
-      
+      const preMedicarePremium = profile.preMedicarePremium || 10000;
+      const medicarePremium = profile.medicarePremium || 4000;
       const referenceAge = Math.max(age, targetRetirementAge);
       if (referenceAge < 65) {
         retirementBaseExpenses += preMedicarePremium * nominalFactor;
@@ -2257,7 +1652,6 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Calculate active retirement income sources for the current age, and discount future ones
     let activeRetirementIncomeThisYearInTodayDollars = 0;
     let futureRetirementIncomeDiscountedSumInTodayDollars = 0;
 
@@ -2299,7 +1693,6 @@ export function runFireSimulation(inputs) {
       }
     });
 
-    // Retirement Ready Target (portfolio + active retirement income sources cover spending, discounting future ones)
     const nominalActiveSS = activeRetirementIncomeThisYearInTodayDollars * nominalFactor;
     const nominalDiscountedSS = futureRetirementIncomeDiscountedSumInTodayDollars * nominalFactor;
 
@@ -2318,7 +1711,6 @@ export function runFireSimulation(inputs) {
 
     const totalPortfolio = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
 
-    // Compute total planned savings for lifestyle gap calculation
     let plannedPreTaxSavings = 0;
     let plannedPostTaxSavings = 0;
     if (isSavingPeriod) {
@@ -2389,7 +1781,6 @@ export function runFireSimulation(inputs) {
       isCoastAchieved,
       childCosts: yearChildCosts,
       lifestyleGap: lifestyleGapValue,
-      // Record detailed asset allocations for breakdowns
       cashBalance: balances.cash + customAssets.filter(ca => ca.type === 'checkingSavings').reduce((sum, ca) => sum + ca.balance, 0),
       emergencyFundBalance: balances.emergencyFund,
       brokerageBalance: balances.brokerage + customAssets.filter(ca => ca.type === 'brokerage').reduce((sum, ca) => sum + ca.balance, 0),
@@ -2401,29 +1792,62 @@ export function runFireSimulation(inputs) {
     });
   }
 
-    const debtSummaries = activeLoans.map(loan => ({
-      id: loan.id,
-      name: loan.name,
-      totalInterestPaid: loan.totalInterestPaid || 0,
-      payoffAge: loan.balance <= 0 ? loan.payoffAge : null
-    }));
+  const debtSummaries = activeLoans.map(loan => ({
+    id: loan.id,
+    name: loan.name,
+    totalInterestPaid: loan.totalInterestPaid || 0,
+    payoffAge: loan.balance <= 0 ? loan.payoffAge : null
+  }));
 
-    return {
-      moneyLasts: !hasRunOut,
-      runOutAge,
-      endingSurplusShortfall,
-      logs,
-      dynamicMilestones,
-      coastAge,
-      lastWorkingYearSpendingNominal,
-      debtSummaries
-    };
+  return {
+    moneyLasts: !hasRunOut,
+    runOutAge,
+    endingSurplusShortfall,
+    logs,
+    dynamicMilestones,
+    coastAge,
+    lastWorkingYearSpendingNominal,
+    debtSummaries
   };
+}
 
-  const plannedResults = executeSimulation(targetRetirementAge);
+export function computeRetirementResult(profile, phases, events, plannedProjection) {
+  const currentAge = profile.currentAge;
+  const lifeExpectancy = profile.lifeExpectancy;
+  const targetRetirementAge = profile.targetRetirementAge;
+  const inflationRate = profile.inflationRate;
+  const lifestyleUpgrades = profile.lifestyleUpgrades;
+  const swr = profile.swr;
+  const postRetirementReturn = profile.postRetirementReturn;
+  const enableHealthcareModel = profile.enableHealthcareModel;
+  const assets = profile.assets || {};
+  const currentConditions = events.filter(e => e.type === 'conditionItem');
+  
+  const customAssetsStartingValue = currentConditions
+    .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const customHousesStartingValue = currentConditions
+    .filter(c => c.type === 'house')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
 
-  // Deflate all logged money values to Today's (Real) Dollars
-  const deflatedLogs = plannedResults.logs.map(log => {
+  const marriageEvent = events.find(e => e.type === 'marriage');
+  const spouseMember = events.find(e => e.type === 'spouseMember');
+  const hasMarriage = !!marriageEvent;
+  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+    ? Number(spouseMember.currentAge)
+    : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : currentAge);
+  const spouseLifeExpectancy = spouseMember && spouseMember.spouseLifeExpectancy !== undefined && spouseMember.spouseLifeExpectancy !== null && spouseMember.spouseLifeExpectancy !== ''
+    ? Number(spouseMember.spouseLifeExpectancy)
+    : (spouseMember && spouseMember.lifeExpectancy !== undefined && spouseMember.lifeExpectancy !== null && spouseMember.lifeExpectancy !== ''
+      ? Number(spouseMember.lifeExpectancy)
+      : (marriageEvent && marriageEvent.spouseLifeExpectancy !== undefined ? Number(marriageEvent.spouseLifeExpectancy) : lifeExpectancy));
+  const userAgeWhenSpouseDies = currentAge + (spouseLifeExpectancy - spouseCurrentAge);
+  const maxLifeExpectancy = hasMarriage ? Math.max(lifeExpectancy, userAgeWhenSpouseDies) : lifeExpectancy;
+
+  const simYearsToCompute = Math.max(1, maxLifeExpectancy - currentAge);
+  
+  const deflatedLogs = plannedProjection.logs.map(log => {
     const yearsElapsed = log.age - currentAge;
     const factor = Math.pow(1 + inflationRate, yearsElapsed);
     
@@ -2460,36 +1884,43 @@ export function runFireSimulation(inputs) {
     };
   });
 
+  const enabledEvents = events.filter(e => e.enabled !== false);
+  const socialSecurityDetails = profile.socialSecurityDetails || { monthlyBenefit: 0 };
+  
+  const customDebtsSum = currentConditions
+    .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const baseActiveLoansSum = (profile.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
+  const initialDebtSum = baseActiveLoansSum + customDebtsSum;
+
   let retirementReadyAgeSWR = null;
   let retirementReadyAgeComfortable = null;
   let retirementReadyAgeSurvival = null;
 
-  if (!inputs.skipReadyAgeSearch) {
-    // Binary search for retirementReadyAgeSWR
+  if (!profile.skipReadyAgeSearch) {
     let lowSWR = currentAge;
-    let highSWR = lifeExpectancy;
+    let highSWR = maxLifeExpectancy;
     while (lowSWR <= highSWR) {
       const mid = Math.floor((lowSWR + highSWR) / 2);
-      const testRes = executeSimulation(mid);
+      const testRes = projectYearlyBalances(profile, phases, events, mid);
       if (testRes.moneyLasts) {
         const lastLog = testRes.logs[testRes.logs.length - 1];
         if (lastLog && lastLog.portfolio >= lastLog.retirementReadyTarget) {
           retirementReadyAgeSWR = mid;
-          highSWR = mid - 1; // Try to retire even earlier
+          highSWR = mid - 1;
         } else {
-          lowSWR = mid + 1; // Need to work longer
+          lowSWR = mid + 1;
         }
       } else {
         lowSWR = mid + 1;
       }
     }
 
-    // Binary search for retirementReadyAgeComfortable
     let lowC = currentAge;
-    let highC = lifeExpectancy;
+    let highC = maxLifeExpectancy;
     while (lowC <= highC) {
       const mid = Math.floor((lowC + highC) / 2);
-      const testRes = executeSimulation(mid, lifeExpectancy + 10);
+      const testRes = projectYearlyBalances(profile, phases, events, mid, maxLifeExpectancy + 10);
       if (testRes.moneyLasts) {
         retirementReadyAgeComfortable = mid;
         highC = mid - 1;
@@ -2498,12 +1929,11 @@ export function runFireSimulation(inputs) {
       }
     }
 
-    // Binary search for retirementReadyAgeSurvival
     let lowS = currentAge;
-    let highS = lifeExpectancy;
+    let highS = maxLifeExpectancy;
     while (lowS <= highS) {
       const mid = Math.floor((lowS + highS) / 2);
-      const testRes = executeSimulation(mid);
+      const testRes = projectYearlyBalances(profile, phases, events, mid);
       if (testRes.moneyLasts) {
         retirementReadyAgeSurvival = mid;
         highS = mid - 1;
@@ -2513,7 +1943,8 @@ export function runFireSimulation(inputs) {
     }
   }
 
-  const readinessCriteria = inputs.readinessCriteria || 'lastsIndefinitely';
+  const readinessCriteria = profile.readinessCriteria || 'lastsIndefinitely';
+  let retirementReadyAge = null;
   if (readinessCriteria === 'lastsLifeExp') {
     retirementReadyAge = retirementReadyAgeSurvival;
   } else if (readinessCriteria === 'lastsComfortable') {
@@ -2522,6 +1953,10 @@ export function runFireSimulation(inputs) {
     retirementReadyAge = retirementReadyAgeSWR;
   }
 
+  const retirementSpendingPercent = (events.find(e => e.type === 'retire' && e.enabled)?.spendingPercent !== undefined
+    ? Number(events.find(e => e.type === 'retire' && e.enabled).spendingPercent)
+    : 70) / 100;
+
   let retirementReadyTarget = 0;
   if (retirementReadyAge !== null) {
     const readyLog = deflatedLogs.find(l => l.age === retirementReadyAge);
@@ -2529,6 +1964,7 @@ export function runFireSimulation(inputs) {
       retirementReadyTarget = readyLog.fiNumber;
     } else {
       const factor = Math.pow(1 + inflationRate, retirementReadyAge - currentAge);
+      const spendingPhases = profile.spendingPhases || [];
       const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || spendingPhases[0];
       let baseSpending = 42500;
       if (initialPhase) {
@@ -2541,9 +1977,8 @@ export function runFireSimulation(inputs) {
       let estRetSpending = baseSpending * Math.pow(1 + rate + lifestyleUpgrades, retirementReadyAge - currentAge) * retirementSpendingPercent;
       
       if (enableHealthcareModel) {
-        const preMedicarePremium = Number(inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000);
-        const medicarePremium = Number(inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000);
-        
+        const preMedicarePremium = profile.preMedicarePremium || 10000;
+        const medicarePremium = profile.medicarePremium || 4000;
         if (retirementReadyAge < 65) {
           estRetSpending += preMedicarePremium * factor;
         } else {
@@ -2562,7 +1997,7 @@ export function runFireSimulation(inputs) {
           if (ev.type === 'socialSecurity') {
             monthlyBenefit = socialSecurityDetails.monthlyBenefit;
           }
-          let annualAmt = monthlyBenefit * 12; // in today's dollars
+          let annualAmt = monthlyBenefit * 12;
           const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted;
           
           if (retirementReadyAge >= claimingAge) {
@@ -2586,32 +2021,29 @@ export function runFireSimulation(inputs) {
   }
 
   const retirementLog = deflatedLogs.find(log => log.age === targetRetirementAge) || deflatedLogs[deflatedLogs.length - 1];
-  
-  // Also deflate ending surplus/shortfall
-  const finalSurplusShortfall = plannedResults.endingSurplusShortfall / Math.pow(1 + inflationRate, yearsToCompute);
+  const finalSurplusShortfall = plannedProjection.endingSurplusShortfall / Math.pow(1 + inflationRate, simYearsToCompute);
 
-  // Compute Retirement Outcome
   let retirementOutcome;
-  if (plannedResults.runOutAge === null) {
+  if (plannedProjection.runOutAge === null) {
     if (retirementReadyAgeComfortable !== null && targetRetirementAge >= retirementReadyAgeComfortable) {
       retirementOutcome = 'comfortable';
     } else {
       retirementOutcome = 'sustainable';
     }
   } else {
-    // runs out before life expectancy
     retirementOutcome = 'retirementGap';
   }
 
-  const nominalRetirementLog = plannedResults.logs.find(log => log.age === targetRetirementAge) || plannedResults.logs[plannedResults.logs.length - 1];
+  const nominalRetirementLog = plannedProjection.logs.find(log => log.age === targetRetirementAge) || plannedProjection.logs[plannedProjection.logs.length - 1];
 
   let nominalRetirementReadyTarget = 0;
   if (retirementReadyAge !== null) {
-    const readyLogNominal = plannedResults.logs.find(l => l.age === retirementReadyAge);
+    const readyLogNominal = plannedProjection.logs.find(l => l.age === retirementReadyAge);
     nominalRetirementReadyTarget = readyLogNominal ? readyLogNominal.fiNumber : (retirementReadyTarget * Math.pow(1 + inflationRate, retirementReadyAge - currentAge));
   }
 
   let nominalRetirementIncomeSources = 0;
+  let retirementIncomeSourcesInTodayDollars = 0;
   enabledEvents.forEach(ev => {
     if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
       const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
@@ -2620,6 +2052,7 @@ export function runFireSimulation(inputs) {
         monthlyBenefit = socialSecurityDetails.monthlyBenefit;
       }
       let annualAmt = monthlyBenefit * 12;
+      retirementIncomeSourcesInTodayDollars += annualAmt;
       const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted !== false;
       if (isInflationAdjusted) {
         const factor = Math.pow(1 + inflationRate, claimingAge - currentAge);
@@ -2641,7 +2074,7 @@ export function runFireSimulation(inputs) {
                      customAssetsStartingValue +
                      homeEquityBaseline -
                      initialDebtSum -
-                     plannedResults.logs[plannedResults.logs.length - 1].debtBalance,
+                     plannedProjection.logs[plannedProjection.logs.length - 1].debtBalance,
     fiNumber: retirementReadyTarget,
     fiAge: retirementReadyAge,
     yearsToFI: retirementReadyAge !== null ? Math.max(0, retirementReadyAge - currentAge) : null,
@@ -2657,18 +2090,16 @@ export function runFireSimulation(inputs) {
     netWorthAtRetirement: retirementLog ? retirementLog.netWorth : 0,
     annualRetirementSpending: retirementLog ? retirementLog.expenses : 0,
     retirementOutcome,
-    moneyLasts: plannedResults.moneyLasts,
-    runOutAge: plannedResults.runOutAge,
+    moneyLasts: plannedProjection.moneyLasts,
+    runOutAge: plannedProjection.runOutAge,
     endingSurplusShortfall: finalSurplusShortfall,
-    coastAge: plannedResults.coastAge,
-    dynamicMilestones: plannedResults.dynamicMilestones,
-    debtSummaries: plannedResults.debtSummaries,
+    coastAge: plannedProjection.coastAge,
+    dynamicMilestones: plannedProjection.dynamicMilestones,
+    debtSummaries: plannedProjection.debtSummaries,
     data: deflatedLogs,
     socialSecurityDetails,
-    
-    // Nominal vs Deflated support
     deflatedData: deflatedLogs,
-    nominalData: plannedResults.logs,
+    nominalData: plannedProjection.logs,
     nominalRetirementReadyTarget,
     deflatedRetirementReadyTarget: retirementReadyTarget,
     nominalPortfolioAtRetirement: nominalRetirementLog ? nominalRetirementLog.portfolio : 0,
@@ -2677,15 +2108,394 @@ export function runFireSimulation(inputs) {
     deflatedNetWorthAtRetirement: retirementLog ? retirementLog.netWorth : 0,
     nominalAnnualRetirementSpending: nominalRetirementLog ? nominalRetirementLog.expenses : 0,
     deflatedAnnualRetirementSpending: retirementLog ? retirementLog.expenses : 0,
-    nominalEndingSurplusShortfall: plannedResults.endingSurplusShortfall,
+    nominalEndingSurplusShortfall: plannedProjection.nominalEndingSurplusShortfall !== undefined ? plannedProjection.nominalEndingSurplusShortfall : plannedProjection.endingSurplusShortfall,
     deflatedEndingSurplusShortfall: finalSurplusShortfall,
     nominalRetirementIncomeSources,
-    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars,
-    socialSecurityDetails,
-    incomeList,
-    spendingPhases
+    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars
   };
 }
+
+export function runFireSimulation(inputs) {
+  const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
+  const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
+  const lifeEvents = inputs.lifeEvents || [];
+  const enabledEvents = lifeEvents.filter(e => e.enabled);
+  const retireEvent = enabledEvents.find(e => e.type === 'retire');
+  const targetRetirementAge = retireEvent 
+    ? Math.max(currentAge, Number(retireEvent.age) || 65) 
+    : lifeExpectancy;
+    
+  const retirementSpendingPercent = retireEvent
+    ? Number(retireEvent.spendingPercent !== undefined ? retireEvent.spendingPercent : 70) / 100
+    : 0.7;
+
+  const expectedReturn = (Number(inputs.expectedReturn) || 7) / 100;
+  const postRetirementReturn = inputs.postRetirementReturn !== undefined
+    ? (Number(inputs.postRetirementReturn) || 0) / 100
+    : expectedReturn;
+  const inflationRate = (Number(inputs.inflationRate) || 3) / 100;
+  const swr = (Number(inputs.swr) || 4) / 100;
+
+  const includeTaxes = !!inputs.includeTaxes;
+  let filingStatus = inputs.filingStatus || 'single';
+  if (filingStatus === 'jointly' || filingStatus === 'marriedJointly') {
+    filingStatus = 'married';
+  }
+
+  const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
+  let socialSecurityDetails = {
+    claimAge: 67,
+    workingYears: 0,
+    isEligible: false,
+    indexedEarningsHistory: [],
+    top35AnnualEarnings: 0,
+    averageTop35AnnualIncome: 0,
+    aimeMonthly: 0,
+    piaMonthly: 0,
+    claimingAgeMultiplier: 0,
+    monthlyBenefit: 0,
+    annualBenefit: 0,
+    adjustmentType: 'Not eligible'
+  };
+
+  if (ssEvent) {
+    const claimAge = Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67;
+    if (claimAge < 62) {
+      socialSecurityDetails = {
+        claimAge,
+        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
+        isEligible: false,
+        indexedEarningsHistory: [],
+        top35AnnualEarnings: 0,
+        averageTop35AnnualIncome: 0,
+        aimeMonthly: 0,
+        piaMonthly: 0,
+        claimingAgeMultiplier: 0,
+        monthlyBenefit: 0,
+        annualBenefit: 0,
+        adjustmentType: 'Not eligible'
+      };
+    } else if (ssEvent.useEarnings) {
+      const incomeHistory = getIncomeHistory(inputs, ssEvent);
+      socialSecurityDetails = calculateSocialSecurityBenefit({
+        incomeHistory,
+        claimAge,
+        fullRetirementAge: 67,
+        firstBendPoint: ssEvent.firstBendPoint !== undefined ? Number(ssEvent.firstBendPoint) : 1286,
+        secondBendPoint: ssEvent.secondBendPoint !== undefined ? Number(ssEvent.secondBendPoint) : 7749
+      });
+    } else {
+      const monthlyBenefitBase = Number(ssEvent.monthlyBenefit) || 0;
+      const multRes = calculateClaimingAgeMultiplier({
+        claimAge,
+        fullRetirementAge: 67
+      });
+      const monthlyBenefit = monthlyBenefitBase * multRes.multiplier;
+      socialSecurityDetails = {
+        claimAge,
+        workingYears: (getIncomeHistory(inputs, ssEvent) || []).filter(v => Number(v) > 0).length,
+        isEligible: true,
+        indexedEarningsHistory: [],
+        top35AnnualEarnings: 0,
+        averageTop35AnnualIncome: 0,
+        aimeMonthly: 0,
+        piaMonthly: monthlyBenefitBase,
+        claimingAgeMultiplier: multRes.multiplier,
+        monthlyBenefit,
+        annualBenefit: monthlyBenefit * 12,
+        adjustmentType: multRes.adjustmentType
+      };
+    }
+  }
+
+  let year0Taxes = 0;
+  if (includeTaxes) {
+    const simpleIncome = Number(inputs.simpleIncome) || 50000;
+    const simpleExpenses = Number(inputs.simpleExpenses) || 42500;
+    const rate = simpleIncome > 0 ? ((simpleIncome - simpleExpenses) / simpleIncome) : 0.15;
+    const preTaxSavings = simpleIncome * rate;
+    const taxableIncome0 = Math.max(0, simpleIncome - preTaxSavings);
+    
+    const taxConfig = U_S_TAX_DATA[filingStatus] || U_S_TAX_DATA.single;
+    const stdDeduction0 = taxConfig.standardDeduction;
+    const brackets0 = taxConfig.brackets;
+    year0Taxes = calculateUSTax(taxableIncome0, stdDeduction0, brackets0);
+  }
+
+  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
+  const hasMarriage = !!marriageEvent;
+
+  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+    ? Number(spouseMember.currentAge)
+    : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : currentAge);
+  const spouseLifeExpectancy = spouseMember && spouseMember.spouseLifeExpectancy !== undefined && spouseMember.spouseLifeExpectancy !== null && spouseMember.spouseLifeExpectancy !== ''
+    ? Number(spouseMember.spouseLifeExpectancy)
+    : (spouseMember && spouseMember.lifeExpectancy !== undefined && spouseMember.lifeExpectancy !== null && spouseMember.lifeExpectancy !== ''
+      ? Number(spouseMember.lifeExpectancy)
+      : (marriageEvent && marriageEvent.spouseLifeExpectancy !== undefined ? Number(marriageEvent.spouseLifeExpectancy) : lifeExpectancy));
+  const userAgeWhenSpouseDies = currentAge + (spouseLifeExpectancy - spouseCurrentAge);
+  
+  let spouseSocialSecurityDetails = null;
+  const isSpouseEnabled = hasMarriage;
+  if (isSpouseEnabled && spouseMember) {
+    const spouseClaimAge = Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67);
+    if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && spouseMember.spouseEstimatedSocialSecurityBenefit !== null && spouseMember.spouseEstimatedSocialSecurityBenefit !== '' && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
+      const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
+      const factor = getSocialSecurityFactor(spouseClaimAge);
+      spouseSocialSecurityDetails = {
+        claimAge: spouseClaimAge,
+        annualBenefit: baseBenefit * factor * 12,
+        monthlyBenefit: baseBenefit * factor
+      };
+    } else if (spouseMember.income > 0) {
+      const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
+        ? Number(spouseMember.desiredRetirementAge)
+        : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : spouseCurrentAge) - currentAge);
+      const spouseWorkYears = Math.max(0, spouseRetAge - 22);
+      const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
+      spouseSocialSecurityDetails = calculateSocialSecurityBenefit({
+        incomeHistory: spouseIncomeHistory,
+        claimAge: spouseClaimAge
+      });
+    }
+  }
+
+  const maxLifeExpectancy = hasMarriage ? Math.max(lifeExpectancy, userAgeWhenSpouseDies) : lifeExpectancy;
+
+  const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
+  let incomeList = inputs.incomeList || [];
+  let spendingPhases = inputs.spendingPhases || [];
+
+  if (hasActiveChild) {
+    const incomeSegments = getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents);
+    const spendingSegments = getPartitionedPhases(currentAge, maxLifeExpectancy, enabledEvents);
+
+    const hasChildcarePhase = incomeSegments.some(seg => seg.type === 'childcare') || spendingSegments.some(seg => seg.type === 'childcare');
+
+    if (hasChildcarePhase) {
+      const existingAutoIncomes = incomeList.filter(inc => 
+        inc.id.startsWith('simple-inc-prechild') ||
+        inc.id.startsWith('simple-inc-childcare') ||
+        inc.id.startsWith('simple-inc-worksave')
+      );
+      const needsIncomeRegen = existingAutoIncomes.length !== incomeSegments.length ||
+        incomeSegments.some(seg => {
+          const expectedId = seg.type === 'childcare' 
+            ? `simple-inc-childcare-${seg.startAge}-${seg.endAge}`
+            : (seg.startAge === currentAge ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}` : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
+          const match = existingAutoIncomes.find(inc => inc.id === expectedId);
+          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
+        });
+
+      const existingAutoSpending = spendingPhases.filter(p => 
+        p.id.startsWith('simple-spend-prechild') ||
+        p.id.startsWith('simple-spend-childcare') ||
+        p.id.startsWith('simple-spend-worksave')
+      );
+      const needsSpendingRegen = existingAutoSpending.length !== spendingSegments.length ||
+        spendingSegments.some(seg => {
+          const expectedId = seg.type === 'childcare'
+            ? `simple-spend-childcare-${seg.startAge}-${seg.endAge}`
+            : (seg.startAge === currentAge ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}` : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`);
+          const match = existingAutoSpending.find(p => p.id === expectedId);
+          return !match || match.startAge !== seg.startAge || match.endAge !== seg.endAge;
+        });
+
+      const needsRegen = needsIncomeRegen || needsSpendingRegen;
+
+      if (needsRegen) {
+        const cleanIncomeList = incomeList.filter(inc => 
+          inc.id !== 'inc-1' && 
+          inc.id !== 'simple-inc' && 
+          !inc.id.startsWith('simple-inc-prechild') &&
+          !inc.id.startsWith('simple-inc-childcare') && 
+          !inc.id.startsWith('simple-inc-worksave')
+        );
+        const wsIncomeAnnual = (Number(inputs.budgetDetails?.income) || (Number(inputs.simpleIncome) / 12) || 4167) * 12;
+        const finalChildcareBudgets = inputs.budgetDetails?.childcareBudgets || {};
+        
+        incomeSegments.forEach(seg => {
+          if (seg.type === 'childcare') {
+            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
+            let childcareIncome = inputs.budgetDetails?.childcareIncome;
+            if (finalChildcareBudgets[C]) {
+              childcareIncome = finalChildcareBudgets[C].income;
+            } else if (Object.keys(finalChildcareBudgets).length > 0) {
+              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+              childcareIncome = finalChildcareBudgets[minC].income;
+            }
+            const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
+
+            const existingChildcareInc = incomeList.find(inc => 
+              inc.id === 'simple-inc-childcare' || inc.id.startsWith('simple-inc-childcare-')
+            );
+            const growthRate = existingChildcareInc && existingChildcareInc.growthRate !== undefined 
+              ? existingChildcareInc.growthRate 
+              : 0.03;
+
+            cleanIncomeList.push({
+              id: `simple-inc-childcare-${seg.startAge}-${seg.endAge}`,
+              name: 'Salary / Main Income (Childcare Phase)',
+              amount: ccIncomeAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              growthRate: growthRate,
+              isTaxable: true
+            });
+          } else {
+            const expectedId = seg.startAge === currentAge
+              ? `simple-inc-prechild-${seg.startAge}-${seg.endAge}`
+              : `simple-inc-worksave-${seg.startAge}-${seg.endAge}`;
+
+            const existingStandardInc = incomeList.find(inc => 
+              inc.id === 'simple-inc-worksave' || inc.id.startsWith('simple-inc-worksave-') ||
+              inc.id === 'simple-inc-prechild' || inc.id.startsWith('simple-inc-prechild-') ||
+              inc.id === 'simple-inc' || inc.id === 'inc-1'
+            );
+            const growthRate = existingStandardInc && existingStandardInc.growthRate !== undefined
+              ? existingStandardInc.growthRate
+              : 0.03;
+
+            cleanIncomeList.push({
+              id: expectedId,
+              name: 'Salary / Main Income (Standard Work Phase)',
+              amount: wsIncomeAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              growthRate: growthRate,
+              isTaxable: true
+            });
+          }
+        });
+        incomeList = cleanIncomeList;
+
+        const cleanSpendingPhases = spendingPhases.filter(p => 
+          p.id !== 'spend-1' && 
+          p.id !== 'simple-spend' && 
+          !p.id.startsWith('simple-spend-prechild') &&
+          !p.id.startsWith('simple-spend-childcare') && 
+          !p.id.startsWith('simple-spend-worksave')
+        );
+        const wsExpensesAnnual = (Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542) * 12;
+
+        spendingSegments.forEach(seg => {
+          if (seg.type === 'childcare') {
+            const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
+            let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
+            if (finalChildcareBudgets[C]) {
+              childcareExpensesVal = finalChildcareBudgets[C].expenses;
+            } else if (Object.keys(finalChildcareBudgets).length > 0) {
+              const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
+              childcareExpensesVal = finalChildcareBudgets[minC].expenses;
+            }
+            const ccExpensesAnnual = childcareExpensesVal
+              ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
+              : wsExpensesAnnual;
+
+            cleanSpendingPhases.push({
+              id: `simple-spend-childcare-${seg.startAge}-${seg.endAge}`,
+              name: 'Lifestyle Spending (Childcare Phase)',
+              amount: ccExpensesAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              annualSpending: ccExpensesAnnual
+            });
+          } else {
+            const expectedId = seg.startAge === currentAge
+              ? `simple-spend-prechild-${seg.startAge}-${seg.endAge}`
+              : `simple-spend-worksave-${seg.startAge}-${seg.endAge}`;
+            cleanSpendingPhases.push({
+              id: expectedId,
+              name: 'Lifestyle Spending (Standard Work Phase)',
+              amount: wsExpensesAnnual,
+              frequency: 'yearly',
+              startAge: seg.startAge,
+              endAge: seg.endAge,
+              annualSpending: wsExpensesAnnual
+            });
+          }
+        });
+        spendingPhases = cleanSpendingPhases;
+      }
+    }
+  }
+
+  const isAdvanced = inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
+  if (!isAdvanced) {
+    const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
+    incomeList = incomeList.map(inc => {
+      if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
+        if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
+          const isGapPhase = inc.id.startsWith('simple-inc-worksave') && 
+            incomeSegments.some(seg => seg.type === 'standard' && seg.endAge < targetRetirementAge && inc.id === `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
+          const end = (inc.id.startsWith('simple-inc-prechild') || isGapPhase) ? inc.endAge : targetRetirementAge;
+          return { ...inc, amount: Number(inputs.simpleIncome) || inc.amount, endAge: end };
+        }
+      }
+      return inc;
+    });
+  }
+  if (!hasActiveChild) {
+    incomeList = incomeList
+      .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'))
+      .map(inc => {
+        if (inc.id.startsWith('simple-inc-worksave')) {
+          return { ...inc, startAge: currentAge };
+        }
+        return inc;
+      });
+  }
+  if (!isAdvanced) {
+    spendingPhases = spendingPhases.map(p => {
+      if (p.id === 'spend-1' || p.id.startsWith('simple-spend-worksave') || p.id.startsWith('simple-spend-prechild') || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
+        if (!p.id.includes('childcare') && !p.name.toLowerCase().includes('childcare')) {
+          const amt = Number(inputs.simpleExpenses) || p.amount;
+          return { ...p, amount: amt, annualSpending: amt };
+        }
+      }
+      return p;
+    });
+  }
+  if (!hasActiveChild) {
+    spendingPhases = spendingPhases
+      .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'))
+      .map(p => {
+        if (p.id.startsWith('simple-spend-worksave')) {
+          return { ...p, startAge: currentAge };
+        }
+        return p;
+      });
+  }
+
+  const events = getEventsFromInputs(inputs);
+  const profile = getProfileFromInputs({
+    ...inputs,
+    incomeList,
+    spendingPhases
+  });
+
+  profile.socialSecurityDetails = socialSecurityDetails;
+  profile.spouseSocialSecurityDetails = spouseSocialSecurityDetails;
+  profile.year0Taxes = year0Taxes;
+  profile.spendingPhases = spendingPhases;
+  profile.incomeList = incomeList;
+
+  const phases = derivePhasesFromEvents(profile, events, inputs.budgetDetails?.phases || []);
+
+  const plannedProjection = projectYearlyBalances(profile, phases, events, targetRetirementAge);
+
+  const result = computeRetirementResult(profile, phases, events, plannedProjection);
+
+  result.incomeList = incomeList;
+  result.spendingPhases = spendingPhases;
+
+  return result;
+}
+
 
 /**
  * Validates inputs for the FIRE simulator calculator
@@ -2847,14 +2657,117 @@ export function getPartitionedPhases(startAge, endAge, enabledEvents) {
   return segments;
 }
 
-export function getNormalizedPhases(inputs) {
+export function getProfileFromInputs(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled);
-  const retireEvent = enabledEvents.find(e => e.type === 'retire');
+  const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire' && e.enabled);
   const targetRetirementAge = retireEvent 
     ? Math.max(currentAge, Number(retireEvent.age) || 65) 
     : lifeExpectancy;
+
+  return {
+    currentAge,
+    lifeExpectancy,
+    targetRetirementAge,
+    expectedReturn: (Number(inputs.expectedReturn) || 7) / 100,
+    postRetirementReturn: inputs.postRetirementReturn !== undefined
+      ? (Number(inputs.postRetirementReturn) || 0) / 100
+      : (Number(inputs.expectedReturn) || 7) / 100,
+    inflationRate: (Number(inputs.inflationRate) || 3) / 100,
+    lifestyleUpgrades: (Number(inputs.lifestyleUpgrades) || 0) / 100,
+    swr: (Number(inputs.swr) || 4) / 100,
+    fireMode: inputs.fireMode || 'traditional',
+    includeTaxes: !!inputs.includeTaxes,
+    filingStatus: inputs.filingStatus || 'single',
+    preTaxSavingsRate: inputs.preTaxSavingsRate,
+    enableHealthcareModel: inputs.enableHealthcareModel !== false,
+    preMedicarePremium: Number(inputs.preMedicarePremium) || 10000,
+    medicarePremium: Number(inputs.medicarePremium) || 4000,
+    simpleIncome: Number(inputs.simpleIncome) || 50000,
+    simpleExpenses: Number(inputs.simpleExpenses) || 42500,
+    simpleInvestments: Number(inputs.simpleInvestments) || 5000,
+    childCosts: inputs.childCosts || { ages0to4: 15000, ages5to12: 15000, ages13to18: 15000, ages19to22: 15000, includeCollege: false },
+    assets: inputs.assets || {},
+    budgetDetails: inputs.budgetDetails || {},
+    skipReadyAgeSearch: inputs.skipReadyAgeSearch,
+    readinessCriteria: inputs.readinessCriteria || 'lastsComfortable',
+    allocationRules: inputs.allocationRules || [],
+    debtList: inputs.debtList || [],
+    houseAssets: inputs.houseAssets || [],
+    isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1)
+  };
+}
+
+export function getEventsFromInputs(inputs) {
+  const events = [];
+
+  // 1. Standard lifeEvents
+  if (inputs.lifeEvents) {
+    inputs.lifeEvents.forEach(e => {
+      events.push({ ...e });
+    });
+  }
+
+  // 2. Household spouse
+  if (inputs.householdMembers) {
+    inputs.householdMembers.forEach(m => {
+      if (m.id === 'spouse') {
+        events.push({
+          type: 'spouseMember',
+          ...m
+        });
+      }
+    });
+  }
+
+  // 3. Income list items (career change, child boosts)
+  if (inputs.incomeList) {
+    inputs.incomeList.forEach(inc => {
+      events.push({
+        type: 'incomeItem',
+        ...inc
+      });
+    });
+  }
+
+  // 4. Spending phases (moves, lifestyle changes)
+  if (inputs.spendingPhases) {
+    inputs.spendingPhases.forEach(sp => {
+      events.push({
+        type: 'spendingItem',
+        ...sp
+      });
+    });
+  }
+
+  // 5. Debt list
+  if (inputs.debtList) {
+    inputs.debtList.forEach(d => {
+      events.push({
+        type: 'debtItem',
+        ...d
+      });
+    });
+  }
+
+  // 6. Current conditions
+  if (inputs.currentConditions) {
+    inputs.currentConditions.forEach(c => {
+      events.push({
+        type: 'conditionItem',
+        ...c
+      });
+    });
+  }
+
+  return events;
+}
+
+export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
+  const currentAge = profile.currentAge;
+  const lifeExpectancy = profile.lifeExpectancy;
+  const targetRetirementAge = profile.targetRetirementAge;
+  const enabledEvents = events.filter(e => e.enabled !== false);
 
   const boundaries = new Set();
   boundaries.add(currentAge);
@@ -2864,59 +2777,59 @@ export function getNormalizedPhases(inputs) {
   // Social Security Claiming Age Boundary
   const ssEv = enabledEvents.find(e => e.type === 'socialSecurity');
   if (ssEv) {
-    const claimAge = Number(ssEv.claimingAge !== undefined ? ssEv.claimingAge : 67);
+    const claimAge = Number(ssEv.claimingAge !== undefined ? ssEv.claimingAge : ssEv.age) || 67;
     if (claimAge > currentAge && claimAge < lifeExpectancy) {
       boundaries.add(claimAge);
     }
   }
 
-  // A. Career Changes (from incomeList start ages)
-  (inputs.incomeList || []).forEach(inc => {
-    if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
-      return;
+  // A. Career Changes (from income list events)
+  enabledEvents.forEach(e => {
+    if (e.type === 'incomeItem') {
+      if (e.id && typeof e.id === 'string' && e.id.startsWith('child-income-boost')) return;
+      const start = Number(e.startAge);
+      if (start > currentAge && start < targetRetirementAge) {
+        boundaries.add(start);
+      }
     }
-    const start = Number(inc.startAge);
-    if (start > currentAge && start < targetRetirementAge) {
-      boundaries.add(start);
+    if (e.type === 'spendingItem') {
+      const start = Number(e.startAge);
+      if (start > currentAge && start < targetRetirementAge) {
+        boundaries.add(start);
+      }
     }
-  });
-
-  // B. Moves (from spendingPhases start ages)
-  (inputs.spendingPhases || []).forEach(sp => {
-    const start = Number(sp.startAge);
-    if (start > currentAge && start < targetRetirementAge) {
-      boundaries.add(start);
-    }
-  });
-
-  // C. Life Events (marriage, divorce, haveChild, buyHouse, sellHouse)
-  enabledEvents.forEach(ev => {
-    const age = Number(ev.age || ev.purchaseAge || ev.birthAge || ev.startAge);
-    if (age > currentAge && age < targetRetirementAge) {
-      if (['marriage', 'divorce', 'haveChild', 'buyHouse', 'sellHouse'].includes(ev.type)) {
+    if (['marriage', 'divorce', 'haveChild', 'buyHouse', 'sellHouse'].includes(e.type)) {
+      const age = Number(e.age || e.purchaseAge || e.birthAge || e.startAge || e.saleAge);
+      if (age > currentAge && age < targetRetirementAge) {
         boundaries.add(age);
       }
     }
   });
 
-  // Spouse Retirement boundary
-  const marriageEventForBoundary = enabledEvents.find(e => e.type === 'marriage');
-  if (marriageEventForBoundary) {
-    const spouseCurrentAge = Number(marriageEventForBoundary.spouseCurrentAge) || currentAge;
-    const spouseDesiredRetirementAge = marriageEventForBoundary.spouseDesiredRetirementAge;
+  // Spouse retirement boundary
+  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const spouseMember = enabledEvents.find(e => e.type === 'spouseMember');
+  if (marriageEvent) {
+    const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+      ? Number(spouseMember.currentAge)
+      : (Number(marriageEvent.spouseCurrentAge) || currentAge);
+    const spouseDesiredRetirementAge = (spouseMember && spouseMember.spouseDesiredRetirementAge !== undefined && spouseMember.spouseDesiredRetirementAge !== null && spouseMember.spouseDesiredRetirementAge !== '')
+      ? spouseMember.spouseDesiredRetirementAge
+      : ((spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== '')
+        ? spouseMember.desiredRetirementAge
+        : marriageEvent.spouseDesiredRetirementAge);
     if (spouseDesiredRetirementAge !== undefined && spouseDesiredRetirementAge !== null && spouseDesiredRetirementAge !== '') {
-      const spouseRetAge = Number(spouseDesiredRetirementAge);
-      const userAgeWhenSpouseRetires = currentAge + (spouseRetAge - spouseCurrentAge);
+      const userAgeWhenSpouseRetires = currentAge + (Number(spouseDesiredRetirementAge) - spouseCurrentAge);
       if (userAgeWhenSpouseRetires > currentAge && userAgeWhenSpouseRetires < targetRetirementAge) {
         boundaries.add(userAgeWhenSpouseRetires);
       }
     }
   }
 
-  // D. Child count transitions (when active child count changes)
+  // D. Child count transitions
   for (let age = currentAge + 1; age < lifeExpectancy; age++) {
-    const prevCount = getActiveChildrenCountAtAge(age - 1, inputs.lifeEvents);
-    const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+    const prevCount = getActiveChildrenCountAtAge(age - 1, enabledEvents);
+    const count = getActiveChildrenCountAtAge(age, enabledEvents);
     if (count !== prevCount) {
       boundaries.add(age);
     }
@@ -2931,11 +2844,9 @@ export function getNormalizedPhases(inputs) {
     const start = sortedBoundaries[i];
     const end = sortedBoundaries[i + 1];
 
-    const childCount = getActiveChildrenCountAtAge(start, inputs.lifeEvents);
-
-    const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
-    const ssClaimingAge = ssEvent ? (Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67) : 67;
-    const isReceivingSS = ssEvent && start >= ssClaimingAge;
+    const childCount = getActiveChildrenCountAtAge(start, enabledEvents);
+    const ssClaimingAge = ssEv ? (Number(ssEv.claimingAge !== undefined ? ssEv.claimingAge : ssEv.age) || 67) : 67;
+    const isReceivingSS = ssEv && start >= ssClaimingAge;
 
     // Identify primary type, name, and icon
     let type = 'workSave';
@@ -2965,14 +2876,8 @@ export function getNormalizedPhases(inputs) {
         icon = '👶';
       }
     } else {
-      const marriageEv = enabledEvents.find(e => e.type === 'marriage' && Number(e.age) === start);
-      const divorceEv = enabledEvents.find(e => e.type === 'divorce' && Number(e.age) === start);
-      const childEv = enabledEvents.find(e => e.type === 'haveChild' && Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) === start);
-      const buyHouseEv = enabledEvents.find(e => e.type === 'buyHouse' && Number(e.purchaseAge !== undefined ? e.purchaseAge : e.age) === start);
-      const incomeItem = (inputs.incomeList || []).find(inc => Number(inc.startAge) === start && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
-      const spendingItem = (inputs.spendingPhases || []).find(sp => Number(sp.startAge) === start && !sp.id.startsWith('simple-spend-childcare') && !sp.id.startsWith('simple-spend-prechild'));
-
-      if (marriageEv) {
+      const isMarriageBoundary = marriageEvent && Number(marriageEvent.age) === start;
+      if (isMarriageBoundary) {
         type = 'marriage';
         name = isReceivingSS ? 'Marriage Phase (Receiving SS)' : 'Marriage Phase';
         icon = isReceivingSS ? '🇺🇸' : '💍';
@@ -2981,9 +2886,8 @@ export function getNormalizedPhases(inputs) {
 
     const id = `${type}_${start}_${end}`;
 
-    // Defaults calculations
     // User monthly income
-    const rawIncomeItem = (inputs.incomeList || []).find(inc => start >= inc.startAge && start < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
+    const rawIncomeItem = enabledEvents.find(inc => inc.type === 'incomeItem' && start >= inc.startAge && start < inc.endAge && !inc.id.startsWith('child-income-boost'));
     let baseSalaryMonthly = 0;
     let growthRate = 0.03;
     if (start >= targetRetirementAge) {
@@ -2993,15 +2897,15 @@ export function getNormalizedPhases(inputs) {
       baseSalaryMonthly = rawIncomeItem.frequency === 'monthly' ? Math.round(Number(rawIncomeItem.amount)) : Math.round(Number(rawIncomeItem.amount) / 12);
       growthRate = Number(rawIncomeItem.growthRate) || 0.03;
     } else {
-      baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
+      baseSalaryMonthly = Math.round(profile.simpleIncome / 12);
       growthRate = 0.03;
     }
 
     let childBoost = 0;
     if (childCount > 0) {
       let activeBoostMonthly = 0;
-      (inputs.incomeList || []).forEach(inc => {
-        if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
+      enabledEvents.forEach(inc => {
+        if (inc.type === 'incomeItem' && inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
           if (inc.startAge <= start && inc.endAge > start) {
             const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
             activeBoostMonthly += boostYearly / 12;
@@ -3013,17 +2917,16 @@ export function getNormalizedPhases(inputs) {
 
     // Add Social Security monthly benefit if receiving SS
     let ssMonthlyIncome = 0;
-    if (isReceivingSS && ssEvent) {
-      if (ssEvent.useEarnings) {
-        const incomeHistory = getIncomeHistory(inputs, ssEvent, true);
+    if (isReceivingSS && ssEv) {
+      if (ssEv.useEarnings) {
+        const incomeHistory = getIncomeHistory({ currentAge, lifeExpectancy, lifeEvents: enabledEvents }, ssEv, true);
         const ssCalculated = calculateSocialSecurityBenefit({
           incomeHistory,
-          claimAge: ssClaimingAge,
-          fullRetirementAge: 67
+          claimAge: ssClaimingAge
         });
         ssMonthlyIncome = Math.round(ssCalculated.monthlyBenefit);
       } else {
-        const baseBenefit = Number(ssEvent.monthlyBenefit !== undefined ? ssEvent.monthlyBenefit : 2000);
+        const baseBenefit = Number(ssEv.monthlyBenefit !== undefined ? ssEv.monthlyBenefit : 2000);
         const factor = getSocialSecurityFactor(ssClaimingAge);
         ssMonthlyIncome = Math.round(baseBenefit * factor);
       }
@@ -3032,23 +2935,26 @@ export function getNormalizedPhases(inputs) {
     const defaultIncome = baseSalaryMonthly + childBoost + ssMonthlyIncome;
 
     // User monthly expenses
-    const rawSpendingItem = (inputs.spendingPhases || []).find(sp => start >= sp.startAge && start < sp.endAge && !sp.id.startsWith('simple-spend-childcare') && !sp.id.startsWith('simple-spend-prechild'));
+    const rawSpendingItem = enabledEvents.find(sp => sp.type === 'spendingItem' && start >= sp.startAge && start < sp.endAge);
     let baseExpensesMonthly = 0;
     if (start >= targetRetirementAge) {
       baseExpensesMonthly = 0;
     } else if (rawSpendingItem) {
       baseExpensesMonthly = rawSpendingItem.frequency === 'monthly' ? Math.round(Number(rawSpendingItem.amount)) : Math.round(Number(rawSpendingItem.amount) / 12);
     } else {
-      baseExpensesMonthly = Math.round((Number(inputs.simpleExpenses) || 42500) / 12);
+      baseExpensesMonthly = Math.round(profile.simpleExpenses / 12);
     }
 
-    const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
     const isMarried = marriageEvent && start >= Number(marriageEvent.age);
     const spouseCurrentAge = marriageEvent ? (Number(marriageEvent.spouseCurrentAge) || currentAge) : currentAge;
     const spouseAgeAtStart = spouseCurrentAge + (start - currentAge);
-    const partnerRetirementAge = (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== '')
-      ? Number(marriageEvent.spouseDesiredRetirementAge)
-      : (targetRetirementAge + (spouseCurrentAge - currentAge));
+    const partnerRetirementAge = (spouseMember && spouseMember.spouseDesiredRetirementAge !== undefined && spouseMember.spouseDesiredRetirementAge !== null && spouseMember.spouseDesiredRetirementAge !== '')
+      ? Number(spouseMember.spouseDesiredRetirementAge)
+      : ((spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== '')
+        ? Number(spouseMember.desiredRetirementAge)
+        : (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== ''
+           ? Number(marriageEvent.spouseDesiredRetirementAge)
+           : (targetRetirementAge + (spouseCurrentAge - currentAge))));
     const isPartnerRetiredInPhase = isMarried && spouseAgeAtStart >= partnerRetirementAge;
 
     let spouseIncome = 0;
@@ -3057,36 +2963,30 @@ export function getNormalizedPhases(inputs) {
     let spouseCash = 0;
     let spouseInvestments = 0;
     let spouseRetirement = 0;
-
     let partnerSSMonthlyIncome = 0;
+
     if (isMarried) {
-      const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
-      if (spouseMember) {
-        const spouseClaimAge = Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67);
-        if (start >= spouseClaimAge) {
-          if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && spouseMember.spouseEstimatedSocialSecurityBenefit !== null && spouseMember.spouseEstimatedSocialSecurityBenefit !== '' && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
-            const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
-            const factor = getSocialSecurityFactor(spouseClaimAge);
-            partnerSSMonthlyIncome = Math.round(baseBenefit * factor);
-          } else if (spouseMember.income > 0) {
-            const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
-              ? Number(spouseMember.desiredRetirementAge)
-              : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : (marriageEvent.spouseCurrentAge !== undefined ? marriageEvent.spouseCurrentAge : currentAge)) - currentAge);
-            const spouseWorkYears = Math.max(0, spouseRetAge - 22);
-            const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
-            const spouseSSCalc = calculateSocialSecurityBenefit({
-              incomeHistory: spouseIncomeHistory,
-              claimAge: spouseClaimAge
-            });
-            partnerSSMonthlyIncome = Math.round(spouseSSCalc.monthlyBenefit);
-          }
+      const spouseClaimAge = spouseMember ? Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67) : 67;
+      if (start >= spouseClaimAge && spouseMember) {
+        if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
+          const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
+          const factor = getSocialSecurityFactor(spouseClaimAge);
+          partnerSSMonthlyIncome = Math.round(baseBenefit * factor);
+        } else if (spouseMember.income > 0) {
+          const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null
+            ? Number(spouseMember.desiredRetirementAge)
+            : (targetRetirementAge + (spouseMember.currentAge !== undefined ? spouseMember.currentAge : spouseCurrentAge) - currentAge);
+          const spouseWorkYears = Math.max(0, spouseRetAge - 22);
+          const spouseIncomeHistory = new Array(spouseWorkYears).fill(Number(spouseMember.income) || 0);
+          const spouseSSCalc = calculateSocialSecurityBenefit({
+            incomeHistory: spouseIncomeHistory,
+            claimAge: spouseClaimAge
+          });
+          partnerSSMonthlyIncome = Math.round(spouseSSCalc.monthlyBenefit);
         }
       }
-    }
 
-    if (isMarried) {
       if (start < targetRetirementAge && !isPartnerRetiredInPhase) {
-        const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
         spouseIncome = spouseMember ? Math.round((Number(spouseMember.income) || 0) / 12) : Math.round(Number(marriageEvent.spouseIncome || 0) / 12);
         spouseIncomeGrowthRate = spouseMember
           ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
@@ -3098,17 +2998,15 @@ export function getNormalizedPhases(inputs) {
         spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (Number(marriageEvent.investments) || 0);
         spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (Number(marriageEvent.retirement) || 0);
 
-        // default combined spending if married
         if (marriageEvent.combinedSpendingAfterMarriage) {
           baseExpensesMonthly = Math.round(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
         } else {
-          const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100)); // default spouse spending
+          const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100));
           const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
           const housing = Number(marriageEvent.housingSavings || 0);
           baseExpensesMonthly = baseExpensesMonthly + spousePersonal + lifestyle + housing;
         }
       } else {
-        // Spouse is retired, set spouseIncome to spouse's SS benefit
         spouseIncome = partnerSSMonthlyIncome;
       }
     }
@@ -3129,25 +3027,25 @@ export function getNormalizedPhases(inputs) {
 
     if (start < targetRetirementAge) {
       if (childCount > 0) {
-        if (inputs.budgetDetails?.childcareBudgets?.[childCount]?.expenses) {
-          defaultExpenses = { ...inputs.budgetDetails.childcareBudgets[childCount].expenses };
-        } else if (inputs.budgetDetails?.childcareExpenses) {
-          defaultExpenses = { ...inputs.budgetDetails.childcareExpenses };
-        } else if (inputs.budgetDetails?.expenses) {
-          defaultExpenses = { ...inputs.budgetDetails.expenses };
+        if (profile.budgetDetails?.childcareBudgets?.[childCount]?.expenses) {
+          defaultExpenses = { ...profile.budgetDetails.childcareBudgets[childCount].expenses };
+        } else if (profile.budgetDetails?.childcareExpenses) {
+          defaultExpenses = { ...profile.budgetDetails.childcareExpenses };
+        } else if (profile.budgetDetails?.expenses) {
+          defaultExpenses = { ...profile.budgetDetails.expenses };
         }
       } else {
-        if (inputs.budgetDetails?.expenses) {
-          defaultExpenses = { ...inputs.budgetDetails.expenses };
+        if (profile.budgetDetails?.expenses) {
+          defaultExpenses = { ...profile.budgetDetails.expenses };
         }
       }
     } else {
-      // Scale down from pre-retirement phase expenses
       let sourcePhase = [...phases].reverse().find(p => p.startAge < targetRetirementAge && p.childCount === childCount);
       if (!sourcePhase) {
         sourcePhase = [...phases].reverse().find(p => p.startAge < targetRetirementAge);
       }
       const sourceExpenses = sourcePhase ? sourcePhase.expenses : defaultExpenses;
+      const retireEvent = enabledEvents.find(e => e.type === 'retire');
       const spendingPercent = retireEvent && retireEvent.spendingPercent !== undefined ? Number(retireEvent.spendingPercent) : 70;
       const scale = spendingPercent / 100;
       let retirementExpenses = {};
@@ -3157,31 +3055,30 @@ export function getNormalizedPhases(inputs) {
       defaultExpenses = retirementExpenses;
     }
 
-    // Default savings
     let defaultSavingsMonthly = 0;
     if (start < targetRetirementAge) {
-      if (inputs.preTaxSavingsRate) {
-        defaultSavingsMonthly = Math.round(((defaultIncome * 12) * (Number(inputs.preTaxSavingsRate) / 100)) / 12);
+      if (profile.preTaxSavingsRate) {
+        defaultSavingsMonthly = Math.round(((defaultIncome * 12) * (Number(profile.preTaxSavingsRate) / 100)) / 12);
       } else {
         defaultSavingsMonthly = Math.max(0, Math.round(defaultIncome - baseExpensesMonthly));
       }
     }
-    
+
     let defaultSavings = {
       trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: defaultSavingsMonthly, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
     };
     if (start < targetRetirementAge) {
       if (childCount > 0) {
-        if (inputs.budgetDetails?.childcareBudgets?.[childCount]?.savings) {
-          defaultSavings = { ...inputs.budgetDetails.childcareBudgets[childCount].savings };
-        } else if (inputs.budgetDetails?.childcareSavings) {
-          defaultSavings = { ...inputs.budgetDetails.childcareSavings };
-        } else if (inputs.budgetDetails?.savings) {
-          defaultSavings = { ...inputs.budgetDetails.savings };
+        if (profile.budgetDetails?.childcareBudgets?.[childCount]?.savings) {
+          defaultSavings = { ...profile.budgetDetails.childcareBudgets[childCount].savings };
+        } else if (profile.budgetDetails?.childcareSavings) {
+          defaultSavings = { ...profile.budgetDetails.childcareSavings };
+        } else if (profile.budgetDetails?.savings) {
+          defaultSavings = { ...profile.budgetDetails.savings };
         }
       } else {
-        if (inputs.budgetDetails?.savings) {
-          defaultSavings = { ...inputs.budgetDetails.savings };
+        if (profile.budgetDetails?.savings) {
+          defaultSavings = { ...profile.budgetDetails.savings };
         }
       }
     }
@@ -3212,7 +3109,7 @@ export function getNormalizedPhases(inputs) {
       }
     }
 
-    const savedPhase = (inputs.budgetDetails?.phases || []).find(p => p.id === id || (Number(p.startAge) === start && p.type === type));
+    const savedPhase = budgetOverrides.find(p => p.id === id || (Number(p.startAge) === start && p.type === type));
 
     let resolvedIncome = defaultIncome;
     if (savedPhase && savedPhase.income !== undefined) {
@@ -3223,24 +3120,9 @@ export function getNormalizedPhases(inputs) {
           resolvedIncome += childBoost;
         }
       }
-      if (type === 'childcare') {
-        let savedChildCount = 0;
-        if (savedPhase.type === 'childcare' && savedPhase.name) {
-          if (savedPhase.name.includes('1 Child')) {
-            savedChildCount = 1;
-          } else {
-            const match = savedPhase.name.match(/(\d+)\s+Kids?/i);
-            if (match) {
-              savedChildCount = parseInt(match[1], 10);
-            }
-          }
-        }
-        // No automatic boost adjustment here (user-initiated choice)
-        // resolvedIncome += (childCount - savedChildCount) * 1250;
-      }
     }
 
-    const phase = {
+    phases.push({
       id,
       name,
       icon,
@@ -3251,12 +3133,10 @@ export function getNormalizedPhases(inputs) {
       income: resolvedIncome,
       incomeGrowthRate: growthRate,
       ssMonthlyIncome,
-      savingsAllocMode: savedPhase?.savingsAllocMode || inputs.budgetDetails?.savingsAllocMode || 'fixed',
+      savingsAllocMode: savedPhase?.savingsAllocMode || profile.budgetDetails?.savingsAllocMode || 'fixed',
       savings: savedPhase?.savings ? { ...savedPhase.savings } : defaultSavings,
       partnerSavings: savedPhase?.partnerSavings ? { ...savedPhase.partnerSavings } : defaultPartnerSavings,
       expenses: savedPhase?.expenses ? { ...savedPhase.expenses } : defaultExpenses,
-      
-      // Married details
       isMarried,
       spouseIncome,
       spouseIncomeGrowthRate,
@@ -3264,12 +3144,17 @@ export function getNormalizedPhases(inputs) {
       spouseCash,
       spouseInvestments,
       spouseRetirement
-    };
-
-    phases.push(phase);
+    });
   }
 
   return phases;
+}
+
+export function getNormalizedPhases(inputs) {
+  const profile = getProfileFromInputs(inputs);
+  const events = getEventsFromInputs(inputs);
+  const budgetOverrides = inputs.budgetDetails?.phases || [];
+  return derivePhasesFromEvents(profile, events, budgetOverrides);
 }
 
 export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPhases = false) {
