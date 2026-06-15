@@ -974,10 +974,8 @@ export function runFireSimulation(inputs) {
     if (hasMarriage && includeWeddingCost && age === weddingAge) {
       const leftoverWedding = deductFromLiquidAssets(weddingCost * nominalFactor, age);
       if (leftoverWedding > 0.01) {
-        hasRunOut = true;
-        if (runOutAge === null) {
-          runOutAge = age;
-        }
+        // A wedding cost funding gap is treated as a funding problem (debt/shortfall), not a retirement failure.
+        cumulativeShortfall += leftoverWedding;
       }
       dynamicMilestones.push({
         age,

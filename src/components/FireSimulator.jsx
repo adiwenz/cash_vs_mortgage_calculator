@@ -3312,8 +3312,9 @@ export default function FireSimulator() {
         housingCost: 0,
         lifestyleOption: 'same',
         lifestyleAdjustment: 0,
-        includeWeddingCost: false,
+        includeWeddingCost: true,
         weddingCost: 20000,
+        weddingFundingMethod: 'savings',
         weddingAge: inputs.currentAge || 35,
         filingStatus: 'jointly',
         wizardStep: 1,
@@ -3680,12 +3681,14 @@ export default function FireSimulator() {
             lifestyleAdjustment: lifestyleAdjustmentAmount,
             includeWeddingCost: !!editingEvent.includeWeddingCost,
             weddingCost: Number(editingEvent.weddingCost),
+            weddingFundingMethod: editingEvent.weddingFundingMethod || 'savings',
             weddingAge: Number(editingEvent.weddingAge),
             filingStatus: editingEvent.filingStatus || 'jointly',
             spouseCurrentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
             spouseLifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
+
             spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
             desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
             partnerRetiresWithUser: true,
@@ -3838,6 +3841,24 @@ export default function FireSimulator() {
       updateInput('incomeList', updated);
       return;
     }
+  };
+
+  const handleDeleteEvent = () => {
+    if (!editingEvent) return;
+    
+    // Create a proxy event object that handleDeleteRoadmapEvent expects
+    const proxyEvent = {
+      originalId: editingEvent.id,
+      id: editingEvent.id,
+      type: editingEvent.type,
+      age: editingEvent.age || editingEvent.purchaseAge || editingEvent.birthAge || editingEvent.claimingAge || editingEvent.moveAge
+    };
+    
+    handleDeleteRoadmapEvent(proxyEvent);
+    setEditingEvent(null);
+    setIsFullPartnerProfileOpen(false);
+    setIsZeroSpendingConfirmed(false);
+    setIsPartnerZeroSpendingConfirmed(false);
   };
 
   const commitEventAgeChange = (evt, newAge) => {
@@ -5105,18 +5126,14 @@ export default function FireSimulator() {
     const showTaxesStep = !!inputs.includeTaxes;
 
     const handleNext = () => {
-      if (stepId === 1) {
-        setEditingEvent({ ...editingEvent, wizardStep: 2 });
-      } else if (stepId === 2) {
-        setEditingEvent({ ...editingEvent, wizardStep: 3 });
+      if (stepId < 4) {
+        setEditingEvent({ ...editingEvent, wizardStep: stepId + 1 });
       }
     };
 
     const handleBack = () => {
-      if (stepId === 3) {
-        setEditingEvent({ ...editingEvent, wizardStep: 2 });
-      } else if (stepId === 2) {
-        setEditingEvent({ ...editingEvent, wizardStep: 1 });
+      if (stepId > 1) {
+        setEditingEvent({ ...editingEvent, wizardStep: stepId - 1 });
       }
     };
 
@@ -5185,16 +5202,15 @@ export default function FireSimulator() {
     const userSavingsMonthly = Object.values(inputs.budgetDetails?.savings || {}).reduce((sum, val) => sum + (Number(val) || 0), 0);
     const userFlatSavings = (Number(inputs.simpleIncome) || 50000) * ((Number(inputs.preTaxSavingsRate) || 15) / 100) / 12;
     const userSavings = userSavingsMonthly > 0 ? userSavingsMonthly : Math.round(userFlatSavings);
-
     const partnerSavingsMonthly = partnerSavings / 12;
     const combinedSavings = userSavings + partnerSavingsMonthly;
     const surplusMonthly = combinedIncome / 12 - combinedSpendingVal / 12;
     const leftoverGap = surplusMonthly - combinedSavings;
 
-    const isStep3Invalid = (combinedSpendingVal <= userSpendingPreRetirement && !isZeroSpendingConfirmed) || (partnerPersonalSpending === 0 && !isPartnerZeroSpendingConfirmed);
+    const isStep4Invalid = (combinedSpendingVal <= userSpendingPreRetirement && !isZeroSpendingConfirmed) || (partnerPersonalSpending === 0 && !isPartnerZeroSpendingConfirmed);
+    const isStep3Invalid = isStep4Invalid;
 
-    // Simulation Previews (Step 3)
-    const isPreviewStep = stepId === 3;
+    const isPreviewStep = stepId === 4;
     let beforeReadyAge = null;
     let afterReadyAge = null;
     if (isPreviewStep) {
@@ -5267,138 +5283,361 @@ export default function FireSimulator() {
 
           {/* Stepper Headers */}
           <div className="wizard-steps-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-            {/* Step 1: Partner Finances */}
+            {/* Step 1: Congratulations */}
             <div className={`wizard-step-node ${stepId === 1 ? 'active' : ''} ${stepId > 1 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 1 })}>
               <div className="wizard-step-icon">1</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Partner Finances</span>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Congratulations</span>
             </div>
 
             <div className={`wizard-step-divider ${stepId >= 2 ? 'active' : ''}`} />
 
-            {/* Step 2: Life Together */}
-            <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => {
-              setEditingEvent({ ...editingEvent, wizardStep: 2 });
-            }}>
+            {/* Step 2: Wedding */}
+            <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 2 })}>
               <div className="wizard-step-icon">2</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Life Together</span>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Wedding</span>
             </div>
 
             <div className={`wizard-step-divider ${stepId >= 3 ? 'active' : ''}`} />
 
-            {/* Step 3: Marriage Impact */}
-            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''}`} onClick={() => {
-              if (stepId > 1) {
-                setEditingEvent({ ...editingEvent, wizardStep: 3 });
-              }
-            }}>
+            {/* Step 3: Life Together */}
+            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''} ${stepId > 3 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 3 })}>
               <div className="wizard-step-icon">3</div>
+              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Life Together</span>
+            </div>
+
+            <div className={`wizard-step-divider ${stepId >= 4 ? 'active' : ''}`} />
+
+            {/* Step 4: Marriage Impact */}
+            <div className={`wizard-step-node ${stepId === 4 ? 'active' : ''}`} onClick={() => {
+              setEditingEvent({ ...editingEvent, wizardStep: 4 });
+            }}>
+              <div className="wizard-step-icon">4</div>
               <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Marriage Impact</span>
             </div>
           </div>
 
-          {/* STEP 1: PARTNER FINANCES */}
+          {/* STEP 1: CONGRATULATIONS */}
           {stepId === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Tell Us About Your Partner</h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Marriage can improve or reduce retirement readiness depending on income, assets, debts, taxes, and spending.
+              <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
+                <h4 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary)', margin: '0 0 0.5rem 0' }}>Congratulations! 🎉</h4>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  We've assumed your partner's finances are similar to yours and that you'll combine households after marriage.
                 </p>
               </div>
 
-              {/* Assumed finances helper text */}
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '0.65rem 0.85rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                ℹ️ We’ve assumed your partner’s finances are similar to yours. You can customize these values if needed.
-              </div>
-
-              {/* Step 1 Inputs */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div className="input-wrapper">
-                  <span className="input-name">Marriage Age</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={editingEvent.age}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, age: parseInt(e.target.value) || inputs.currentAge })}
-                  />
-                </div>
-                <div className="input-wrapper">
-                  <span className="input-name">Spouse Income ($/year)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={editingEvent.spouseIncome}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, spouseIncome: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="input-wrapper">
-                  <span className="input-name">Savings Rate (%)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={editingEvent.savingsRate}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, savingsRate: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="input-wrapper">
-                  <span className="input-name">Partner Assets ($)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={Number(editingEvent.cash || 0) + Number(editingEvent.investments || 0) + Number(editingEvent.retirement || 0)}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, investments: parseFloat(e.target.value) || 0, cash: 0, retirement: 0 })}
-                  />
-                </div>
-                <div className="input-wrapper">
-                  <span className="input-name">Partner Debt ($)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={Number(editingEvent.debtStudent || 0) + Number(editingEvent.debtCredit || 0) + Number(editingEvent.debtOther || 0)}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, debtOther: parseFloat(e.target.value) || 0, debtStudent: 0, debtCredit: 0 })}
-                  />
-                </div>
-                <div className="input-wrapper">
-                  <span className="input-name">Spouse Retirement Age</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '100%' }}
-                    value={editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== null ? editingEvent.spouseDesiredRetirementAge : ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, spouseDesiredRetirementAge: e.target.value !== '' ? parseInt(e.target.value) : '' })}
-                    placeholder="e.g. 65 (optional)"
-                  />
+              {/* Simple Benefits List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                  Key Benefits of Combining Finances:
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>💼 Shared Income</div>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Pool your monthly earnings to boost purchasing power.</p>
+                  </div>
+                  <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>💰 Shared Savings</div>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Grow your investments faster with combined capital.</p>
+                  </div>
+                  <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>🏠 Split Housing Costs</div>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Share rent/mortgage and utilities to lower monthly expenses.</p>
+                  </div>
+                  <div style={{ padding: '0.75rem', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>📊 Joint FIRE Planning</div>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Coordinate retirement targets and withdrawal strategies.</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Live Summary Card */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Live Household Summary</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Income</div>
-                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary)' }}>{formatCurrency(combinedIncome)}</strong>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Assets</div>
-                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-emerald)' }}>{formatCurrency(combinedAssets)}</strong>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Combined Debt</div>
-                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-rose)' }}>{formatCurrency(combinedDebt)}</strong>
+              {/* Edit Partner Profile Toggle Button */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+                <button
+                  key="toggle-partner-profile"
+                  type="button"
+                  onClick={() => setIsFullPartnerProfileOpen(!isFullPartnerProfileOpen)}
+                  className="list-builder-edit-btn"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                >
+                  👤 {isFullPartnerProfileOpen ? 'Hide Partner Profile' : 'Edit Partner Profile'}
+                </button>
+              </div>
+
+              {/* Advanced Partner Profile Controls (Progressive Disclosure) */}
+              {isFullPartnerProfileOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>Advanced Partner Profile</span>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="input-wrapper">
+                      <span className="input-name">Marriage Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.age}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { age: parseInt(e.target.value) || inputs.currentAge }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Partner Current Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? editingEvent.spouseCurrentAge : editingEvent.age}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseCurrentAge: parseInt(e.target.value) || editingEvent.age }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Spouse Income ($/year)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseIncome}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseIncome: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Savings Rate (%)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.savingsRate}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { savingsRate: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Partner Assets ($)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={Number(editingEvent.cash || 0) + Number(editingEvent.investments || 0) + Number(editingEvent.retirement || 0)}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { investments: parseFloat(e.target.value) || 0, cash: 0, retirement: 0 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Partner Debt ($)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={Number(editingEvent.debtStudent || 0) + Number(editingEvent.debtCredit || 0) + Number(editingEvent.debtOther || 0)}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { debtOther: parseFloat(e.target.value) || 0, debtStudent: 0, debtCredit: 0 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Spouse Retirement Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== null ? editingEvent.spouseDesiredRetirementAge : ''}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseDesiredRetirementAge: e.target.value !== '' ? parseInt(e.target.value) : null }))}
+                        placeholder="e.g. 65 (optional)"
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Spouse Life Expectancy</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? editingEvent.spouseLifeExpectancy : 85}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseLifeExpectancy: parseInt(e.target.value) || 85 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Spouse Social Security Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? editingEvent.spouseSocialSecurityAge : 67}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseSocialSecurityAge: parseInt(e.target.value) || 67 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Spouse Est. SS Benefit ($/yr)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? editingEvent.spouseEstimatedSocialSecurityBenefit : 0}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseEstimatedSocialSecurityBenefit: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* STEP 2: LIFE TOGETHER */}
+          {/* STEP 2: WEDDING */}
           {stepId === 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Plan Your Wedding</h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Determine your wedding budget, evaluate funding sources, and identify any savings gaps.
+                </p>
+              </div>
+
+              {/* Savings Details */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Available Savings Summary</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Your Savings</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{formatCurrency(userAssets)}</strong>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Partner Savings</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{formatCurrency(spouseAssets)}</strong>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Total Savings</div>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-emerald)' }}>{formatCurrency(userAssets + spouseAssets)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wedding Cost Checkbox & Inputs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="include-wedding-cost"
+                  checked={editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : true}
+                  onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { includeWeddingCost: e.target.checked }))}
+                  style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                />
+                <label htmlFor="include-wedding-cost" className="input-name" style={{ margin: 0, cursor: 'pointer' }}>
+                  Plan to have a wedding ceremony / celebration
+                </label>
+              </div>
+
+              {(editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : true) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '0.75rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                  
+                  {/* Presets */}
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>Cost Presets</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {[
+                        { label: 'Court $500', value: 500 },
+                        { label: 'Simple $5k', value: 5000 },
+                        { label: 'Traditional $20k', value: 20000 },
+                        { label: 'Dream $50k', value: 50000 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          className="list-builder-edit-btn"
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.3rem 0.6rem',
+                            border: (editingEvent.weddingCost === preset.value) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            background: (editingEvent.weddingCost === preset.value) ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                            color: (editingEvent.weddingCost === preset.value) ? 'var(--primary)' : 'var(--text-primary)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setEditingEvent(Object.assign({}, editingEvent, { weddingCost: preset.value }))}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="list-builder-edit-btn"
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.3rem 0.6rem',
+                          border: ![500, 5000, 20000, 50000].includes(editingEvent.weddingCost) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                          background: ![500, 5000, 20000, 50000].includes(editingEvent.weddingCost) ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                          color: ![500, 5000, 20000, 50000].includes(editingEvent.weddingCost) ? 'var(--primary)' : 'var(--text-primary)'
+                        }}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Manual cost and age input */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="input-wrapper">
+                      <span className="input-name">Wedding Cost ($)</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ 
+                          width: '100%',
+                          color: (editingEvent.weddingCost || 0) > 0 ? '#f43f5e' : 'inherit',
+                          fontWeight: (editingEvent.weddingCost || 0) > 0 ? 'bold' : 'normal'
+                        }}
+                        value={editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingCost: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="input-wrapper">
+                      <span className="input-name">Wedding Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%' }}
+                        value={editingEvent.weddingAge !== undefined ? editingEvent.weddingAge : editingEvent.age}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingAge: parseInt(e.target.value) || editingEvent.age }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Funding Options */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>How will you fund the wedding?</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {[
+                        { label: '🏦 Use Available Savings (Deduct from liquid assets)', value: 'savings' },
+                        { label: '📈 Save Until Wedding (Extra savings targeted before wedding)', value: 'save_targeted' },
+                        { label: '💳 Finance Difference (Create credit card or other debt)', value: 'debt' }
+                      ].map((opt) => (
+                        <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="weddingFundingMethod"
+                            value={opt.value}
+                            checked={(editingEvent.weddingFundingMethod || 'savings') === opt.value}
+                            onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingFundingMethod: e.target.value }))}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Funding Gap Calculation Display */}
+                  {Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
+                    <div style={{ border: '1px solid var(--accent-orange)', backgroundColor: 'rgba(245, 158, 11, 0.08)', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.25rem' }}>
+                      <strong style={{ color: 'var(--accent-orange)' }}>⚠️ Funding Gap Identified</strong>
+                      <span>
+                        Wedding cost exceeds combined available savings by <strong>{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</strong>.
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                        {(editingEvent.weddingFundingMethod || 'savings') === 'savings' && 'Note: This gap will result in negative liquid assets at the wedding age.'}
+                        {(editingEvent.weddingFundingMethod || 'savings') === 'save_targeted' && 'Note: You will need to save this difference before the wedding.'}
+                        {(editingEvent.weddingFundingMethod || 'savings') === 'debt' && `Note: This will add ${formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))} of debt.`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: LIFE TOGETHER */}
+          {stepId === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Life Together</h4>
@@ -5485,55 +5724,9 @@ export default function FireSimulator() {
                 </div>
               )}
 
-              {/* Wedding Cost Section */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    id="include-wedding-cost"
-                    checked={editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : false}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, includeWeddingCost: e.target.checked })}
-                    style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="include-wedding-cost" className="input-name" style={{ margin: 0, cursor: 'pointer' }}>
-                    Include One-time Wedding Cost
-                  </label>
-                </div>
-
-                {(editingEvent.includeWeddingCost !== undefined ? !!editingEvent.includeWeddingCost : false) && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.4rem' }}>
-                    <div className="input-wrapper">
-                      <span className="input-name">Wedding Cost ($)</span>
-                      <input
-                        type="number"
-                        className="input-number-box"
-                        style={{ 
-                          width: '100%',
-                          color: (editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000) > 0 
-                            ? '#f43f5e' 
-                            : 'inherit',
-                          fontWeight: (editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000) > 0 ? 'bold' : 'normal'
-                        }}
-                        value={editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, weddingCost: parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="input-wrapper">
-                      <span className="input-name">Wedding Age</span>
-                      <input
-                        type="number"
-                        className="input-number-box"
-                        style={{ width: '100%' }}
-                        value={editingEvent.weddingAge !== undefined ? editingEvent.weddingAge : editingEvent.age}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, weddingAge: parseInt(e.target.value) || editingEvent.age })}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Large CTA - Update Household Budget */}
               <button
+                key="open-budget-wizard"
                 type="button"
                 onClick={() => {
                   setIsBudgetOpenFromMarriageWizard(true);
@@ -5558,13 +5751,13 @@ export default function FireSimulator() {
                   gap: '0.5rem'
                 }}
               >
-                📊 Update Household Budget
+                📊 Adjust Budget Details
               </button>
             </div>
           )}
 
-          {/* STEP 3: MARRIAGE IMPACT */}
-          {stepId === 3 && (
+          {/* STEP 4: MARRIAGE IMPACT */}
+          {stepId === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>Marriage Impact</h4>
@@ -5584,7 +5777,7 @@ export default function FireSimulator() {
                         name="filingStatus"
                         value="jointly"
                         checked={editingEvent.filingStatus === 'jointly'}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, filingStatus: e.target.value })}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { filingStatus: e.target.value }))}
                       />
                       Married Filing Jointly
                     </label>
@@ -5594,7 +5787,7 @@ export default function FireSimulator() {
                         name="filingStatus"
                         value="separately"
                         checked={editingEvent.filingStatus === 'separately'}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, filingStatus: e.target.value })}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { filingStatus: e.target.value }))}
                       />
                       Married Filing Separately
                     </label>
@@ -5627,8 +5820,8 @@ export default function FireSimulator() {
                       <strong style={{ color: 'var(--text-primary)' }}>{Math.round(userSavingsRate)}%</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Surplus:</span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(Math.max(0, userIncome / 12 - userSavings - userSpendingPreRetirement / 12))}/mo</strong>
+                      <span style={{ color: 'var(--text-secondary)' }}>Net Worth:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(userAssets - userDebt)}</strong>
                     </div>
                   </div>
                 </div>
@@ -5656,14 +5849,36 @@ export default function FireSimulator() {
                       <strong style={{ color: 'var(--text-primary)' }}>{Math.round(((combinedSavings + Math.max(0, leftoverGap)) / (combinedIncome / 12)) * 100)}%</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--primary)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Surplus:</span>
-                      <strong style={{ color: leftoverGap >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
-                        {formatCurrency(Math.max(0, leftoverGap))}/mo
-                      </strong>
+                      <span style={{ color: 'var(--text-secondary)' }}>Net Worth:</span>
+                      <strong style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(combinedAssets - combinedDebt)}</strong>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Wedding details summary */}
+              {editingEvent.includeWeddingCost && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Wedding Cost:</span>
+                    <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(editingEvent.weddingCost || 0)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Funding Method:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>
+                      {(editingEvent.weddingFundingMethod === 'savings') && 'Available Savings'}
+                      {(editingEvent.weddingFundingMethod === 'save_targeted') && 'Save Until Wedding'}
+                      {(editingEvent.weddingFundingMethod === 'debt') && 'Finance Difference'}
+                    </strong>
+                  </div>
+                  {editingEvent.weddingFundingMethod === 'debt' && Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
+                      <span>Debt Created:</span>
+                      <span>+{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Retirement Readiness Impact Card */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.2rem', marginTop: '0.2rem' }}>
@@ -5739,31 +5954,43 @@ export default function FireSimulator() {
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            <button
-              type="button"
-              className="list-builder-remove-btn"
-              onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
-              style={{ alignSelf: 'center', margin: 0 }}
-            >
-              Cancel
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="list-builder-remove-btn"
+                onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+                style={{ alignSelf: 'center', margin: 0 }}
+              >
+                Cancel
+              </button>
+              {editingEvent.id && (
+                <button
+                  type="button"
+                  className="list-builder-remove-btn"
+                  onClick={handleDeleteEvent}
+                  style={{ alignSelf: 'center', margin: 0, background: 'var(--accent-rose, #f43f5e)', color: '#fff', borderColor: 'var(--accent-rose, #f43f5e)', cursor: 'pointer' }}
+                >
+                  Delete Event
+                </button>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {stepId > 1 && (
                 <button
                   type="button"
                   className="list-builder-edit-btn"
                   onClick={handleBack}
-                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1rem' }}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1rem', cursor: 'pointer' }}
                 >
                   Back
                 </button>
               )}
-              {stepId < 3 ? (
+              {stepId < 4 ? (
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={handleNext}
-                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold' }}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   Next
                 </button>
@@ -5772,8 +5999,8 @@ export default function FireSimulator() {
                   type="button"
                   className="btn-primary"
                   onClick={handleSaveEvent}
-                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
-                  disabled={isStep3Invalid}
+                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)', cursor: 'pointer' }}
+                  disabled={isStep4Invalid}
                 >
                   Save Marriage Event
                 </button>

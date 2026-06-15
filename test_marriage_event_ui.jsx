@@ -76,6 +76,10 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Assert marriage modal is open
     expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
 
+    // Click "Edit Partner Profile" to expose Step 1 inputs
+    const editProfileBtn = screen.getByRole('button', { name: /Edit Partner Profile/i });
+    fireEvent.click(editProfileBtn);
+
     // Verify generated partner profile values match user exactly
     const spouseIncomeInput = getInputByWrapperText(/Spouse Income/i);
     expect(spouseIncomeInput.value).toBe('50000'); // same salary
@@ -92,11 +96,17 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     const spouseAgeInput = getInputByWrapperText(/Marriage Age/i);
     expect(spouseAgeInput.value).toBe('35'); // starts at age 35
 
-    // Click Next to Step 2
+    // Click Next to Step 2 (Wedding)
     const nextBtn = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextBtn);
 
-    // Step 2: Shared Household Savings
+    // Step 2: Wedding
+    expect(screen.getAllByText(/Plan Your Wedding/i).length).toBeGreaterThan(0);
+
+    // Click Next to Step 3 (Life Together)
+    fireEvent.click(nextBtn);
+
+    // Step 3: Shared Household Savings
     expect(screen.getByText(/Shared Household Benefits/i)).toBeDefined();
     
     // Check savings breakdown displays and shows positive numbers
@@ -112,7 +122,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(screen.getByText(/\+\$30\/mo/)).toBeDefined();
     expect(screen.getByText(/\+\$955\/mo/)).toBeDefined();
 
-    // Click Next to Step 3
+    // Click Next to Step 4 (Marriage Impact)
     fireEvent.click(nextBtn);
 
     // Step 3: UI Summary Validation
@@ -225,8 +235,9 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     
     // Step through the wizard
     const nextBtn = screen.getByRole('button', { name: /Next/i });
-    fireEvent.click(nextBtn);
-    fireEvent.click(nextBtn);
+    fireEvent.click(nextBtn); // Step 1 -> 2
+    fireEvent.click(nextBtn); // Step 2 -> 3
+    fireEvent.click(nextBtn); // Step 3 -> 4
     
     // Save Marriage Event
     fireEvent.click(screen.getByRole('button', { name: /Save Marriage Event/i }));

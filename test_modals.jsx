@@ -233,18 +233,17 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Verify modal opens
     expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
+
+    // Click "Edit Partner Profile" to expose Step 1 inputs
+    const editProfileBtn = screen.getByRole('button', { name: /Edit Partner Profile/i });
+    fireEvent.click(editProfileBtn);
     
     // Step 1: Partner Finances
     const spouseIncome = getInputByWrapperText(/Spouse Income/i);
     expect(spouseIncome.value).toBe('50000'); // Defaults to User Income
     
-    // Check household summary
-    expect(screen.getByText(/Live Household Summary/i)).toBeDefined();
-    expect(screen.getByText(/\$100,000/)).toBeDefined(); // User 50k + Spouse 50k
-    
-    // Modify spouse income and verify real-time household summary updates
+    // Modify spouse income
     fireEvent.change(spouseIncome, { target: { value: '90000' } });
-    expect(screen.getByText(/\$140,000/)).toBeDefined(); // User 50k + Spouse 90k
     
     // Modify Savings Rate to 100% to test Zero Partner Personal Spending warning
     const savingsRate = getInputByWrapperText(/Savings Rate/i);
@@ -252,19 +251,31 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(savingsRate, { target: { value: '100' } });
     expect(savingsRate.value).toBe('100');
     
-    // Click Next to Step 2
+    // Click Next to Step 2 (Wedding)
     const nextBtn = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextBtn);
+
+    // Step 2: Wedding
+    expect(screen.getAllByText(/Plan Your Wedding/i).length).toBeGreaterThan(0);
+    const weddingCheckbox = document.getElementById('include-wedding-cost');
+    // It defaults to checked in the congratulations/new wizard flow
+    expect(weddingCheckbox.checked).toBe(true);
     
-    // Step 2: Life Together
+    const weddingCost = getInputByWrapperText(/Wedding Cost \(\$\)/i);
+    expect(weddingCost.value).toBe('20000');
+    
+    // Click Next to Step 3 (Life Together)
+    fireEvent.click(nextBtn);
+    
+    // Step 3: Life Together
     expect(screen.getAllByText(/Life Together/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Shared Household Benefits/i)).toBeDefined();
     
     // Update Household Budget CTA exists
-    expect(screen.getAllByRole('button', { name: /Update Household Budget/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Adjust Budget Details/i }).length).toBeGreaterThan(0);
     
     // Click Update Household Budget
-    const updateBudgetBtn = screen.getAllByRole('button', { name: /Update Household Budget/i })[0];
+    const updateBudgetBtn = screen.getAllByRole('button', { name: /Adjust Budget Details/i })[0];
     fireEvent.click(updateBudgetBtn);
     
     // Verify Budget modal opens in married mode
@@ -287,19 +298,10 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const saveBudgetBtn = screen.getByRole('button', { name: /Save Budget/i });
     fireEvent.click(saveBudgetBtn);
     
-    // Include one-time wedding cost
-    const weddingCheckbox = document.getElementById('include-wedding-cost');
-    expect(weddingCheckbox.checked).toBe(false);
-    fireEvent.click(weddingCheckbox);
-    expect(weddingCheckbox.checked).toBe(true);
-    
-    const weddingCost = getInputByWrapperText(/Wedding Cost \(\$\)/i);
-    expect(weddingCost.value).toBe('20000');
-    
-    // Click Next to Step 3
+    // Click Next to Step 4 (Marriage Impact)
     fireEvent.click(nextBtn);
     
-    // Step 3: Marriage Impact
+    // Step 4: Marriage Impact
     expect(screen.getAllByText(/Marriage Impact/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Before Marriage/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/After Marriage/i).length).toBeGreaterThan(0);
@@ -312,7 +314,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(zeroSpendConfirm.checked).toBe(false);
     expect(lowSpendConfirm.checked).toBe(false);
     
-    // Save button should be disabled due to step 3 warning validation
+    // Save button should be disabled due to step 4 warning validation
     const saveBtn = screen.getByRole('button', { name: /Save Marriage Event/i });
     expect(saveBtn.disabled).toBe(true);
     
@@ -449,19 +451,26 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Verify marriage modal opens
     expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
 
+    // Click "Edit Partner Profile" to expose inputs
+    const editProfileBtn = screen.getByRole('button', { name: /Edit Partner Profile/i });
+    fireEvent.click(editProfileBtn);
+
     // Verify Spouse Retirement Age input is present in Step 1
     const spouseRetAgeInput = getInputByWrapperText(/Spouse Retirement Age/i);
     expect(spouseRetAgeInput).toBeDefined();
     expect(spouseRetAgeInput.placeholder).toContain('65 (optional)');
     
-    // Click Next through step 1 (Partner Finances) -> Step 2
+    // Click Next through step 1 (Congratulations) -> Step 2 (Wedding)
     const nextBtn = screen.getByRole('button', { name: /Next/i });
     fireEvent.click(nextBtn);
     
-    // Click Next through step 2 (Life Together) -> Step 3
+    // Click Next through step 2 (Wedding) -> Step 3 (Life Together)
     fireEvent.click(nextBtn);
     
-    // Step 3: Save the Event
+    // Click Next through step 3 (Life Together) -> Step 4 (Marriage Impact)
+    fireEvent.click(nextBtn);
+    
+    // Step 4: Save the Event
     const saveBtn = screen.getByRole('button', { name: /Save Marriage Event/i });
     fireEvent.click(saveBtn);
     
