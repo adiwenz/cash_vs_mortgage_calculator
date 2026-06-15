@@ -6646,7 +6646,7 @@ export default function FireSimulator() {
       } else if (activePhaseObj.type === 'buyHouse') {
         modalTitle = `Home Purchase Phase Budget (${activePhaseObj.name})`;
       } else if (activePhaseObj.type === 'retire') {
-        modalTitle = 'Retirement Phase Budget';
+        modalTitle = activePhaseObj.childCount > 0 ? 'Retirement Childcare Phase Budget' : 'Retirement Phase Budget';
       } else {
         modalTitle = 'Work Phase Budget';
       }

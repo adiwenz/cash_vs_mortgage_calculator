@@ -298,6 +298,80 @@ try {
   const deflatedIncome9 = age62Data9.income;
   assert(Math.round(deflatedIncome9) === 15000, `Expected deflated simulated income in retirement to be $15,000, got ${Math.round(deflatedIncome9)}`);
   console.log('✅ Test 9 Passed: Child income boost continues past targetRetirementAge during retirement.');
+  // Test 10: Verify retirement childcare phase splits and proportional expense scaling
+  const testInputs10 = {
+    currentAge: 35,
+    lifeExpectancy: 85,
+    simpleIncome: 120000,
+    simpleExpenses: 60000, // Monthly expenses = $5,000
+    preTaxSavingsRate: 0,
+    lifeEvents: [
+      {
+        id: 'retire-event-10',
+        type: 'retire',
+        enabled: true,
+        age: 60,
+        spendingPercent: 80 // Scale expenses to 80%
+      },
+      {
+        id: 'child-test-10',
+        type: 'haveChild',
+        enabled: true,
+        name: 'Late Child 10',
+        birthAge: 50, // Born when parent was 50, active 50-68
+        childStartAge: 0,
+        costMethod: 'custom',
+        customAges0to4: 15000,
+        customAges5to12: 15000,
+        customAges13to18: 15000,
+        customAges19to22: 15000,
+        includeCollege: false
+      }
+    ]
+  };
+
+  const phases10 = getNormalizedPhases(testInputs10);
+  assert(phases10.length === 4, `Expected 4 phases, got ${phases10.length}`);
+  
+  // Phase 0: workSave (35-50)
+  assert(phases10[0].id === 'workSave_35_50', `Expected phase 0 ID to be workSave_35_50, got ${phases10[0].id}`);
+  assert(phases10[0].type === 'workSave', 'Expected phase 0 type to be workSave');
+  
+  // Phase 1: childcare (50-60)
+  assert(phases10[1].id === 'childcare_50_60', `Expected phase 1 ID to be childcare_50_60, got ${phases10[1].id}`);
+  assert(phases10[1].type === 'childcare', 'Expected phase 1 type to be childcare');
+  
+  // Phase 2: retire_60_68 (retired with child)
+  assert(phases10[2].id === 'retire_60_68', `Expected phase 2 ID to be retire_60_68, got ${phases10[2].id}`);
+  assert(phases10[2].type === 'retire', 'Expected phase 2 type to be retire');
+  assert(phases10[2].name === '1 Child (Retired)', `Expected phase 2 name to be "1 Child (Retired)", got "${phases10[2].name}"`);
+  assert(phases10[2].childCount === 1, 'Expected child count to be 1');
+  
+  // Phase 3: retire_68_85 (retired childless)
+  assert(phases10[3].id === 'retire_68_85', `Expected phase 3 ID to be retire_68_85, got ${phases10[3].id}`);
+  assert(phases10[3].type === 'retire', 'Expected phase 3 type to be retire');
+  assert(phases10[3].name === 'Retirement', `Expected phase 3 name to be "Retirement", got "${phases10[3].name}"`);
+  assert(phases10[3].childCount === 0, 'Expected child count to be 0');
+
+  // Verify expense scaling (80%)
+  const p0Expenses = phases10[0].expenses;
+  const p1Expenses = phases10[1].expenses;
+  const p2Expenses = phases10[2].expenses;
+  const p3Expenses = phases10[3].expenses;
+
+  // Each category in phase 2 should be exactly 80% of phase 1
+  Object.keys(p1Expenses).forEach(key => {
+    const expected = Math.round(p1Expenses[key] * 0.80);
+    assert(p2Expenses[key] === expected, `Expected phase 2 expense for ${key} to be ${expected}, got ${p2Expenses[key]}`);
+  });
+
+  // Each category in phase 3 should be exactly 80% of phase 0
+  Object.keys(p0Expenses).forEach(key => {
+    const expected = Math.round(p0Expenses[key] * 0.80);
+    assert(p3Expenses[key] === expected, `Expected phase 3 expense for ${key} to be ${expected}, got ${p3Expenses[key]}`);
+  });
+
+  console.log('✅ Test 10 Passed: Retirement childcare phase splits and expense scaling are completely correct.');
 
   console.log('--- ALL test_child_recommendations PASSED ---');
   process.exit(0);
