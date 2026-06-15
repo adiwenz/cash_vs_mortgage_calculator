@@ -9515,10 +9515,6 @@ export default function FireSimulator() {
                                     <div className="financial-milestone-dot">
                                       {evt.icon}
                                     </div>
-                                    
-                                    <div className="milestone-age-label">
-                                      {evt.label || evt.title} ({Math.floor(displayAge)})
-                                    </div>
 
                                     {/* Tooltip on hover */}
                                     <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
@@ -9591,10 +9587,6 @@ export default function FireSimulator() {
                                   >
                                     <div className="milestone-glow-circle">
                                       {evt.icon}
-                                    </div>
-                                    
-                                    <div className="milestone-age-label">
-                                      {evt.label || evt.title} ({Math.floor(displayAge)})
                                     </div>
 
                                     {/* Tooltip on hover */}
