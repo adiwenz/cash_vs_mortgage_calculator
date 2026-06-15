@@ -2040,5 +2040,326 @@
   border-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Redesigned Budget Modal Layout & Cards */
+.budget-modal-card.redesigned {
+  max-width: 680px;
+  width: 95%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  transition: max-width 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow: hidden;
+  padding: 0; /* Let layout columns handle padding */
+}
+
+.budget-modal-card.redesigned.with-breakdown {
+  max-width: 1100px;
+}
+
+.budget-modal-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.budget-main-col {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+}
+
+.budget-breakdown-sidebar {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-left: 0 solid transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: width 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease, padding 0.35s ease;
+  background: rgba(15, 23, 42, 0.25);
+  box-sizing: border-box;
+}
+
+.budget-breakdown-sidebar.open {
+  width: 420px;
+  opacity: 1;
+  border-left: 1px solid var(--border-color);
+  padding: 1.25rem 1.5rem;
+}
+
+/* Scrollable main body inside modal */
+.budget-main-scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+  padding-right: 0.35rem;
+}
+
+.budget-main-scroll-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.budget-main-scroll-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+.budget-main-scroll-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.budget-main-scroll-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.budget-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .budget-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.budget-card {
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  user-select: none;
+}
+
+.budget-card:hover {
+  transform: translateY(-4px);
+  background: rgba(30, 41, 59, 0.45);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.budget-card.active {
+  background: rgba(30, 41, 59, 0.55);
+}
+
+/* Specific Card Accents */
+.budget-card.needs {
+  border-bottom: 3px solid var(--accent-emerald);
+}
+.budget-card.needs.active {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+.budget-card.needs:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.budget-card.wants {
+  border-bottom: 3px solid var(--accent-amber);
+}
+.budget-card.wants.active {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+}
+.budget-card.wants:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.budget-card.save {
+  border-bottom: 3px solid #c084fc;
+}
+.budget-card.save.active {
+  border-color: rgba(192, 132, 252, 0.45);
+  box-shadow: 0 0 15px rgba(192, 132, 252, 0.15);
+}
+.budget-card.save:hover {
+  border-color: rgba(192, 132, 252, 0.4);
+}
+
+/* Circular Icons */
+.budget-card-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.budget-card:hover .budget-card-icon-circle {
+  transform: scale(1.1);
+}
+
+.needs .budget-card-icon-circle {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--accent-emerald);
+}
+.wants .budget-card-icon-circle {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-amber);
+}
+.save .budget-card-icon-circle {
+  background: rgba(192, 132, 252, 0.12);
+  color: #c084fc;
+}
+
+.budget-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.budget-card-amount {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.needs .budget-card-amount { color: var(--accent-emerald); }
+.wants .budget-card-amount { color: var(--accent-amber); }
+.save .budget-card-amount { color: #c084fc; }
+
+.budget-card-pct {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+/* Progress bar inside cards */
+.budget-card-progress {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.budget-card-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+.needs .budget-card-progress-fill { background: var(--accent-emerald); }
+.wants .budget-card-progress-fill { background: var(--accent-amber); }
+.save .budget-card-progress-fill { background: #c084fc; }
+
+/* Dotted lists for breakdown */
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.breakdown-row-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.breakdown-row-dots {
+  flex-grow: 1;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.12);
+  margin: 0 0.5rem;
+  align-self: flex-end;
+  position: relative;
+  top: -4px;
+}
+
+.breakdown-row-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.breakdown-edit-link {
+  font-size: 0.75rem;
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  transition: all var(--transition-fast);
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.breakdown-edit-link:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+  text-decoration: none;
+  color: #ffffff;
+}
+
+/* Collapsible Advanced Details */
+.advanced-details-container {
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.25s ease, margin 0.3s ease;
+  opacity: 0;
+  max-height: 0;
+}
+
+.advanced-details-container.open {
+  opacity: 1;
+  max-height: 1000px;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Childcare adjustment card */
+.childcare-adjustment-card {
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px dashed rgba(245, 158, 11, 0.25);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .childcare-adjustment-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}
+
 
 

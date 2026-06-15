@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
@@ -22,7 +21,7 @@ vi.mock('recharts', () => {
 });
 
 // Mock ResizeObserver
-global.ResizeObserver = class ResizeObserver {
+globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -83,9 +82,13 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Assert Modal is Open and renders correct title
     expect(screen.getByText(/Work Phase Budget/i)).toBeDefined();
 
-    // Expand the Savings section
-    const savingsHeader = screen.getByText('Savings');
-    fireEvent.click(savingsHeader);
+    // Expand the Savings section by clicking the card
+    const savingsCard = screen.getAllByText(/Save & Invest/i)[0];
+    fireEvent.click(savingsCard);
+
+    // Click Edit Savings to enable inputs
+    const editSavingsLink = screen.getByText(/Edit Savings/i);
+    fireEvent.click(editSavingsLink);
     
     // Assert default values
     const check401k = getInputByWrapperText(/401\(k\) \(Pre-Tax\)/i);
@@ -95,14 +98,14 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(checkingAcc.value).toBe('100');
     
     // Verify initial balance state
-    expect(screen.getByText(/Perfectly balanced! \$0 leftover/i)).toBeDefined();
+    expect(screen.getByText(/You’re on track/i)).toBeDefined();
     
     // Modify input state
     fireEvent.change(checkingAcc, { target: { value: '150' } });
     expect(checkingAcc.value).toBe('150');
     
     // Verify reconciliation updates to show deficit/leftover
-    expect(screen.getAllByText(/Deficit/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Over budget by/i).length).toBeGreaterThan(0);
     
     // Test Cancel button closes the modal
     const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
@@ -374,15 +377,25 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Click on 1 Child tab (0) and check boost/details
     fireEvent.click(tabs[0]);
+    // Expand advanced settings to expose input
+    const advancedToggle1 = screen.getByText(/Show Advanced Details/i);
+    fireEvent.click(advancedToggle1);
     const userIncomeInput = getInputByWrapperText(/Monthly Take-home Income/i);
     fireEvent.change(userIncomeInput, { target: { value: '5417' } });
     expect(screen.getAllByText(/child boost/i).length).toBeGreaterThan(0);
+    // Collapse advanced details back
+    fireEvent.click(screen.getByText(/Hide Advanced Details/i));
     
     // Click on 2 Kids tab (1)
     fireEvent.click(tabs[1]);
+    // Expand advanced settings to expose input
+    const advancedToggle2 = screen.getByText(/Show Advanced Details/i);
+    fireEvent.click(advancedToggle2);
     const userIncomeInput2 = getInputByWrapperText(/Monthly Take-home Income/i);
     fireEvent.change(userIncomeInput2, { target: { value: '6667' } });
     expect(screen.getAllByText(/child boost/i).length).toBeGreaterThan(0);
+    // Collapse advanced details back
+    fireEvent.click(screen.getByText(/Hide Advanced Details/i));
     
     // Close modal
     const cancelBtnBudget = document.querySelector('.budget-modal-card .btn-secondary');
@@ -406,12 +419,8 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Click the timeline node for Liam
     const liamTooltipText = screen.getAllByText(/Have Child: Liam/i)[0];
-    const liamNode = liamTooltipText.closest('.timeline-node, .vertical-timeline-node');
+    const liamNode = liamTooltipText.closest('.financial-milestone-wrapper, .milestone-circle-wrapper, .timeline-node, .vertical-timeline-node');
     fireEvent.click(liamNode);
-    
-    // Click edit event
-    const editBtn = screen.getByRole('button', { name: /Edit Event/i });
-    fireEvent.click(editBtn);
     
     // Verify college cost text is visible
     expect(screen.getByText(/Adds an additional/i)).toBeDefined();
