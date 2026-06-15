@@ -263,6 +263,26 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Update Household Budget CTA exists
     expect(screen.getAllByRole('button', { name: /Update Household Budget/i }).length).toBeGreaterThan(0);
     
+    // Click Update Household Budget
+    const updateBudgetBtn = screen.getAllByRole('button', { name: /Update Household Budget/i })[0];
+    fireEvent.click(updateBudgetBtn);
+    
+    // Verify Budget modal opens in married mode
+    expect(screen.getByText(/Work Phase Budget/i)).toBeDefined();
+    expect(screen.getAllByText(/\$11,667/).length).toBeGreaterThan(0); // Combined take-home income
+    
+    // Expand the Needs section to inspect Housing (Rent/Mortgage)
+    const needsHeader = screen.getByText('Needs');
+    fireEvent.click(needsHeader);
+    
+    // Verify Housing stays the same price ($1,500)
+    const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);
+    expect(housingInput.value).toBe('1500');
+    
+    // Click Save Budget
+    const saveBudgetBtn = screen.getByRole('button', { name: /Save Budget/i });
+    fireEvent.click(saveBudgetBtn);
+    
     // Include one-time wedding cost
     const weddingCheckbox = document.getElementById('include-wedding-cost');
     expect(weddingCheckbox.checked).toBe(false);

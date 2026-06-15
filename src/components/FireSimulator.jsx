@@ -2668,7 +2668,7 @@ export default function FireSimulator() {
     };
   };
 
-  const handleSetBudgetClick = (initialPhaseId = null) => {
+  const handleSetBudgetClick = (initialPhaseId = null, fromMarriageWizard = false) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const inp = scen.inputs;
 
@@ -2678,7 +2678,7 @@ export default function FireSimulator() {
     let estimatedExpenses = null;
     let estimatedPartnerSavings = null;
 
-    if (isBudgetOpenFromMarriageWizard && editingEvent) {
+    if ((isBudgetOpenFromMarriageWizard || fromMarriageWizard) && editingEvent) {
       const estimates = calculateMarriageEstimates(editingEvent, inp);
       if (estimates) {
         const userExpenses = inp.budgetDetails?.expenses || {
@@ -2692,41 +2692,27 @@ export default function FireSimulator() {
           misc: 142
         };
         
-        // 1. Adjust Housing
-        let housingVal = Math.max(0, (userExpenses.housing || 1500) - estimates.savingsBreakdown.housing);
+        // 1. Housing stays the same price
+        const housingVal = userExpenses.housing !== undefined ? Number(userExpenses.housing) : 1500;
         
-        // 2. Spouse personal spending (monthly)
+        // 2. Spouse spending and total savings to apply
         const partnerMonthlySpend = Math.round(estimates.partnerTakeHomeRemaining / 12);
         const nonHousingCats = ['utilities', 'food', 'diningOut', 'transportation', 'healthcare', 'leisure', 'misc'];
         const userNonHousingTotal = nonHousingCats.reduce((sum, cat) => sum + (Number(userExpenses[cat]) || 0), 0);
+        
+        // Total non-housing spending to distribute
+        const remainingToDistribute = Math.max(0, userNonHousingTotal + partnerMonthlySpend - estimates.savingsBreakdown.total);
         
         const tempExpenses = { ...userExpenses, housing: housingVal };
         nonHousingCats.forEach(cat => {
           let spouseCatSpend = 0;
           if (userNonHousingTotal > 0) {
-            spouseCatSpend = partnerMonthlySpend * ((Number(userExpenses[cat]) || 0) / userNonHousingTotal);
+            spouseCatSpend = remainingToDistribute * ((Number(userExpenses[cat]) || 0) / userNonHousingTotal);
           } else {
-            spouseCatSpend = partnerMonthlySpend / nonHousingCats.length;
+            spouseCatSpend = remainingToDistribute / nonHousingCats.length;
           }
-          tempExpenses[cat] = Math.round((Number(userExpenses[cat]) || 0) + spouseCatSpend);
+          tempExpenses[cat] = Math.round(spouseCatSpend);
         });
-        
-        // 3. Shared Cost Savings (Utilities, Internet, Streaming, and Other)
-        const nonHousingSavings = estimates.savingsBreakdown.utilities + estimates.savingsBreakdown.internet + estimates.savingsBreakdown.streaming + estimates.savingsBreakdown.otherShared;
-        let savingsToApply = nonHousingSavings;
-        const applied = Math.min(tempExpenses.utilities || 0, savingsToApply);
-        tempExpenses.utilities = Math.max(0, (tempExpenses.utilities || 0) - applied);
-        let remainingSavings = savingsToApply - applied;
-        if (remainingSavings > 0) {
-          const otherCats = ['misc', 'leisure', 'diningOut', 'transportation', 'food', 'healthcare'];
-          const otherTotal = otherCats.reduce((sum, cat) => sum + (Number(tempExpenses[cat]) || 0), 0);
-          if (otherTotal > 0) {
-            otherCats.forEach(cat => {
-              const deduct = remainingSavings * ((Number(tempExpenses[cat]) || 0) / otherTotal);
-              tempExpenses[cat] = Math.max(0, Math.round((Number(tempExpenses[cat]) || 0) - deduct));
-            });
-          }
-        }
         
         estimatedExpenses = tempExpenses;
         
@@ -2752,7 +2738,7 @@ export default function FireSimulator() {
     // Initialize editedPhases mapping
     const initialEdited = {};
     normalizedPhases.forEach(p => {
-      if (p.type !== 'retire' && isBudgetOpenFromMarriageWizard && estimatedExpenses && estimatedPartnerSavings) {
+      if (p.type !== 'retire' && (isBudgetOpenFromMarriageWizard || fromMarriageWizard) && estimatedExpenses && estimatedPartnerSavings) {
         initialEdited[p.id] = { 
           ...p, 
           expenses: { ...estimatedExpenses },
@@ -5524,7 +5510,7 @@ export default function FireSimulator() {
                 type="button"
                 onClick={() => {
                   setIsBudgetOpenFromMarriageWizard(true);
-                  handleSetBudgetClick('workSave');
+                  handleSetBudgetClick('workSave', true);
                 }}
                 className="btn-primary"
                 style={{
