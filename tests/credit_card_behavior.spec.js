@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+// Verification comment for playwright only-changed
 
 test.describe('Credit Card Behavior Simulator End-to-End Tests', () => {
   // Set a generous timeout
