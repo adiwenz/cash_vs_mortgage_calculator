@@ -151,7 +151,7 @@ try {
   const childcarePhase = phases2.find(p => p.startAge === 39 && p.endAge === 57);
   assert(childcarePhase !== undefined, 'Should have a childcare phase from 39 to 57');
   assert(childcarePhase.type === 'childcare', 'Childcare phase should be type childcare');
-  assert(childcarePhase.income === baseSalaryMonthly + 1250, `Childcare phase income should have the child boost, expected ${baseSalaryMonthly + 1250}, got ${childcarePhase.income}`);
+  assert(childcarePhase.income === baseSalaryMonthly, `Childcare phase income should be base salary monthly ${baseSalaryMonthly}, got ${childcarePhase.income}`);
 
   // Verify there are no duplicate childcare tabs/phases (e.g. split at 53)
   const childcarePhases = phases2.filter(p => p.type === 'childcare');

@@ -170,22 +170,22 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Build My Life Plan →' }).click();
 
     // Verify default view is nominal / future dollars
-    await expect(page.getByText('$81,920 / yr')).toBeVisible();
-    await expect(page.getByText('$996,380', { exact: true })).toBeVisible();
+    await expect(page.getByText('$81,915 / yr')).toBeVisible();
+    await expect(page.getByText('$996,385', { exact: true })).toBeVisible();
 
     // Toggle to "Today's Dollars" (real dollars)
     await page.getByRole('button', { name: 'Today’s Dollars' }).click();
 
     // Verify chart/result labels adjust to Today's Dollars
-    await expect(page.getByText('$33,750 / yr')).toBeVisible();
-    await expect(page.getByText('$410,495', { exact: true })).toBeVisible();
+    await expect(page.getByText('$33,748 / yr')).toBeVisible();
+    await expect(page.getByText('$410,497', { exact: true })).toBeVisible();
 
     // Toggle back to "Future Dollars"
     await page.getByRole('button', { name: 'Future Dollars' }).click();
 
     // Verify it changes back to Future Dollars
-    await expect(page.getByText('$81,920 / yr')).toBeVisible();
-    await expect(page.getByText('$996,380', { exact: true })).toBeVisible();
+    await expect(page.getByText('$81,915 / yr')).toBeVisible();
+    await expect(page.getByText('$996,385', { exact: true })).toBeVisible();
   });
 
   test('7. Multi-child scenario with compounding adjustments and baseline matching', async ({ page }) => {
@@ -195,8 +195,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Build My Life Plan →' }).click();
 
     // Verify initial default baseline values
-    await expect(page.getByText('$81,920 / yr')).toBeVisible();
-    await expect(page.getByText('$996,380', { exact: true })).toBeVisible();
+    await expect(page.getByText('$81,915 / yr')).toBeVisible();
+    await expect(page.getByText('$996,385', { exact: true })).toBeVisible();
 
     // 1. Add first child
     await page.locator('select.add-event-dropdown').selectOption('haveChild');
@@ -212,8 +212,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Retire at Requested Retirement Date
-    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Offset child costs with temporary income
+    await page.locator('.improvement-plan-card:has-text("Offset child costs with temporary income")').first().getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: /👶 1 Child/ }).first().click();
@@ -226,7 +226,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Save Budget' }).click();
 
     // Verify resulting NW graph matches default case (same portfolio/income numbers) within rounding tolerance
-    await expect(page.getByText(/^\$81,9[23]\d \/ yr$/)).toBeVisible();
+    await expect(page.getByText(/^\$81,9[12]\d \/ yr$/)).toBeVisible();
     await expect(page.getByText(/^\$996,3\d\d$/)).toBeVisible();
 
     // 2. Add second child
@@ -243,8 +243,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open again
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Retire at Requested Retirement Date again
-    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Offset child costs with temporary income again
+    await page.locator('.improvement-plan-card:has-text("Offset child costs with temporary income")').nth(1).getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: /👶 2 Kids/ }).first().click();
@@ -257,7 +257,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Save Budget' }).click();
 
     // Verify resulting NW graph matches default case again within rounding tolerance
-    await expect(page.getByText(/^\$81,9[23]\d \/ yr$/)).toBeVisible();
+    await expect(page.getByText(/^\$81,9[12]\d \/ yr$/)).toBeVisible();
     await expect(page.getByText(/^\$996,3\d\d$/)).toBeVisible();
 
     // 3. Add third child
@@ -274,8 +274,8 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     // Assert Recommendations modal is open again
     await expect(page.getByRole('heading', { name: '💡 Retirement Improvement Plan' })).toBeVisible();
 
-    // Click Apply Scenario on Retire at Requested Retirement Date again
-    await page.locator('.improvement-plan-card:has-text("Retire at Requested Retirement Date")').getByRole('button', { name: 'Apply Scenario' }).click();
+    // Click Apply Scenario on Offset child costs with temporary income again
+    await page.locator('.improvement-plan-card:has-text("Offset child costs with temporary income")').nth(2).getByRole('button', { name: 'Apply Scenario' }).click();
 
     // Switch to Childcare Phase
     await page.getByRole('button', { name: /👶 3 Kids/ }).first().click();
@@ -288,7 +288,7 @@ test.describe('FIRE & Life Simulator End-to-End Tests', () => {
     await page.getByRole('button', { name: 'Save Budget' }).click();
 
     // Verify resulting NW graph matches default case again within rounding tolerance
-    await expect(page.getByText(/^\$81,9[23]\d \/ yr$/)).toBeVisible();
+    await expect(page.getByText(/^\$81,9[12]\d \/ yr$/)).toBeVisible();
     await expect(page.getByText(/^\$996,3\d\d$/)).toBeVisible();
   });
 

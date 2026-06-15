@@ -205,6 +205,50 @@ try {
 
   console.log('✅ Test 3 Passed: Retirement budget scaled to 80%, not all 0s, and is not balanced.');
 
+  // ----------------------------------------------------
+  // Test 4: Base Salary & Active Child Boost calculation in Retirement Childcare Phase
+  // ----------------------------------------------------
+  console.log('\nRunning Test 4: Verify baseSalaryMonthly is 0 and child boost is shown in retired childcare phase...');
+
+  const retiredChildPhase = phases[2]; // retire_60_68
+  assert(retiredChildPhase.type === 'retire', 'Expected type of retirement childcare phase to be retire');
+  assert(retiredChildPhase.childCount > 0, 'Expected childCount to be > 0');
+
+  // Simulate FireSimulator.jsx baseSalaryMonthly and activeChildBoost logic:
+  const isRetirementPhase = retiredChildPhase.type === 'retire';
+  
+  const rawIncomeItem = (childInputs.incomeList || []).find(inc => 
+    retiredChildPhase.startAge >= inc.startAge && 
+    retiredChildPhase.startAge < inc.endAge && 
+    inc.id !== 'simple-inc-childcare' && 
+    !inc.id.startsWith('simple-inc-childcare-') && 
+    inc.id !== 'simple-inc-worksave' && 
+    !inc.id.startsWith('simple-inc-worksave-') &&
+    inc.id !== 'simple-inc-prechild' &&
+    !inc.id.startsWith('simple-inc-prechild-') &&
+    !inc.id.startsWith('child-income-boost')
+  );
+
+  let baseSalaryMonthly = 0;
+  if (isRetirementPhase) {
+    baseSalaryMonthly = 0;
+  } else if (rawIncomeItem) {
+    baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
+  } else {
+    baseSalaryMonthly = Math.round((Number(childInputs.simpleIncome) || 50000) / 12);
+  }
+
+  // Expect baseSalaryMonthly to be 0 since it is a retirement phase
+  assert(baseSalaryMonthly === 0, `Expected baseSalaryMonthly to be 0 for retired phase, got ${baseSalaryMonthly}`);
+
+  const budgetMonthlyIncome = retiredChildPhase.income; // 1250
+  const activeChildBoost = Math.max(0, budgetMonthlyIncome - baseSalaryMonthly);
+
+  // Expect activeChildBoost to be 1250 (i.e. the full child boost is visible)
+  assert(activeChildBoost === 1250, `Expected activeChildBoost to be 1250, got ${activeChildBoost}`);
+
+  console.log('✅ Test 4 Passed: baseSalaryMonthly is 0 and activeChildBoost is 1250 (fully visible).');
+
   console.log('\n🎉 ALL test_retirement_child_unit PASSED SUCCESSFULLY!');
   process.exit(0);
 } catch (error) {

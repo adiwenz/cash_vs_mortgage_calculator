@@ -1429,7 +1429,11 @@ export default function FireSimulator() {
 
   const handleApplyImprovementScenario = (scenario) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
-    const inp = scen.inputs;
+    let inp = scen.inputs;
+    if (scenario.type.startsWith('childOffset')) {
+      inp = JSON.parse(JSON.stringify(scen.inputs));
+      inp.incomeList = [...(inp.incomeList || []), ...(scenario.incomeBoosts || [])];
+    }
     const currentAgeVal = Number(inp.currentAge) || 30;
     const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
 
@@ -1789,10 +1793,19 @@ export default function FireSimulator() {
 
     const currentPhase = normalizedPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normalizedPhases[0];
     if (currentPhase) {
-      const childBoostForCurrent = (currentPhase.childCount || 0) * 1250;
+      let childBoostForCurrent = 0;
+      (inp.incomeList || []).forEach(inc => {
+        if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
+          if (currentPhase.startAge >= inc.startAge && currentPhase.startAge < inc.endAge) {
+            const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
+            childBoostForCurrent += boostYearly / 12;
+          }
+        }
+      });
+      const baseSalaryMonthly = (currentPhase.startAge >= targetRetAgeVal) ? 0 : Math.round(targetIncome / 12);
       initialEdited[currentPhase.id] = {
         ...currentPhase,
-        income: Math.round(targetIncome / 12) + childBoostForCurrent,
+        income: baseSalaryMonthly + childBoostForCurrent,
         savings: targetSavingsMap,
         expenses: targetExpensesMap,
         savingsAllocMode: inp.budgetDetails?.savingsAllocMode || 'fixed'
@@ -2701,7 +2714,9 @@ export default function FireSimulator() {
       const currentPhase = Object.values(finalEdited).find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || Object.values(finalEdited)[0];
       
       if (currentPhase) {
-        const childBoost = (currentPhase.childCount || 0) * 1250;
+        const wsPhase = Object.values(finalEdited).find(p => p.type === 'workSave');
+        const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
+        const childBoost = Math.max(0, currentPhase.income - standardIncomeMonthly);
         newInputs.simpleIncome = (currentPhase.income - childBoost) * 12;
         newInputs.simpleExpenses = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
       }
@@ -4351,7 +4366,10 @@ export default function FireSimulator() {
     if (!childImpactSummary) return null;
     const { beforeAge, afterAge, diffYears, annualSpending, event } = childImpactSummary;
 
-    const isStillReady = afterAge !== null && (diffYears <= 0 || afterAge <= inputs.targetRetirementAge);
+    const targetRet = Number(inputs.targetRetirementAge) || 65;
+    const isBeforeReady = beforeAge !== null && beforeAge <= targetRet;
+    const isAfterReady = afterAge !== null && afterAge <= targetRet;
+    const isStillReady = afterAge !== null && (diffYears <= 0 || afterAge <= targetRet);
 
     const startAge = event.childStartAge !== undefined ? Number(event.childStartAge) : 0;
     const includeCollege = !!event.includeCollege;
@@ -4375,14 +4393,18 @@ export default function FireSimulator() {
           <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '1rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Before Child:</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: beforeAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
-                {beforeAge ? `✓ Retirement Ready at Age ${beforeAge}` : '⚠ Current Plan Needs Adjustment'}
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: isBeforeReady ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
+                {beforeAge 
+                  ? (beforeAge <= targetRet ? `✓ Retirement Ready at Age ${beforeAge}` : `⚠ Retires Late at Age ${beforeAge}`)
+                  : '⚠ Current Plan Needs Adjustment'}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>After Child:</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: afterAge ? 'var(--primary)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
-                {afterAge ? `✓ Retirement Ready at Age ${afterAge}` : '⚠ Current Plan Needs Adjustment'}
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: isAfterReady ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
+                {afterAge 
+                  ? (afterAge <= targetRet ? `✓ Retirement Ready at Age ${afterAge}` : `⚠ Retires Late at Age ${afterAge}`)
+                  : '⚠ Current Plan Needs Adjustment'}
               </div>
             </div>
             <div>
@@ -4415,17 +4437,17 @@ export default function FireSimulator() {
             >
               Done
             </button>
-              <button 
-                type="button"
-                className="btn-primary" 
-                onClick={() => {
-                  setChildImpactSummary(null);
-                  setShowImprovementModal(true);
-                }}
-                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-              >
-                Adjust Plan
-              </button>
+            <button 
+              type="button"
+              className={isStillReady ? "btn-secondary" : "btn-primary"} 
+              onClick={() => {
+                setChildImpactSummary(null);
+                setShowImprovementModal(true);
+              }}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              Adjust Plan
+            </button>
           </div>
         </div>
       </div>
@@ -6428,7 +6450,9 @@ export default function FireSimulator() {
         !inc.id.startsWith('child-income-boost')
       );
       let baseSalaryMonthly = 0;
-      if (rawIncomeItem) {
+      if (isRetirementPhase) {
+        baseSalaryMonthly = 0;
+      } else if (rawIncomeItem) {
         baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
       } else {
         baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
@@ -7116,7 +7140,7 @@ export default function FireSimulator() {
                           </span>
                         </div>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-                          Roadmap child event cost (Age {inputs.currentAge})
+                          Roadmap child event cost (Age {activePhaseObj?.startAge || inputs.currentAge})
                         </span>
                       </div>
                       <div className="input-prefix-wrapper" style={{ width: '110px', opacity: 0.85 }}>
@@ -7616,8 +7640,8 @@ export default function FireSimulator() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                         <span style={{ fontSize: '0.78rem', color: netRemaining < 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 'bold' }}>
                           {netRemaining < 0 
-                            ? `🔴 Cash Flow Deficit: ${formatCurrency(Math.abs(netRemaining))}/mo deficit at parent age ${inputs.currentAge}.`
-                            : `🟢 Cash Flow Balanced: ${formatCurrency(netRemaining)}/mo surplus at parent age ${inputs.currentAge}.`}
+                            ? `🔴 Cash Flow Deficit: ${formatCurrency(Math.abs(netRemaining))}/mo deficit at parent age ${activePhaseObj?.startAge || inputs.currentAge}.`
+                            : `🟢 Cash Flow Balanced: ${formatCurrency(netRemaining)}/mo surplus at parent age ${activePhaseObj?.startAge || inputs.currentAge}.`}
                         </span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                           {savingsAllocMode === 'percentSurplus'

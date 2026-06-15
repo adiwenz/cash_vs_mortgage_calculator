@@ -366,7 +366,7 @@ export function runFireSimulation(inputs) {
           const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
           childcareIncome = finalChildcareBudgets[minC].income;
         }
-        const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12) + 1250) * 12;
+        const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
 
         if (childcareStartAge > currentAge) {
           cleanIncomeList.push({
@@ -1200,7 +1200,7 @@ export function runFireSimulation(inputs) {
                 const configuredKeys = Object.keys(inputs.budgetDetails.childcareBudgets).map(Number);
                 const refC = configuredKeys[0];
                 const refIncome = Number(inputs.budgetDetails.childcareBudgets[refC].income);
-                let boostPerChild = 1250;
+                let boostPerChild = 0;
                 if (refC > 0 && refIncome > wsIncome) {
                   boostPerChild = (refIncome - wsIncome) / refC;
                 }
@@ -1226,7 +1226,7 @@ export function runFireSimulation(inputs) {
                   }
                 }
               });
-              let boostForOne = 1250;
+              let boostForOne = 0;
               if (initialCount > 0) {
                 boostForOne = (oldCcIncome - wsIncome) / initialCount;
               } else {
@@ -2825,7 +2825,16 @@ export function getNormalizedPhases(inputs) {
 
     let childBoost = 0;
     if (childCount > 0) {
-      childBoost = 1250 * childCount;
+      let activeBoostMonthly = 0;
+      (inputs.incomeList || []).forEach(inc => {
+        if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
+          if (inc.startAge <= start && inc.endAge > start) {
+            const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
+            activeBoostMonthly += boostYearly / 12;
+          }
+        }
+      });
+      childBoost = activeBoostMonthly;
     }
 
     // Add Social Security monthly benefit if receiving SS
@@ -3009,6 +3018,12 @@ export function getNormalizedPhases(inputs) {
     let resolvedIncome = defaultIncome;
     if (savedPhase && savedPhase.income !== undefined) {
       resolvedIncome = Number(savedPhase.income);
+      if (childCount > 0 && childBoost > 0) {
+        const standardBase = (start >= targetRetirementAge) ? 0 : baseSalaryMonthly;
+        if (resolvedIncome <= standardBase) {
+          resolvedIncome += childBoost;
+        }
+      }
       if (type === 'childcare') {
         let savedChildCount = 0;
         if (savedPhase.type === 'childcare' && savedPhase.name) {
@@ -3021,8 +3036,8 @@ export function getNormalizedPhases(inputs) {
             }
           }
         }
-        // If childCount is different, adjust the income boost accordingly
-        resolvedIncome += (childCount - savedChildCount) * 1250;
+        // No automatic boost adjustment here (user-initiated choice)
+        // resolvedIncome += (childCount - savedChildCount) * 1250;
       }
     }
 
