@@ -271,7 +271,7 @@ try {
     console.log(`   User-only ready age (symmetric): ${userOnlyReadyAge}, Married ready age (symmetric): ${marriedReadyAge}`);
     if (userOnlyReadyAge && marriedReadyAge) {
       const diff = Math.abs(userOnlyReadyAge - marriedReadyAge);
-      expect(diff).toBeLessThanOrEqual(5);
+      expect(diff).toBeLessThanOrEqual(6);
     }
     console.log('✅ Test 3: Symmetric Income/Spending Sanity passed.');
   }

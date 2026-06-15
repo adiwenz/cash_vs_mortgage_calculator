@@ -949,9 +949,11 @@ export function runFireSimulation(inputs) {
     const spouseAge = age + ageDifference;
     const isSpouseActive = hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies;
     const isSpouseAlive = isSpouseActive && spouseAge <= spouseLifeExpectancy;
-    const spouseRetirementAge = spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== ''
+    const spouseRetirementAge = (spouseMember && spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null && spouseMember.desiredRetirementAge !== '')
       ? Number(spouseMember.desiredRetirementAge)
-      : (targetRetirementAge + ageDifference);
+      : (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== ''
+         ? Number(marriageEvent.spouseDesiredRetirementAge)
+         : (targetRetirementAge + ageDifference));
     const isSpouseWorking = isSpouseAlive && spouseAge < spouseRetirementAge;
     const spouseSocialSecurityAge = spouseMember ? (Number(spouseMember.spouseSocialSecurityAge) || 67) : 67;
 
@@ -1290,7 +1292,7 @@ export function runFireSimulation(inputs) {
     });
 
     let spouseIncomeThisYear = 0;
-    if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && age < targetRetirementAge) {
+    if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && spouseAge < spouseRetirementAge && age < targetRetirementAge) {
       spouseIncomeThisYear = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
       annualIncome += spouseIncomeThisYear;
       taxableIncome += spouseIncomeThisYear;
@@ -1325,6 +1327,13 @@ export function runFireSimulation(inputs) {
         }
       }
     });
+
+    // Add spouse Social Security if married and spouse is alive and claiming age is reached
+    if (isSpouseAlive && spouseSocialSecurityDetails && spouseAge >= spouseSocialSecurityDetails.claimAge) {
+      const spouseSSAmt = spouseSocialSecurityDetails.annualBenefit * nominalFactor;
+      annualIncome += spouseSSAmt;
+      taxableIncome += spouseSSAmt;
+    }
 
     // Add windfalls/inheritances / business sales
     let windfallReceived = 0;
@@ -1417,9 +1426,9 @@ export function runFireSimulation(inputs) {
     
     // Check if marriage is active this year (pre-retirement)
     if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && age < targetRetirementAge) {
-      if (combinedSpendingAfterMarriage > 0) {
+      if (!isAdvanced && combinedSpendingAfterMarriage > 0) {
         spendingForYear = combinedSpendingAfterMarriage * Math.pow(1 + rate + lifestyleUpgrades, age - currentAge);
-      } else {
+      } else if (!isAdvanced) {
         // Auto-estimate combined spending
         const spouseIncomeNominal = spouseIncome * Math.pow(1 + spouseGrowth, age - marriageAge);
         let partnerTax = 0;
@@ -2841,6 +2850,20 @@ export function getNormalizedPhases(inputs) {
     }
   });
 
+  // Spouse Retirement boundary
+  const marriageEventForBoundary = enabledEvents.find(e => e.type === 'marriage');
+  if (marriageEventForBoundary) {
+    const spouseCurrentAge = Number(marriageEventForBoundary.spouseCurrentAge) || currentAge;
+    const spouseDesiredRetirementAge = marriageEventForBoundary.spouseDesiredRetirementAge;
+    if (spouseDesiredRetirementAge !== undefined && spouseDesiredRetirementAge !== null && spouseDesiredRetirementAge !== '') {
+      const spouseRetAge = Number(spouseDesiredRetirementAge);
+      const userAgeWhenSpouseRetires = currentAge + (spouseRetAge - spouseCurrentAge);
+      if (userAgeWhenSpouseRetires > currentAge && userAgeWhenSpouseRetires < targetRetirementAge) {
+        boundaries.add(userAgeWhenSpouseRetires);
+      }
+    }
+  }
+
   // D. Child count transitions (when active child count changes)
   for (let age = currentAge + 1; age < lifeExpectancy; age++) {
     const prevCount = getActiveChildrenCountAtAge(age - 1, inputs.lifeEvents);
@@ -2972,6 +2995,13 @@ export function getNormalizedPhases(inputs) {
 
     const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
     const isMarried = marriageEvent && start >= Number(marriageEvent.age);
+    const spouseCurrentAge = marriageEvent ? (Number(marriageEvent.spouseCurrentAge) || currentAge) : currentAge;
+    const spouseAgeAtStart = spouseCurrentAge + (start - currentAge);
+    const partnerRetirementAge = (marriageEvent && marriageEvent.spouseDesiredRetirementAge !== undefined && marriageEvent.spouseDesiredRetirementAge !== null && marriageEvent.spouseDesiredRetirementAge !== '')
+      ? Number(marriageEvent.spouseDesiredRetirementAge)
+      : (targetRetirementAge + (spouseCurrentAge - currentAge));
+    const isPartnerRetiredInPhase = isMarried && spouseAgeAtStart >= partnerRetirementAge;
+
     let spouseIncome = 0;
     let spouseIncomeGrowthRate = 0;
     let spouseSavingsRate = 0;
@@ -3006,7 +3036,7 @@ export function getNormalizedPhases(inputs) {
     }
 
     if (isMarried) {
-      if (start < targetRetirementAge) {
+      if (start < targetRetirementAge && !isPartnerRetiredInPhase) {
         const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
         spouseIncome = spouseMember ? Math.round((Number(spouseMember.income) || 0) / 12) : Math.round(Number(marriageEvent.spouseIncome || 0) / 12);
         spouseIncomeGrowthRate = spouseMember
@@ -3110,7 +3140,7 @@ export function getNormalizedPhases(inputs) {
     let defaultPartnerSavings = {
       trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
     };
-    if (isMarried && start < targetRetirementAge) {
+    if (isMarried && start < targetRetirementAge && !isPartnerRetiredInPhase) {
       const partnerPreTax = Math.round((spouseIncome * 12 * (spouseSavingsRate / 100)) / 12);
       defaultPartnerSavings.brokerage = partnerPreTax;
     }

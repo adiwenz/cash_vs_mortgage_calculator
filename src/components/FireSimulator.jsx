@@ -2619,7 +2619,7 @@ export default function FireSimulator() {
     const spouseIncome = Number(editingEvent.spouseIncome) || 0;
     const savingsRate = Number(editingEvent.savingsRate) || 0;
     const partnerSavings = spouseIncome * (savingsRate / 100);
-    const partnerTax = calculateUSTaxForModal(spouseIncome, partnerSavings, 'single');
+    const partnerTax = inputs?.includeTaxes ? calculateUSTaxForModal(spouseIncome, partnerSavings, 'single') : 0;
     const partnerTakeHome = spouseIncome - partnerTax;
     const partnerTakeHomeRemaining = Math.max(0, partnerTakeHome - partnerSavings);
 
@@ -3670,8 +3670,8 @@ export default function FireSimulator() {
             spouseLifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            spouseDesiredRetirementAge: null,
-            desiredRetirementAge: null,
+            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
             partnerRetiresWithUser: true,
             retirementSpendingNeed: spouseRetSpendingVal,
             combinedSpendingAfterMarriage: combinedSpendingVal
@@ -3701,8 +3701,8 @@ export default function FireSimulator() {
             lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
             spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
             spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            spouseDesiredRetirementAge: null,
-            desiredRetirementAge: null,
+            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
+            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
             partnerRetiresWithUser: true,
             retirementSpendingNeed: spouseRetSpendingVal,
             growthRate: Number(editingEvent.incomeGrowthRate || 3),
@@ -5337,7 +5337,7 @@ export default function FireSimulator() {
                     onChange={(e) => setEditingEvent({ ...editingEvent, investments: parseFloat(e.target.value) || 0, cash: 0, retirement: 0 })}
                   />
                 </div>
-                <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
+                <div className="input-wrapper">
                   <span className="input-name">Partner Debt ($)</span>
                   <input
                     type="number"
@@ -5345,6 +5345,17 @@ export default function FireSimulator() {
                     style={{ width: '100%' }}
                     value={Number(editingEvent.debtStudent || 0) + Number(editingEvent.debtCredit || 0) + Number(editingEvent.debtOther || 0)}
                     onChange={(e) => setEditingEvent({ ...editingEvent, debtOther: parseFloat(e.target.value) || 0, debtStudent: 0, debtCredit: 0 })}
+                  />
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-name">Spouse Retirement Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '100%' }}
+                    value={editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== null ? editingEvent.spouseDesiredRetirementAge : ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, spouseDesiredRetirementAge: e.target.value !== '' ? parseInt(e.target.value) : '' })}
+                    placeholder="e.g. 65 (optional)"
                   />
                 </div>
               </div>
@@ -7478,8 +7489,8 @@ export default function FireSimulator() {
       }
     }
 
-    const activeSavingsRate = budgetMonthlyIncome > 0 
-      ? Math.round((activeSavings / budgetMonthlyIncome) * 100) 
+    const activeSavingsRate = combinedIncome > 0 
+      ? Math.round((activeSavings / combinedIncome) * 100) 
       : 0;
 
     let modalTitle = 'Work Phase Budget';
@@ -8105,8 +8116,12 @@ export default function FireSimulator() {
                             { key: 'tradIra', label: 'Traditional IRA', desc: 'Limit $7,000/yr' },
                             { key: 'hsa', label: 'HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
                             { key: 'brokerage', label: 'Taxable Brokerage' },
+                            { key: 'checking', label: 'Checking Account' },
+                            { key: 'hysa', label: 'High-Yield Savings' },
+                            { key: 'emergency', label: 'Emergency Fund' },
                             { key: 'cash', label: 'Cash Savings' },
-                            { key: 'debt', label: 'Debt Paydown' }
+                            { key: 'debt', label: 'Debt Paydown' },
+                            { key: 'other', label: 'Other Savings' }
                           ] : [
                             { key: 'trad401k', label: '401(k) (Pre-Tax)', desc: 'Limit $23,500/yr' },
                             { key: 'rothIra', label: 'Roth IRA', desc: 'Limit $7,000/yr combined' },
@@ -8169,10 +8184,24 @@ export default function FireSimulator() {
                                 { key: 'tradIra', label: 'Partner Traditional IRA', desc: 'Limit $7,000/yr' },
                                 { key: 'hsa', label: 'Partner HSA', desc: `Limit ${budgetHsaCoverage === 'family' ? '$8,300' : '$4,150'}/yr` },
                                 { key: 'brokerage', label: 'Partner Brokerage' },
+                                { key: 'checking', label: 'Partner Checking Account' },
+                                { key: 'hysa', label: 'Partner High-Yield Savings' },
+                                { key: 'emergency', label: 'Partner Emergency Fund' },
                                 { key: 'cash', label: 'Partner Cash Savings' },
-                                { key: 'debt', label: 'Partner Debt Paydown' }
+                                { key: 'debt', label: 'Partner Debt Paydown' },
+                                { key: 'other', label: 'Partner Other Savings' }
                               ].map(item => (
-                                <div key={item.key} className="breakdown-row budget-input-row" style={{ minHeight: '22px' }}>
+                                <div 
+                                  key={item.key} 
+                                  className="budget-input-row"
+                                  style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between', 
+                                    alignItems: 'center', 
+                                    gap: '0.5rem',
+                                    padding: '0.4rem 0.5rem'
+                                  }}
+                                >
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span className="breakdown-row-label">{item.label}</span>
                                     {item.desc && !isEditingSavings && (

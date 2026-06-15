@@ -435,4 +435,76 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /Done/i }));
   });
+
+  test('8. Marriage Flow - Budget Modal Savings Fields are present and editable', async () => {
+    navigateToStep2();
+    
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'marriage' } });
+    
+    // Verify marriage modal opens
+    expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
+
+    // Verify Spouse Retirement Age input is present in Step 1
+    const spouseRetAgeInput = getInputByWrapperText(/Spouse Retirement Age/i);
+    expect(spouseRetAgeInput).toBeDefined();
+    expect(spouseRetAgeInput.placeholder).toContain('65 (optional)');
+    
+    // Click Next through step 1 (Partner Finances) -> Step 2
+    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    fireEvent.click(nextBtn);
+    
+    // Click Next through step 2 (Life Together) -> Step 3
+    fireEvent.click(nextBtn);
+    
+    // Step 3: Save the Event
+    const saveBtn = screen.getByRole('button', { name: /Save Marriage Event/i });
+    fireEvent.click(saveBtn);
+    
+    // Verify Marriage Modal is closed
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Get Married/i })).toBeNull();
+    });
+
+    // Open budget builder modal
+    const setBudgetBtn = screen.getAllByRole('button', { name: /Set Budget/i })[0];
+    fireEvent.click(setBudgetBtn);
+
+    // Verify budget builder is open
+    expect(screen.getByText(/Phase Budget/i)).toBeDefined();
+
+    // Expand the Savings section
+    const savingsHeader = screen.getByText('Savings');
+    fireEvent.click(savingsHeader);
+
+    // Verify checking, hysa, emergency are present for user
+    const checkingAcc = getInputByWrapperText(/Checking Account/i);
+    const hysa = getInputByWrapperText(/High-Yield Savings/i);
+    const emergency = getInputByWrapperText(/Emergency Fund/i);
+    
+    expect(checkingAcc).toBeDefined();
+    expect(hysa).toBeDefined();
+    expect(emergency).toBeDefined();
+
+    // Verify they are editable
+    fireEvent.change(checkingAcc, { target: { value: '250' } });
+    expect(checkingAcc.value).toBe('250');
+
+    // Verify checking, hysa, emergency are present for partner
+    const partnerChecking = getInputByWrapperText(/Partner Checking Account/i);
+    const partnerHysa = getInputByWrapperText(/Partner High-Yield Savings/i);
+    const partnerEmergency = getInputByWrapperText(/Partner Emergency Fund/i);
+    
+    expect(partnerChecking).toBeDefined();
+    expect(partnerHysa).toBeDefined();
+    expect(partnerEmergency).toBeDefined();
+
+    // Verify partner fields are editable
+    fireEvent.change(partnerChecking, { target: { value: '180' } });
+    expect(partnerChecking.value).toBe('180');
+
+    // Cancel / Close modal
+    const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
+    fireEvent.click(cancelBtn);
+  });
 });
