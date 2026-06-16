@@ -88,13 +88,13 @@ if (mainStatus) {
   process.exit(1);
 }
 
-// 5. Pull latest changes in main repository
+// 5. Pull latest changes in main repository (optional/non-fatal)
 console.log(`\n📥 Pulling latest changes from remote in main repository...`);
 try {
-  runCmd(`git pull origin ${mainBranchName}`, { cwd: mainRepoPath });
+  execSync(`git pull origin ${mainBranchName}`, { cwd: mainRepoPath, stdio: 'pipe' });
   console.log('✅ Main repository up-to-date.');
 } catch (error) {
-  console.warn('⚠️  WARNING: Failed to pull from origin. Proceeding with local merge anyway.');
+  console.warn('⚠️  WARNING: Failed to pull from origin (this may be due to diverged history or offline status). Proceeding with local merge.');
 }
 
 // 6. Merge feature branch into main
@@ -112,11 +112,13 @@ try {
 // 7. Push main to remote
 console.log(`\n📤 Pushing merged '${mainBranchName}' to origin...`);
 try {
-  runCmd(`git push origin ${mainBranchName}`, { cwd: mainRepoPath });
+  execSync(`git push origin ${mainBranchName}`, { cwd: mainRepoPath, stdio: 'pipe' });
   console.log('✅ Pushed changes to origin successfully.');
 } catch (error) {
-  console.error('❌ ERROR: Failed to push changes to origin.');
-  console.error('Please check your network connection or repository permissions, and push manually.');
+  console.error('\n❌ ERROR: Failed to push changes to origin.');
+  console.error('The merge was successful locally, but pushing to the remote failed.');
+  console.error('Please resolve any remote conflicts/push issues manually in the main repository.');
+  console.error('Worktree and branch deletion have been skipped to prevent data loss.');
   process.exit(1);
 }
 
