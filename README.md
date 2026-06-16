@@ -58,43 +58,42 @@ To verify input conditions, see the comprehensive [Test Cases Checklist](file://
 
 ## Testing Policy & Commands
 
-The project uses **Vitest** for unit testing of calculations and simulation logic, and **Playwright** for end-to-end user flow tests.
+The project uses **Vitest** as the primary test runner for unit and component testing, and **Playwright** for end-to-end (E2E) testing.
 
-### 1. Unit Testing (Vitest)
+### Recommended Workflow
 
-To minimize feedback loops during development, run Vitest targeting only the changed files:
+To maintain a fast and high-confidence test suite, follow this development workflow:
+
+#### 1. During Development
+Run only tests affected by changes relative to the `main` branch:
 ```bash
-npx vitest --changed
+npm run test:changed
 ```
-*(or `npm run test:changed`)*
 
-*   **Persistent Watch Mode**: To run Vitest continuously in watch mode:
-    ```bash
-    npm run test:watch
-    ```
-*   **One-time Related Run**: To run Vitest targeting only the modified files:
-    ```bash
-    npx vitest related <changed files>
-    ```
-    (or `npm run test:unit:related <changed files>`).
-*   **One-time Full Run**: To run all unit tests once:
-    ```bash
-    npm run test:unit
-    ```
-
-### 2. End-to-End Testing (Playwright)
-
-To save execution time, E2E validation defaults to running only tests impacted by changes relative to the `main` branch:
+#### 2. Before Commit
+Verify that your changes pass linting, all unit tests, and affected E2E tests:
 ```bash
-npm run test:e2e:changed
+npm run verify
 ```
-*(Runs: `npx playwright test --only-changed=main`)*
 
-*   **Full Suite Run**: Before merging into `main` or when doing a release build validation, run the full E2E suite:
-    ```bash
-    npm run test:e2e:full
-    ```
-*   **E2E UI Runner**:
-    ```bash
-    npm run test:e2e:ui
-    ```
+#### 3. Before Merge
+Run the complete verification suite including all linting, unit, and E2E tests:
+```bash
+npm run verify:full
+```
+
+---
+
+### Command Reference
+
+#### Unit & Component Tests (Vitest)
+*   **Run Changed Tests**: `npm run test:changed` (runs `vitest run --changed=main`)
+*   **Run All Tests**: `npm run test` or `npm run test:unit` (runs `vitest run`)
+*   **Watch Mode**: `npm run test:watch` (runs `vitest`)
+
+#### End-to-End Tests (Playwright)
+*   **Run Changed E2E**: `npm run test:e2e:changed` (runs `playwright test --only-changed=main`)
+*   **Run All E2E**: `npm run test:e2e` (runs `playwright test`)
+*   **Run Headed E2E**: `npm run test:e2e:headed` (runs `playwright test --headed`)
+*   **Run UI E2E**: `npm run test:e2e:ui` (runs `playwright test --ui`)
+
