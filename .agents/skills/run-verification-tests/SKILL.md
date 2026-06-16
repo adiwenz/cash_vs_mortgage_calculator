@@ -11,27 +11,26 @@ This skill ensures that whenever you modify, create, or delete any source code, 
 1. **Active Development Unit Validation**:
    - After each code edit, run a one-time execution of Vitest targeting only the changed files:
      ```bash
-     npx vitest --changed
+     npm run test:changed
      ```
-     (or `npm run test:changed`). Inspect the output to ensure the affected tests pass. Do not run Vitest in watch mode.
+     Inspect the output to ensure the affected tests pass. Do not run Vitest in watch mode.
 
 2. **One-Time Related Unit Validation**:
    - If git changes are not staged/committed, run Vitest targeting only the modified files:
      ```bash
      npx vitest related <changed files>
      ```
-     (or `npm run test:unit:related <changed files>`). Avoid running the full suite `npm run test:unit` during development iterations.
+     Avoid running the full suite `npm run test:unit` during development iterations.
 
 3. **E2E Changed Validation (Playwright)**:
    - For Playwright end-to-end tests, only run changed tests relative to the main branch when code is changed:
      ```bash
-     npx playwright test --only-changed=main
+     npm run test:e2e:changed
      ```
-     (or `npm run test:e2e:changed`).
-   - Do NOT run the whole Playwright test suite (`npx playwright test` or `npm run test:e2e`) when code is changed during development.
+   - Do NOT run the whole Playwright test suite (`npm run test:e2e`) when code is changed during development.
 
 4. **Broader/Full-Suite Validation**:
-   - Only run the full E2E suite (`npm run test:e2e:full` / `npx playwright test`) or full unit test suite (`npm run test:unit`) when:
+   - Only run the full E2E suite (`npm run test:e2e`) or full unit test suite (`npm run test:unit`) when:
      - Explicitly requested by the user.
      - Preparing a final release/build verification.
      - The branch is about to be merged into `main`.
