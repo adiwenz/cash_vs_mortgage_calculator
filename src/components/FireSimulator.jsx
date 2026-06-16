@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { Wallet, TrendingUp, Home, Target, User, ChevronRight } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -5156,76 +5157,108 @@ export default function FireSimulator() {
     return (
       <div className="modal-backdrop" onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}>
         <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1.25rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{
+            fontSize: '1.2rem',
+            fontWeight: 'bold',
+            marginBottom: stepId === 1 ? '1.5rem' : '1.25rem',
+            color: 'var(--primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            borderBottom: stepId === 1 ? '1px solid var(--border-color)' : 'none',
+            paddingBottom: stepId === 1 ? '1rem' : '0'
+          }}>
             💍 Get Married
           </h3>
 
-          {/* Stepper Headers */}
-          <div className="wizard-steps-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-            {/* Step 1: Congratulations */}
-            <div className={`wizard-step-node ${stepId === 1 ? 'active' : ''} ${stepId > 1 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 1 })}>
-              <div className="wizard-step-icon">1</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Congratulations</span>
+          {/* Stepper Headers - hidden on Step 1 */}
+          {stepId > 1 && (
+            <div className="wizard-steps-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+              {/* Step 1: Congratulations */}
+              <div className={`wizard-step-node ${stepId === 1 ? 'active' : ''} ${stepId > 1 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 1 })}>
+                <div className="wizard-step-icon">1</div>
+                <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Congratulations</span>
+              </div>
+
+              <div className={`wizard-step-divider ${stepId >= 2 ? 'active' : ''}`} />
+
+              {/* Step 2: Wedding */}
+              <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 2 })}>
+                <div className="wizard-step-icon">2</div>
+                <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Wedding</span>
+              </div>
+
+              <div className={`wizard-step-divider ${stepId >= 3 ? 'active' : ''}`} />
+
+              {/* Step 3: Life Together */}
+              <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''} ${stepId > 3 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 3 })}>
+                <div className="wizard-step-icon">3</div>
+                <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Life Together</span>
+              </div>
+
+              <div className={`wizard-step-divider ${stepId >= 4 ? 'active' : ''}`} />
+
+              {/* Step 4: Marriage Impact */}
+              <div className={`wizard-step-node ${stepId === 4 ? 'active' : ''}`} onClick={() => {
+                setEditingEvent({ ...editingEvent, wizardStep: 4 });
+              }}>
+                <div className="wizard-step-icon">4</div>
+                <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Marriage Impact</span>
+              </div>
             </div>
-
-            <div className={`wizard-step-divider ${stepId >= 2 ? 'active' : ''}`} />
-
-            {/* Step 2: Wedding */}
-            <div className={`wizard-step-node ${stepId === 2 ? 'active' : ''} ${stepId > 2 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 2 })}>
-              <div className="wizard-step-icon">2</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Wedding</span>
-            </div>
-
-            <div className={`wizard-step-divider ${stepId >= 3 ? 'active' : ''}`} />
-
-            {/* Step 3: Life Together */}
-            <div className={`wizard-step-node ${stepId === 3 ? 'active' : ''} ${stepId > 3 ? 'completed' : ''}`} onClick={() => setEditingEvent({ ...editingEvent, wizardStep: 3 })}>
-              <div className="wizard-step-icon">3</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Life Together</span>
-            </div>
-
-            <div className={`wizard-step-divider ${stepId >= 4 ? 'active' : ''}`} />
-
-            {/* Step 4: Marriage Impact */}
-            <div className={`wizard-step-node ${stepId === 4 ? 'active' : ''}`} onClick={() => {
-              setEditingEvent({ ...editingEvent, wizardStep: 4 });
-            }}>
-              <div className="wizard-step-icon">4</div>
-              <span className="wizard-step-label" style={{ fontSize: '0.75rem' }}>Marriage Impact</span>
-            </div>
-          </div>
+          )}
 
           {/* STEP 1: CONGRATULATIONS */}
           {stepId === 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
-                <h4 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary)', margin: '0 0 0.5rem 0' }}>Congratulations! 🎉</h4>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  We've assumed your partner's finances are similar to yours and that you'll combine households after marriage.
+                <h4 style={{
+                  fontSize: '2rem',
+                  fontWeight: '800',
+                  margin: '0 0 0.5rem 0',
+                  backgroundImage: 'linear-gradient(135deg, #a78bfa 0%, #818cf8 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  display: 'inline-block'
+                }}>
+                  Congrats! 🎉
+                </h4>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  You'll combine finances after marriage.
                 </p>
               </div>
 
-              {/* Simple Benefits List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', margin: '0.5rem 0' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-                  Key Benefits of Combining Finances:
-                </span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>💼 Shared Income</div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Pool your monthly earnings to boost purchasing power.</p>
+              {/* Grid of Key Benefits */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                <div className="marriage-benefit-card">
+                  <Wallet size={28} color="#8b5cf6" strokeWidth={1.5} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.15rem' }}>More Income</div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Bigger monthly budget.</p>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>💰 Shared Savings</div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Grow your investments faster with combined capital.</p>
+                </div>
+
+                <div className="marriage-benefit-card">
+                  <TrendingUp size={28} color="#10b981" strokeWidth={1.5} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.15rem' }}>Faster Savings</div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Grow investments faster.</p>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>🏠 Split Housing Costs</div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Share rent/mortgage and utilities to lower monthly expenses.</p>
+                </div>
+
+                <div className="marriage-benefit-card">
+                  <Home size={28} color="#fbbf24" strokeWidth={1.5} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.15rem' }}>Lower Costs</div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Share housing expenses.</p>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(99, 102, 241, 0.04)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>📊 Joint FIRE Planning</div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>Coordinate retirement targets and withdrawal strategies.</p>
+                </div>
+
+                <div className="marriage-benefit-card">
+                  <Target size={28} color="#3b82f6" strokeWidth={1.5} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.15rem' }}>Aligned Goals</div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Plan retirement together.</p>
                   </div>
                 </div>
               </div>
@@ -5236,10 +5269,24 @@ export default function FireSimulator() {
                   key="toggle-partner-profile"
                   type="button"
                   onClick={() => setIsFullPartnerProfileOpen(!isFullPartnerProfileOpen)}
-                  className="list-builder-edit-btn"
-                  style={{ fontSize: '0.8rem', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                  aria-label={isFullPartnerProfileOpen ? 'Hide Partner Profile' : 'Edit Partner Profile'}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#8b5cf6',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                    padding: '0.5rem 1rem',
+                  }}
                 >
-                  👤 {isFullPartnerProfileOpen ? 'Hide Partner Profile' : 'Edit Partner Profile'}
+                  <User size={16} />
+                  {isFullPartnerProfileOpen ? 'Hide Partner Profile' : 'Edit Partner'}
+                  <span style={{ fontSize: '0.85rem' }}>{isFullPartnerProfileOpen ? '▾' : ' ›'}</span>
                 </button>
               </div>
 
@@ -5834,23 +5881,46 @@ export default function FireSimulator() {
           {/* Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="list-builder-remove-btn"
-                onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
-                style={{ alignSelf: 'center', margin: 0 }}
-              >
-                Cancel
-              </button>
-              {editingEvent.id && (
+              {stepId === 1 ? (
                 <button
                   type="button"
-                  className="list-builder-remove-btn"
-                  onClick={handleDeleteEvent}
-                  style={{ alignSelf: 'center', margin: 0, background: 'var(--accent-rose, #f43f5e)', color: '#fff', borderColor: 'var(--accent-rose, #f43f5e)', cursor: 'pointer' }}
+                  onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    padding: '0.5rem 1rem',
+                    transition: 'color 0.2s',
+                    alignSelf: 'center',
+                    margin: 0
+                  }}
                 >
-                  Delete Event
+                  Skip
                 </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="list-builder-remove-btn"
+                    onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+                    style={{ alignSelf: 'center', margin: 0 }}
+                  >
+                    Cancel
+                  </button>
+                  {editingEvent.id && (
+                    <button
+                      type="button"
+                      className="list-builder-remove-btn"
+                      onClick={handleDeleteEvent}
+                      style={{ alignSelf: 'center', margin: 0, background: 'var(--accent-rose, #f43f5e)', color: '#fff', borderColor: 'var(--accent-rose, #f43f5e)', cursor: 'pointer' }}
+                    >
+                      Delete Event
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -5869,7 +5939,20 @@ export default function FireSimulator() {
                   type="button"
                   className="btn-primary"
                   onClick={handleNext}
-                  style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={stepId === 1 ? {
+                    background: '#5850ec',
+                    borderColor: '#5850ec',
+                    color: '#ffffff',
+                    borderRadius: '12px',
+                    padding: '0.6rem 2.25rem',
+                    fontSize: '0.95rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(88, 80, 236, 0.2)',
+                    border: 'none',
+                    alignSelf: 'center',
+                    margin: 0
+                  } : { alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   Next
                 </button>
