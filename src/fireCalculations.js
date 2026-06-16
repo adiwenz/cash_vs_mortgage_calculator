@@ -1652,8 +1652,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     }
 
-    let activeRetirementIncomeThisYearInTodayDollars = 0;
-    let futureRetirementIncomeDiscountedSumInTodayDollars = 0;
+    let nominalActiveSS = 0;
 
     enabledEvents.forEach(ev => {
       if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
@@ -1666,44 +1665,17 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted;
         
         if (age >= claimingAge) {
-          if (!isInflationAdjusted) {
-            annualAmt = annualAmt / nominalFactor;
+          if (isInflationAdjusted) {
+            annualAmt = annualAmt * nominalFactor;
           }
-          activeRetirementIncomeThisYearInTodayDollars += annualAmt;
-        } else {
-          let deflatedAnnualAmt = annualAmt;
-          if (!isInflationAdjusted) {
-            deflatedAnnualAmt = annualAmt / Math.pow(1 + inflationRate, claimingAge - currentAge);
-          }
-          
-          let discountedValue;
-          if (age >= targetRetirementAge) {
-            const realReturn = Math.max(0.001, postRetirementReturn - inflationRate);
-            const yearsToClaim = claimingAge - age;
-            discountedValue = deflatedAnnualAmt / Math.pow(1 + realReturn, yearsToClaim);
-          } else {
-            const yearsPre = Math.max(0, Math.min(claimingAge, targetRetirementAge) - age);
-            const yearsPost = Math.max(0, claimingAge - Math.max(age, targetRetirementAge));
-            const realPre = Math.max(0.001, expectedReturn - inflationRate);
-            const realPost = Math.max(0.001, postRetirementReturn - inflationRate);
-            discountedValue = deflatedAnnualAmt / (Math.pow(1 + realPre, yearsPre) * Math.pow(1 + realPost, yearsPost));
-          }
-          futureRetirementIncomeDiscountedSumInTodayDollars += discountedValue;
+          nominalActiveSS += annualAmt;
         }
       }
     });
 
-    const nominalActiveSS = activeRetirementIncomeThisYearInTodayDollars * nominalFactor;
-    const nominalDiscountedSS = futureRetirementIncomeDiscountedSumInTodayDollars * nominalFactor;
-
-    const retirementReadyTargetForYear = Math.max(0, 
-      retirementBaseExpenses - nominalActiveSS - nominalDiscountedSS
-    ) / swr;
-
-    if (liquidNW >= retirementReadyTargetForYear && !retirementReadyReached) {
-      retirementReadyReached = true;
-      retirementReadyAge = age;
-    }
+    const retirementReadyTargetForYear = age >= targetRetirementAge
+      ? Math.max(0, retirementBaseExpenses - nominalActiveSS) / swr
+      : 0;
 
     if (age === simLifeExpectancy) {
       endingSurplusShortfall = cumulativeShortfall > 0 ? -cumulativeShortfall : liquidNW;
@@ -1810,6 +1782,42 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     debtSummaries
   };
 }
+export function calculateMinimumPortfolioForRetirement(profile, phases, events, retirementAge, maxAgeOverride, readinessCriteria) {
+  const currentAge = Math.max(0, Number(profile.currentAge) || 30);
+  const lifeExpectancy = Math.max(currentAge + 1, Number(profile.lifeExpectancy) || 85);
+  const inflationRate = (Number(profile.inflationRate) || 3) / 100;
+  const swr = (Number(profile.swr) || 4) / 100;
+  const postRetirementReturn = profile.postRetirementReturn !== undefined
+    ? (Number(profile.postRetirementReturn) || 0) / 100
+    : (Number(profile.expectedReturn) || 7) / 100;
+
+  const simLifeExpectancy = maxAgeOverride || lifeExpectancy;
+
+  const testRes = projectYearlyBalances(profile, phases, events, retirementAge, simLifeExpectancy);
+  const logs = testRes.logs;
+
+  const retirementLogs = logs.filter(l => l.age >= retirementAge && l.age <= simLifeExpectancy);
+  if (retirementLogs.length === 0) return 0;
+
+  let endingTarget = 0;
+  if (readinessCriteria === 'lastsIndefinitely') {
+    const lastLog = retirementLogs[retirementLogs.length - 1];
+    const lastNominalExpense = lastLog.expenses;
+    const lastNominalIncome = lastLog.income;
+    endingTarget = Math.max(0, lastNominalExpense - lastNominalIncome) / swr;
+  }
+
+  let pNext = endingTarget;
+  for (let i = retirementLogs.length - 1; i >= 0; i--) {
+    const log = retirementLogs[i];
+    const nominalExpense = log.expenses;
+    const nominalIncome = log.income;
+    const withdrawalNeeded = Math.max(0, nominalExpense - nominalIncome);
+    pNext = (pNext + withdrawalNeeded) / (1 + postRetirementReturn);
+  }
+
+  return pNext;
+}
 
 export function computeRetirementResult(profile, phases, events, plannedProjection) {
   const currentAge = profile.currentAge;
@@ -1905,7 +1913,10 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
       const testRes = projectYearlyBalances(profile, phases, events, mid);
       if (testRes.moneyLasts) {
         const lastLog = testRes.logs[testRes.logs.length - 1];
-        if (lastLog && lastLog.portfolio >= lastLog.retirementReadyTarget) {
+        const lastNominalExpense = lastLog.expenses;
+        const lastNominalIncome = lastLog.income;
+        const swrTarget = Math.max(0, lastNominalExpense - lastNominalIncome) / swr;
+        if (lastLog && lastLog.portfolio >= swrTarget) {
           retirementReadyAgeSWR = mid;
           highSWR = mid - 1;
         } else {
@@ -1958,66 +1969,13 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     : 70) / 100;
 
   let retirementReadyTarget = 0;
+  let nominalRetirementReadyTarget = 0;
   if (retirementReadyAge !== null) {
-    const readyLog = deflatedLogs.find(l => l.age === retirementReadyAge);
-    if (readyLog) {
-      retirementReadyTarget = readyLog.fiNumber;
-    } else {
-      const factor = Math.pow(1 + inflationRate, retirementReadyAge - currentAge);
-      const spendingPhases = profile.spendingPhases || [];
-      const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || spendingPhases[0];
-      let baseSpending = 42500;
-      if (initialPhase) {
-        baseSpending = Number(initialPhase.amount) || Number(initialPhase.annualSpending) || 42500;
-        if (initialPhase.frequency === 'monthly') baseSpending *= 12;
-      }
-      const rate = (initialPhase && initialPhase.inflationOverride !== null && initialPhase.inflationOverride !== undefined && initialPhase.inflationOverride !== '')
-        ? (Number(initialPhase.inflationOverride) / 100)
-        : inflationRate;
-      let estRetSpending = baseSpending * Math.pow(1 + rate + lifestyleUpgrades, retirementReadyAge - currentAge) * retirementSpendingPercent;
-      
-      if (enableHealthcareModel) {
-        const preMedicarePremium = profile.preMedicarePremium || 10000;
-        const medicarePremium = profile.medicarePremium || 4000;
-        if (retirementReadyAge < 65) {
-          estRetSpending += preMedicarePremium * factor;
-        } else {
-          estRetSpending += medicarePremium * factor;
-        }
-      }
-      
-      let activeRetIncome = 0;
-      let futureRetIncomeDiscountedSum = 0;
-      const realReturn = Math.max(0.001, postRetirementReturn - inflationRate);
-      
-      enabledEvents.forEach(ev => {
-        if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
-          const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
-          let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
-          if (ev.type === 'socialSecurity') {
-            monthlyBenefit = socialSecurityDetails.monthlyBenefit;
-          }
-          let annualAmt = monthlyBenefit * 12;
-          const isInflationAdjusted = ev.type === 'socialSecurity' || ev.inflationAdjusted;
-          
-          if (retirementReadyAge >= claimingAge) {
-            if (!isInflationAdjusted) {
-              annualAmt = annualAmt / factor;
-            }
-            activeRetIncome += annualAmt;
-          } else {
-            const yearsToClaim = claimingAge - retirementReadyAge;
-            let deflatedAnnualAmt = annualAmt;
-            if (!isInflationAdjusted) {
-              deflatedAnnualAmt = annualAmt / Math.pow(1 + inflationRate, claimingAge - currentAge);
-            }
-            const discountedValue = deflatedAnnualAmt / Math.pow(1 + realReturn, yearsToClaim);
-            futureRetIncomeDiscountedSum += discountedValue;
-          }
-        }
-      });
-      retirementReadyTarget = Math.max(0, (estRetSpending / factor) - activeRetIncome - futureRetIncomeDiscountedSum) / swr;
-    }
+    const maxAgeOverride = readinessCriteria === 'lastsComfortable' ? maxLifeExpectancy + 10 : maxLifeExpectancy;
+    const nominalTarget = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAge, maxAgeOverride, readinessCriteria);
+    nominalRetirementReadyTarget = nominalTarget;
+    const factor = Math.pow(1 + inflationRate, retirementReadyAge - currentAge);
+    retirementReadyTarget = nominalTarget / factor;
   }
 
   const retirementLog = deflatedLogs.find(log => log.age === targetRetirementAge) || deflatedLogs[deflatedLogs.length - 1];
@@ -2035,12 +1993,6 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   }
 
   const nominalRetirementLog = plannedProjection.logs.find(log => log.age === targetRetirementAge) || plannedProjection.logs[plannedProjection.logs.length - 1];
-
-  let nominalRetirementReadyTarget = 0;
-  if (retirementReadyAge !== null) {
-    const readyLogNominal = plannedProjection.logs.find(l => l.age === retirementReadyAge);
-    nominalRetirementReadyTarget = readyLogNominal ? readyLogNominal.fiNumber : (retirementReadyTarget * Math.pow(1 + inflationRate, retirementReadyAge - currentAge));
-  }
 
   let nominalRetirementIncomeSources = 0;
   let retirementIncomeSourcesInTodayDollars = 0;
