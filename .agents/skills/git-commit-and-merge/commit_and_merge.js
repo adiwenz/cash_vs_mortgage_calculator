@@ -88,16 +88,7 @@ if (mainStatus) {
   process.exit(1);
 }
 
-// 5. Pull latest changes in main repository (optional/non-fatal)
-console.log(`\n📥 Pulling latest changes from remote in main repository...`);
-try {
-  execSync(`git pull origin ${mainBranchName}`, { cwd: mainRepoPath, stdio: 'pipe' });
-  console.log('✅ Main repository up-to-date.');
-} catch (error) {
-  console.warn('⚠️  WARNING: Failed to pull from origin (this may be due to diverged history or offline status). Proceeding with local merge.');
-}
-
-// 6. Merge feature branch into main
+// 5. Merge feature branch into main
 console.log(`\n🔀 Merging branch '${currentBranch}' into '${mainBranchName}'...`);
 try {
   runCmd(`git merge "${currentBranch}" --no-edit`, { cwd: mainRepoPath });
