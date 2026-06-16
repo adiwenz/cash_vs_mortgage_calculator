@@ -8846,14 +8846,6 @@ export default function FireSimulator() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                      retire indefinitely without SS
-                    </span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(displayedResults.retirementReadyTargetNoSS)}
-                    </strong>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
                       {inputs.readinessCriteria === 'lastsLifeExp' 
                         ? 'retire sustainably, taking SS at selected year' 
                         : inputs.readinessCriteria === 'lastsComfortable' 
