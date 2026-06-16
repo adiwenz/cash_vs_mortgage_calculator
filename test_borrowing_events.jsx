@@ -151,21 +151,21 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     vi.clearAllMocks();
   });
 
-  test("Today Screen snapshot card displays correct initial starting balances", async () => {
+  test("Today Screen onboarding card displays correct initial starting state", async () => {
     render(<FireSimulator />);
     
-    // Default starting savings is $5,000, and starting debt is $0
-    expect(screen.getAllByText(/Today's Assets/i)[0]).toBeDefined();
-    expect(screen.getAllByText(/\$5,000/i)[0]).toBeDefined();
-    expect(screen.getAllByText(/Today's Debt/i)[0]).toBeDefined();
-    expect(screen.getAllByText(/\$0/i)[0]).toBeDefined();
-    expect(screen.getAllByText(/Today's Net Worth/i)[0]).toBeDefined();
+    // Check mountain peak title
+    expect(screen.getByText(/Imagine Your Future/i)).toBeDefined();
+    
+    // Check that categories are removed
+    expect(screen.queryByText(/Marriage/i)).toBeNull();
+    expect(screen.queryByText(/Children/i)).toBeNull();
   });
 
   const navigateToStep2 = () => {
     render(<FireSimulator />);
-    // Click Build My Life Plan button to go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Build My Life Plan/i })[0];
+    // Click Start Planning button to go to Step 2
+    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
   };
 

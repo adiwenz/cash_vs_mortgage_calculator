@@ -37,7 +37,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     render(<FireSimulator />);
     
     // First go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Build My Life Plan/i })[0];
+    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
 
     // Expand Advanced Detail accordion (which is visible in Step 2)

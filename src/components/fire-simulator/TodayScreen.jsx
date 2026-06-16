@@ -10,7 +10,8 @@ export default function TodayScreen({
   todayAssets,
   todayDebt,
   todayNetWorth,
-  setActiveStep
+  setActiveStep,
+  displayedResults
 }) {
   const simpleSavingsRate = useMemo(() => {
     const income = Number(inputs.simpleIncome) || 0;
@@ -18,6 +19,12 @@ export default function TodayScreen({
     if (income <= 0) return 0;
     return Math.round(((income - expenses) / income) * 100);
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
+
+  const hasUserEvents = useMemo(() => {
+    const list = inputs.lifeEvents || [];
+    const excludedTypes = ['socialSecurity', 'retire'];
+    return list.some(e => e.enabled && !excludedTypes.includes(e.type));
+  }, [inputs.lifeEvents]);
 
   return (
     <div className="today-screen-layout" style={{ alignItems: 'stretch' }}>
@@ -46,22 +53,7 @@ export default function TodayScreen({
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-            <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-              <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Life Expectancy</span>
-              <input
-                type="number"
-                className="input-number-box"
-                style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
-                value={inputs.lifeExpectancy}
-                placeholder="e.g. 85"
-                onChange={(e) => handleStep1Change('lifeExpectancy', parseInt(e.target.value) || 0)}
-              />
-            </div>
-            <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
-              Age you expect to live to (e.g. 85)
-            </span>
-          </div>
+
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
@@ -147,119 +139,134 @@ export default function TodayScreen({
         </div>
       </div>
 
-      {/* Immediate Value Display Progress Board */}
-      <div className="progress-board-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', padding: '1.25rem 1.5rem', height: 'auto' }}>
-        <div>
-          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Your Financial Snapshot</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>
-            Your current starting point parameters:
-          </p>
-        </div>
+      {/* Right Column: Mountain Peak Concept */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: 'auto', flex: 1, minWidth: 0 }}>
+        <div className="glass-card" style={{
+          padding: '2.5rem 2.0rem',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(147, 51, 234, 0.03) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.15)',
+          borderRadius: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.5rem',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 8px 32px 0 rgba(99, 102, 241, 0.05)',
+          textAlign: 'center',
+          minHeight: '450px'
+        }}>
+          {/* Subtle background glow */}
+          <div style={{
+            position: 'absolute',
+            top: '-30%',
+            right: '-30%',
+            width: '200px',
+            height: '200px',
+            borderRadius: '50%',
+            background: 'var(--primary)',
+            filter: 'blur(75px)',
+            opacity: 0.12,
+            pointerEvents: 'none'
+          }} />
 
-        {/* Positive Metrics Deck */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%' }}>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Annual Income
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '1.15' }}>
-              {formatCurrency(inputs.simpleIncome)}
-            </span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Pre-Tax Savings Rate
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.15' }}>
-              {simpleSavingsRate}%
-            </span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Annual Surplus
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-emerald)', lineHeight: '1.15' }}>
-              {formatCurrency(Math.max(0, inputs.simpleIncome - inputs.simpleExpenses))}
-            </span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Today's Assets
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-emerald, #10b981)', lineHeight: '1.15' }}>
-              {formatCurrency(todayAssets)}
-            </span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Today's Debt
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-rose, #f43f5e)', lineHeight: '1.15' }}>
-              {formatCurrency(todayDebt)}
-            </span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gridColumn: 'span 2' }}>
-            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Today's Net Worth
-            </span>
-            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.15' }}>
-              {formatCurrency(todayNetWorth)}
-            </span>
-          </div>
-        </div>
+          {/* Mountain Peak Illustration */}
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '0 0 0.5rem 0' }}>
+            <svg
+              width="100%"
+              height="200px"
+              viewBox="0 0 320 200"
+              style={{ overflow: 'visible' }}
+            >
+              <defs>
+                <radialGradient id="mountain-glow" cx="50%" cy="30%" r="60%">
+                  <stop offset="0%" stopColor="rgba(147, 51, 234, 0.25)" />
+                  <stop offset="100%" stopColor="rgba(99, 102, 241, 0)" />
+                </radialGradient>
+                <linearGradient id="mountain-grad-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(99, 102, 241, 0.45)" />
+                  <stop offset="100%" stopColor="rgba(79, 70, 229, 0.15)" />
+                </linearGradient>
+                <linearGradient id="mountain-grad-right" x1="100%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(167, 139, 250, 0.55)" />
+                  <stop offset="100%" stopColor="rgba(99, 102, 241, 0.2)" />
+                </linearGradient>
+                <linearGradient id="back-peak-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(139, 92, 246, 0.25)" />
+                  <stop offset="100%" stopColor="rgba(79, 70, 229, 0.05)" />
+                </linearGradient>
+                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="6" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
 
-        {/* Encouraging Insights */}
-        <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.15)', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', textAlign: 'left' }}>
-          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Starting Point Insights
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
-              <span>💡</span>
-              <span>
-                {simpleSavingsRate >= 15 
-                  ? `Strong Start: You are currently saving ${simpleSavingsRate}% of your income pre-tax.`
-                  : simpleSavingsRate > 0
-                    ? `Good Start: You are currently saving ${simpleSavingsRate}% of your income pre-tax.`
-                    : `Action Plan: Try adjusting your spending to create a surplus and start saving.`}
-              </span>
-            </div>
-            {inputs.simpleIncome - inputs.simpleExpenses > 0 && (
-              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
-                <span>🌱</span>
-                <span>
-                  {`Annual Investing: You have ${formatCurrency(inputs.simpleIncome - inputs.simpleExpenses)}/yr to build wealth.`}
-                </span>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
-              <span>✨</span>
-              <span>
-                {`Current Status: This is your starting point. Life choices can change your timeline.`}
-              </span>
-            </div>
-          </div>
-        </div>
+              {/* Ambient Glow behind the summit */}
+              <circle cx="160" cy="50" r="100" fill="url(#mountain-glow)" />
 
-        {/* Next Step CTA */}
-        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: 'auto', width: '100%' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Next Step
-            </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Now let’s see how future life choices affect your path.
-            </span>
+              {/* Background Peak 1 (Left) */}
+              <polygon points="20,180 90,80 160,180" fill="url(#back-peak-grad)" />
+
+              {/* Background Peak 2 (Right) */}
+              <polygon points="160,180 230,90 300,180" fill="url(#back-peak-grad)" />
+
+              {/* Main Central Foreground Peak - Shaded Shards (Geometric look) */}
+              {/* Left shaded face */}
+              <polygon points="60,180 160,40 160,180" fill="url(#mountain-grad-left)" />
+              {/* Right shaded face */}
+              <polygon points="160,40 260,180 160,180" fill="url(#mountain-grad-right)" />
+
+              {/* Glowing Flag / Destination Pin at the summit (160, 40) */}
+              {/* Flagpole */}
+              <line x1="160" y1="40" x2="160" y2="20" stroke="rgba(255, 255, 255, 0.85)" strokeWidth="1.5" />
+              {/* Flag (facing right) */}
+              <polygon points="160,20 174,25 160,30" fill="var(--primary)" />
+              {/* Glowing Light at Flag tip */}
+              <circle cx="160" cy="19" r="6" fill="rgba(167, 139, 250, 0.8)" filter="url(#glow)" />
+              <circle cx="160" cy="19" r="2.5" fill="#ffffff" />
+            </svg>
           </div>
+
+          <div style={{ maxWidth: '280px', margin: '0 0 0.5rem 0' }}>
+            <h3 style={{
+              fontSize: '1.6rem',
+              fontWeight: '800',
+              margin: 0,
+              color: 'var(--text-primary)',
+              fontFamily: 'var(--font-heading)',
+              letterSpacing: '-0.02em',
+              lineHeight: '1.25'
+            }}>
+              Imagine Your Future
+            </h3>
+          </div>
+
+          {/* Action button */}
           <button
             type="button"
             className="btn-primary"
-            style={{ width: '100%', padding: '0.65rem', fontSize: '1.05rem', fontWeight: '700', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
-            onClick={() => {
-              setActiveStep(2);
+            style={{
+              width: '100%',
+              maxWidth: '240px',
+              padding: '0.9rem',
+              fontSize: '1.05rem',
+              fontWeight: '700',
+              borderRadius: '10px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+              boxShadow: '0 4px 20px rgba(99, 102, 241, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#fff',
+              marginTop: '0.5rem'
             }}
+            onClick={() => setActiveStep(2)}
           >
-            Build My Life Plan →
+            {hasUserEvents ? "Continue Planning →" : "Start Planning →"}
           </button>
         </div>
       </div>
