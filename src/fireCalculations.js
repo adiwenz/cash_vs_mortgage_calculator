@@ -19,7 +19,8 @@ import {
   calculateMinimumPortfolioForRetirement,
   computeRetirementResult,
   getSavingsPriority,
-  runFireSimulation
+  runFireSimulation,
+  buildSimulationDebugSnapshot
 } from './calculators/fire/index.js';
 
 export {
@@ -43,5 +44,6 @@ export {
   calculateMinimumPortfolioForRetirement,
   computeRetirementResult,
   getSavingsPriority,
-  runFireSimulation
+  runFireSimulation,
+  buildSimulationDebugSnapshot
 };

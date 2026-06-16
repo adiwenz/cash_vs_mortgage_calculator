@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,7 +12,7 @@ import {
 import { formatCurrency, formatYAxis, getOutcomeDetails, isEditableEvent, isFinancialEvent } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
 import { propPIAmount, getActiveChildrenCountAtAge } from '../../simulatorMathUtils';
-import { getSocialSecurityFactor } from '../../fireCalculations';
+import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot } from '../../fireCalculations';
 
 const generateLifeStory = (inp, results) => {
   const list = [];
@@ -150,6 +150,86 @@ const generateLifeStory = (inp, results) => {
   );
 };
 
+const getConciseSummaryText = (snapshot) => {
+  if (!snapshot) return '';
+  const sa = snapshot.globalAssumptions;
+  const ba = snapshot.budgetAssumptions;
+  const fr = snapshot.finalResult;
+  const ev = snapshot.events;
+
+  const activeEventsStr = ev.normalizedEvents && ev.normalizedEvents.length > 0
+    ? ev.normalizedEvents.map(e => `${e.name || e.type} (Age ${e.startAge}${e.endAge ? '-' + e.endAge : ''})`).join(', ')
+    : 'None';
+
+  return `--- FIRE Simulation Debug Summary ---
+Current Age: ${sa.currentAge}
+Target Retirement Age: ${sa.retirementAge}
+Retirement Ready Age: ${fr.retirementReadyAge ?? 'N/A'}
+Annual Income: $${ba.income.toLocaleString()}
+Annual Expenses: $${ba.expenses.toLocaleString()}
+Savings Rate: ${ba.savingsRate !== null ? ba.savingsRate + '%' : 'N/A'}
+
+Main Assumptions:
+- Inflation: ${(sa.inflation * 100).toFixed(1)}%
+- Expected Return (Pre-retirement): ${(sa.preRetirementReturn * 100).toFixed(1)}%
+- Expected Return (Post-retirement): ${(sa.postRetirementReturn * 100).toFixed(1)}%
+- Safe Withdrawal Rate (SWR): ${(sa.safeWithdrawalRate * 100).toFixed(1)}%
+- Include Taxes: ${sa.taxSettings.includeTaxes ? 'Yes (' + sa.taxSettings.filingStatus + ')' : 'No'}
+
+Active Events:
+${activeEventsStr}
+
+Final Status:
+- Retirement Success: ${fr.retirementSuccess ? 'Yes' : 'No'}
+- Final Net Worth / Depletion Status: ${fr.retirementSuccess ? 'Success (Assets last)' : 'Portfolio depleted'}${fr.depletionAge ? ' at Age ' + fr.depletionAge : ''}
+-------------------------------------`;
+};
+
+const downloadTimelineCSV = (timeline) => {
+  if (!timeline || timeline.length === 0) return;
+  const headers = [
+    'Age', 'Year', 'Gross Income', 'Taxes', 'Net Income', 'Expenses',
+    'Contributions', 'Withdrawals', 'Investment Growth', 'Debt Balance',
+    'Asset Balance', 'Net Worth', 'Retirement Status', 'Active Events', 'Warnings/Errors'
+  ];
+
+  const csvRows = [headers.join(',')];
+
+  timeline.forEach(row => {
+    const activeEventsEscaped = `"${(row.activeEvents || []).join('; ')}"`;
+    const warningsEscaped = `"${(row.warningsErrors || []).join('; ')}"`;
+    const line = [
+      row.age,
+      row.year,
+      row.grossIncome,
+      row.taxes,
+      row.netIncome,
+      row.expenses,
+      row.contributions,
+      row.withdrawals,
+      row.investmentGrowth,
+      row.debtBalance,
+      row.assetBalance,
+      row.netWorth,
+      row.retirementStatus,
+      activeEventsEscaped,
+      warningsEscaped
+    ];
+    csvRows.push(line.join(','));
+  });
+
+  const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join('\n'));
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const filename = `simulation-timeline-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${now.getHours()}-${now.getMinutes()}.csv`;
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", csvContent);
+  downloadAnchor.setAttribute("download", filename);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+};
+
 export default function LifePlanScreen({
   inputs,
   updateInput,
@@ -181,6 +261,46 @@ export default function LifePlanScreen({
   const [showDebt, setShowDebt] = useState(true);
   const [showNetWorth, setShowNetWorth] = useState(true);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
+  const [showDebugDrawer, setShowDebugDrawer] = useState(false);
+  const [debugTab, setDebugTab] = useState('inputs'); // 'inputs', 'events', 'accounts', 'timeline', 'summary'
+  const [copiedText, setCopiedText] = useState(false);
+  const [copiedRaw, setCopiedRaw] = useState(false);
+  const [copiedNorm, setCopiedNorm] = useState(false);
+
+  const showDebugButton = typeof window !== 'undefined' && (
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) ||
+    window.location?.search?.includes('debug=true') ||
+    window.location?.href?.includes('debug=true')
+  );
+
+  const debugSnapshot = useMemo(() => {
+    if (!showDebugDrawer) return null;
+    const norm = getProfileFromInputs(inputs);
+    const evs = getEventsFromInputs(inputs);
+    return buildSimulationDebugSnapshot(inputs, norm, evs, activeResults, activeResults.nominalData);
+  }, [showDebugDrawer, inputs, activeResults]);
+
+  const handleDownloadJSON = (snapshot) => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const filename = `simulation-debug-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${now.getHours()}-${now.getMinutes()}.json`;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snapshot, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", filename);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleCopySummary = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    });
+  };
+
+
 
   const simpleSavingsRate = inputs.simpleIncome > 0
     ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
@@ -207,6 +327,35 @@ export default function LifePlanScreen({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                           🏆 Retirement Plan Summary
+                          {showDebugButton && (
+                            <button
+                              id="debug-export-btn"
+                              type="button"
+                              onClick={() => {
+                                setDebugTab('inputs');
+                                setShowDebugDrawer(true);
+                              }}
+                              style={{
+                                padding: '0.2rem 0.5rem',
+                                fontSize: '0.7rem',
+                                borderRadius: '4px',
+                                background: 'var(--accent-orange, #f59e0b)',
+                                color: '#0f172a',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '700',
+                                marginLeft: '0.5rem',
+                                transition: 'opacity 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}
+                              onMouseOver={(e) => e.target.style.opacity = '0.8'}
+                              onMouseOut={(e) => e.target.style.opacity = '1'}
+                            >
+                              ⚙️ Debug
+                            </button>
+                          )}
                         </h3>
                         <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
                           <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
@@ -1756,6 +1905,460 @@ export default function LifePlanScreen({
                   </div>
                 )}
               </div>
+
+      {showDebugDrawer && debugSnapshot && (
+        <div 
+          id="debug-drawer-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}
+          onClick={() => setShowDebugDrawer(false)}
+        >
+          <div 
+            id="debug-drawer-content"
+            style={{
+              width: '850px',
+              maxWidth: '95vw',
+              height: '100%',
+              background: 'var(--bg-primary, #090d16)',
+              borderLeft: '1px solid var(--border-color, #1e293b)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+              color: 'var(--text-primary, #f8fafc)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-color, #1e293b)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(255,255,255,0.02)'
+            }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text-primary, #f8fafc)' }}>
+                  ⚙️ Simulation Debugger
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary, #94a3b8)' }}>
+                  Developer tool for simulation analysis & exporting
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  id="debug-download-json-btn"
+                  type="button"
+                  onClick={() => handleDownloadJSON(debugSnapshot)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    borderRadius: '6px',
+                    background: 'var(--primary, #6366f1)',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  📥 Download JSON
+                </button>
+                <button
+                  id="debug-close-btn"
+                  type="button"
+                  onClick={() => setShowDebugDrawer(false)}
+                  style={{
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.9rem',
+                    borderRadius: '6px',
+                    background: 'transparent',
+                    color: 'var(--text-secondary, #94a3b8)',
+                    border: '1px solid var(--border-color, #1e293b)',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs Bar */}
+            <div style={{
+              display: 'flex',
+              borderBottom: '1px solid var(--border-color, #1e293b)',
+              background: 'rgba(0,0,0,0.2)',
+              padding: '0 1rem'
+            }}>
+              {[
+                { id: 'inputs', label: 'Inputs' },
+                { id: 'events', label: 'Events' },
+                { id: 'accounts', label: 'Accounts & Allocations' },
+                { id: 'timeline', label: 'Year-by-Year Timeline' },
+                { id: 'summary', label: 'Summary' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  id={`debug-tab-${tab.id}`}
+                  type="button"
+                  onClick={() => setDebugTab(tab.id)}
+                  style={{
+                    padding: '1rem 1.25rem',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    border: 'none',
+                    background: 'transparent',
+                    color: debugTab === tab.id ? 'var(--primary, #6366f1)' : 'var(--text-secondary, #94a3b8)',
+                    borderBottom: debugTab === tab.id ? '2px solid var(--primary, #6366f1)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem',
+              background: '#070a13'
+            }}>
+              {debugTab === 'inputs' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Raw User Inputs</h4>
+                      <button
+                        id="debug-copy-raw-btn"
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(debugSnapshot.rawInputs, null, 2));
+                          setCopiedRaw(true);
+                          setTimeout(() => setCopiedRaw(false), 2000);
+                        }}
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', background: '#334155', color: '#fff', border: 'none', cursor: 'pointer' }}
+                      >
+                        {copiedRaw ? 'Copied!' : 'Copy Raw'}
+                      </button>
+                    </div>
+                    <pre style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px', overflowX: 'auto', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid #1e293b', maxHeight: '300px', color: '#94a3b8' }}>
+                      {JSON.stringify(debugSnapshot.rawInputs, null, 2)}
+                    </pre>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Normalized Simulation Inputs (Profile)</h4>
+                      <button
+                        id="debug-copy-norm-btn"
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(debugSnapshot.normalizedInputs, null, 2));
+                          setCopiedNorm(true);
+                          setTimeout(() => setCopiedNorm(false), 2000);
+                        }}
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', background: '#334155', color: '#fff', border: 'none', cursor: 'pointer' }}
+                      >
+                        {copiedNorm ? 'Copied!' : 'Copy Normalized'}
+                      </button>
+                    </div>
+                    <pre style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px', overflowX: 'auto', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid #1e293b', maxHeight: '300px', color: '#94a3b8' }}>
+                      {JSON.stringify(debugSnapshot.normalizedInputs, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'events' && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Normalized Timeline Events</h4>
+                  {debugSnapshot.events.normalizedEvents.length === 0 ? (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>No active life events in this simulation.</p>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Name</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Type</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Start Age</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>End Age</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Financial Impact</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugSnapshot.events.normalizedEvents.map((e, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
+                            <td style={{ padding: '0.5rem 0.25rem', fontWeight: '700' }}>{e.name}</td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.type}</td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.startAge !== null ? e.startAge : 'N/A'}</td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.endAge !== null ? e.endAge : 'N/A'}</td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>
+                              {e.financialImpact !== null ? formatCurrency(e.financialImpact) : 'N/A'}
+                            </td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>
+                              <span style={{
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                background: e.enabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                color: e.enabled ? '#10b981' : '#ef4444'
+                              }}>
+                                {e.enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {debugTab === 'accounts' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Starting Account Balances</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                      {Object.entries(debugSnapshot.accountBalances.startingBalances).map(([name, val]) => (
+                        <div key={name} style={{ background: '#0f172a', padding: '0.5rem 0.75rem', borderRadius: '4px', border: '1px solid #1e293b' }}>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{name}</span>
+                          <div style={{ fontSize: '0.85rem', fontWeight: '700' }}>{formatCurrency(val)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {debugSnapshot.savingsAllocations.warnings && debugSnapshot.savingsAllocations.warnings.length > 0 && (
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '6px',
+                      padding: '0.75rem 1rem',
+                      color: '#fca5a5',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.25rem'
+                    }}>
+                      <div style={{ fontWeight: '700', color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚠️ savings allocation warnings</div>
+                      {debugSnapshot.savingsAllocations.warnings.map((w, idx) => (
+                        <div key={idx} style={{ lineHeight: '1.4' }}>• {w}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Savings Allocation Comparison</h4>
+                    <div style={{ overflowX: 'auto', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b', padding: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'right' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
+                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Account</th>
+                            <th style={{ padding: '0.5rem' }}>Expected Monthly</th>
+                            <th style={{ padding: '0.5rem' }}>Actual Monthly (Y0)</th>
+                            <th style={{ padding: '0.5rem' }}>Annual Contribution (Y0)</th>
+                            <th style={{ padding: '0.5rem' }}>Cumulative Balance (Y0)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {debugSnapshot.savingsAllocations.comparison.map((item, idx) => (
+                            <tr key={idx} style={{
+                              borderBottom: '1px solid #1e293b',
+                              color: item.expectedMonthly > 0 || item.actualMonthly > 0 ? '#cbd5e1' : '#64748b',
+                            }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '500' }}>{item.label}</td>
+                              <td style={{ padding: '0.5rem', color: item.expectedMonthly > 0 ? '#38bdf8' : 'inherit' }}>
+                                {formatCurrency(item.expectedMonthly)}/mo
+                              </td>
+                              <td style={{ padding: '0.5rem', color: item.actualMonthly > 0 ? '#10b981' : 'inherit' }}>
+                                {formatCurrency(item.actualMonthly)}/mo
+                              </td>
+                              <td style={{ padding: '0.5rem' }}>{formatCurrency(item.annualContribution)}</td>
+                              <td style={{ padding: '0.5rem' }}>{formatCurrency(item.cumulativeBalance)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Yearly Balances & Flows</h4>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem', textAlign: 'right' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
+                            <th style={{ padding: '0.4rem', textAlign: 'left' }}>Age (Year)</th>
+                            <th style={{ padding: '0.4rem' }}>Cash</th>
+                            <th style={{ padding: '0.4rem' }}>Emergency</th>
+                            <th style={{ padding: '0.4rem' }}>Brokerage</th>
+                            <th style={{ padding: '0.4rem' }}>401k</th>
+                            <th style={{ padding: '0.4rem' }}>IRA</th>
+                            <th style={{ padding: '0.4rem' }}>Roth</th>
+                            <th style={{ padding: '0.4rem' }}>HSA</th>
+                            <th style={{ padding: '0.4rem' }}>Contrib</th>
+                            <th style={{ padding: '0.4rem' }}>Withdraw</th>
+                            <th style={{ padding: '0.4rem' }}>Growth</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {debugSnapshot.accountBalances.yearlyBalances.map((y, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
+                              <td style={{ padding: '0.4rem', textAlign: 'left', fontWeight: '700' }}>{y.age} ({y.year})</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.cash)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.emergencyFund)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.brokerage)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.trad401k)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.tradIra)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.rothIra)}</td>
+                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.hsa)}</td>
+                              <td style={{ padding: '0.4rem', color: '#10b981' }}>{formatCurrency(y.contributions)}</td>
+                              <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(y.withdrawals)}</td>
+                              <td style={{ padding: '0.4rem', color: '#38bdf8' }}>{formatCurrency(y.growth)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'timeline' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Year-by-Year Computed Timeline</h4>
+                    <button
+                      id="debug-download-csv-btn"
+                      type="button"
+                      onClick={() => downloadTimelineCSV(debugSnapshot.yearlyTimeline)}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.7rem',
+                        borderRadius: '4px',
+                        background: '#10b981',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      📊 Export CSV (Timeline Only)
+                    </button>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem', textAlign: 'right' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
+                          <th style={{ padding: '0.4rem', textAlign: 'left' }}>Age (Year)</th>
+                          <th style={{ padding: '0.4rem' }}>Gross Inc</th>
+                          <th style={{ padding: '0.4rem' }}>Taxes</th>
+                          <th style={{ padding: '0.4rem' }}>Net Inc</th>
+                          <th style={{ padding: '0.4rem' }}>Expenses</th>
+                          <th style={{ padding: '0.4rem' }}>Contrib</th>
+                          <th style={{ padding: '0.4rem' }}>Withdraw</th>
+                          <th style={{ padding: '0.4rem' }}>Growth</th>
+                          <th style={{ padding: '0.4rem' }}>Debts</th>
+                          <th style={{ padding: '0.4rem' }}>Assets</th>
+                          <th style={{ padding: '0.4rem' }}>Net Worth</th>
+                          <th style={{ padding: '0.4rem' }}>Status</th>
+                          <th style={{ padding: '0.4rem', textAlign: 'left' }}>Events</th>
+                          <th style={{ padding: '0.4rem', textAlign: 'left' }}>Warnings</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugSnapshot.yearlyTimeline.map((row, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
+                            <td style={{ padding: '0.4rem', textAlign: 'left', fontWeight: '700' }}>{row.age} ({row.year})</td>
+                            <td style={{ padding: '0.4rem' }}>{formatCurrency(row.grossIncome)}</td>
+                            <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(row.taxes)}</td>
+                            <td style={{ padding: '0.4rem' }}>{formatCurrency(row.netIncome)}</td>
+                            <td style={{ padding: '0.4rem', color: '#f59e0b' }}>{formatCurrency(row.expenses)}</td>
+                            <td style={{ padding: '0.4rem', color: '#10b981' }}>{formatCurrency(row.contributions)}</td>
+                            <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(row.withdrawals)}</td>
+                            <td style={{ padding: '0.4rem', color: '#38bdf8' }}>{formatCurrency(row.investmentGrowth)}</td>
+                            <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(row.debtBalance)}</td>
+                            <td style={{ padding: '0.4rem', color: '#10b981' }}>{formatCurrency(row.assetBalance)}</td>
+                            <td style={{ padding: '0.4rem', fontWeight: '700' }}>{formatCurrency(row.netWorth)}</td>
+                            <td style={{ padding: '0.4rem' }}>
+                              <span style={{
+                                padding: '1px 4px',
+                                borderRadius: '4px',
+                                background: row.retirementStatus === 'Retired' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: row.retirementStatus === 'Retired' ? '#6366f1' : '#f59e0b'
+                              }}>
+                                {row.retirementStatus}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.4rem', textAlign: 'left', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {row.activeEvents.join(', ') || '-'}
+                            </td>
+                            <td style={{ padding: '0.4rem', textAlign: 'left', color: '#ef4444', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {row.warningsErrors.join(', ') || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'summary' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Concise Run Summary</h4>
+                    <button
+                      id="debug-copy-summary-btn"
+                      type="button"
+                      onClick={() => handleCopySummary(getConciseSummaryText(debugSnapshot))}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        background: 'var(--accent-emerald, #10b981)',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {copiedText ? '✅ Copied!' : '📋 Copy Summary'}
+                    </button>
+                  </div>
+                  <pre style={{
+                    background: '#0f172a',
+                    padding: '1.25rem',
+                    borderRadius: '8px',
+                    overflowX: 'auto',
+                    fontSize: '0.8rem',
+                    fontFamily: 'monospace',
+                    border: '1px solid #1e293b',
+                    color: '#e2e8f0',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: '1.5'
+                  }}>
+                    {getConciseSummaryText(debugSnapshot)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
