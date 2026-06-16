@@ -524,4 +524,110 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
     fireEvent.click(cancelBtn);
   });
+
+  test('9. Delete Event buttons - Allows deleting events from the timeline dialog boxes', async () => {
+    navigateToStep2();
+
+    // 1. Create a child event
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'haveChild' } });
+
+    // Assert haveChild modal opens
+    expect(screen.getByRole('heading', { name: /Have a Child/i })).toBeDefined();
+
+    // Enter child name
+    const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
+    fireEvent.change(childNameInput, { target: { value: 'Liam' } });
+
+    // Save
+    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+
+    // Done on welcome modal
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
+    });
+
+    // Find the child start element
+    const birthTextNode = screen.getByText('👶 Have Child: Liam');
+    const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    expect(birthNode).not.toBeNull();
+
+    // Click to edit
+    fireEvent.click(birthNode);
+
+    // Verify Delete Event button is present in the dialog
+    let deleteBtn = screen.getByRole('button', { name: /Delete Event/i });
+    expect(deleteBtn).toBeDefined();
+
+    // Click Delete Event
+    fireEvent.click(deleteBtn);
+
+    // Verify modal is closed and child event is deleted from timeline
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Have a Child/i })).toBeNull();
+      expect(screen.queryByText('👶 Have Child: Liam')).toBeNull();
+    });
+
+    // 2. Create a marriage event
+    fireEvent.change(select, { target: { value: 'marriage' } });
+
+    // Verify Marriage modal opens
+    expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
+
+    // Click "Edit Partner Profile" to expose Step 1 inputs
+    const editProfileBtn = screen.getByRole('button', { name: /Edit Partner Profile/i });
+    fireEvent.click(editProfileBtn);
+
+    // Modify spouse income or just go next
+    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    fireEvent.click(nextBtn); // Step 2
+
+    fireEvent.click(nextBtn); // Step 3
+
+    fireEvent.click(nextBtn); // Step 4 (Taxes / Marriage Impact)
+
+    // Confirm warnings if present
+    const zeroSpendConfirm = document.getElementById('confirm-partner-zero-spending');
+    const lowSpendConfirm = document.getElementById('confirm-zero-spending-preview');
+    if (zeroSpendConfirm) fireEvent.click(zeroSpendConfirm);
+    if (lowSpendConfirm) fireEvent.click(lowSpendConfirm);
+
+    // Click Save Marriage Event
+    const saveMarriageBtn = screen.getByRole('button', { name: /Save Marriage Event/i });
+    fireEvent.click(saveMarriageBtn);
+
+    // Verify Marriage modal is closed
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Get Married/i })).toBeNull();
+    });
+
+    // Find the marriage event on the timeline
+    const marriageTextNode = screen.getByText('💍 💍 Get Married');
+    const marriageNode = marriageTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    expect(marriageNode).not.toBeNull();
+
+    // Click to edit the marriage event (which opens it back at step 1)
+    fireEvent.click(marriageNode);
+
+    // Verify Marriage modal is open
+    expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
+
+    // Verify Delete Event button is present in Step 1
+    deleteBtn = screen.getByRole('button', { name: /Delete Event/i });
+    expect(deleteBtn).toBeDefined();
+
+    // Click Delete Event
+    fireEvent.click(deleteBtn);
+
+    // Verify modal is closed and marriage event is deleted from timeline
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Get Married/i })).toBeNull();
+      expect(screen.queryByText('💍 💍 Get Married')).toBeNull();
+    });
+  });
 });

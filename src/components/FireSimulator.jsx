@@ -5881,7 +5881,37 @@ export default function FireSimulator() {
           {/* Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {stepId === 1 ? (
+              {editingEvent.id ? (
+                <>
+                  <button
+                    type="button"
+                    className="list-builder-remove-btn"
+                    onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+                    style={{ alignSelf: 'center', margin: 0 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="list-builder-remove-btn"
+                    onClick={handleDeleteEvent}
+                    style={{
+                      alignSelf: 'center',
+                      margin: 0,
+                      background: 'var(--accent-rose, #f43f5e)',
+                      color: '#fff',
+                      borderColor: 'var(--accent-rose, #f43f5e)',
+                      cursor: 'pointer',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '4px',
+                      fontWeight: '600',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    Delete Event
+                  </button>
+                </>
+              ) : stepId === 1 ? (
                 <button
                   type="button"
                   onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
@@ -5901,26 +5931,14 @@ export default function FireSimulator() {
                   Skip
                 </button>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className="list-builder-remove-btn"
-                    onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
-                    style={{ alignSelf: 'center', margin: 0 }}
-                  >
-                    Cancel
-                  </button>
-                  {editingEvent.id && (
-                    <button
-                      type="button"
-                      className="list-builder-remove-btn"
-                      onClick={handleDeleteEvent}
-                      style={{ alignSelf: 'center', margin: 0, background: 'var(--accent-rose, #f43f5e)', color: '#fff', borderColor: 'var(--accent-rose, #f43f5e)', cursor: 'pointer' }}
-                    >
-                      Delete Event
-                    </button>
-                  )}
-                </>
+                <button
+                  type="button"
+                  className="list-builder-remove-btn"
+                  onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
+                  style={{ alignSelf: 'center', margin: 0 }}
+                >
+                  Cancel
+                </button>
               )}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -6991,21 +7009,46 @@ export default function FireSimulator() {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => setEditingEvent(null)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleSaveEvent}
-          >
-            Save Event
-          </button>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: editingEvent.id ? 'space-between' : 'flex-end' }}>
+          {editingEvent.id && (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{
+                color: 'var(--accent-rose, #f43f5e)',
+                borderColor: 'rgba(244, 63, 94, 0.2)',
+                backgroundColor: 'rgba(244, 63, 94, 0.05)',
+                fontWeight: '700'
+              }}
+              onClick={handleDeleteEvent}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
+                e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.05)';
+                e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.2)';
+              }}
+            >
+              Delete Event
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => setEditingEvent(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleSaveEvent}
+            >
+              Save Event
+            </button>
+          </div>
         </div>
       </div>
     </div>
