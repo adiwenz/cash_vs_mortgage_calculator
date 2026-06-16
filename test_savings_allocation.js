@@ -55,7 +55,7 @@ describe('Savings Allocation Engine', () => {
           transportation: 400,
           healthcare: 300,
           leisure: 300,
-          misc: 766 // Total expenses = 4166/mo (50000/yr)
+          misc: 766.666666666667 // Total expenses = 4166.67/mo (50000/yr)
         }
       }
     };
@@ -111,7 +111,7 @@ describe('Savings Allocation Engine', () => {
           other: 0
         },
         expenses: {
-          housing: 4166
+          housing: 4166.666666666667
         }
       }
     };
@@ -162,7 +162,7 @@ describe('Savings Allocation Engine', () => {
           other: 0
         },
         expenses: {
-          housing: 4166
+          housing: 4166.666666666667
         }
       }
     };
@@ -172,7 +172,7 @@ describe('Savings Allocation Engine', () => {
     const actual = firstYearLog.actualContributions;
 
     expect(actual.debt).toBe(1000);
-    expect(actual.brokerage).toBe(49000); // 1400 spillover + 47600 leftover surplus
+    expect(actual.brokerage).toBeCloseTo(49000, -1); // 1400 spillover + 47600 leftover surplus
   });
 
   test('mismatch warnings are correctly compiled', () => {

@@ -10,6 +10,7 @@ try {
   // ====================================================
   console.log('\n--- Case A: Extreme Shortfall ---');
   const inputsA = getMappedDefaultInputs();
+  inputsA.budgetDetails = undefined;
   inputsA.currentAge = 35;
   inputsA.targetRetirementAge = 55;
   inputsA.lifeExpectancy = 85;
@@ -102,6 +103,7 @@ try {
   // ====================================================
   console.log('\n--- Case B: Standard Shortfall ---');
   const inputsB = getMappedDefaultInputs();
+  inputsB.budgetDetails = undefined;
   inputsB.currentAge = 35;
   inputsB.targetRetirementAge = 55;
   inputsB.lifeExpectancy = 85;

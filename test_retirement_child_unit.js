@@ -241,13 +241,13 @@ try {
   // Expect baseSalaryMonthly to be 0 since it is a retirement phase
   assert(baseSalaryMonthly === 0, `Expected baseSalaryMonthly to be 0 for retired phase, got ${baseSalaryMonthly}`);
 
-  const budgetMonthlyIncome = retiredChildPhase.income; // 1250
+  const budgetMonthlyIncome = retiredChildPhase.income;
   const activeChildBoost = Math.max(0, budgetMonthlyIncome - baseSalaryMonthly);
 
-  // Expect activeChildBoost to be 1250 (i.e. the full child boost is visible)
-  assert(activeChildBoost === 1250, `Expected activeChildBoost to be 1250, got ${activeChildBoost}`);
+  // Expect activeChildBoost to be 1000 (i.e. the scaled child boost is visible)
+  assert(activeChildBoost === 1000, `Expected activeChildBoost to be 1000, got ${activeChildBoost}`);
 
-  console.log('✅ Test 4 Passed: baseSalaryMonthly is 0 and activeChildBoost is 1250 (fully visible).');
+  console.log('✅ Test 4 Passed: baseSalaryMonthly is 0 and activeChildBoost is 1000 (scaled).');
 
   // ----------------------------------------------------
   // Test 5: Retired, has child, receiving Social Security
@@ -310,8 +310,8 @@ try {
   const expectedSSMonthly = ssChildPhase.ssMonthlyIncome;
   console.log(`  SS monthly benefit calculated: ${expectedSSMonthly}`);
 
-  // Total income should be SS monthly + 1250 child boost
-  const expectedTotalIncome = expectedSSMonthly + 1250;
+  // Total income should be SS monthly + 1000 child boost
+  const expectedTotalIncome = expectedSSMonthly + 1000;
   assert(ssChildPhase.income === expectedTotalIncome, `Expected total phase income to be ${expectedTotalIncome}, got ${ssChildPhase.income}`);
 
   // Simulate FireSimulator.jsx activeChildBoost logic
@@ -322,9 +322,9 @@ try {
   }
   
   const simActiveChildBoost = Math.max(0, ssChildPhase.income - simBaseSalary);
-  assert(simActiveChildBoost === 1250, `Expected active child boost badge to show 1250, got ${simActiveChildBoost}`);
+  assert(simActiveChildBoost === 1000, `Expected active child boost badge to show 1000, got ${simActiveChildBoost}`);
 
-  console.log('✅ Test 5 Passed: total income is SS + 1250, child boost badge correctly shows only +1250.');
+  console.log('✅ Test 5 Passed: total income is SS + 1000, child boost badge correctly shows only +1000.');
 
   console.log('\n🎉 ALL test_retirement_child_unit PASSED SUCCESSFULLY!');
   process.exit(0);

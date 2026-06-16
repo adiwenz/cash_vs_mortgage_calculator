@@ -41,6 +41,15 @@ function createCleanGrowthInputs() {
     other: 0,
     debts: 0
   };
+
+  inputs.budgetDetails = {
+    expenses: {},
+    savings: {},
+    partnerSavings: {},
+    phases: [],
+    defaultTemplate: { needsPct: 0, wantsPct: 0, savingsPct: 0 }
+  };
+
   return inputs;
 }
 

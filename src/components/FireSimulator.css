@@ -2049,7 +2049,7 @@
 
 /* Redesigned Budget Modal Layout & Cards */
 .budget-modal-card.redesigned {
-  max-width: 680px;
+  max-width: 960px;
   width: 95%;
   height: 85vh;
   max-height: 85vh;
@@ -2061,7 +2061,7 @@
 }
 
 .budget-modal-card.redesigned.with-breakdown {
-  max-width: 1100px;
+  max-width: 1380px;
   height: 85vh;
 }
 

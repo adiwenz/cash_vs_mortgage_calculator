@@ -41,6 +41,7 @@ try {
     simpleIncome: 100000,
     simpleExpenses: 50000,
     simpleInvestments: 50000, // higher starting investments
+    budgetDetails: null,
     assets: {
       checking: 0,
       emergencyFund: 0,

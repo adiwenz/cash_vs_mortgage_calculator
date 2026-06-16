@@ -21,6 +21,7 @@ import {
   calculateEarnMoreRecommendation,
   getChildCostOffsetRecommendations
 } from '../recommendations';
+import { getActiveDebtsForAge } from '../calculators/fire/debts';
 import './FireSimulator.css';
 
 import MarriageWizard from './fire-simulator/MarriageWizard';
@@ -1009,6 +1010,7 @@ export default function FireSimulator() {
       expenses: p.expenses
     }));
     const recResults = runFireSimulation(recInputs);
+    const currentReadyAge = recResults.retirementReadyAge;
 
     const retirementExpenses = recResults.annualRetirementSpending || 40000;
     const shortfall = recResults.endingSurplusShortfall < 0 ? -recResults.endingSurplusShortfall : 0;
@@ -1090,14 +1092,22 @@ export default function FireSimulator() {
 
     const unfundedMaxChildCostsMonthly = Math.max(0, maxChildCostsMonthly - currentChildcareIncomeBoostMonthly);
 
-    const currentReadyAge = recResults.retirementReadyAge;
+    const activePhaseObj = normPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || normPhases[0];
+    const activeDebts = getActiveDebtsForAge(inputs, currentAge);
+    const activeDebtsTotal = activeDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+    const baseExpenses = Object.keys(activePhaseObj?.expenses || {}).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (activePhaseObj.expenses[v] || 0), 0);
+    const activeSavings = activePhaseObj?.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(activePhaseObj?.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const activeTaxes = inputs.includeTaxes ? Math.round(calculateUSTaxForModal(activePhaseObj?.income * 12 || 0, 0, inputs.filingStatus || 'single') / 12) : 0;
+    const totalAllocated = baseExpenses + activeDebtsTotal + activeSavings + activeTaxes;
+    const debtDeficit = Math.max(0, totalAllocated - (activePhaseObj?.income || 0));
+
     const hasShortfall = recResults.endingSurplusShortfall < 0 || 
                          !recResults.moneyLasts ||
                          (recResults.retirementReadyAge && inputs.targetRetirementAge < recResults.retirementReadyAge) ||
                          (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
 
     const hasBuyHouse = (inputs.lifeEvents || []).some(e => e.type === 'buyHouse' && e.enabled);
-    if (!hasShortfall && !hasBuyHouse) return null;
+    if (!hasShortfall && !hasBuyHouse && !(debtDeficit > 0)) return null;
 
     // Calculate sum of current liquid assets
     const currentAssets = (Number(inputs.assets?.cash) || 0) +
@@ -1232,7 +1242,6 @@ export default function FireSimulator() {
       const boostResults = runFireSimulation(clonedInputs);
       const readyAge = boostResults.retirementReadyAge;
       
-      const currentReadyAge = recResults.retirementReadyAge;
       const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
       
       list.push({
@@ -1275,6 +1284,60 @@ export default function FireSimulator() {
         isInfoOnly: true
       });
     });
+
+    if (debtDeficit > 0 && activeDebts.length > 0) {
+      list.push({
+        type: 'startDebtPayoff',
+        icon: '📈',
+        title: 'Start a debt payoff plan',
+        details: `Create a debt payoff plan to pay down your highest-interest debts faster and eliminate the deficit.`,
+        bulletPoints: [
+          `Add an extra monthly payment to accelerate your payoff timeline.`,
+          `Once paid off, your Needs expenses will drop, increasing your future savings.`,
+          `This helps you reach financial independence sooner.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: debtDeficit,
+        savingsFocus: 'Debt Payoff',
+        savingsEffortScore: 2,
+        activeDebts
+      });
+
+      list.push({
+        type: 'increaseDebtIncome',
+        icon: '💰',
+        title: `Increase income by $${debtDeficit}/month`,
+        details: `Increase your monthly gross income by earning extra money to fully cover your new debt obligations.`,
+        bulletPoints: [
+          `Earn an extra $${debtDeficit}/month ($${debtDeficit * 12}/year) gross income.`,
+          `This covers the monthly deficit without changing your savings or wants allocations.`,
+          `Your retirement timeline remains fully on track.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: debtDeficit,
+        savingsFocus: 'Earn More',
+        savingsEffortScore: 1
+      });
+
+      list.push({
+        type: 'reduceDiscretionary',
+        icon: '💸',
+        title: `Reduce discretionary spending by $${debtDeficit}/month`,
+        details: `Reduce your wants budget categories (leisure, dining out, misc) by $${debtDeficit}/month to balance your budget.`,
+        bulletPoints: [
+          `Decrease leisure, dining out, and misc expenses by a combined $${debtDeficit}/month.`,
+          `This eliminates the deficit using your existing income.`,
+          `Your savings rate and retirement timeline are fully protected.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: debtDeficit,
+        savingsFocus: 'Reduce Wants',
+        savingsEffortScore: 3
+      });
+    }
 
     return {
       showImprovementPlan: true,
@@ -1548,6 +1611,23 @@ export default function FireSimulator() {
       // Retire at ready age doesn't change current income/expenses
     } else if (scenario.type.startsWith('childOffset')) {
       // Offset child costs with temporary income doesn't change current base income/expenses/savings
+    } else if (scenario.type === 'startDebtPayoff') {
+      // Handled during handleSaveBudget
+    } else if (scenario.type === 'increaseDebtIncome') {
+      // Handled during handleSaveBudget
+    } else if (scenario.type === 'reduceDiscretionary') {
+      if (targetExpensesMap) {
+        let remainingReduction = scenario.value;
+        const keysToReduce = ['leisure', 'diningOut', 'misc'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
+      }
     }
 
     // Calculate differences for glow effect
@@ -2726,7 +2806,7 @@ export default function FireSimulator() {
     setSavingsAllocMode(newMode);
   };
 
-  const handleSaveBudget = () => {
+  const handleSaveBudget = (updatedDefaultTemplate) => {
     // Capture the current edits for the active phase
     const finalEdited = {
       ...editedPhases,
@@ -2748,6 +2828,9 @@ export default function FireSimulator() {
       newInputs.filingStatus = budgetFilingStatus;
       if (!newInputs.budgetDetails) newInputs.budgetDetails = {};
       newInputs.budgetDetails.hsaCoverage = budgetHsaCoverage;
+      if (updatedDefaultTemplate) {
+        newInputs.budgetDetails.defaultTemplate = updatedDefaultTemplate;
+      }
       
       // Save all phases back to inputs.budgetDetails.phases
       newInputs.budgetDetails.phases = Object.values(finalEdited).map(p => ({
@@ -2772,7 +2855,7 @@ export default function FireSimulator() {
         const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
         const childBoost = Math.max(0, currentPhase.income - standardIncomeMonthly);
         newInputs.simpleIncome = (currentPhase.income - childBoost) * 12;
-        newInputs.simpleExpenses = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
+        newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
       }
 
       // Sync career incomes in incomeList
@@ -2788,7 +2871,7 @@ export default function FireSimulator() {
       newInputs.spendingPhases = (newInputs.spendingPhases || []).map(sp => {
         const matchingPhase = Object.values(finalEdited).find(p => p.startAge === sp.startAge && p.type === 'move');
         if (matchingPhase) {
-          const totalMonthlyExpenses = Object.values(matchingPhase.expenses).reduce((sum, v) => sum + v, 0);
+          const totalMonthlyExpenses = Object.keys(matchingPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (matchingPhase.expenses[v] || 0), 0);
           sp.amount = sp.frequency === 'monthly' ? totalMonthlyExpenses : totalMonthlyExpenses * 12;
           sp.annualSpending = totalMonthlyExpenses * 12;
         }
@@ -2811,6 +2894,34 @@ export default function FireSimulator() {
         } else if (scenario.type.startsWith('childOffset')) {
           const boosts = scenario.incomeBoosts || [];
           newInputs.incomeList = [...(newInputs.incomeList || []), ...boosts];
+        } else if (scenario.type === 'startDebtPayoff') {
+          const activeLoan = scenario.activeDebts.find(d => d.type !== 'mortgage');
+          if (activeLoan) {
+            const payoffId = `payoff-plan-auto-${Date.now()}`;
+            const payoffEvent = {
+              id: payoffId,
+              type: 'payoffPlan',
+              borrowingId: activeLoan.id,
+              extraPayment: 100,
+              startAge: currentAgeVal,
+              linked: true,
+              enabled: true,
+              name: `Payoff Plan: ${activeLoan.name}`
+            };
+            newInputs.lifeEvents = [...(newInputs.lifeEvents || []), payoffEvent];
+          }
+        } else if (scenario.type === 'increaseDebtIncome') {
+          const extraIncomeItem = {
+            id: `debt-income-boost-${Date.now()}`,
+            name: `Extra Income (to cover debt)`,
+            amount: scenario.value * 12,
+            frequency: 'yearly',
+            startAge: currentAgeVal,
+            endAge: targetRetAgeVal,
+            growthRate: 0.03,
+            isTaxable: true
+          };
+          newInputs.incomeList = [...(newInputs.incomeList || []), extraIncomeItem];
         }
 
         const targetRetAge = newInputs.targetRetirementAge;

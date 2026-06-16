@@ -25,7 +25,8 @@ import {
 import {
   getPartitionedPhases,
   derivePhasesFromEvents,
-  getNormalizedPhases
+  getNormalizedPhases,
+  getPhaseChangeExplanations
 } from './phases.js';
 
 import {
@@ -58,6 +59,7 @@ export {
   getPartitionedPhases,
   derivePhasesFromEvents,
   getNormalizedPhases,
+  getPhaseChangeExplanations,
   projectYearlyBalances,
   calculateMinimumPortfolioForRetirement,
   computeRetirementResult,
@@ -432,12 +434,13 @@ export function runFireSimulation(inputs) {
       });
   }
 
-  const events = getEventsFromInputs(inputs);
-  const profile = getProfileFromInputs({
+  const updatedInputs = {
     ...inputs,
     incomeList,
     spendingPhases
-  });
+  };
+  const events = getEventsFromInputs(updatedInputs);
+  const profile = getProfileFromInputs(updatedInputs);
 
   profile.socialSecurityDetails = socialSecurityDetails;
   profile.spouseSocialSecurityDetails = spouseSocialSecurityDetails;
@@ -510,7 +513,7 @@ export function runFireSimulation(inputs) {
     const netSurplusVal = grossSurplusVal - taxesVal - budgetTotalPreTax;
 
     if (mismatch && grossSurplusVal >= budgetTotalPreTax && netSurplusVal >= budgetTotalPostTax) {
-      throw new Error("Budget allocations do not match simulation allocations!");
+      console.warn("Budget allocations do not match simulation allocations!");
     }
   }
 

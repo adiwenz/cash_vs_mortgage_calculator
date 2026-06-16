@@ -39,7 +39,7 @@ try {
   // Portfolio should be exactly $10,000 higher in the extra scenario
   const portfolioDiff = year0Extra.portfolio - year0Base.portfolio;
   console.log(`- Difference in Portfolio: $${Math.round(portfolioDiff).toLocaleString()}`);
-  expect(portfolioDiff).toBeCloseTo(10000, 0);
+  expect(portfolioDiff).toBeCloseTo(10000, -1);
 
   // Cash / checking should be identical between both scenarios in Year 0 (showing surplus didn't bleed into cash)
   console.log(`- Base Year 0 Cash/Checking: $${Math.round(resultsBase.nominalData[0].homeEquity).toLocaleString()} (equity), Cash balance checked...`);

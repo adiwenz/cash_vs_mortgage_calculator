@@ -11,6 +11,7 @@ try {
   inputs.lifeEvents = inputs.lifeEvents.map(e => e.type === 'retire' ? { ...e, age: 55 } : e);
   inputs.incomeList = inputs.incomeList.map(inc => inc.id === 'inc-1' ? { ...inc, endAge: 55 } : inc);
   inputs.readinessCriteria = 'lastsComfortable'; // selected criterion
+  inputs.budgetDetails = undefined;
 
   const results = runFireSimulation(inputs);
   
@@ -71,6 +72,7 @@ try {
   inputsResolved.targetRetirementAge = 65;
   inputsResolved.lifeEvents = inputsResolved.lifeEvents.map(e => e.type === 'retire' ? { ...e, age: 65 } : e);
   inputsResolved.readinessCriteria = 'lastsComfortable';
+  inputsResolved.budgetDetails = undefined;
 
   const resultsResolved = runFireSimulation(inputsResolved);
   expect(resultsResolved.moneyLasts).toBe(true);

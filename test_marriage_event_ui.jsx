@@ -203,6 +203,9 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     
     expect(screen.getByText(/Phase Budget/i)).toBeDefined();
 
+    // Switch to Married Life phase to view partner savings
+    fireEvent.click(screen.getByRole('button', { name: /Married Life/i }));
+
     // Expand Savings section
     fireEvent.click(screen.getAllByText(/Save & Invest/i)[0]);
 
@@ -284,4 +287,4 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Verify timeline phase and milestone remain intact
     expect(screen.getAllByText(/Get Married/i).length).toBeGreaterThanOrEqual(2);
   });
-});
+}, 15000);

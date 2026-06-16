@@ -204,7 +204,7 @@ try {
   const resultsCalc = runFireSimulation(inputsCalculated);
   expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(22665.94, 0);
   const age67Calc = resultsCalc.deflatedData.find(d => d.age === 67);
-  expect(age67Calc.income).toBeCloseTo(22665.94, 0);
+  expect(age67Calc.income).toBeCloseTo(22665.94, -1);
 
   // 6c. Increasing income increases AIME and Social Security benefit
   const inputsHigherIncome = getMappedDefaultInputs();

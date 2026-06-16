@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { getNormalizedPhases } from '../../fireCalculations';
+import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
 import { calculateUSTaxForModal } from '../../simulatorMathUtils';
 import { formatCurrency } from './helpers';
+import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 
 export default function BudgetModal({
   inputs,
@@ -36,6 +37,9 @@ export default function BudgetModal({
   const [isEditingWants, setIsEditingWants] = useState(false);
   const [isEditingSavings, setIsEditingSavings] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [defaultTemplate, setDefaultTemplate] = useState(
+    inputs.budgetDetails?.defaultTemplate || { needsPct: 50, wantsPct: 30, savingsPct: 20 }
+  );
 
   const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
   const isMarriedMode = !!marriageEvent;
@@ -43,12 +47,18 @@ export default function BudgetModal({
   const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
 
   const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
+  const activeDebtsTotal = Object.keys(budgetExpenses)
+    .filter(k => k.startsWith('debt_'))
+    .reduce((sum, k) => sum + (Number(budgetExpenses[k]) || 0), 0);
+
   const needsTotal = (Number(budgetExpenses.housing) || 0) +
                      (Number(budgetExpenses.utilities) || 0) +
                      (Number(budgetExpenses.food) || 0) +
                      (Number(budgetExpenses.transportation) || 0) +
                      (Number(budgetExpenses.healthcare) || 0) +
-                     (isMarriedMode ? (Number(budgetExpenses.debt) || 0) : 0);
+                     (isMarriedMode ? (Number(budgetExpenses.debt) || 0) : 0) +
+                     (Number(budgetExpenses.childcare) || 0) +
+                     activeDebtsTotal;
   const wantsTotal = (Number(budgetExpenses.leisure) || 0) +
                      (Number(budgetExpenses.diningOut) || 0) +
                      (Number(budgetExpenses.misc) || 0);
@@ -62,6 +72,9 @@ export default function BudgetModal({
   const normalizedPhases = getNormalizedPhases(inputs);
   const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
   const isRetirementPhase = activePhaseObj?.type === 'retire';
+
+  const activeDebts = getActiveDebtsForAge(inputs, activePhaseObj?.startAge || inputs.currentAge);
+  const [decideLater, setDecideLater] = useState(false);
 
   let activeC = activePhaseObj?.childCount || 0;
   let activeChildBoost = 0;
@@ -215,6 +228,23 @@ export default function BudgetModal({
     }
   };
 
+  const handleReduceWants = () => {
+    const deficit = Math.abs(remainingBalance);
+    if (wantsTotal <= 0) return;
+    const factor = Math.max(0, (wantsTotal - deficit) / wantsTotal);
+    setBudgetExpenses(prev => ({
+      ...prev,
+      leisure: Math.round((prev.leisure || 0) * factor),
+      diningOut: Math.round((prev.diningOut || 0) * factor),
+      misc: Math.round((prev.misc || 0) * factor)
+    }));
+  };
+
+  const handleIncreaseIncome = () => {
+    const deficit = Math.abs(remainingBalance);
+    setBudgetMonthlyIncome(prev => prev + deficit);
+  };
+
   const handleMonthlyIncomeChange = (val) => {
     const newIncome = Math.max(0, val);
     setBudgetMonthlyIncome(newIncome);
@@ -265,6 +295,151 @@ export default function BudgetModal({
       >
         <div className="budget-modal-layout">
           
+          {/* Left Sidebar: Phase Navigator & Template */}
+          <div className="budget-phase-navigator-sidebar" style={{
+            width: '280px',
+            borderRight: '1px solid var(--border-color)',
+            background: 'rgba(15, 23, 42, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '1.25rem 1rem',
+            overflowY: 'auto',
+            gap: '1.5rem',
+            boxSizing: 'border-box'
+          }}>
+            <div>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                Life Phases
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {normalizedPhases.map((phase) => {
+                  const isActive = activeBudgetPhase === phase.id;
+                  return (
+                    <button
+                      key={phase.id}
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        width: '100%',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '6px',
+                        background: isActive ? 'var(--primary)' : 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid',
+                        borderColor: isActive ? 'var(--primary)' : 'var(--border-color)',
+                        color: isActive ? '#fff' : 'var(--text-primary)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onClick={() => handleSwitchBudgetPhase(phase.id)}
+                    >
+                      <span style={{ fontSize: '1.1rem' }}>{phase.icon}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {phase.name}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: isActive ? 'rgba(255, 255, 255, 0.8)' : 'var(--text-tertiary)' }}>
+                          Age {phase.startAge}–{phase.endAge}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                Default Template
+              </h4>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', margin: '0 0 0.75rem 0', lineHeight: '1.3' }}>
+                Sets starting allocations (must total 100%) for new phases.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    <span>Needs:</span>
+                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.needsPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    style={{ width: '100%', accentColor: 'var(--primary)' }}
+                    value={defaultTemplate.needsPct}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setDefaultTemplate(prev => {
+                        const newNeeds = val;
+                        const remaining = 100 - newNeeds;
+                        const currSum = prev.wantsPct + prev.savingsPct;
+                        const factor = currSum > 0 ? remaining / currSum : 0.5;
+                        const newWants = currSum > 0 ? Math.round(prev.wantsPct * factor) : Math.round(remaining / 2);
+                        const newSavings = 100 - newNeeds - newWants;
+                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    <span>Wants:</span>
+                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.wantsPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    style={{ width: '100%', accentColor: 'var(--primary)' }}
+                    value={defaultTemplate.wantsPct}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setDefaultTemplate(prev => {
+                        const newWants = val;
+                        const remaining = 100 - newWants;
+                        const currSum = prev.needsPct + prev.savingsPct;
+                        const factor = currSum > 0 ? remaining / currSum : 0.5;
+                        const newNeeds = currSum > 0 ? Math.round(prev.needsPct * factor) : Math.round(remaining / 2);
+                        const newSavings = 100 - newNeeds - newWants;
+                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    <span>Savings:</span>
+                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.savingsPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    style={{ width: '100%', accentColor: 'var(--primary)' }}
+                    value={defaultTemplate.savingsPct}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setDefaultTemplate(prev => {
+                        const newSavings = val;
+                        const remaining = 100 - newSavings;
+                        const currSum = prev.needsPct + prev.wantsPct;
+                        const factor = currSum > 0 ? remaining / currSum : 0.5;
+                        const newNeeds = currSum > 0 ? Math.round(prev.needsPct * factor) : Math.round(remaining / 2);
+                        const newWants = 100 - newNeeds - newSavings;
+                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Left/Main Column */}
           <div className="budget-main-col">
             
@@ -309,43 +484,35 @@ export default function BudgetModal({
               </div>
             )}
 
-            {/* Segmented Phase Tabs */}
-            {normalizedPhases.length > 1 && (
-              <div className="segmented-control-container" style={{ margin: '0 0 1.25rem 0', width: '100%', overflowX: 'auto' }}>
-                <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: 'max-content', gap: '4px' }}>
-                  {normalizedPhases.map((phase) => {
-                    const isActive = activeBudgetPhase === phase.id;
-                    return (
-                      <button
-                        key={phase.id}
-                        type="button"
-                        className={`segmented-control-btn ${isActive ? 'active' : ''}`}
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '0.45rem 0.65rem',
-                          borderRadius: '6px',
-                          background: isActive ? 'var(--primary)' : 'transparent',
-                          color: isActive ? '#fff' : 'var(--text-secondary)',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontWeight: '600',
-                          transition: 'all 0.2s',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.3rem',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onClick={() => handleSwitchBudgetPhase(phase.id)}
-                      >
-                        <span>{phase.icon}</span>
-                        <span>{phase.name.split(':')[0]} ({phase.startAge}-{phase.endAge})</span>
-                      </button>
-                    );
-                  })}
+            {/* Why did this phase change? explanation breakdown */}
+            {(() => {
+              const explanations = getPhaseChangeExplanations(activePhaseObj, normalizedPhases);
+              if (explanations.length === 0) return null;
+              return (
+                <div className="phase-explanation-box" style={{
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: '6px',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{ color: '#60a5fa', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    ❓ Why did this phase change?
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {explanations.map((exp, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        <span style={{ fontSize: '1rem' }}>{exp.icon}</span>
+                        <span>{exp.text}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Primary Section: Three Budget Cards */}
             <div className="budget-cards-grid">
@@ -497,17 +664,72 @@ export default function BudgetModal({
                   ✅ You’re on track. You’re saving {activeSavingsRate}% of your income.
                 </div>
               ) : remainingBalance < 0 ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.5rem 0.75rem', borderRadius: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                  <span>⚠️ Over budget by {formatCurrency(Math.abs(remainingBalance))}/mo.</span>
-                  <button 
-                    type="button"
-                    className="list-builder-edit-btn" 
-                    style={{ padding: '0.15rem 0.35rem', fontSize: '0.68rem', borderColor: 'var(--accent-rose)', color: '#fda4af' }}
-                    onClick={handleAutoReduceSavingsToBalance}
-                  >
-                    ⚖️ Auto-Reduce Savings
-                  </button>
-                </div>
+                activeDebts.length > 0 && !decideLater ? (
+                  <div className="deficit-warning-box" style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <div style={{ color: 'var(--accent-rose, #f43f5e)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '0.15rem' }}>
+                        New obligation added.
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                        This plan is currently running a monthly deficit of <strong>{formatCurrency(Math.abs(remainingBalance))}</strong>.
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="list-builder-edit-btn"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderColor: 'var(--primary)', color: 'var(--primary-light, #a5b4fc)' }}
+                        onClick={handleReduceWants}
+                      >
+                        📉 Reduce Wants
+                      </button>
+                      <button
+                        type="button"
+                        className="list-builder-edit-btn"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderColor: 'var(--primary)', color: 'var(--primary-light, #a5b4fc)' }}
+                        onClick={handleAutoReduceSavingsToBalance}
+                      >
+                        ⚖️ Reduce Savings
+                      </button>
+                      <button
+                        type="button"
+                        className="list-builder-edit-btn"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderColor: 'var(--primary)', color: 'var(--primary-light, #a5b4fc)' }}
+                        onClick={handleIncreaseIncome}
+                      >
+                        💰 Increase Income
+                      </button>
+                      <button
+                        type="button"
+                        className="list-builder-edit-btn"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+                        onClick={() => setDecideLater(true)}
+                      >
+                        ⏳ I’ll Decide Later
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.5rem 0.75rem', borderRadius: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                    <span>⚠️ Over budget by {formatCurrency(Math.abs(remainingBalance))}/mo.</span>
+                    <button 
+                      type="button"
+                      className="list-builder-edit-btn" 
+                      style={{ padding: '0.15rem 0.35rem', fontSize: '0.68rem', borderColor: 'var(--accent-rose)', color: '#fda4af' }}
+                      onClick={handleAutoReduceSavingsToBalance}
+                    >
+                      ⚖️ Auto-Reduce Savings
+                    </button>
+                  </div>
+                )
               ) : (
                 <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '0.5rem 0.75rem', borderRadius: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                   <span>💡 {formatCurrency(remainingBalance)}/mo remains unallocated.</span>
@@ -693,7 +915,7 @@ export default function BudgetModal({
                 type="button"
                 className="btn-primary"
                 style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-                onClick={handleSaveBudget}
+                onClick={() => handleSaveBudget(defaultTemplate)}
               >
                 Save Budget
               </button>
@@ -764,6 +986,14 @@ export default function BudgetModal({
                             <span className="breakdown-row-value">{formatCurrency(budgetExpenses[item.key] || 0)}</span>
                           </>
                         )}
+                      </div>
+                    ))}
+
+                    {activeDebts.map(debt => (
+                      <div key={debt.id} className="breakdown-row budget-input-row">
+                        <span className="breakdown-row-label">{debt.icon} {debt.name}</span>
+                        <div className="breakdown-row-dots" />
+                        <span className="breakdown-row-value">{formatCurrency(budgetExpenses[`debt_${debt.id}`] || debt.monthlyPayment)}</span>
                       </div>
                     ))}
 

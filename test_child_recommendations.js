@@ -294,9 +294,9 @@ try {
   const age62Data9 = results9.data.find(d => d.age === 62);
   assert(age62Data9 !== undefined, 'Should have simulated data at age 62');
   
-  // Deflated income at age 62 should be exactly $15,000/yr (since they are retired, base salary is 0)
+  // Deflated income at age 62 should be exactly $10,500/yr (since they are retired, base salary is 0, and child boost is scaled by the 70% retirement spending percent)
   const deflatedIncome9 = age62Data9.income;
-  assert(Math.round(deflatedIncome9) === 15000, `Expected deflated simulated income in retirement to be $15,000, got ${Math.round(deflatedIncome9)}`);
+  assert(Math.round(deflatedIncome9) === 10500, `Expected deflated simulated income in retirement to be $10,500, got ${Math.round(deflatedIncome9)}`);
   console.log('✅ Test 9 Passed: Child income boost continues past targetRetirementAge during retirement.');
   // Test 10: Verify retirement childcare phase splits and proportional expense scaling
   const testInputs10 = {

@@ -72,6 +72,13 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     throw new Error(`Could not find input associated with text matching: ${textRegex}`);
   };
 
+  const clickDoneOnWelcomeModal = (childName) => {
+    const heading = screen.getByRole('heading', { name: new RegExp(`Welcome, ${childName}!`, 'i') });
+    const modal = heading.closest('.modal-content');
+    const doneBtn = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === 'Done');
+    fireEvent.click(doneBtn);
+  };
+
   test('1. Budget Modal - Opens, renders defaults, modifies state, cancels, and saves', async () => {
     render(<FireSimulator />);
     
@@ -159,8 +166,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(screen.getByRole('button', { name: /Refine Child Costs/i })).toBeDefined();
     
     // Click Done to close the welcome modal
-    const doneBtn = screen.getByRole('button', { name: /Done/i });
-    fireEvent.click(doneBtn);
+    clickDoneOnWelcomeModal('Liam');
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
@@ -346,7 +352,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    clickDoneOnWelcomeModal('Liam');
     
     // Add child 2: Emma, born at 40
     fireEvent.change(select, { target: { value: 'haveChild' } });
@@ -359,7 +365,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Emma!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    clickDoneOnWelcomeModal('Emma');
 
     // Open budget builder modal
     const setBudgetBtn = screen.getAllByRole('button', { name: /Set Budget/i })[0];
@@ -368,14 +374,18 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Verify budget builder is open
     expect(screen.getByText(/Childcare Phase Budget/i)).toBeDefined();
 
-    // Verify there are 5 tabs: Liam (1 Child), Both (2 Kids), Emma (1 Child), Standard Work Phase, Retirement
-    const tabs = document.querySelectorAll('.budget-modal-card .segmented-control-btn');
+    // Verify there are 5 phases: Childcare (35-40), Childcare (40-53), Childcare (53-58), Current Life (58-65), Retirement
+    const tabs = document.querySelectorAll('.budget-phase-navigator-sidebar button');
     console.log('TABS FOUND:', Array.from(tabs).map(t => t.textContent));
     expect(tabs.length).toBeGreaterThanOrEqual(5);
-    expect(tabs[0].textContent).toContain('1 Child');
-    expect(tabs[1].textContent).toContain('2 Kids');
-    expect(tabs[2].textContent).toContain('1 Child');
+    expect(tabs[0].textContent).toContain('Childcare Years');
+    expect(tabs[0].textContent).toContain('35–40');
+    expect(tabs[1].textContent).toContain('Childcare Years');
+    expect(tabs[1].textContent).toContain('40–53');
+    expect(tabs[2].textContent).toContain('Childcare Years');
+    expect(tabs[2].textContent).toContain('53–58');
     expect(tabs[3].textContent).toContain('Standard Work Phase');
+    expect(tabs[3].textContent).toContain('58–65');
     
     // Click on 1 Child tab (0) and check boost/details
     fireEvent.click(tabs[0]);
@@ -417,7 +427,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    clickDoneOnWelcomeModal('Liam');
     
     // Click the timeline node for Liam
     const liamTooltipText = screen.getAllByText(/Have Child: Liam/i)[0];
@@ -439,7 +449,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    clickDoneOnWelcomeModal('Liam');
   });
 
   test('8. Marriage Flow - Budget Modal Savings Fields are present and editable', async () => {
@@ -546,7 +556,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    clickDoneOnWelcomeModal('Liam');
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();

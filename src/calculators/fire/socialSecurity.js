@@ -92,7 +92,7 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
       const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
       if (activeIncomeItem) {
         baseIncomeMonthly = activeIncomeItem.frequency === 'monthly' ? Number(activeIncomeItem.amount) : Number(activeIncomeItem.amount) / 12;
-        growthRate = Number(activeIncomeItem.growthRate) || 0.03;
+        growthRate = (activeIncomeItem.growthRate !== undefined && activeIncomeItem.growthRate !== null && activeIncomeItem.growthRate !== '') ? Number(activeIncomeItem.growthRate) : 0.03;
         startOfPhase = activeIncomeItem.startAge;
       } else {
         baseIncomeMonthly = (Number(inputs.simpleIncome) || 50000) / 12;

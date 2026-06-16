@@ -1,3 +1,9 @@
+const parseNum = (val, defaultVal) => {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  const num = Number(val);
+  return isNaN(num) ? defaultVal : num;
+};
+
 export function getProfileFromInputs(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
@@ -10,23 +16,23 @@ export function getProfileFromInputs(inputs) {
     currentAge,
     lifeExpectancy,
     targetRetirementAge,
-    expectedReturn: (Number(inputs.expectedReturn) || 7) / 100,
+    expectedReturn: parseNum(inputs.expectedReturn, 7) / 100,
     postRetirementReturn: inputs.postRetirementReturn !== undefined
-      ? (Number(inputs.postRetirementReturn) || 0) / 100
-      : (Number(inputs.expectedReturn) || 7) / 100,
-    inflationRate: (Number(inputs.inflationRate) || 3) / 100,
-    lifestyleUpgrades: (Number(inputs.lifestyleUpgrades) || 0) / 100,
-    swr: (Number(inputs.swr) || 4) / 100,
+      ? parseNum(inputs.postRetirementReturn, 0) / 100
+      : parseNum(inputs.expectedReturn, 7) / 100,
+    inflationRate: parseNum(inputs.inflationRate, 3) / 100,
+    lifestyleUpgrades: parseNum(inputs.lifestyleUpgrades, 0) / 100,
+    swr: parseNum(inputs.swr, 4) / 100,
     fireMode: inputs.fireMode || 'traditional',
     includeTaxes: !!inputs.includeTaxes,
     filingStatus: inputs.filingStatus || 'single',
     preTaxSavingsRate: inputs.preTaxSavingsRate,
     enableHealthcareModel: inputs.enableHealthcareModel !== false,
-    preMedicarePremium: Number(inputs.preMedicarePremium) || 10000,
-    medicarePremium: Number(inputs.medicarePremium) || 4000,
-    simpleIncome: Number(inputs.simpleIncome) || 50000,
-    simpleExpenses: Number(inputs.simpleExpenses) || 42500,
-    simpleInvestments: Number(inputs.simpleInvestments) || 5000,
+    preMedicarePremium: parseNum(inputs.preMedicarePremium, 10000),
+    medicarePremium: parseNum(inputs.medicarePremium, 4000),
+    simpleIncome: parseNum(inputs.simpleIncome, 50000),
+    simpleExpenses: parseNum(inputs.simpleExpenses, 42500),
+    simpleInvestments: parseNum(inputs.simpleInvestments, 5000),
     childCosts: inputs.childCosts || { ages0to4: 15000, ages5to12: 15000, ages13to18: 15000, ages19to22: 15000, includeCollege: false },
     assets: inputs.assets || {},
     budgetDetails: inputs.budgetDetails || {},

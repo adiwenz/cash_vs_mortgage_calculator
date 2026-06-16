@@ -75,7 +75,9 @@ describe('Child Event Linked Dragging Regression Test', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+    const doneButtons = screen.getAllByRole('button', { name: /Done/i });
+    const doneBtn = doneButtons.find(btn => btn.classList.contains('btn-primary')) || doneButtons[0];
+    fireEvent.click(doneBtn);
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
