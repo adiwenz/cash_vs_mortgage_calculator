@@ -813,12 +813,16 @@ export default function FireSimulator() {
       ...activeResults,
       data: isNominal ? activeResults.nominalData : activeResults.deflatedData,
       retirementReadyTarget: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
+      retirementReadyTargetNoSS: isNominal ? activeResults.nominalRetirementReadyTargetNoSS : activeResults.deflatedRetirementReadyTargetNoSS,
+      retirementReadyTargetComfortable: isNominal ? activeResults.retirementReadyTargetComfortable : activeResults.deflatedRetirementReadyTargetComfortable,
+      retirementReadyTargetSurvival: isNominal ? activeResults.retirementReadyTargetSurvival : activeResults.deflatedRetirementReadyTargetSurvival,
       portfolioAtRetirement: isNominal ? activeResults.nominalPortfolioAtRetirement : activeResults.deflatedPortfolioAtRetirement,
       netWorthAtRetirement: isNominal ? activeResults.nominalNetWorthAtRetirement : activeResults.deflatedNetWorthAtRetirement,
       annualRetirementSpending: isNominal ? activeResults.nominalAnnualRetirementSpending : activeResults.deflatedAnnualRetirementSpending,
       endingSurplusShortfall: isNominal ? activeResults.nominalEndingSurplusShortfall : activeResults.deflatedEndingSurplusShortfall,
       retirementIncomeSources: isNominal ? activeResults.nominalRetirementIncomeSources : activeResults.deflatedRetirementIncomeSources,
-      fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget
+      fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
+      retireTodayTarget: activeResults.retireTodayTarget
     };
   }, [activeResults, displayMode]);
 
@@ -828,14 +832,142 @@ export default function FireSimulator() {
       ...baselineResults,
       data: isNominal ? baselineResults.nominalData : baselineResults.deflatedData,
       retirementReadyTarget: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget,
+      retirementReadyTargetNoSS: isNominal ? baselineResults.nominalRetirementReadyTargetNoSS : baselineResults.deflatedRetirementReadyTargetNoSS,
+      retirementReadyTargetComfortable: isNominal ? baselineResults.retirementReadyTargetComfortable : baselineResults.deflatedRetirementReadyTargetComfortable,
+      retirementReadyTargetSurvival: isNominal ? baselineResults.retirementReadyTargetSurvival : baselineResults.deflatedRetirementReadyTargetSurvival,
       portfolioAtRetirement: isNominal ? baselineResults.nominalPortfolioAtRetirement : baselineResults.deflatedPortfolioAtRetirement,
       netWorthAtRetirement: isNominal ? baselineResults.nominalNetWorthAtRetirement : baselineResults.deflatedNetWorthAtRetirement,
       annualRetirementSpending: isNominal ? baselineResults.nominalAnnualRetirementSpending : baselineResults.deflatedAnnualRetirementSpending,
       endingSurplusShortfall: isNominal ? baselineResults.nominalEndingSurplusShortfall : baselineResults.deflatedEndingSurplusShortfall,
       retirementIncomeSources: isNominal ? baselineResults.nominalRetirementIncomeSources : baselineResults.deflatedRetirementIncomeSources,
-      fiNumber: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget
+      fiNumber: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget,
+      retireTodayTarget: baselineResults.retireTodayTarget
     };
   }, [baselineResults, displayMode]);
+
+  const chartData = useMemo(() => {
+    if (!displayedResults.data || displayedResults.data.length === 0) return [];
+    
+    const cash = Number(inputs.assets?.cash) || 0;
+    const emergencyFund = Number(inputs.assets?.emergencyFund) || 0;
+    const brokerage = Number(inputs.assets?.brokerage) || 0;
+    const trad401k = Number(inputs.assets?.trad401k) || 0;
+    const tradIra = Number(inputs.assets?.tradIra) || 0;
+    const rothIra = Number(inputs.assets?.rothIra) || 0;
+    const hsa = Number(inputs.assets?.hsa) || 0;
+    const other = Number(inputs.assets?.other) || 0;
+    
+    const currentConditions = inputs.currentConditions || [];
+    const customAssetsStartingValue = currentConditions
+      .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const customHousesStartingValue = currentConditions
+      .filter(c => c.type === 'house')
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const homeValueBaseline = (Number(inputs.assets?.realEstate) || 0) + customHousesStartingValue;
+    
+    const startingPortfolio = cash + emergencyFund + brokerage + trad401k + tradIra + rothIra + hsa + other + customAssetsStartingValue;
+    const startingAssets = startingPortfolio + homeValueBaseline;
+    
+    const customDebtsSum = currentConditions
+      .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const baseActiveLoansSum = (inputs.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
+    
+    const houseAssets = inputs.houseAssets || [];
+    const houseMortgagesSum = houseAssets.reduce((sum, h) => {
+      if (h.hasMortgage && h.mortgage) {
+        return sum + (Number(h.mortgage.balance) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum;
+    const startingNetWorth = startingAssets - startingDebt;
+
+    return displayedResults.data.map((log, idx) => {
+      if (idx === 0) {
+        return {
+          ...log,
+          assets: startingAssets,
+          debt: startingDebt,
+          portfolio: startingPortfolio,
+          netWorth: startingNetWorth
+        };
+      } else {
+        const prevLog = displayedResults.data[idx - 1];
+        return {
+          ...log,
+          assets: prevLog.assets,
+          debt: prevLog.debt,
+          portfolio: prevLog.portfolio,
+          netWorth: prevLog.netWorth
+        };
+      }
+    });
+  }, [displayedResults.data, inputs]);
+
+  const baselineChartData = useMemo(() => {
+    if (!displayedBaselineResults.data || displayedBaselineResults.data.length === 0) return [];
+    
+    const cash = Number(inputs.assets?.cash) || 0;
+    const emergencyFund = Number(inputs.assets?.emergencyFund) || 0;
+    const brokerage = Number(inputs.assets?.brokerage) || 0;
+    const trad401k = Number(inputs.assets?.trad401k) || 0;
+    const tradIra = Number(inputs.assets?.tradIra) || 0;
+    const rothIra = Number(inputs.assets?.rothIra) || 0;
+    const hsa = Number(inputs.assets?.hsa) || 0;
+    const other = Number(inputs.assets?.other) || 0;
+    
+    const currentConditions = inputs.currentConditions || [];
+    const customAssetsStartingValue = currentConditions
+      .filter(c => ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type))
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const customHousesStartingValue = currentConditions
+      .filter(c => c.type === 'house')
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const homeValueBaseline = (Number(inputs.assets?.realEstate) || 0) + customHousesStartingValue;
+    
+    const startingPortfolio = cash + emergencyFund + brokerage + trad401k + tradIra + rothIra + hsa + other + customAssetsStartingValue;
+    const startingAssets = startingPortfolio + homeValueBaseline;
+    
+    const customDebtsSum = currentConditions
+      .filter(c => c.type === 'debt' && c.creditCardHandling !== 'payoff' && (Number(c.value) || 0) > 0)
+      .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    const baseActiveLoansSum = (inputs.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
+    
+    const houseAssets = inputs.houseAssets || [];
+    const houseMortgagesSum = houseAssets.reduce((sum, h) => {
+      if (h.hasMortgage && h.mortgage) {
+        return sum + (Number(h.mortgage.balance) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum;
+    const startingNetWorth = startingAssets - startingDebt;
+
+    return displayedBaselineResults.data.map((log, idx) => {
+      if (idx === 0) {
+        return {
+          ...log,
+          assets: startingAssets,
+          debt: startingDebt,
+          portfolio: startingPortfolio,
+          netWorth: startingNetWorth
+        };
+      } else {
+        const prevLog = displayedBaselineResults.data[idx - 1];
+        return {
+          ...log,
+          assets: prevLog.assets,
+          debt: prevLog.debt,
+          portfolio: prevLog.portfolio,
+          netWorth: prevLog.netWorth
+        };
+      }
+    });
+  }, [displayedBaselineResults.data, inputs]);
 
   // Validate inputs
   const validation = useMemo(() => {
@@ -4090,9 +4222,14 @@ export default function FireSimulator() {
     const roadmapLabel = criteria === 'lastsLifeExp' ? 'Sustainable' : criteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite';
     const retirementReadyAge = results.retirementReadyAge;
     if (retirementReadyAge) {
+      const targetValForStory = criteria === 'lastsLifeExp'
+        ? results.retirementReadyTargetSurvival
+        : criteria === 'lastsComfortable'
+          ? results.retirementReadyTargetComfortable
+          : results.retirementReadyTarget;
       list.push({
         age: retirementReadyAge,
-        text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
+        text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(targetValForStory)})</strong>`
       });
     }
 
@@ -8526,9 +8663,15 @@ export default function FireSimulator() {
             const readyAge = activeResults.retirementReadyAge;
             const isNotAchieved = readyAge === null || targetRetAge < readyAge;
 
+            const criteriaTarget = inputs.readinessCriteria === 'lastsLifeExp'
+              ? activeResults.retirementReadyTargetSurvival
+              : inputs.readinessCriteria === 'lastsComfortable'
+                ? activeResults.retirementReadyTargetComfortable
+                : activeResults.retirementReadyTarget;
+
             const gapAmount = activeResults.endingSurplusShortfall < 0 
               ? -activeResults.endingSurplusShortfall 
-              : Math.max(0, activeResults.retirementReadyTarget - activeResults.portfolioAtRetirement);
+              : Math.max(0, criteriaTarget - activeResults.portfolioAtRetirement);
             
             const yearsAdditionalWork = readyAge ? Math.max(0, readyAge - targetRetAge) : 0;
             
@@ -8752,13 +8895,17 @@ export default function FireSimulator() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
                       {inputs.readinessCriteria === 'lastsLifeExp' 
-                        ? 'Sustainable Target' 
+                        ? 'retire sustainably, taking SS at selected year' 
                         : inputs.readinessCriteria === 'lastsComfortable' 
-                          ? 'Comfortable Target' 
-                          : 'Indefinite Target'}
+                          ? 'retire comfortably, taking SS at the selected year' 
+                          : 'retire indefinitely, taking SS at selected year'}
                     </span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(displayedResults.retirementReadyTarget)}
+                      {inputs.readinessCriteria === 'lastsLifeExp' 
+                        ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
+                        : inputs.readinessCriteria === 'lastsComfortable' 
+                          ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
+                          : formatCurrency(displayedResults.retirementReadyTarget)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
@@ -8767,16 +8914,31 @@ export default function FireSimulator() {
                       {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Retirement Income</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>{formatCurrency(displayedResults.retirementIncomeSources)} / yr</strong>
+                </div>
+
+                {/* 🏖 Retire Today Compact Secondary Card */}
+                <div style={{ 
+                  marginTop: '0.65rem', 
+                  padding: '0.4rem 0.6rem', 
+                  background: 'rgba(255, 255, 255, 0.015)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '1rem' }}>🏖️</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-primary)' }}>🏖 Retire Today</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>“Portfolio needed today to replace your current spending.”</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Annual Spending</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(displayedResults.annualRetirementSpending)} / yr
-                    </strong>
-                  </div>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                    {formatCurrency(displayedResults.retireTodayTarget)}
+                  </strong>
                 </div>
 
                 {/* Retirement Improvement Plan Banner (Compact) */}
@@ -8986,8 +9148,6 @@ export default function FireSimulator() {
                                 }
                                 return evt.age;
                               })();
-
-
                               const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
                               const isFinancial = isFinancialEvent(evt);
 
@@ -9356,7 +9516,15 @@ export default function FireSimulator() {
             <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Wealth Journey</h3>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    Wealth Journey
+                    <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                      <span className="toggle-tooltip-icon">i</span>
+                      <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                        Shows values at the start of the fiscal year.
+                      </span>
+                    </span>
+                  </h3>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -9392,7 +9560,7 @@ export default function FireSimulator() {
               <div className="chart-container-inner" style={{ height: '240px', cursor: 'crosshair' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={displayedResults.data}
+                    data={chartData}
                     margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
                     onClick={(data) => {
                       if (data && data.activeLabel) {
@@ -9558,7 +9726,7 @@ export default function FireSimulator() {
               {/* Benchmarks Snapshot */}
               {validation.errors.length === 0 && (() => {
                 const activeYear = selectedYear !== null ? selectedYear : Number(inputs.currentAge);
-                const yearData = displayedResults.data.find(d => d.age === activeYear);
+                const yearData = chartData.find(d => d.age === activeYear);
                 if (!yearData) return null;
 
                 const isWorking = activeYear < displayedResults.targetRetirementAge;
