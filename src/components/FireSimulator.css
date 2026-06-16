@@ -390,6 +390,12 @@
   color: var(--accent-rose, #ec4899);
 }
 
+.commitment-span.payoffPlan {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--accent-emerald, #10b981);
+}
+
 /* Layer 2: Events / Milestones Track */
 .events-row-content {
   height: 180px; /* Taller track to prevent overlaps with stacked glowing badges */
@@ -2434,6 +2440,12 @@
   background: rgba(236, 72, 153, 0.18) !important;
   border-color: rgba(236, 72, 153, 0.5) !important;
   box-shadow: 0 0 8px rgba(236, 72, 153, 0.3) !important;
+}
+
+.commitment-span.payoffPlan.highlighted {
+  background: rgba(16, 185, 129, 0.18) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3) !important;
 }
 
 /* Marriage Wizard Benefit Cards styling */

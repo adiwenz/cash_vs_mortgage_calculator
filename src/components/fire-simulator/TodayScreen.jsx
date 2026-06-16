@@ -7,7 +7,9 @@ export default function TodayScreen({
   handleSetBudgetClick,
   handleOpenSavingsDetails,
   lastNonZeroSavingsRateRef,
-  totalNetWorth,
+  todayAssets,
+  todayDebt,
+  todayNetWorth,
   setActiveStep
 }) {
   const simpleSavingsRate = useMemo(() => {
@@ -182,10 +184,26 @@ export default function TodayScreen({
           </div>
           <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
-              Current Net Worth
+              Today's Assets
+            </span>
+            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-emerald, #10b981)', lineHeight: '1.15' }}>
+              {formatCurrency(todayAssets)}
+            </span>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
+              Today's Debt
+            </span>
+            <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--accent-rose, #f43f5e)', lineHeight: '1.15' }}>
+              {formatCurrency(todayDebt)}
+            </span>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gridColumn: 'span 2' }}>
+            <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: '700', marginBottom: '0.12rem' }}>
+              Today's Net Worth
             </span>
             <span style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.15' }}>
-              {formatCurrency(totalNetWorth)}
+              {formatCurrency(todayNetWorth)}
             </span>
           </div>
         </div>

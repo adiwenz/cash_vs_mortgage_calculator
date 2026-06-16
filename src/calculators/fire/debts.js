@@ -26,7 +26,38 @@ export function initializeActiveLoans(profile, currentConditions, currentAge) {
     startAge: d.startAge !== undefined ? Number(d.startAge) : currentAge
   }));
 
-  const startingLoans = [...baseActiveLoans, ...customDebts];
+  // Add borrowing events from profile.lifeEvents
+  const borrowingLoans = (profile.lifeEvents || [])
+    .filter(e => e.type === 'borrowing' && e.enabled)
+    .map(e => {
+      const isExisting = e.timing
+        ? (e.timing === 'current')
+        : (e.isExisting !== false || Number(e.startAge) === currentAge);
+      const startAge = isExisting ? currentAge : (e.startAge !== undefined ? Number(e.startAge) : currentAge);
+
+      // Find linked payoff plan if any
+      const payoffPlan = (profile.lifeEvents || []).find(p => p.type === 'payoffPlan' && p.borrowingId === e.id && p.enabled);
+      const paydownPlanEnabled = !!payoffPlan;
+      const extraPayment = payoffPlan ? (Number(payoffPlan.extraPayment) || 0) : 0;
+
+      return {
+        id: e.id,
+        name: e.name || 'Borrowing',
+        startingBalance: Number(e.balance) || 0,
+        balance: isExisting ? (Number(e.balance) || 0) : 0,
+        interestRate: (Number(e.interestRate) || 0) / 100,
+        payment: (Number(e.minPayment) || 0) * 12,
+        extraPayment: extraPayment * 12,
+        frequency: 'monthly',
+        paydownPlanEnabled,
+        startAge,
+        isExisting,
+        isFutureBorrowing: !isExisting,
+        activated: isExisting
+      };
+    });
+
+  const startingLoans = [...baseActiveLoans, ...customDebts, ...borrowingLoans];
   return startingLoans.map(l => ({
     ...l,
     totalInterestPaid: 0,
@@ -35,20 +66,26 @@ export function initializeActiveLoans(profile, currentConditions, currentAge) {
 }
 
 export function processYearlyDebtPayments(age, activeLoans, dynamicMilestones) {
-  let annualDebtPayments = 0;
+  let annualMinPayments = 0;
+  let annualExtraPayments = 0;
+
   activeLoans.forEach(loan => {
     if (loan.balance > 0) {
       const interest = loan.balance * loan.interestRate;
       loan.totalInterestPaid = (loan.totalInterestPaid || 0) + interest;
-      
-      let totalPayment = loan.payment;
+
+      let minPayment = loan.payment;
+      let extraPayment = 0;
       if (loan.paydownPlanEnabled && age >= loan.startAge) {
-        totalPayment += loan.extraPayment;
+        extraPayment = loan.extraPayment;
       }
 
-      let actualPaid;
-      if (loan.balance + interest <= totalPayment) {
-        actualPaid = loan.balance + interest;
+      let totalDue = loan.balance + interest;
+      let actualPaidMin = 0;
+      let actualPaidExtra = 0;
+
+      if (totalDue <= minPayment) {
+        actualPaidMin = totalDue;
         loan.balance = 0;
         loan.payoffAge = age;
         dynamicMilestones.push({
@@ -58,11 +95,31 @@ export function processYearlyDebtPayments(age, activeLoans, dynamicMilestones) {
           isMilestone: true
         });
       } else {
-        actualPaid = totalPayment;
-        loan.balance = loan.balance + interest - actualPaid;
+        actualPaidMin = minPayment;
+        let remainingDue = totalDue - minPayment;
+        if (remainingDue <= extraPayment) {
+          actualPaidExtra = remainingDue;
+          loan.balance = 0;
+          loan.payoffAge = age;
+          dynamicMilestones.push({
+            age,
+            label: `${loan.name} Paid Off`,
+            type: 'debtPayoff',
+            isMilestone: true
+          });
+        } else {
+          actualPaidExtra = extraPayment;
+          loan.balance = remainingDue - extraPayment;
+        }
       }
-      annualDebtPayments += actualPaid;
+
+      annualMinPayments += actualPaidMin;
+      annualExtraPayments += actualPaidExtra;
     }
   });
-  return annualDebtPayments;
+
+  return {
+    annualMinPayments,
+    annualExtraPayments
+  };
 }

@@ -281,6 +281,15 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
     state.annualEarlyWithdrawalPenalties = 0;
+
+    // Activate future borrowing events starting this year
+    activeLoans.forEach(loan => {
+      if (loan.isFutureBorrowing && age === loan.startAge && !loan.activated) {
+        loan.balance = loan.startingBalance;
+        loan.activated = true;
+      }
+    });
+
     const isUserAlive = age <= lifeExpectancy;
     const spouseAge = age + ageDifference;
     const isSpouseActive = hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies;
@@ -803,10 +812,22 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const totalMortgageBalance = housingUpdates.totalMortgageBalance;
     annualExpenses += housingUpdates.annualHousingExpenses;
 
-    const annualDebtPayments = processYearlyDebtPayments(
+    let annualMinPayments = 0;
+    let annualExtraPayments = 0;
+    const debtPayments = processYearlyDebtPayments(
       age, activeLoans, dynamicMilestones
     );
-    annualExpenses += annualDebtPayments;
+    annualMinPayments = debtPayments.annualMinPayments;
+    annualExtraPayments = debtPayments.annualExtraPayments;
+    annualExpenses += annualMinPayments;
+
+    const extraDebtShortfall = deductFromLiquidAssets(annualExtraPayments, age, state);
+    if (extraDebtShortfall > 0.01) {
+      state.hasRunOut = true;
+      if (state.runOutAge === null) {
+        state.runOutAge = age;
+      }
+    }
 
     enabledEvents.forEach(ev => {
       if (ev.type === 'debtPayoff' && age === Number(ev.payoffAge)) {
@@ -1255,6 +1276,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       income: annualIncome + windfallReceived,
       expenses: annualExpenses + taxes,
       taxes,
+      debtPayoffAllocation: annualExtraPayments,
+      minDebtPayment: annualMinPayments,
       savings: savingsContribution,
       employerMatch: employerMatchContribution,
       withdrawals: withdrawal,

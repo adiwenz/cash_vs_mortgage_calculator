@@ -541,6 +541,25 @@ export default function LifePlanScreen({
                           <option value="custom">➕ Custom Event</option>
                         </select>
                       </div>
+                      <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
+                        <select
+                          className="add-event-dropdown"
+                          style={{ width: '100%', height: '32px', padding: '0 2rem 0 1rem', fontSize: '0.78rem', lineHeight: '30px' }}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleCreateEvent(e.target.value);
+                              e.target.value = ''; // reset selection
+                            }
+                          }}
+                          defaultValue=""
+                        >
+                          <option value="" disabled>💳 Borrowing...</option>
+                          <option value="studentLoan">Student Loan</option>
+                          <option value="carLoan">Car Loan</option>
+                          <option value="personalLoan">Personal Loan</option>
+                          <option value="creditCard">Credit Card Balance</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
       
@@ -912,6 +931,39 @@ export default function LifePlanScreen({
                               className: 'commitment-span marriage'
                             });
                           }
+
+                          // Payoff Plans
+                          (inputs.lifeEvents || []).forEach(ev => {
+                            if (ev.enabled && ev.type === 'payoffPlan') {
+                              const borrowing = (inputs.lifeEvents || []).find(b => b.id === ev.borrowingId);
+                              const borrowingName = borrowing ? borrowing.name : 'Borrowing';
+                              let start = Number(ev.startAge);
+                              let end = Number(ev.payoffAge);
+
+                              // Apply drag offset in real-time if we are currently dragging this payoff plan or its linked borrowing event
+                              if (draggingInfo) {
+                                if (draggingInfo.type === 'borrowing' && draggingInfo.originalId === ev.borrowingId) {
+                                  const shift = draggingInfo.currentAge - draggingInfo.initialAge;
+                                  start = draggingInfo.currentAge;
+                                  end = ev.payoffAge + shift;
+                                } else if (draggingInfo.type === 'payoffPlanEnd' && draggingInfo.originalId === ev.id) {
+                                  const minPossibleEnd = start + 1;
+                                  end = Math.max(minPossibleEnd, draggingInfo.currentAge);
+                                }
+                              }
+                              
+                              if (end > start && start < inputs.lifeExpectancy) {
+                                activeCommitments.push({
+                                  id: ev.id,
+                                  label: `Payoff: ${borrowingName}`,
+                                  emoji: '🏁',
+                                  startAge: start,
+                                  endAge: Math.min(inputs.lifeExpectancy, end),
+                                  className: 'commitment-span payoffPlan'
+                                });
+                              }
+                            }
+                          });
       
                           return activeCommitments.map(c => {
                             const startPct = Math.max(0, Math.min(100, ((c.startAge - inputs.currentAge) / totalYears) * 100));
@@ -922,7 +974,9 @@ export default function LifePlanScreen({
                             const isRowHighlighted = !!(editingEvent && (
                               (editingEvent.type === 'haveChild' && c.id.startsWith('childcare')) ||
                               (editingEvent.type === 'marriage' && c.id === 'marriage') ||
-                              ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`)
+                              ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`) ||
+                              (editingEvent.type === 'payoffPlan' && c.id === editingEvent.id) ||
+                              (editingEvent.type === 'borrowing' && (inputs.lifeEvents || []).some(le => le.type === 'payoffPlan' && le.id === c.id && le.borrowingId === editingEvent.id))
                             ));
       
                             return (

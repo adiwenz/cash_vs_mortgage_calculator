@@ -35,7 +35,8 @@ export function getProfileFromInputs(inputs) {
     allocationRules: inputs.allocationRules || [],
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],
-    isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1)
+    isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1),
+    lifeEvents: inputs.lifeEvents || []
   };
 }
 
@@ -205,6 +206,26 @@ export function validateFireInputs(inputs) {
       const start = Number(ev.startAge);
       if (start < currentAge) {
         errors.push(`College start age (${start}) for event #${i+1} cannot be in the past.`);
+      }
+    }
+    if (ev.type === 'borrowing' && ev.enabled) {
+      const balance = Number(ev.balance);
+      const interestRate = Number(ev.interestRate);
+      const minPayment = Number(ev.minPayment);
+      if (balance < 0) {
+        errors.push(`Borrowing "${ev.name}" cannot have a negative balance.`);
+      }
+      if (interestRate < 0) {
+        errors.push(`Borrowing "${ev.name}" cannot have a negative interest rate.`);
+      }
+      if (minPayment < 0) {
+        errors.push(`Borrowing "${ev.name}" cannot have a negative minimum payment.`);
+      }
+
+      const timing = ev.timing || (ev.isExisting !== false || Number(ev.startAge) === currentAge ? 'current' : 'future');
+      const startAge = Number(ev.startAge);
+      if (timing === 'future' && startAge <= currentAge) {
+        errors.push(`Future borrowing "${ev.name}" start age (${startAge}) must be greater than your current age (${currentAge}).`);
       }
     }
   });

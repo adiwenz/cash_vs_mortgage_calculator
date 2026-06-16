@@ -873,6 +873,10 @@ export default function FireSimulator() {
       .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
     const baseActiveLoansSum = (inputs.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
     
+    const startingBorrowingSum = (inputs.lifeEvents || [])
+      .filter(e => e.type === 'borrowing' && e.enabled && (e.timing === 'current' || (e.timing !== 'future' && (e.isExisting !== false || Number(e.startAge) === Number(inputs.currentAge)))))
+      .reduce((sum, e) => sum + (Number(e.balance) || 0), 0);
+    
     const houseAssets = inputs.houseAssets || [];
     const houseMortgagesSum = houseAssets.reduce((sum, h) => {
       if (h.hasMortgage && h.mortgage) {
@@ -881,7 +885,7 @@ export default function FireSimulator() {
       return sum;
     }, 0);
     
-    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum;
+    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum + startingBorrowingSum;
     const startingNetWorth = startingAssets - startingDebt;
 
     return displayedResults.data.map((log, idx) => {
@@ -935,6 +939,10 @@ export default function FireSimulator() {
       .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
     const baseActiveLoansSum = (inputs.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
     
+    const startingBorrowingSum = (inputs.lifeEvents || [])
+      .filter(e => e.type === 'borrowing' && e.enabled && (e.timing === 'current' || (e.timing !== 'future' && (e.isExisting !== false || Number(e.startAge) === Number(inputs.currentAge)))))
+      .reduce((sum, e) => sum + (Number(e.balance) || 0), 0);
+    
     const houseAssets = inputs.houseAssets || [];
     const houseMortgagesSum = houseAssets.reduce((sum, h) => {
       if (h.hasMortgage && h.mortgage) {
@@ -943,7 +951,7 @@ export default function FireSimulator() {
       return sum;
     }, 0);
     
-    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum;
+    const startingDebt = baseActiveLoansSum + customDebtsSum + houseMortgagesSum + startingBorrowingSum;
     const startingNetWorth = startingAssets - startingDebt;
 
     return displayedBaselineResults.data.map((log, idx) => {
@@ -3141,6 +3149,44 @@ export default function FireSimulator() {
         retirementSpendingNeed: '',
         partnerRetiresWithUser: true
       };
+    } else if (['studentLoan', 'carLoan', 'personalLoan', 'creditCard'].includes(type)) {
+      defaults = {
+        ...defaults,
+        type: 'borrowing',
+        borrowingType: type,
+        startAge: curAge,
+        isExisting: true,
+        timing: 'current',
+        payoffPlanEnabled: true,
+        notes: ''
+      };
+      
+      if (type === 'studentLoan') {
+        defaults.name = 'Student Loan';
+        defaults.balance = 30000;
+        defaults.interestRate = 5.0;
+        defaults.minPayment = 318.20;
+      } else if (type === 'carLoan') {
+        defaults.name = 'Car Loan';
+        defaults.purchasePrice = 25000;
+        defaults.downPayment = 5000;
+        defaults.balance = 20000;
+        defaults.interestRate = 6.0;
+        defaults.isExisting = false;
+        defaults.timing = 'future';
+        defaults.startAge = curAge + 1;
+        defaults.minPayment = 386.66;
+      } else if (type === 'personalLoan') {
+        defaults.name = 'Personal Loan';
+        defaults.balance = 10000;
+        defaults.interestRate = 8.0;
+        defaults.minPayment = 313.36;
+      } else if (type === 'creditCard') {
+        defaults.name = 'Credit Card Balance';
+        defaults.balance = 5000;
+        defaults.interestRate = 22.0;
+        defaults.minPayment = 100;
+      }
     }
     
     setIsFullPartnerProfileOpen(false);
@@ -3397,6 +3443,121 @@ export default function FireSimulator() {
 
         savedEvent = sellEvObj;
 
+      } else if (type === 'borrowing') {
+        const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
+          const r = (apr / 100) / 12;
+          const pmt = monthlyPayment + extraPayment;
+          if (balance <= 0) return startAge;
+          if (pmt <= 0) return Infinity;
+          if (pmt <= balance * r) return Infinity;
+          if (r === 0) {
+            return startAge + (balance / pmt) / 12;
+          }
+          const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
+          return startAge + months / 12;
+        };
+
+        const borrowId = editingEvent.id && editingEvent.id.startsWith('borrowing-') ? editingEvent.id : `borrowing-${Date.now()}`;
+        const newEventObj = {
+          id: borrowId,
+          type: 'borrowing',
+          enabled: true,
+          borrowingType: editingEvent.borrowingType,
+          name: editingEvent.name || 'Borrowing',
+          balance: Number(editingEvent.balance) || 0,
+          interestRate: Number(editingEvent.interestRate) || 0,
+          minPayment: Number(editingEvent.minPayment) || 0,
+          startAge: editingEvent.timing === 'current' ? newInputs.currentAge : (Number(editingEvent.startAge) || (newInputs.currentAge + 1)),
+          notes: editingEvent.notes || '',
+          isExisting: editingEvent.timing === 'current',
+          timing: editingEvent.timing || (editingEvent.isExisting !== false ? 'current' : 'future'),
+          payoffPlanEnabled: !!editingEvent.payoffPlanEnabled
+        };
+
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== borrowId && e.id !== editingEvent.id);
+
+        if (newEventObj.payoffPlanEnabled) {
+          const existingPayoff = newInputs.lifeEvents.find(e => e.type === 'payoffPlan' && e.borrowingId === borrowId);
+          const extraPmt = existingPayoff ? (Number(existingPayoff.extraPayment) || 0) : 100;
+          const linkedVal = existingPayoff ? existingPayoff.linked !== false : true;
+
+          const startAgeForPayoff = linkedVal ? newEventObj.startAge : (existingPayoff ? Number(existingPayoff.startAge) : newEventObj.startAge);
+          const payoffAge = calculatePayoffAgeInline(newEventObj.balance, newEventObj.interestRate, newEventObj.minPayment, extraPmt, startAgeForPayoff);
+
+          const payoffObj = {
+            id: existingPayoff ? existingPayoff.id : `payoffPlan-${Date.now()}`,
+            type: 'payoffPlan',
+            enabled: true,
+            name: `Payoff Plan: ${newEventObj.name}`,
+            borrowingId: borrowId,
+            linked: linkedVal,
+            extraPayment: extraPmt,
+            startAge: startAgeForPayoff,
+            payoffAge: payoffAge,
+            notes: existingPayoff ? existingPayoff.notes || '' : ''
+          };
+
+          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffObj.id && !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
+          newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj, payoffObj];
+        } else {
+          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
+          newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+        }
+
+        savedEvent = newEventObj;
+
+      } else if (type === 'payoffPlan') {
+        const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
+          const r = (apr / 100) / 12;
+          const pmt = monthlyPayment + extraPayment;
+          if (balance <= 0) return startAge;
+          if (pmt <= 0) return Infinity;
+          if (pmt <= balance * r) return Infinity;
+          if (r === 0) {
+            return startAge + (balance / pmt) / 12;
+          }
+          const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
+          return startAge + months / 12;
+        };
+
+        const payoffId = editingEvent.id && editingEvent.id.startsWith('payoffPlan-') ? editingEvent.id : `payoffPlan-${Date.now()}`;
+        const borrowing = newInputs.lifeEvents.find(b => b.id === editingEvent.borrowingId);
+        
+        let startAge = Number(editingEvent.startAge);
+        if (editingEvent.linked !== false && borrowing) {
+          startAge = Number(borrowing.startAge);
+        }
+
+        const balance = borrowing ? Number(borrowing.balance) || 0 : 0;
+        const interestRate = borrowing ? Number(borrowing.interestRate) || 0 : 0;
+        const minPayment = borrowing ? Number(borrowing.minPayment) || 0 : 0;
+        const extraPayment = Number(editingEvent.extraPayment) || 0;
+
+        let payoffAge = calculatePayoffAgeInline(balance, interestRate, minPayment, extraPayment, startAge);
+
+        if (editingEvent.targetPayoffAge && editingEvent.targetPayoffAge > startAge) {
+          payoffAge = Number(editingEvent.targetPayoffAge);
+        }
+
+        const newEventObj = {
+          id: payoffId,
+          type: 'payoffPlan',
+          enabled: true,
+          name: editingEvent.name || 'Payoff Plan',
+          borrowingId: editingEvent.borrowingId,
+          linked: editingEvent.linked !== false,
+          extraPayment: extraPayment,
+          startAge: startAge,
+          payoffAge: payoffAge,
+          targetPayoffAge: editingEvent.targetPayoffAge || null,
+          notes: editingEvent.notes || ''
+        };
+
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffId && e.id !== editingEvent.id);
+        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+
+        savedEvent = newEventObj;
+
       } else {
         const isRetIncomeType = ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(type);
         let defaultName = 'Other Income';
@@ -3608,6 +3769,17 @@ export default function FireSimulator() {
             newAssets = (scen.inputs.houseAssets || []).filter(h => h.id !== houseId);
           }
         }
+        if (matchEvent.type === 'borrowing') {
+          newEvents = newEvents.filter(e => !(e.type === 'payoffPlan' && e.borrowingId === matchEvent.id));
+        }
+        if (matchEvent.type === 'payoffPlan') {
+          newEvents = newEvents.map(e => {
+            if (e.id === matchEvent.borrowingId && e.type === 'borrowing') {
+              return { ...e, payoffPlanEnabled: false };
+            }
+            return e;
+          });
+        }
 
         let newInputs = {
           ...scen.inputs,
@@ -3691,6 +3863,56 @@ export default function FireSimulator() {
         newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
           if (e.type === 'retire') {
             return { ...e, age: newAge };
+          }
+          return e;
+        });
+      } else if (evt.type === 'borrowing') {
+        newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
+          if (e.id === evt.originalId && e.type === 'borrowing') {
+            const updatedBorrowing = { ...e, startAge: newAge, age: newAge };
+            return updatedBorrowing;
+          }
+          if (e.type === 'payoffPlan' && e.borrowingId === evt.originalId) {
+            const updatedPayoff = { ...e };
+            if (e.linked) {
+              const shift = newAge - e.startAge;
+              updatedPayoff.startAge = newAge;
+              updatedPayoff.payoffAge = e.payoffAge + shift;
+              if (updatedPayoff.targetPayoffAge) {
+                updatedPayoff.targetPayoffAge = updatedPayoff.targetPayoffAge + shift;
+              }
+            }
+            return updatedPayoff;
+          }
+          return e;
+        });
+      } else if (evt.type === 'payoffPlanEnd') {
+        newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
+          if (e.id === evt.originalId && e.type === 'payoffPlan') {
+            const updatedPayoff = { ...e };
+            const borrowing = newInputs.lifeEvents.find(b => b.id === e.borrowingId);
+            if (borrowing) {
+              const startAge = borrowing.startAge !== undefined ? Number(borrowing.startAge) : newInputs.currentAge;
+              const targetPayoffAge = Math.max(startAge + 1, newAge);
+              updatedPayoff.payoffAge = targetPayoffAge;
+              updatedPayoff.targetPayoffAge = targetPayoffAge;
+
+              const r = (Number(borrowing.interestRate) || 0) / 100 / 12;
+              const n = (targetPayoffAge - startAge) * 12;
+              const balance = Number(borrowing.balance) || 0;
+              const minPayment = Number(borrowing.minPayment) || 0;
+
+              let requiredTotal = 0;
+              if (n > 0) {
+                if (r === 0) {
+                  requiredTotal = balance / n;
+                } else {
+                  requiredTotal = (balance * r) / (1 - Math.pow(1 + r, -n));
+                }
+              }
+              updatedPayoff.extraPayment = Math.max(0, requiredTotal - minPayment);
+            }
+            return updatedPayoff;
           }
           return e;
         });
@@ -4083,6 +4305,31 @@ export default function FireSimulator() {
           spousePersonalSpending: matchEvent.spousePersonalSpending,
           wizardStep: 1
         };
+      } else if (matchEvent.type === 'borrowing') {
+        defaults = {
+          ...defaults,
+          borrowingType: matchEvent.borrowingType,
+          name: matchEvent.name,
+          balance: matchEvent.balance,
+          interestRate: matchEvent.interestRate,
+          minPayment: matchEvent.minPayment,
+          startAge: matchEvent.startAge,
+          notes: matchEvent.notes,
+          isExisting: matchEvent.isExisting !== false,
+          timing: matchEvent.timing || (matchEvent.isExisting !== false || Number(matchEvent.startAge) === inputs.currentAge ? 'current' : 'future'),
+          payoffPlanEnabled: !!matchEvent.payoffPlanEnabled
+        };
+      } else if (matchEvent.type === 'payoffPlan') {
+        defaults = {
+          ...defaults,
+          borrowingId: matchEvent.borrowingId,
+          linked: matchEvent.linked !== false,
+          extraPayment: matchEvent.extraPayment,
+          startAge: matchEvent.startAge,
+          payoffAge: matchEvent.payoffAge,
+          targetPayoffAge: matchEvent.targetPayoffAge || null,
+          notes: matchEvent.notes
+        };
       }
       setEditingEvent(defaults);
       return;
@@ -4425,6 +4672,31 @@ export default function FireSimulator() {
               weddingAge: ev.weddingAge,
               filingStatus: ev.filingStatus
             });
+          } else if (ev.type === 'borrowing') {
+            events.push({
+              originalId: ev.id,
+              age,
+              title: ev.name,
+              label: ev.name,
+              icon: ev.borrowingType === 'studentLoan' ? '🎓' : ev.borrowingType === 'carLoan' ? '🚗' : ev.borrowingType === 'personalLoan' ? '💸' : '💳',
+              type: 'borrowing',
+              description: `Took out a ${ev.name} of ${formatCurrency(ev.balance)} at ${ev.interestRate}% interest (min monthly payment: ${formatCurrency(ev.minPayment)}).`
+            });
+          } else if (ev.type === 'payoffPlan') {
+            const payoffAge = Number(ev.payoffAge);
+            if (payoffAge >= inp.currentAge && payoffAge <= inp.lifeExpectancy) {
+              const borrowing = inp.lifeEvents.find(b => b.id === ev.borrowingId);
+              const bName = borrowing ? borrowing.name : 'Borrowing';
+              events.push({
+                originalId: ev.id,
+                age: payoffAge,
+                title: `Payoff End: ${bName}`,
+                label: `${bName} Paid Off`,
+                icon: '🏁',
+                type: 'payoffPlanEnd',
+                description: `Payoff Plan for "${bName}" is scheduled to complete at age ${Math.round(payoffAge * 10) / 10}.`
+              });
+            }
           }
         }
       }
@@ -4435,6 +4707,9 @@ export default function FireSimulator() {
     calculationMilestones.forEach(m => {
       if (m.type === 'sellHouse') {
         return; // Skip duplicate sellHouse dynamic milestones (already represented by Sell House event)
+      }
+      if (m.type === 'debtPayoff' && inp.lifeEvents.some(e => e.type === 'borrowing' && `${e.name} Paid Off` === m.label)) {
+        return; // Skip duplicate payoff milestones for borrowing events
       }
       events.push({
         age: m.age,
@@ -4630,6 +4905,10 @@ export default function FireSimulator() {
 
   // Summary statistics
   const totalNetWorth = displayedResults.currentNetWorth;
+  const todayLog = chartData[0] || { assets: 0, debt: 0, netWorth: 0 };
+  const todayAssets = todayLog.assets || 0;
+  const todayDebt = todayLog.debt || 0;
+  const todayNetWorth = todayLog.netWorth !== undefined ? todayLog.netWorth : totalNetWorth;
   const targetGoal = displayedResults.fiNumber || 0;
   const rawPercent = targetGoal > 0 ? Math.round((totalNetWorth / targetGoal) * 100) : 0;
   const gaugePercent = rawPercent;
@@ -4718,7 +4997,9 @@ export default function FireSimulator() {
           handleSetBudgetClick={handleSetBudgetClick}
           handleOpenSavingsDetails={handleOpenSavingsDetails}
           lastNonZeroSavingsRateRef={lastNonZeroSavingsRateRef}
-          totalNetWorth={totalNetWorth}
+          todayAssets={todayAssets}
+          todayDebt={todayDebt}
+          todayNetWorth={todayNetWorth}
           setActiveStep={setActiveStep}
         />
       )}
