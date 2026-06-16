@@ -148,8 +148,12 @@ describe('Child Event Linked Dragging Regression Test', () => {
     // 4. Verify post-drop committed state
     // Make sure they committed to Age 45 and Age 63
     await waitFor(() => {
-      expect(birthNode.textContent).toContain('Age 45');
-      expect(endNode.textContent).toContain('Age 63');
+      const updatedBirthText = screen.getByText('👶 Have Child: Liam');
+      const updatedEndText = screen.getByText('👶 Support for Liam Ends');
+      const updatedBirthNode = updatedBirthText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+      const updatedEndNode = updatedEndText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+      expect(updatedBirthNode.textContent).toContain('Age 45');
+      expect(updatedEndNode.textContent).toContain('Age 63');
     });
 
     // Double check that there are still only 2 child milestone nodes total

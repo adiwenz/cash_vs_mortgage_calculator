@@ -197,17 +197,18 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(currentRetAgeValue).toBe(`Age ${afterRetAge}`);
 
     // Verify savings allocations inheritance
-    // Open Budget Modal from Step 2
-    const budgetBtn = screen.getAllByRole('button', { name: /Set Budget/i })[0];
-    fireEvent.click(budgetBtn);
-    
-    expect(screen.getByText(/Phase Budget/i)).toBeDefined();
+    // Select the first budget segment on the timeline (married phase)
+    const segments = document.querySelectorAll('.budget-segment');
+    fireEvent.click(segments[0]);
 
-    // Switch to Married Life phase to view partner savings
-    fireEvent.click(screen.getByRole('button', { name: /Married Life/i }));
+    // Click Edit Phase Budget in the details drawer to open the budget modal
+    const editBtn = screen.getByRole('button', { name: /Edit Phase Budget/i });
+    fireEvent.click(editBtn);
+    
+    expect(screen.getByRole('heading', { name: /Phase Budget/i })).toBeDefined();
 
     // Expand Savings section
-    fireEvent.click(screen.getAllByText(/Save & Invest/i)[0]);
+    fireEvent.click(document.querySelector('.budget-card.save'));
 
     // Click Edit Savings to enable inputs
     fireEvent.click(screen.getByText(/Edit Savings/i));
@@ -250,34 +251,36 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
 
     // 1. Establish the baseline married budget by opening and saving the budget modal once
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
-    expect(screen.getByText(/Phase Budget/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Phase Budget/i })).toBeDefined();
     
     // Save Budget immediately
     fireEvent.click(screen.getByRole('button', { name: /Save Budget/i }));
     await waitFor(() => {
-      expect(screen.queryByText(/Phase Budget/i)).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Phase Budget/i })).toBeNull();
     });
 
     const retAgeBeforeBudgetChange = parseInt(getStatsCardValue('Comfortable Age').match(/\d+/)[0], 10);
 
     // 2. Open Update Budget again to increase household spending
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
-    expect(screen.getByText(/Phase Budget/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Phase Budget/i })).toBeDefined();
 
     // Expand Needs section
-    fireEvent.click(screen.getByText('Needs'));
+    fireEvent.click(document.querySelector('.budget-modal-card .budget-card.needs') || screen.getByText('Needs'));
 
     // Click Edit Needs to enable inputs
     fireEvent.click(screen.getByText(/Edit Needs/i));
 
-    // Increase household spending: Housing Rent/Mortgage from 1500 to 2500
+    // Increase household spending: Housing Rent/Mortgage
     const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);
-    fireEvent.change(housingInput, { target: { value: '2500' } });
+    const currentHousingVal = parseInt(housingInput.value, 10) || 1500;
+    const newHousingVal = String(currentHousingVal + 1000);
+    fireEvent.change(housingInput, { target: { value: newHousingVal } });
 
     // Save Budget
     fireEvent.click(screen.getByRole('button', { name: /Save Budget/i }));
     await waitFor(() => {
-      expect(screen.queryByText(/Phase Budget/i)).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Phase Budget/i })).toBeNull();
     });
 
     // Verify retirement age recalculates (it should increase since spending is higher)

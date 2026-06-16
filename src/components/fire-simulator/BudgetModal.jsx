@@ -41,9 +41,14 @@ export default function BudgetModal({
     inputs.budgetDetails?.defaultTemplate || { needsPct: 50, wantsPct: 30, savingsPct: 20 }
   );
 
+  // Get normalized phases
+  const normalizedPhases = getNormalizedPhases(inputs);
+  const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
+  const isRetirementPhase = activePhaseObj?.type === 'retire';
+
   const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
-  const isMarriedMode = !!marriageEvent;
-  const partnerMonthlyIncome = isMarriedMode ? Math.round(Number(marriageEvent.spouseIncome || 0) / 12) : 0;
+  const isMarriedMode = isBudgetOpenFromMarriageWizard ? true : (activePhaseObj ? !!activePhaseObj.isMarried : !!marriageEvent);
+  const partnerMonthlyIncome = isMarriedMode ? Math.round(Number(marriageEvent?.spouseIncome || activePhaseObj?.spouseIncome || 0) / 12) : 0;
   const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
 
   const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
@@ -67,11 +72,6 @@ export default function BudgetModal({
   const totalUserAllocationPct = Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
   const totalPartnerAllocationPct = isMarriedMode ? Object.values(budgetPartnerSavings).reduce((sum, val) => sum + val, 0) : 0;
   const totalAllocationPct = totalUserAllocationPct + totalPartnerAllocationPct;
-
-  // Get normalized phases
-  const normalizedPhases = getNormalizedPhases(inputs);
-  const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
-  const isRetirementPhase = activePhaseObj?.type === 'retire';
 
   const activeDebts = getActiveDebtsForAge(inputs, activePhaseObj?.startAge || inputs.currentAge);
   const [decideLater, setDecideLater] = useState(false);
@@ -295,150 +295,7 @@ export default function BudgetModal({
       >
         <div className="budget-modal-layout">
           
-          {/* Left Sidebar: Phase Navigator & Template */}
-          <div className="budget-phase-navigator-sidebar" style={{
-            width: '280px',
-            borderRight: '1px solid var(--border-color)',
-            background: 'rgba(15, 23, 42, 0.4)',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '1.25rem 1rem',
-            overflowY: 'auto',
-            gap: '1.5rem',
-            boxSizing: 'border-box'
-          }}>
-            <div>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                Life Phases
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {normalizedPhases.map((phase) => {
-                  const isActive = activeBudgetPhase === phase.id;
-                  return (
-                    <button
-                      key={phase.id}
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        width: '100%',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '6px',
-                        background: isActive ? 'var(--primary)' : 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid',
-                        borderColor: isActive ? 'var(--primary)' : 'var(--border-color)',
-                        color: isActive ? '#fff' : 'var(--text-primary)',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                      }}
-                      onClick={() => handleSwitchBudgetPhase(phase.id)}
-                    >
-                      <span style={{ fontSize: '1.1rem' }}>{phase.icon}</span>
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {phase.name}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: isActive ? 'rgba(255, 255, 255, 0.8)' : 'var(--text-tertiary)' }}>
-                          Age {phase.startAge}–{phase.endAge}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            <div style={{ marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                Default Template
-              </h4>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', margin: '0 0 0.75rem 0', lineHeight: '1.3' }}>
-                Sets starting allocations (must total 100%) for new phases.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                    <span>Needs:</span>
-                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.needsPct}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    style={{ width: '100%', accentColor: 'var(--primary)' }}
-                    value={defaultTemplate.needsPct}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setDefaultTemplate(prev => {
-                        const newNeeds = val;
-                        const remaining = 100 - newNeeds;
-                        const currSum = prev.wantsPct + prev.savingsPct;
-                        const factor = currSum > 0 ? remaining / currSum : 0.5;
-                        const newWants = currSum > 0 ? Math.round(prev.wantsPct * factor) : Math.round(remaining / 2);
-                        const newSavings = 100 - newNeeds - newWants;
-                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
-                      });
-                    }}
-                  />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                    <span>Wants:</span>
-                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.wantsPct}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    style={{ width: '100%', accentColor: 'var(--primary)' }}
-                    value={defaultTemplate.wantsPct}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setDefaultTemplate(prev => {
-                        const newWants = val;
-                        const remaining = 100 - newWants;
-                        const currSum = prev.needsPct + prev.savingsPct;
-                        const factor = currSum > 0 ? remaining / currSum : 0.5;
-                        const newNeeds = currSum > 0 ? Math.round(prev.needsPct * factor) : Math.round(remaining / 2);
-                        const newSavings = 100 - newNeeds - newWants;
-                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
-                      });
-                    }}
-                  />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                    <span>Savings:</span>
-                    <span style={{ fontWeight: 'bold' }}>{defaultTemplate.savingsPct}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    style={{ width: '100%', accentColor: 'var(--primary)' }}
-                    value={defaultTemplate.savingsPct}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setDefaultTemplate(prev => {
-                        const newSavings = val;
-                        const remaining = 100 - newSavings;
-                        const currSum = prev.needsPct + prev.wantsPct;
-                        const factor = currSum > 0 ? remaining / currSum : 0.5;
-                        const newNeeds = currSum > 0 ? Math.round(prev.needsPct * factor) : Math.round(remaining / 2);
-                        const newWants = 100 - newNeeds - newSavings;
-                        return { needsPct: newNeeds, wantsPct: newWants, savingsPct: newSavings };
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Left/Main Column */}
           <div className="budget-main-col">

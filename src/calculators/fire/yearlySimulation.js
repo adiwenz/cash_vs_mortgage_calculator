@@ -960,6 +960,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
     const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
     logs.push({
+      intervalId: activePhaseForAge ? activePhaseForAge.id : null,
       year,
       age,
       income: annualIncome + windfallReceived,

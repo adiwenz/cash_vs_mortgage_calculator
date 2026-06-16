@@ -246,6 +246,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
       assetBalance: log.portfolio ?? 0,
       netWorth: log.netWorth ?? 0,
       retirementStatus: log.age >= (normInputs.targetRetirementAge ?? 65) ? 'Retired' : 'Working',
+      intervalId: log.intervalId ?? null,
       activeEvents: activeEventsThisAge,
       warningsErrors: log.shortfall > 0 ? [`Shortfall of ${log.shortfall} encountered`] : []
     };
@@ -260,6 +261,8 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     failureReason: res.moneyLasts ? null : `Portfolio depleted at age ${res.runOutAge}`
   };
 
+  const boundaries = Array.from(new Set(simPhases.flatMap(p => [p.startAge, p.endAge]))).sort((a, b) => a - b);
+
   return {
     rawInputs,
     normalizedInputs: normInputs,
@@ -270,6 +273,24 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     debts,
     events: debugEvents,
     yearlyTimeline: computedTimeline,
-    finalResult
+    finalResult,
+    boundaries,
+    generatedBudgetIntervals: simPhases.map(p => ({
+      id: p.id,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      activeEvents: p.activeEvents || [],
+      label: p.label || p.name,
+      icon: p.icon,
+      type: p.type,
+      resolvedBudget: {
+        income: p.income,
+        expenses: p.expenses,
+        savings: p.savings,
+        partnerSavings: p.partnerSavings
+      },
+      effectsApplied: p.effectsApplied || []
+    })),
+    userOverrides: rawInputs.budgetDetails?.phases || []
   };
 }

@@ -2467,6 +2467,583 @@
   transform: translateY(-1px);
 }
 
+/* --- Segmented Budget Timeline --- */
+.budget-timeline-segmented-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.budget-timeline-segmented-axis {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  margin-bottom: 0.25rem;
+}
+
+.budget-timeline-today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed #a855f7;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.budget-timeline-today-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #a855f7;
+  text-transform: uppercase;
+  background: var(--bg-primary);
+  padding: 0 4px;
+  border-radius: 4px;
+  margin-top: -16px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.budget-timeline-segmented {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
+.budget-timeline-segmented::-webkit-scrollbar {
+  height: 4px;
+}
+
+.budget-timeline-segmented::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.budget-segment {
+  position: relative;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  box-sizing: border-box;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.budget-segment:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.budget-segment.selected {
+  border: 2px solid #a855f7;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.budget-segment.selected::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 10px 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent var(--bg-secondary) transparent;
+  display: block;
+  width: 0;
+  z-index: 15;
+}
+
+.budget-segment-age {
+  font-size: 0.75rem;
+  font-weight: 800;
+  opacity: 0.9;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.budget-segment-label-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.budget-segment-icons {
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* Colors / Gradients for Phase Types */
+.budget-segment-workSave {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+}
+.budget-segment-childcare {
+  background: linear-gradient(135deg, #7c2d12, #ea580c);
+}
+.budget-segment-marriage {
+  background: linear-gradient(135deg, #881337, #db2777);
+}
+.budget-segment-debt,
+.budget-segment-studentLoan,
+.budget-segment-creditCard,
+.budget-segment-carLoan,
+.budget-segment-mortgage {
+  background: linear-gradient(135deg, #4c1d95, #7c3aed);
+}
+.budget-segment-careerChange {
+  background: linear-gradient(135deg, #164e63, #0891b2);
+}
+.budget-segment-debtFree {
+  background: linear-gradient(135deg, #115e59, #0d9488);
+}
+.budget-segment-retire {
+  background: linear-gradient(135deg, #064e3b, #10b981);
+}
+
+/* --- Inline Selected Phase Inspector --- */
+.selected-phase-inspector {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.inspector-layout {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.inspector-left-col {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.inspector-right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.inspector-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.inspector-emoji {
+  font-size: 2rem;
+}
+
+.inspector-title-text h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.inspector-title-text p {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0.15rem 0 0 0;
+}
+
+.inspector-cards-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.inspector-card {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.1rem;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.inspector-card h3 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.05em;
+}
+
+.card-header-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.card-header-with-action h3 {
+  margin-bottom: 0;
+}
+
+.card-content {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-grow: 1;
+}
+
+.no-data-text {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Why budget lists */
+.why-budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.flow-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.expense-text {
+  color: var(--accent-rose);
+  font-weight: 600;
+}
+
+.income-text {
+  color: var(--accent-emerald);
+  font-weight: 600;
+}
+
+.neutral-text {
+  color: var(--text-secondary);
+}
+
+.flow-item.net-change {
+  border-top: 1px dashed var(--border-color);
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  font-weight: 700;
+}
+
+/* Active events */
+.active-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.event-icon {
+  font-size: 1.25rem;
+}
+
+.event-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.event-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.event-range {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+
+/* Budget Equation block */
+.budget-equation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.25rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.equation-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 80px;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.equation-block.income { border-color: rgba(99, 102, 241, 0.15); }
+.equation-block.needs { border-color: rgba(239, 68, 68, 0.15); }
+.equation-block.wants { border-color: rgba(245, 158, 11, 0.15); }
+.equation-block.savings { border-color: rgba(16, 185, 129, 0.15); }
+
+.block-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.15rem;
+}
+
+.block-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.block-subtext {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  margin-top: 0.1rem;
+}
+
+.equation-operator {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-tertiary);
+  padding: 0 0.25rem;
+}
+
+/* Savings Allocations */
+.savings-allocation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.savings-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.savings-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.savings-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.savings-value {
+  color: var(--text-secondary);
+}
+
+.savings-progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.savings-progress-bar {
+  height: 100%;
+  background: var(--accent-emerald);
+  border-radius: 3px;
+}
+
+/* Debts */
+.debt-obligations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.debt-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.debt-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.debt-kpis {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.debt-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.debt-kpi span {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.debt-kpi strong {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+/* Impact card */
+.impact-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  padding-bottom: 0.35rem;
+}
+
+.metric-row:last-child {
+  border-bottom: none;
+}
+
+.metric-row span {
+  color: var(--text-secondary);
+}
+
+.metric-row strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+/* Recommendations card */
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rec-item {
+  padding: 0.5rem 0.65rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 4px 4px 0;
+}
+
+.rec-item h4 {
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--primary-light);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rec-item p {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin: 0.15rem 0 0 0;
+  line-height: 1.3;
+}
+
+.next-phase-card p {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Mobile Responsiveness for segmented timeline & inspector */
+@media (max-width: 768px) {
+  .inspector-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .inspector-cards-row {
+    flex-direction: column;
+  }
+  
+  .segment-label-full {
+    display: none;
+  }
+  
+  .segment-label-short {
+    display: inline;
+  }
+  
+  .equation-operator {
+    display: none;
+  }
+  
+  .budget-equation {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .equation-block {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0.4rem 0.75rem;
+  }
+  
+  .block-subtext {
+    margin-top: 0;
+    margin-left: 0.5rem;
+  }
+}
+
+
 
 
 
