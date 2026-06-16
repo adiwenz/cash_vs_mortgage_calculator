@@ -2365,5 +2365,76 @@
   }
 }
 
+/* --- Milestone Selection & Swimlane Highlights --- */
+
+/* Selected Milestone Glow and Ring Highlight */
+.milestone-circle-wrapper.selected {
+  transform: translateX(-50%) scale(1.1) !important;
+  z-index: 50 !important;
+}
+
+.milestone-circle-wrapper.selected.standard-milestone .milestone-glow-circle {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.6), 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--primary) !important;
+}
+
+.milestone-circle-wrapper.selected.milestone-event .milestone-glow-circle {
+  border-color: var(--accent-emerald) !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.6), 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-emerald) !important;
+}
+
+.financial-milestone-wrapper.selected {
+  transform: translateX(-50%) scale(1.1) !important;
+  z-index: 50 !important;
+}
+
+.financial-milestone-wrapper.selected .financial-milestone-dot {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.6), 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--primary) !important;
+  opacity: 1 !important;
+}
+
+/* Force tooltip visibility when wrapper is selected */
+.milestone-circle-wrapper.selected .timeline-tooltip,
+.financial-milestone-wrapper.selected .timeline-tooltip {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) translateY(0) !important;
+  pointer-events: auto;
+}
+
+.milestone-circle-wrapper.selected .timeline-tooltip.align-left,
+.financial-milestone-wrapper.selected .timeline-tooltip.align-left {
+  transform: translateY(0) !important;
+}
+
+.milestone-circle-wrapper.selected .timeline-tooltip.align-right,
+.financial-milestone-wrapper.selected .timeline-tooltip.align-right {
+  transform: translateY(0) !important;
+}
+
+/* Highlighted Swimlane / Commitment Row & Span Styles */
+.timeline-row.highlighted {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.commitment-span.childcare.highlighted {
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3) !important;
+}
+
+.commitment-span.home.highlighted {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.3) !important;
+}
+
+.commitment-span.marriage.highlighted {
+  background: rgba(236, 72, 153, 0.18) !important;
+  border-color: rgba(236, 72, 153, 0.5) !important;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.3) !important;
+}
+
 
 

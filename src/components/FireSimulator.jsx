@@ -3684,7 +3684,18 @@ export default function FireSimulator() {
     const minAge = inputs.currentAge;
     const maxAge = inputs.lifeExpectancy;
     const totalYears = maxAge - minAge;
-    const initialAge = evt.age;
+    const initialAge = typeof evt.age === 'number' && !isNaN(evt.age) ? evt.age : (inputs.currentAge || 35);
+
+    let childEndOffset = 0;
+    if (evt.type === 'haveChild') {
+      const linkedEndEvent = timelineEvents.find(e => e.type === 'childSupportEnds' && String(e.childEventId) === String(evt.originalId));
+      if (linkedEndEvent) {
+        childEndOffset = linkedEndEvent.age - evt.age;
+      } else {
+        const lifeEv = inputs.lifeEvents?.find(e => e.id === evt.originalId);
+        childEndOffset = lifeEv?.includeCollege ? 22 : 18;
+      }
+    }
 
     dragOccurredRef.current = false;
 
@@ -3694,7 +3705,8 @@ export default function FireSimulator() {
       type: evt.type,
       initialAge,
       currentAge: initialAge,
-      startX
+      startX,
+      childEndOffset
     });
 
     const handleDragMove = (moveEvent) => {
@@ -3715,6 +3727,9 @@ export default function FireSimulator() {
         const buyEv = inputs.lifeEvents?.find(e => e.type === 'buyHouse' && e.houseId === evt.houseId);
         const minLimit = buyEv ? Number(buyEv.purchaseAge !== undefined ? buyEv.purchaseAge : buyEv.age) + 1 : minAge;
         newAge = Math.max(minLimit, Math.min(maxAge, newAge));
+      } else if (evt.type === 'haveChild') {
+        const offset = childEndOffset || 18;
+        newAge = Math.max(minAge, Math.min(maxAge - offset, newAge));
       } else {
         newAge = Math.max(minAge, Math.min(maxAge, newAge));
       }
@@ -4167,7 +4182,17 @@ export default function FireSimulator() {
     // 3. Life Events & Asset Transfers
     inp.lifeEvents.forEach(ev => {
       if (ev.enabled) {
-        const age = Number(ev.purchaseAge || ev.birthAge || ev.startAge || ev.claimingAge || ev.ageReceived || ev.transferAge || ev.age);
+        const age = Number(
+          ev.purchaseAge !== undefined ? ev.purchaseAge :
+          ev.birthAge !== undefined ? ev.birthAge :
+          ev.parentAgeAtBirth !== undefined ? ev.parentAgeAtBirth :
+          ev.startAge !== undefined ? ev.startAge :
+          ev.claimingAge !== undefined ? ev.claimingAge :
+          ev.ageReceived !== undefined ? ev.ageReceived :
+          ev.transferAge !== undefined ? ev.transferAge :
+          ev.age !== undefined ? ev.age :
+          35
+        );
         if (age >= inp.currentAge && age <= inp.lifeExpectancy) {
           if (ev.type === 'buyHouse') {
             const asset = inp.houseAssets?.find(h => h.id === ev.houseId) || ev;
@@ -4280,6 +4305,7 @@ export default function FireSimulator() {
                 icon: '👶',
                 type: 'childSupportEnds',
                 isMilestone: true,
+                childEventId: ev.id,
                 description: ev.childName 
                   ? `General support and childcare expenses for ${ev.childName} born when you were Age ${age} have ended (support term: ${supportEndAge} years).`
                   : `General support and childcare expenses for child born when you were Age ${age} have ended (support term: ${supportEndAge} years).`
@@ -4556,7 +4582,29 @@ export default function FireSimulator() {
       }
     });
 
-    return sorted.map(evt => {
+    const deduplicatedSorted = sorted.filter((evt, index) => {
+      if (evt.type === 'lifestyle' || evt.type === 'career') {
+        const hasPrimaryDuplicate = sorted.some((otherEvt, otherIndex) => {
+          if (otherIndex === index) return false;
+          if (otherEvt.age !== evt.age) return false;
+          
+          const isPrimary = ['haveChild', 'marriage', 'buyHouse', 'sellHouse', 'retire', 'college', 'sabbatical', 'windfall', 'assetTransfer'].includes(otherEvt.type);
+          if (!isPrimary) return false;
+          
+          if (otherEvt.icon === evt.icon) return true;
+          if (evt.icon === '👶' && otherEvt.type === 'haveChild') return true;
+          if (evt.icon === '💍' && otherEvt.type === 'marriage') return true;
+          if (evt.icon === '🏠' && (otherEvt.type === 'buyHouse' || otherEvt.type === 'sellHouse')) return true;
+          if ((evt.icon === '🏖️' || evt.icon === '🏖') && otherEvt.type === 'retire') return true;
+          
+          return false;
+        });
+        if (hasPrimaryDuplicate) return false;
+      }
+      return true;
+    });
+
+    return deduplicatedSorted.map(evt => {
       let stackIndex = 0;
       if (evt.houseId && houseSlots[evt.houseId] !== undefined) {
         stackIndex = houseSlots[evt.houseId];
@@ -8901,12 +8949,45 @@ export default function FireSimulator() {
                           <div className="timeline-track-inner">
                             <div className="events-axis-line" />
                             {timelineEvents.map((evt, idx) => {
-                              const isDraggingThis = !!(draggingInfo && (
-                                (evt.originalId && draggingInfo.originalId === evt.originalId) ||
-                                (!evt.originalId && draggingInfo.type === evt.type)
+                              const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
+                              const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
+                              const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
+
+                              const isSelected = !!(editingEvent && (
+                                (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
+                                (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
                               ));
 
-                              const displayAge = isDraggingThis ? draggingInfo.currentAge : evt.age;
+                              const displayAge = (() => {
+                                if (isPrimaryDragging) {
+                                  return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+                                }
+                                if (isLinkedDragging) {
+                                  const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
+                                  const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
+                                  const linkedEndDisplayAge = draggedDisplayAge + offset;
+
+                                  // Temporary console assertions as requested
+                                  console.log('[Child Linked Drag Debug]', {
+                                    childStartAge: draggedDisplayAge,
+                                    childEndAge: evt.age,
+                                    childEndOffset: offset,
+                                    draggedDisplayAge,
+                                    linkedEndDisplayAge
+                                  });
+                                  if (offset !== 0 && linkedEndDisplayAge === draggedDisplayAge) {
+                                    console.error('[Assert Failed] linkedEndDisplayAge is equal to draggedDisplayAge during dragging preview!');
+                                  }
+
+                                  return linkedEndDisplayAge;
+                                }
+                                if (isDraggingThis && evt.type === 'retire') {
+                                  return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+                                }
+                                return evt.age;
+                              })();
+
+
                               const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
                               const isFinancial = isFinancialEvent(evt);
 
@@ -8914,7 +8995,7 @@ export default function FireSimulator() {
                                 return (
                                   <div
                                     key={idx}
-                                    className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''}`}
+                                    className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
                                     style={{
                                       left: `${percent}%`,
                                       bottom: `${16 + (evt.stackIndex * 38)}px`
@@ -8987,7 +9068,7 @@ export default function FireSimulator() {
                                 return (
                                   <div
                                     key={idx}
-                                    className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''}`}
+                                    className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
                                     style={{
                                       left: `${percent}%`,
                                       bottom: `${16 + (evt.stackIndex * 38)}px`
@@ -9161,15 +9242,21 @@ export default function FireSimulator() {
                       const widthPct = endPct - startPct;
                       if (widthPct <= 0) return null;
 
+                      const isRowHighlighted = !!(editingEvent && (
+                        (editingEvent.type === 'haveChild' && c.id.startsWith('childcare')) ||
+                        (editingEvent.type === 'marriage' && c.id === 'marriage') ||
+                        ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`)
+                      ));
+
                       return (
-                        <div className="timeline-row" key={c.id}>
+                        <div className={`timeline-row ${isRowHighlighted ? 'highlighted' : ''}`} key={c.id}>
                           <div className="timeline-row-label">
                             <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
                           </div>
                           <div className="timeline-row-content commitment-track">
                             <div className="timeline-track-inner">
                               <div
-                                className={c.className}
+                                className={`${c.className} ${isRowHighlighted ? 'highlighted' : ''}`}
                                 style={{
                                   left: `${startPct}%`,
                                   width: `${widthPct}%`
