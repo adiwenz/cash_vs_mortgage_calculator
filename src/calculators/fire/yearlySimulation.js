@@ -899,66 +899,54 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     const isSavingPeriod = !isCoasting && age < targetRetirementAge;
 
-    let customPreTaxAllocationsThisYear = 0;
-    let simpleUserPreTax = 0;
-    let simpleSpousePreTax = 0;
+    const actualContributions = {
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      brokerage: 0,
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
+      other: 0,
+      debt: 0
+    };
 
-    if (isSavingPeriod) {
-      if (!isAdvanced) {
-        const userPreTaxRate = Number(profile.preTaxSavingsRate) || 0;
-        const userIncomeThisYear = annualIncome - spouseIncomeThisYear;
-        simpleUserPreTax = userIncomeThisYear * (userPreTaxRate / 100);
-        
-        if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
-          simpleSpousePreTax = spouseIncomeThisYear * (spouseSavingsRate / 100);
+    const activeBudgetPhase = simPhases.find(p => age >= p.startAge && age < p.endAge);
+
+    if (isSavingPeriod && activeBudgetPhase) {
+      const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
+      const savings = activeBudgetPhase.savings || {};
+      const partnerSavings = activeBudgetPhase.partnerSavings || {};
+      const preTaxKeys = ['trad401k', 'tradIra', 'hsa'];
+
+      const uPreTax = {};
+      const pPreTax = {};
+      let totalPreTaxTarget = 0;
+
+      if (grossSurplus > 0) {
+        if (mode === 'percentSurplus') {
+          preTaxKeys.forEach(k => {
+            uPreTax[k] = grossSurplus * ((Number(savings[k]) || 0) / 100);
+            pPreTax[k] = grossSurplus * ((Number(partnerSavings[k]) || 0) / 100);
+            totalPreTaxTarget += uPreTax[k] + pPreTax[k];
+          });
+        } else {
+          preTaxKeys.forEach(k => {
+            uPreTax[k] = (Number(savings[k]) || 0) * 12;
+            pPreTax[k] = (Number(partnerSavings[k]) || 0) * 12;
+            totalPreTaxTarget += uPreTax[k] + pPreTax[k];
+          });
         }
-        totalPreTaxAllocations += simpleUserPreTax + simpleSpousePreTax;
-      } else if (grossSurplus > 0) {
-        customAssets.forEach(ca => {
-          if (ca.endAge !== null && age >= ca.endAge) return;
-          if (ca.monthlyContribution > 0) {
-            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-            if (isPreTax) {
-              const annualContribution = ca.monthlyContribution * 12;
-              customPreTaxAllocationsThisYear += annualContribution;
-            }
-          }
-        });
-        customPreTaxAllocationsThisYear = Math.min(grossSurplus, customPreTaxAllocationsThisYear);
-        totalPreTaxAllocations += customPreTaxAllocationsThisYear;
 
-        let tempGrossSurplus = grossSurplus - customPreTaxAllocationsThisYear;
-
-        sortedAllocations.forEach(rule => {
-          const dest = rule.destination;
-          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-          if (isPreTax && tempGrossSurplus > 0) {
-            let incomeBase = annualIncome;
-            if (rule.belongsTo === 'spouse') {
-              incomeBase = spouseIncomeThisYear;
-            } else if (rule.belongsTo === 'user') {
-              incomeBase = annualIncome - spouseIncomeThisYear;
-            }
-
-            let amt = 0;
-            if (rule.type === 'fixed') {
-              amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
-            } else if (rule.type === 'percentIncome') {
-              amt = incomeBase * (Number(rule.value) / 100);
-            } else if (rule.type === 'percentSurplus') {
-              amt = tempGrossSurplus * (Number(rule.value) / 100);
-            }
-
-            if (rule.smartRule && rule.smartRule.enabled) {
-              const targetVal = Number(rule.smartRule.targetValue) || 0;
-              const space = Math.max(0, targetVal - (balances[dest] || 0));
-              amt = Math.min(amt, space);
-            }
-
-            const allocatedAmt = Math.max(0, Math.min(tempGrossSurplus, amt));
-            tempGrossSurplus -= allocatedAmt;
-            rule.computedPreTaxAmt = allocatedAmt;
-            totalPreTaxAllocations += allocatedAmt;
+        const scale = totalPreTaxTarget > grossSurplus ? (grossSurplus / totalPreTaxTarget) : 1;
+        preTaxKeys.forEach(k => {
+          const uAlloc = (uPreTax[k] || 0) * scale;
+          const pAlloc = (pPreTax[k] || 0) * scale;
+          const totalAlloc = uAlloc + pAlloc;
+          if (totalAlloc > 0) {
+            totalPreTaxAllocations += totalAlloc;
+            actualContributions[k] = totalAlloc;
           }
         });
       }
@@ -978,148 +966,117 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     let netCashFlow = netSurplus;
 
     if (isSavingPeriod) {
-      if (!isAdvanced) {
-        balances.trad401k += simpleUserPreTax + simpleSpousePreTax;
-        savingsContribution += simpleUserPreTax + simpleSpousePreTax;
-      } else {
-        customAssets.forEach(ca => {
-          if (ca.endAge !== null && age >= ca.endAge) return;
-          if (ca.monthlyContribution > 0) {
-            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-            if (isPreTax) {
-              const annualContribution = ca.monthlyContribution * 12;
-              ca.balance += annualContribution;
-              savingsContribution += annualContribution;
-            }
-          }
-        });
-
-        sortedAllocations.forEach(rule => {
-          const dest = rule.destination;
-          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-          if (isPreTax) {
-            const amt = rule.computedPreTaxAmt || 0;
-            if (amt > 0) {
-              balances[dest] += amt;
-              savingsContribution += amt;
-              if (rule.employerMatch) {
-                const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
-                balances[dest] += matchAmt;
-                employerMatchContribution += matchAmt;
-              }
-            }
-          }
-        });
-      }
-
-      if (netSurplus > 0) {
-        customAssets.forEach(ca => {
-          if (ca.endAge !== null && age >= ca.endAge) return;
-          if (ca.monthlyContribution > 0) {
-            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-            if (!isPreTax) {
-              const annualContribution = ca.monthlyContribution * 12;
-              const actualContributed = Math.min(netSurplus, annualContribution);
-              ca.balance += actualContributed;
-              netSurplus -= actualContributed;
-              savingsContribution += actualContributed;
-            }
-          }
-        });
-      }
-
-      sortedAllocations.forEach(rule => {
-        const dest = rule.destination;
-        const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-        if (!isPreTax && netSurplus > 0) {
-          let amt = 0;
-          if (rule.type === 'fixed') {
-            amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
-          } else if (rule.type === 'percentIncome') {
-            amt = annualIncome * (Number(rule.value) / 100);
-          } else if (rule.type === 'percentSurplus') {
-            amt = netSurplus * (Number(rule.value) / 100);
-          }
-
-          let finalDest = dest;
-          let spaceLimit = Infinity;
-
-          if (rule.smartRule && rule.smartRule.enabled) {
-            const targetVal = Number(rule.smartRule.targetValue) || 0;
-            
-            if (dest === 'extraMortgage') {
-              const activeMortgageSum = purchasedProperties.reduce((sum, p) => sum + p.mortgageBalance, 0);
-              if (activeMortgageSum <= 0) {
-                finalDest = rule.smartRule.redirectDestination || 'brokerage';
-              } else {
-                spaceLimit = activeMortgageSum;
-              }
-            } else if (dest.startsWith('loan-') || dest === 'debtPaydown') {
-              const loanId = dest.startsWith('loan-') ? dest.replace('loan-', '') : null;
-              const targetLoan = activeLoans.find(l => l.id === loanId || l.id === dest);
-              if (!targetLoan || targetLoan.balance <= 0) {
-                finalDest = rule.smartRule.redirectDestination || 'brokerage';
-              } else {
-                spaceLimit = targetLoan.balance;
-              }
-            } else {
-              const currentBal = balances[dest] || 0;
-              if (currentBal >= targetVal) {
-                finalDest = rule.smartRule.redirectDestination || 'brokerage';
-              } else {
-                spaceLimit = Math.max(0, targetVal - currentBal);
-              }
-            }
-          }
-
-          let allocatedAmt = Math.max(0, Math.min(netSurplus, amt));
-          if (allocatedAmt > spaceLimit) {
-            const spillOver = allocatedAmt - spaceLimit;
-            allocatedAmt = spaceLimit;
-            
-            const redirectDest = (rule.smartRule && rule.smartRule.redirectDestination) || 'brokerage';
-            const spillAlloc = Math.max(0, Math.min(netSurplus - allocatedAmt, spillOver));
-            if (spillAlloc > 0) {
-              if (balances[redirectDest] !== undefined) {
-                balances[redirectDest] += spillAlloc;
-              }
-            }
-          }
-
-          if (allocatedAmt > 0) {
-            netSurplus -= allocatedAmt;
-            if (balances[finalDest] !== undefined) {
-              balances[finalDest] += allocatedAmt;
-              savingsContribution += allocatedAmt;
-            } else if (finalDest === 'extraMortgage') {
-              let mortgageRemaining = allocatedAmt;
-              for (const prop of purchasedProperties) {
-                if (prop.purchaseType === 'mortgage' && prop.mortgageBalance > 0) {
-                  const pay = Math.min(prop.mortgageBalance, mortgageRemaining);
-                  prop.mortgageBalance -= pay;
-                  mortgageRemaining -= pay;
-                  if (mortgageRemaining <= 0) break;
-                }
-              }
-            } else {
-              const loanId = finalDest.startsWith('loan-') ? finalDest.replace('loan-', '') : null;
-              const targetLoan = activeLoans.find(l => l.id === loanId || l.id === finalDest);
-              if (targetLoan) {
-                targetLoan.balance = Math.max(0, targetLoan.balance - allocatedAmt);
-              }
-            }
-          }
+      const preTaxKeys = ['trad401k', 'tradIra', 'hsa'];
+      preTaxKeys.forEach(k => {
+        const amt = actualContributions[k] || 0;
+        if (amt > 0) {
+          balances[k] += amt;
+          savingsContribution += amt;
         }
       });
+
+      if (allocationRules.length > 0) {
+        allocationRules.forEach(rule => {
+          if (rule.employerMatch) {
+            const dest = rule.destination;
+            const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
+            if (balances[dest] !== undefined) {
+              balances[dest] += matchAmt;
+              employerMatchContribution += matchAmt;
+            }
+          }
+        });
+      }
 
       if (state.cumulativeShortfall > 0 && netSurplus > 0) {
         const payDown = Math.min(state.cumulativeShortfall, netSurplus);
         state.cumulativeShortfall -= payDown;
         netSurplus -= payDown;
       }
-      if (netSurplus > 0) {
-        balances.brokerage += netSurplus;
-        savingsContribution += netSurplus;
+
+      if (activeBudgetPhase && netSurplus > 0) {
+        const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
+        const savings = activeBudgetPhase.savings || {};
+        const partnerSavings = activeBudgetPhase.partnerSavings || {};
+        const postTaxKeys = ['rothIra', 'brokerage', 'checking', 'hysa', 'emergency', 'other', 'debt'];
+
+        const uPostTax = {};
+        const pPostTax = {};
+        let totalPostTaxTarget = 0;
+
+        if (mode === 'percentSurplus') {
+          postTaxKeys.forEach(k => {
+            uPostTax[k] = netSurplus * ((Number(savings[k]) || 0) / 100);
+            pPostTax[k] = netSurplus * ((Number(partnerSavings[k]) || 0) / 100);
+            totalPostTaxTarget += uPostTax[k] + pPostTax[k];
+          });
+        } else {
+          postTaxKeys.forEach(k => {
+            uPostTax[k] = (Number(savings[k]) || 0) * 12;
+            pPostTax[k] = (Number(partnerSavings[k]) || 0) * 12;
+            totalPostTaxTarget += uPostTax[k] + pPostTax[k];
+          });
+        }
+
+        const scale = totalPostTaxTarget > netSurplus ? (netSurplus / totalPostTaxTarget) : 1;
+        const actualPostTax = {};
+        postTaxKeys.forEach(k => {
+          actualPostTax[k] = ((uPostTax[k] || 0) + (pPostTax[k] || 0)) * scale;
+        });
+
+        postTaxKeys.forEach(k => {
+          const amt = actualPostTax[k] || 0;
+          if (amt > 0) {
+            if (k === 'rothIra') {
+              balances.rothIra += amt;
+              savingsContribution += amt;
+              actualContributions.rothIra = amt;
+            } else if (k === 'brokerage') {
+              balances.brokerage += amt;
+              savingsContribution += amt;
+              actualContributions.brokerage = amt;
+            } else if (k === 'checking') {
+              balances.cash += amt;
+              savingsContribution += amt;
+              actualContributions.checking = amt;
+            } else if (k === 'hysa') {
+              balances.cash += amt;
+              savingsContribution += amt;
+              actualContributions.hysa = amt;
+            } else if (k === 'emergency') {
+              balances.emergencyFund += amt;
+              savingsContribution += amt;
+              actualContributions.emergency = amt;
+            } else if (k === 'other') {
+              balances.other += amt;
+              savingsContribution += amt;
+              actualContributions.other = amt;
+            } else if (k === 'debt') {
+              let debtRemaining = amt;
+              for (const loan of activeLoans) {
+                if (loan.balance > 0) {
+                  const pay = Math.min(loan.balance, debtRemaining);
+                  loan.balance -= pay;
+                  debtRemaining -= pay;
+                  if (debtRemaining <= 0) break;
+                }
+              }
+              if (debtRemaining > 0) {
+                balances.brokerage += debtRemaining;
+                savingsContribution += debtRemaining;
+                actualContributions.brokerage = (actualContributions.brokerage || 0) + debtRemaining;
+              }
+              actualContributions.debt = amt - debtRemaining;
+            }
+          }
+        });
+
+        if (mode === 'fixed' && netSurplus > totalPostTaxTarget) {
+          const leftover = netSurplus - totalPostTaxTarget;
+          balances.brokerage += leftover;
+          savingsContribution += leftover;
+          actualContributions.brokerage = (actualContributions.brokerage || 0) + leftover;
+        }
         netSurplus = 0;
       }
     } else {
@@ -1226,42 +1183,31 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     let plannedPreTaxSavings = 0;
     let plannedPostTaxSavings = 0;
-    if (isSavingPeriod) {
-      if (!isAdvanced) {
-        plannedPreTaxSavings += simpleUserPreTax + simpleSpousePreTax;
+    if (isSavingPeriod && activeBudgetPhase) {
+      const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
+      const savings = activeBudgetPhase.savings || {};
+      const partnerSavings = activeBudgetPhase.partnerSavings || {};
+      const preTaxKeys = ['trad401k', 'tradIra', 'hsa'];
+      const postTaxKeys = ['rothIra', 'brokerage', 'checking', 'hysa', 'emergency', 'other', 'debt'];
+
+      if (mode === 'percentSurplus') {
+        if (grossSurplus > 0) {
+          preTaxKeys.forEach(k => {
+            plannedPreTaxSavings += grossSurplus * (((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) / 100);
+          });
+        }
+        const netSurp = Math.max(0, grossSurplus - taxes + windfallReceived - totalPreTaxAllocations);
+        if (netSurp > 0) {
+          postTaxKeys.forEach(k => {
+            plannedPostTaxSavings += netSurp * (((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) / 100);
+          });
+        }
       } else {
-        customAssets.forEach(ca => {
-          if (ca.endAge === null || age < ca.endAge) {
-            const isPreTax = ca.type === 'retirement' && (ca.subtype === 'trad401k' || ca.subtype === 'tradIra' || ca.subtype === 'hsa');
-            if (isPreTax) {
-              plannedPreTaxSavings += ca.monthlyContribution * 12;
-            } else {
-              plannedPostTaxSavings += ca.monthlyContribution * 12;
-            }
-          }
+        preTaxKeys.forEach(k => {
+          plannedPreTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12;
         });
-        sortedAllocations.forEach(rule => {
-          const dest = rule.destination;
-          const isPreTax = dest === 'trad401k' || dest === 'tradIra' || dest === 'hsa';
-          
-          let incomeBase = annualIncome;
-          if (rule.belongsTo === 'spouse') {
-            incomeBase = spouseIncomeThisYear;
-          } else if (rule.belongsTo === 'user') {
-            incomeBase = annualIncome - spouseIncomeThisYear;
-          }
-          
-          let amt = 0;
-          if (rule.type === 'fixed') {
-            amt = rule.frequency === 'monthly' ? Number(rule.value) * 12 : Number(rule.value);
-          } else if (rule.type === 'percentIncome') {
-            amt = incomeBase * (Number(rule.value) / 100);
-          }
-          if (isPreTax) {
-            plannedPreTaxSavings += amt;
-          } else {
-            plannedPostTaxSavings += amt;
-          }
+        postTaxKeys.forEach(k => {
+          plannedPostTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12;
         });
       }
     }
@@ -1269,7 +1215,6 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const incomeAvailable = annualIncome + windfallReceived;
     const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
     const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
-
     logs.push({
       year,
       age,
@@ -1304,7 +1249,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       tradIraBalance: balances.tradIra + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'tradIra').reduce((sum, ca) => sum + ca.balance, 0),
       rothIraBalance: balances.rothIra + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'rothIra').reduce((sum, ca) => sum + ca.balance, 0),
       hsaBalance: balances.hsa + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'hsa').reduce((sum, ca) => sum + ca.balance, 0),
-      otherBalance: balances.other + customAssets.filter(ca => ca.type === 'asset').reduce((sum, ca) => sum + ca.balance, 0)
+      otherBalance: balances.other + customAssets.filter(ca => ca.type === 'asset').reduce((sum, ca) => sum + ca.balance, 0),
+      actualContributions: { ...actualContributions }
     });
   }
 

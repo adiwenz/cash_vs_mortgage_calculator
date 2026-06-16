@@ -37,6 +37,10 @@ import {
   computeRetirementResult
 } from './retirementReadiness.js';
 
+import {
+  buildSimulationDebugSnapshot
+} from './debug.js';
+
 export {
   getActiveChildrenCountAtAge,
   getSocialSecurityFactor,
@@ -56,7 +60,8 @@ export {
   getNormalizedPhases,
   projectYearlyBalances,
   calculateMinimumPortfolioForRetirement,
-  computeRetirementResult
+  computeRetirementResult,
+  buildSimulationDebugSnapshot
 };
 
 export function getSavingsPriority(key) {
@@ -443,6 +448,71 @@ export function runFireSimulation(inputs) {
   const phases = derivePhasesFromEvents(profile, events, inputs.budgetDetails?.phases || []);
 
   const plannedProjection = projectYearlyBalances(profile, phases, events, targetRetirementAge);
+
+  // Temporary console assertion block comparing budget vs simulation allocations
+  const currentAgeVal = Math.max(0, Number(inputs.currentAge) || 30);
+  const activePhase = phases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge);
+  if (activePhase && activePhase.savings) {
+    const firstYearLog = plannedProjection.logs[0] || {};
+    const actualContribs = firstYearLog.actualContributions || {};
+    const budgetAllocKeys = ['trad401k', 'tradIra', 'rothIra', 'hsa', 'brokerage', 'checking', 'hysa', 'emergency', 'other', 'debt'];
+    
+    let budgetTotal = 0;
+    let simTotal = 0;
+    
+    const budgetMap = {};
+    const simMap = {};
+    
+    budgetAllocKeys.forEach(k => {
+      const bVal = ((Number(activePhase.savings[k]) || 0) + (Number(activePhase.partnerSavings?.[k]) || 0)) * 12;
+      const sVal = Number(actualContribs[k]) || 0;
+      budgetTotal += bVal;
+      simTotal += sVal;
+      budgetMap[k] = bVal;
+      simMap[k] = sVal;
+    });
+
+    console.table({
+      budget: budgetMap,
+      simulation: simMap
+    });
+
+    // Check for mismatch (allowing leftover surplus in brokerage and debt paydown caps)
+    let mismatch = false;
+    const activeDebtBalanceEnd = firstYearLog.debtBalance ?? 0;
+    budgetAllocKeys.forEach(k => {
+      const bVal = budgetMap[k];
+      const sVal = simMap[k];
+      if (k === 'brokerage') {
+        if (sVal < bVal - 0.01) {
+          mismatch = true;
+        }
+      } else if (k === 'debt') {
+        if (Math.abs(bVal - sVal) > 0.01) {
+          if (sVal > bVal + 0.01 || activeDebtBalanceEnd > 0) {
+            mismatch = true;
+          }
+        }
+      } else {
+        if (Math.abs(bVal - sVal) > 0.01) {
+          mismatch = true;
+        }
+      }
+    });
+
+    // Only throw if there was enough surplus (no constraints forced actual to be lower)
+    const annualIncomeVal = firstYearLog.income || 0;
+    const taxesVal = firstYearLog.taxes || 0;
+    const expensesVal = firstYearLog.expenses || 0;
+    const budgetTotalPreTax = ['trad401k', 'tradIra', 'hsa'].reduce((sum, k) => sum + ((Number(activePhase.savings[k]) || 0) + (Number(activePhase.partnerSavings?.[k]) || 0)) * 12, 0);
+    const budgetTotalPostTax = ['rothIra', 'brokerage', 'checking', 'hysa', 'emergency', 'other', 'debt'].reduce((sum, k) => sum + ((Number(activePhase.savings[k]) || 0) + (Number(activePhase.partnerSavings?.[k]) || 0)) * 12, 0);
+    const grossSurplusVal = annualIncomeVal - expensesVal;
+    const netSurplusVal = grossSurplusVal - taxesVal - budgetTotalPreTax;
+
+    if (mismatch && grossSurplusVal >= budgetTotalPreTax && netSurplusVal >= budgetTotalPostTax) {
+      throw new Error("Budget allocations do not match simulation allocations!");
+    }
+  }
 
   const result = computeRetirementResult(profile, phases, events, plannedProjection);
 
