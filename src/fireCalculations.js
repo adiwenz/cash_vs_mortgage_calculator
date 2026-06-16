@@ -812,6 +812,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     });
 
+    let yearSocialSecurityIncome = 0;
+
     enabledEvents.forEach(ev => {
       if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
         const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
@@ -826,6 +828,9 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           }
           annualIncome += annualAmt;
           taxableIncome += annualAmt;
+          if (ev.type === 'socialSecurity') {
+            yearSocialSecurityIncome += annualAmt;
+          }
         }
       }
     });
@@ -834,6 +839,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       const spouseSSAmt = spouseSocialSecurityDetails.annualBenefit * nominalFactor;
       annualIncome += spouseSSAmt;
       taxableIncome += spouseSSAmt;
+      yearSocialSecurityIncome += spouseSSAmt;
     }
 
     let windfallReceived = 0;
@@ -1748,6 +1754,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       netWorth,
       isFI: liquidNW >= retirementReadyTargetForYear,
       fiNumber: retirementReadyTargetForYear,
+      ssIncome: yearSocialSecurityIncome,
       retirementReadyTarget: retirementReadyTargetForYear,
       coastFireNumber,
       isCoastAchieved,
@@ -1782,28 +1789,21 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     debtSummaries
   };
 }
-export function calculateMinimumPortfolioForRetirement(profile, phases, events, retirementAge, maxAgeOverride, readinessCriteria) {
-  const currentAge = Math.max(0, Number(profile.currentAge) || 30);
-  const lifeExpectancy = Math.max(currentAge + 1, Number(profile.lifeExpectancy) || 85);
-  const inflationRate = (Number(profile.inflationRate) || 3) / 100;
-  const swr = (Number(profile.swr) || 4) / 100;
-  const postRetirementReturn = profile.postRetirementReturn !== undefined
-    ? (Number(profile.postRetirementReturn) || 0) / 100
-    : (Number(profile.expectedReturn) || 7) / 100;
-
-  const simLifeExpectancy = maxAgeOverride || lifeExpectancy;
-
+export function calculateMinimumPortfolioForRetirement(profile, phases, events, retirementAge, simLifeExpectancy, readinessCriteria, excludeSS = false) {
   const testRes = projectYearlyBalances(profile, phases, events, retirementAge, simLifeExpectancy);
   const logs = testRes.logs;
 
   const retirementLogs = logs.filter(l => l.age >= retirementAge && l.age <= simLifeExpectancy);
   if (retirementLogs.length === 0) return 0;
 
+  const swr = (Number(profile.swr) || 4) / 100;
+  const postRetirementReturn = (Number(profile.postRetirementReturn) || 7) / 100;
+
   let endingTarget = 0;
   if (readinessCriteria === 'lastsIndefinitely') {
     const lastLog = retirementLogs[retirementLogs.length - 1];
     const lastNominalExpense = lastLog.expenses;
-    const lastNominalIncome = lastLog.income;
+    const lastNominalIncome = lastLog.income - (excludeSS ? (lastLog.ssIncome || 0) : 0);
     endingTarget = Math.max(0, lastNominalExpense - lastNominalIncome) / swr;
   }
 
@@ -1811,7 +1811,7 @@ export function calculateMinimumPortfolioForRetirement(profile, phases, events, 
   for (let i = retirementLogs.length - 1; i >= 0; i--) {
     const log = retirementLogs[i];
     const nominalExpense = log.expenses;
-    const nominalIncome = log.income;
+    const nominalIncome = log.income - (excludeSS ? (log.ssIncome || 0) : 0);
     const withdrawalNeeded = Math.max(0, nominalExpense - nominalIncome);
     pNext = (pNext + withdrawalNeeded) / (1 + postRetirementReturn);
   }
@@ -1877,6 +1877,8 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
       assets: (log.portfolio + log.homeValue) / factor,
       debt: (log.debtBalance + log.mortgageBalance + (log.cumulativeShortfall || 0)) / factor,
       fiNumber: log.fiNumber / factor,
+      fiNumberNoSS: log.fiNumberNoSS / factor,
+      ssIncome: log.ssIncome / factor,
       retirementReadyTarget: log.retirementReadyTarget / factor,
       coastFireNumber: log.coastFireNumber / factor,
       childCosts: log.childCosts / factor,
@@ -1970,12 +1972,30 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
 
   let retirementReadyTarget = 0;
   let nominalRetirementReadyTarget = 0;
+  let retirementReadyTargetNoSS = 0;
+  let nominalRetirementReadyTargetNoSS = 0;
   if (retirementReadyAge !== null) {
     const maxAgeOverride = readinessCriteria === 'lastsComfortable' ? maxLifeExpectancy + 10 : maxLifeExpectancy;
-    const nominalTarget = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAge, maxAgeOverride, readinessCriteria);
+    const nominalTarget = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAge, maxAgeOverride, readinessCriteria, false);
     nominalRetirementReadyTarget = nominalTarget;
     const factor = Math.pow(1 + inflationRate, retirementReadyAge - currentAge);
     retirementReadyTarget = nominalTarget / factor;
+
+    // Retire Indefinitely without SS (SWR target)
+    const nominalTargetNoSS = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAge, maxLifeExpectancy, 'lastsIndefinitely', true);
+    nominalRetirementReadyTargetNoSS = nominalTargetNoSS;
+    retirementReadyTargetNoSS = nominalTargetNoSS / factor;
+  }
+
+  let retirementReadyTargetComfortable = 0;
+  let retirementReadyTargetSurvival = 0;
+
+  if (retirementReadyAgeComfortable !== null) {
+    retirementReadyTargetComfortable = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAgeComfortable, maxLifeExpectancy + 10, 'lastsComfortable', false);
+  }
+
+  if (retirementReadyAgeSurvival !== null) {
+    retirementReadyTargetSurvival = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAgeSurvival, maxLifeExpectancy, 'lastsLifeExp', false);
   }
 
   const retirementLog = deflatedLogs.find(log => log.age === targetRetirementAge) || deflatedLogs[deflatedLogs.length - 1];
@@ -2032,6 +2052,11 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     yearsToFI: retirementReadyAge !== null ? Math.max(0, retirementReadyAge - currentAge) : null,
     retirementReadyAge: retirementReadyAge,
     retirementReadyTarget: retirementReadyTarget,
+    retirementReadyTargetNoSS: retirementReadyTargetNoSS,
+    retirementReadyTargetComfortable,
+    retirementReadyTargetSurvival,
+    deflatedRetirementReadyTargetComfortable: retirementReadyTargetComfortable / Math.pow(1 + inflationRate, (retirementReadyAgeComfortable || currentAge) - currentAge),
+    deflatedRetirementReadyTargetSurvival: retirementReadyTargetSurvival / Math.pow(1 + inflationRate, (retirementReadyAgeSurvival || currentAge) - currentAge),
     retirementReadyAgeSWR,
     retirementReadyAgeComfortable,
     retirementReadyAgeSurvival,
@@ -2053,7 +2078,9 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     deflatedData: deflatedLogs,
     nominalData: plannedProjection.logs,
     nominalRetirementReadyTarget,
+    nominalRetirementReadyTargetNoSS,
     deflatedRetirementReadyTarget: retirementReadyTarget,
+    deflatedRetirementReadyTargetNoSS: retirementReadyTargetNoSS,
     nominalPortfolioAtRetirement: nominalRetirementLog ? nominalRetirementLog.portfolio : 0,
     deflatedPortfolioAtRetirement: retirementLog ? retirementLog.portfolio : 0,
     nominalNetWorthAtRetirement: nominalRetirementLog ? nominalRetirementLog.netWorth : 0,

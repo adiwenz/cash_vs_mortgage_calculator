@@ -813,6 +813,9 @@ export default function FireSimulator() {
       ...activeResults,
       data: isNominal ? activeResults.nominalData : activeResults.deflatedData,
       retirementReadyTarget: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
+      retirementReadyTargetNoSS: isNominal ? activeResults.nominalRetirementReadyTargetNoSS : activeResults.deflatedRetirementReadyTargetNoSS,
+      retirementReadyTargetComfortable: isNominal ? activeResults.retirementReadyTargetComfortable : activeResults.deflatedRetirementReadyTargetComfortable,
+      retirementReadyTargetSurvival: isNominal ? activeResults.retirementReadyTargetSurvival : activeResults.deflatedRetirementReadyTargetSurvival,
       portfolioAtRetirement: isNominal ? activeResults.nominalPortfolioAtRetirement : activeResults.deflatedPortfolioAtRetirement,
       netWorthAtRetirement: isNominal ? activeResults.nominalNetWorthAtRetirement : activeResults.deflatedNetWorthAtRetirement,
       annualRetirementSpending: isNominal ? activeResults.nominalAnnualRetirementSpending : activeResults.deflatedAnnualRetirementSpending,
@@ -828,6 +831,9 @@ export default function FireSimulator() {
       ...baselineResults,
       data: isNominal ? baselineResults.nominalData : baselineResults.deflatedData,
       retirementReadyTarget: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget,
+      retirementReadyTargetNoSS: isNominal ? baselineResults.nominalRetirementReadyTargetNoSS : baselineResults.deflatedRetirementReadyTargetNoSS,
+      retirementReadyTargetComfortable: isNominal ? baselineResults.retirementReadyTargetComfortable : baselineResults.deflatedRetirementReadyTargetComfortable,
+      retirementReadyTargetSurvival: isNominal ? baselineResults.retirementReadyTargetSurvival : baselineResults.deflatedRetirementReadyTargetSurvival,
       portfolioAtRetirement: isNominal ? baselineResults.nominalPortfolioAtRetirement : baselineResults.deflatedPortfolioAtRetirement,
       netWorthAtRetirement: isNominal ? baselineResults.nominalNetWorthAtRetirement : baselineResults.deflatedNetWorthAtRetirement,
       annualRetirementSpending: isNominal ? baselineResults.nominalAnnualRetirementSpending : baselineResults.deflatedAnnualRetirementSpending,
@@ -4075,9 +4081,14 @@ export default function FireSimulator() {
     const roadmapLabel = criteria === 'lastsLifeExp' ? 'Sustainable' : criteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite';
     const retirementReadyAge = results.retirementReadyAge;
     if (retirementReadyAge) {
+      const targetValForStory = criteria === 'lastsLifeExp'
+        ? results.retirementReadyTargetSurvival
+        : criteria === 'lastsComfortable'
+          ? results.retirementReadyTargetComfortable
+          : results.retirementReadyTarget;
       list.push({
         age: retirementReadyAge,
-        text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(results.retirementReadyTarget)})</strong>`
+        text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(targetValForStory)})</strong>`
       });
     }
 
@@ -8478,9 +8489,15 @@ export default function FireSimulator() {
             const readyAge = activeResults.retirementReadyAge;
             const isNotAchieved = readyAge === null || targetRetAge < readyAge;
 
+            const criteriaTarget = inputs.readinessCriteria === 'lastsLifeExp'
+              ? activeResults.retirementReadyTargetSurvival
+              : inputs.readinessCriteria === 'lastsComfortable'
+                ? activeResults.retirementReadyTargetComfortable
+                : activeResults.retirementReadyTarget;
+
             const gapAmount = activeResults.endingSurplusShortfall < 0 
               ? -activeResults.endingSurplusShortfall 
-              : Math.max(0, activeResults.retirementReadyTarget - activeResults.portfolioAtRetirement);
+              : Math.max(0, criteriaTarget - activeResults.portfolioAtRetirement);
             
             const yearsAdditionalWork = readyAge ? Math.max(0, readyAge - targetRetAge) : 0;
             
@@ -8703,14 +8720,26 @@ export default function FireSimulator() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                      {inputs.readinessCriteria === 'lastsLifeExp' 
-                        ? 'Sustainable Target' 
-                        : inputs.readinessCriteria === 'lastsComfortable' 
-                          ? 'Comfortable Target' 
-                          : 'Indefinite Target'}
+                      retire indefinitely without SS
                     </span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                      {formatCurrency(displayedResults.retirementReadyTarget)}
+                      {formatCurrency(displayedResults.retirementReadyTargetNoSS)}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                      {inputs.readinessCriteria === 'lastsLifeExp' 
+                        ? 'retire sustainably, taking SS at selected year' 
+                        : inputs.readinessCriteria === 'lastsComfortable' 
+                          ? 'retire comfortably, taking SS at the selected year' 
+                          : 'retire indefinitely, taking SS at selected year'}
+                    </span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                      {inputs.readinessCriteria === 'lastsLifeExp' 
+                        ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
+                        : inputs.readinessCriteria === 'lastsComfortable' 
+                          ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
+                          : formatCurrency(displayedResults.retirementReadyTarget)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
@@ -8907,6 +8936,19 @@ export default function FireSimulator() {
                               ));
 
                               const displayAge = isDraggingThis ? draggingInfo.currentAge : evt.age;
+
+                              if (draggingInfo) {
+                                console.log('[Drag Debug]', {
+                                  title: evt.title,
+                                  type: evt.type,
+                                  originalId: evt.originalId,
+                                  childEventId: evt.childEventId,
+                                  isDraggingThis,
+                                  evtAge: evt.age,
+                                  displayAge,
+                                  draggingInfo
+                                });
+                              }
                               const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
                               const isFinancial = isFinancialEvent(evt);
 
