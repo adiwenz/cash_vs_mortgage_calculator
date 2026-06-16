@@ -821,7 +821,8 @@ export default function FireSimulator() {
       annualRetirementSpending: isNominal ? activeResults.nominalAnnualRetirementSpending : activeResults.deflatedAnnualRetirementSpending,
       endingSurplusShortfall: isNominal ? activeResults.nominalEndingSurplusShortfall : activeResults.deflatedEndingSurplusShortfall,
       retirementIncomeSources: isNominal ? activeResults.nominalRetirementIncomeSources : activeResults.deflatedRetirementIncomeSources,
-      fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget
+      fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
+      retireTodayTarget: activeResults.retireTodayTarget
     };
   }, [activeResults, displayMode]);
 
@@ -839,7 +840,8 @@ export default function FireSimulator() {
       annualRetirementSpending: isNominal ? baselineResults.nominalAnnualRetirementSpending : baselineResults.deflatedAnnualRetirementSpending,
       endingSurplusShortfall: isNominal ? baselineResults.nominalEndingSurplusShortfall : baselineResults.deflatedEndingSurplusShortfall,
       retirementIncomeSources: isNominal ? baselineResults.nominalRetirementIncomeSources : baselineResults.deflatedRetirementIncomeSources,
-      fiNumber: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget
+      fiNumber: isNominal ? baselineResults.nominalRetirementReadyTarget : baselineResults.deflatedRetirementReadyTarget,
+      retireTodayTarget: baselineResults.retireTodayTarget
     };
   }, [baselineResults, displayMode]);
 
@@ -8758,6 +8760,31 @@ export default function FireSimulator() {
                       {formatCurrency(displayedResults.annualRetirementSpending)} / yr
                     </strong>
                   </div>
+                </div>
+
+                {/* 🏖 Retire Today Compact Secondary Card */}
+                <div style={{ 
+                  marginTop: '0.65rem', 
+                  padding: '0.4rem 0.6rem', 
+                  background: 'rgba(255, 255, 255, 0.015)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '1rem' }}>🏖️</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-primary)' }}>🏖 Retire Today</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>“Portfolio needed today to replace your current spending.”</span>
+                    </div>
+                  </div>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                    {formatCurrency(displayedResults.retireTodayTarget)}
+                  </strong>
                 </div>
 
                 {/* Retirement Improvement Plan Banner (Compact) */}

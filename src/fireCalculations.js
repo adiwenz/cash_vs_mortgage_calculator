@@ -1998,6 +1998,10 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     retirementReadyTargetSurvival = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAgeSurvival, maxLifeExpectancy, 'lastsLifeExp', false);
   }
 
+  const swrVal = profile.swr !== undefined && profile.swr !== null ? Number(profile.swr) : 0.04;
+  const currentExpenses = profile.simpleExpenses !== undefined && profile.simpleExpenses !== null ? Number(profile.simpleExpenses) : 42500;
+  const retireTodayTarget = swrVal > 0 ? currentExpenses / swrVal : 0;
+
   const retirementLog = deflatedLogs.find(log => log.age === targetRetirementAge) || deflatedLogs[deflatedLogs.length - 1];
   const finalSurplusShortfall = plannedProjection.endingSurplusShortfall / Math.pow(1 + inflationRate, simYearsToCompute);
 
@@ -2055,6 +2059,7 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     retirementReadyTargetNoSS: retirementReadyTargetNoSS,
     retirementReadyTargetComfortable,
     retirementReadyTargetSurvival,
+    retireTodayTarget,
     deflatedRetirementReadyTargetComfortable: retirementReadyTargetComfortable / Math.pow(1 + inflationRate, (retirementReadyAgeComfortable || currentAge) - currentAge),
     deflatedRetirementReadyTargetSurvival: retirementReadyTargetSurvival / Math.pow(1 + inflationRate, (retirementReadyAgeSurvival || currentAge) - currentAge),
     retirementReadyAgeSWR,
