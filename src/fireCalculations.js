@@ -1796,8 +1796,8 @@ export function calculateMinimumPortfolioForRetirement(profile, phases, events, 
   const retirementLogs = logs.filter(l => l.age >= retirementAge && l.age <= simLifeExpectancy);
   if (retirementLogs.length === 0) return 0;
 
-  const swr = (Number(profile.swr) || 4) / 100;
-  const postRetirementReturn = (Number(profile.postRetirementReturn) || 7) / 100;
+  const swr = profile.swr !== undefined && profile.swr !== null ? Number(profile.swr) : 0.04;
+  const postRetirementReturn = profile.postRetirementReturn !== undefined && profile.postRetirementReturn !== null ? Number(profile.postRetirementReturn) : 0.07;
 
   let endingTarget = 0;
   if (readinessCriteria === 'lastsIndefinitely') {
