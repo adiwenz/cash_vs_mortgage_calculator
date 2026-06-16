@@ -38,7 +38,7 @@ describe('Child Event Linked Dragging Regression Test', () => {
     render(<FireSimulator />);
     
     // Click "Build My Life Plan" to go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Build My Life Plan/i })[0];
+    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
 
     // Expand Advanced Detail accordion

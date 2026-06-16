@@ -5001,6 +5001,7 @@ export default function FireSimulator() {
           todayDebt={todayDebt}
           todayNetWorth={todayNetWorth}
           setActiveStep={setActiveStep}
+          displayedResults={displayedResults}
         />
       )}
 
