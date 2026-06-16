@@ -4,7 +4,10 @@ description: Git commit, merge to main, push, and delete the active branch/workt
 ---
 # Git Commit and Merge Skill
 
-This skill automates the cleanup of a finished worktree. When you have completed all implementations, verified tests, and are ready to merge into `main` and clean up, run this skill.
+> [!IMPORTANT]
+> **CRITICAL RULE**: Do NOT run this skill automatically on your own initiative. You MUST ONLY run this skill when the USER explicitly requests it (e.g. "please run the git-commit-and-merge skill" or similar). NEVER run this automatically after completing features or tests without direct, explicit confirmation from the user in the current turn.
+
+This skill automates the cleanup of a finished worktree. When you have completed all implementations, verified tests, and the USER has explicitly instructed you to run this skill to merge into `main` and clean up, run this skill.
 
 ## Setup & Execution
 
