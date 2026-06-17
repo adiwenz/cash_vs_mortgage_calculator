@@ -189,6 +189,15 @@ function isGeneratedMainIncome(id) {
          id === 'inc-1';
 }
 
+function isCustomSpendingPhase(id) {
+  if (!id || typeof id !== 'string') return false;
+  return id !== 'spend-1' &&
+         id !== 'simple-spend' &&
+         !id.startsWith('simple-spend-prechild') &&
+         !id.startsWith('simple-spend-childcare') &&
+         !id.startsWith('simple-spend-worksave');
+}
+
 export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
   const currentAge = profile.currentAge;
   const lifeExpectancy = profile.lifeExpectancy;
@@ -479,6 +488,35 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
         delete baseExpenses[k];
       }
     });
+
+    const activeSpendingItem = enabledEvents.find(e => e.type === 'spendingItem' && start >= Number(e.startAge) && start < Number(e.endAge));
+    if (activeSpendingItem && isCustomSpendingPhase(activeSpendingItem.id)) {
+      let targetMonthly = activeSpendingItem.frequency === 'monthly'
+        ? (Number(activeSpendingItem.amount) || 0)
+        : (Number(activeSpendingItem.annualSpending || activeSpendingItem.amount) || 0) / 12;
+
+      const startAge = Number(activeSpendingItem.startAge) || start;
+      const yearsElapsed = Math.max(0, startAge - currentAge);
+      targetMonthly = targetMonthly / Math.pow(1 + profile.inflationRate, yearsElapsed);
+
+      if (targetMonthly > 0) {
+        const nonDebtKeys = Object.keys(baseExpenses).filter(k => !k.startsWith('debt_') && k !== 'childcare' && k !== '🏠 Mortgage');
+        const currentSum = nonDebtKeys.reduce((sum, k) => sum + (baseExpenses[k] || 0), 0);
+        if (currentSum > 0) {
+          const scale = targetMonthly / currentSum;
+          nonDebtKeys.forEach(k => {
+            baseExpenses[k] = Math.round(baseExpenses[k] * scale);
+          });
+          const newSum = nonDebtKeys.reduce((sum, k) => sum + (baseExpenses[k] || 0), 0);
+          const diff = Math.round(targetMonthly) - newSum;
+          if (diff !== 0) {
+            baseExpenses.misc = Math.max(0, (baseExpenses.misc || 0) + diff);
+          }
+        } else {
+          baseExpenses.misc = Math.round(targetMonthly);
+        }
+      }
+    }
 
     let growthRate = 0.03;
 

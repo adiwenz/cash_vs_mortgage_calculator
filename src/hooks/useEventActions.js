@@ -78,7 +78,7 @@ export function useEventActions(
     } else if (type === 'careerChange') {
       defaults = { ...defaults, name: 'Senior Manager', startAge: 40, amount: 150000, growthRate: 3.5 };
     } else if (type === 'move') {
-      defaults = { ...defaults, location: 'Dominican Republic', moveAge: 55, newSpending: 40000 };
+      defaults = { ...defaults, location: 'Dominican Republic', moveAge: 55, newSpending: 40000, movingCost: 0 };
     } else if (type === 'retire') {
       defaults = { ...defaults, age: 55, spendingPercent: 70 };
     } else if (type === 'windfall') {
@@ -271,8 +271,24 @@ export function useEventActions(
       } else {
         const isFromIncomeList = inputs.incomeList?.some(i => i.id === baseEvent.id);
         const isFromSpendingPhases = inputs.spendingPhases?.some(p => p.id === baseEvent.id);
+        
+        let extraFields = {};
+        if (isFromSpendingPhases) {
+          let location = baseEvent.location;
+          if (!location && baseEvent.name && baseEvent.name.startsWith("Moved to ")) {
+            location = baseEvent.name.substring("Moved to ".length);
+          }
+          extraFields = {
+            location: location || 'New City',
+            moveAge: baseEvent.moveAge !== undefined ? baseEvent.moveAge : baseEvent.startAge,
+            newSpending: baseEvent.newSpending !== undefined ? baseEvent.newSpending : baseEvent.annualSpending,
+            movingCost: baseEvent.movingCost !== undefined ? baseEvent.movingCost : 0
+          };
+        }
+
         setEditingEvent({
           ...baseEvent,
+          ...extraFields,
           type: isFromIncomeList ? 'careerChange' : (isFromSpendingPhases ? 'move' : baseEvent.type),
           growthRate: isFromIncomeList && baseEvent.growthRate !== undefined ? Number(baseEvent.growthRate) * 100 : baseEvent.growthRate
         });
@@ -421,7 +437,11 @@ export function useEventActions(
           frequency: 'yearly',
           annualSpending: editingEvent.newSpending,
           inflationOverride: null,
-          notes: `Lifestyle after moving to ${editingEvent.location}`
+          notes: `Lifestyle after moving to ${editingEvent.location}`,
+          location: editingEvent.location,
+          moveAge: editingEvent.moveAge,
+          newSpending: editingEvent.newSpending,
+          movingCost: Number(editingEvent.movingCost) || 0
         };
         const updatedPhases = newInputs.spendingPhases.map(p => {
           if (p.startAge < editingEvent.moveAge && p.endAge > editingEvent.moveAge) {

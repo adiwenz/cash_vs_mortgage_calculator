@@ -994,7 +994,11 @@ export default function FireSimulator() {
         frequency: 'yearly',
         annualSpending: event.newSpending,
         inflationOverride: null,
-        notes: `Lifestyle after moving to ${event.location}`
+        notes: `Lifestyle after moving to ${event.location}`,
+        location: event.location,
+        moveAge: event.moveAge,
+        newSpending: event.newSpending,
+        movingCost: Number(event.movingCost) || 0
       };
       const updatedPhases = newInputs.spendingPhases.map(p => {
         if (p.startAge < event.moveAge && p.endAge > event.moveAge) {

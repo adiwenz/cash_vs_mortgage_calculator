@@ -610,6 +610,12 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     });
 
     enabledEvents.forEach(ev => {
+      if (ev.type === 'spendingItem' && ev.movingCost && age === Number(ev.startAge)) {
+        annualExpenses += (Number(ev.movingCost) || 0);
+      }
+    });
+
+    enabledEvents.forEach(ev => {
       if (ev.type === 'sabbatical') {
         const start = Number(ev.startAge);
         const end = Number(ev.endAge);

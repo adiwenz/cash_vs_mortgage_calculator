@@ -24,7 +24,7 @@ const generateLifeStory = (inp, results) => {
     if (phase.startAge > curAge) {
       list.push({
         age: phase.startAge,
-        text: `Change lifestyle: "${phase.name}" costing ${formatCurrency(phase.frequency === 'monthly' ? phase.amount * 12 : phase.amount)}/yr`
+        text: `Change lifestyle: "${phase.name}" costing ${formatCurrency(phase.frequency === 'monthly' ? phase.amount * 12 : phase.amount)}/yr${phase.movingCost ? ` (one-time moving cost: ${formatCurrency(phase.movingCost)})` : ''}`
       });
     }
   });

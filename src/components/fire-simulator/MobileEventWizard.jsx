@@ -223,7 +223,8 @@ export default function MobileEventWizard({
         ...defaults, 
         location: 'New City', 
         moveAge: Math.min(85, curAge + 5), 
-        newSpending: 40000 
+        newSpending: 40000,
+        movingCost: 0
       };
     } else if (type === 'retire') {
       defaults = { 
@@ -1283,6 +1284,16 @@ export default function MobileEventWizard({
                         type="number" 
                         value={draftEvent.newSpending || 0} 
                         onChange={(e) => updateDraft('newSpending', Number(e.target.value))} 
+                        className="mobile-wizard-input-text"
+                      />
+                    </div>
+
+                    <div className="form-group-item">
+                      <label className="form-group-label">One-time Moving Cost ($)</label>
+                      <input 
+                        type="number" 
+                        value={draftEvent.movingCost !== undefined ? draftEvent.movingCost : 0} 
+                        onChange={(e) => updateDraft('movingCost', Number(e.target.value))} 
                         className="mobile-wizard-input-text"
                       />
                     </div>

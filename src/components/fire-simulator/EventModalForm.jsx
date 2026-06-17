@@ -903,6 +903,16 @@ export default function EventModalForm({
                   onChange={(e) => setEditingEvent({ ...editingEvent, newSpending: parseFloat(e.target.value) || 0 })}
                 />
               </div>
+              <div className="input-wrapper">
+                <span className="input-name">One-time Moving Cost ($)</span>
+                <input
+                  type="number"
+                  className="input-number-box"
+                  style={{ width: '100%' }}
+                  value={editingEvent.movingCost !== undefined ? editingEvent.movingCost : 0}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, movingCost: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
             </>
           )}
 

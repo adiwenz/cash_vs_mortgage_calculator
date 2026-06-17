@@ -77,7 +77,7 @@ export function useTimelineEvents(inputs, displayedResults) {
           label: phase.name,
           icon: emoji,
           type: 'lifestyle',
-          description: `Began lifestyle phase "${phase.name}" costing ${formatCurrency(phase.annualSpending)}/year (inflation override: ${phase.inflationOverride !== null ? phase.inflationOverride + '%' : 'default'}).`
+          description: `Began lifestyle phase "${phase.name}" costing ${formatCurrency(phase.annualSpending)}/year (inflation override: ${phase.inflationOverride !== null ? phase.inflationOverride + '%' : 'default'})${phase.movingCost ? ` and incurred a one-time moving cost of ${formatCurrency(phase.movingCost)}` : ''}.`
         });
       }
     });
