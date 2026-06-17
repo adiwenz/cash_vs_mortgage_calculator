@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Home, 
   Map, 
@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import { formatCurrency, formatYAxis, getOutcomeDetails, getAssetLabel, isEditableEvent } from './helpers';
 import { getNormalizedPhases } from '../../fireCalculations';
+import MobileEventWizard from './MobileEventWizard';
 import './MobileFireSimulator.css';
 
 const getShortLabel = (evt) => {
@@ -153,6 +154,88 @@ const getRoadmapDetails = (evt, formatCurrency) => {
   };
 };
 
+export function MobileRecommendationsPanel({
+  improvementPlan,
+  handleApplyMobileRecommendation,
+  targetRetirementAge,
+  showHeader = true
+}) {
+  const rankedPlan = improvementPlan?.rankedPlan || [];
+
+  if (rankedPlan.length === 0) return null;
+
+  return (
+    <div className="mobile-rec-container" style={{ marginTop: showHeader ? '1rem' : '0', padding: '0' }}>
+      {showHeader && (
+        <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', textAlign: 'left' }}>
+          💡 Actionable Recommendations
+        </h3>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {rankedPlan.map((scenario, idx) => {
+          const badgeColor = scenario.savingsFocus === 'Earn More' ? '#10b981' : scenario.savingsFocus === 'Save More' ? '#6366f1' : '#f59e0b';
+          const badgeBg = scenario.savingsFocus === 'Earn More' ? 'rgba(16, 185, 129, 0.12)' : scenario.savingsFocus === 'Save More' ? 'rgba(99, 102, 241, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+          
+          return (
+            <div className="mobile-rec-card" key={scenario.type || idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+              <div className="mobile-rec-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h5 className="mobile-rec-card-title" style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>
+                  {scenario.icon} {scenario.title}
+                </h5>
+                <span 
+                  className="mobile-rec-focus-badge"
+                  style={{ color: badgeColor, backgroundColor: badgeBg }}
+                >
+                  {scenario.savingsFocus}
+                </span>
+              </div>
+              
+              <p className="mobile-rec-details">
+                {scenario.details}
+              </p>
+
+              {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                <ul className="mobile-rec-bullets" style={{ textAlign: 'left' }}>
+                  {scenario.bulletPoints.map((bp, bIdx) => (
+                    <li key={bIdx}>{bp}</li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mobile-rec-kpis">
+                <div>
+                  <span className="mobile-rec-kpi-lbl">New Ready Age</span>
+                  <strong className="mobile-rec-kpi-val" style={{ color: scenario.readyAge <= (targetRetirementAge || 65) ? 'var(--accent-emerald, #10b981)' : 'var(--accent-orange, #f59e0b)' }}>
+                    Age {scenario.readyAge}
+                  </strong>
+                </div>
+                <div>
+                  <span className="mobile-rec-kpi-lbl">Effort / Difficulty</span>
+                  <strong className="mobile-rec-kpi-val">
+                    {scenario.savingsEffortScore === 1 ? '⚡ Low' : scenario.savingsEffortScore === 2 ? '⚡⚡ Medium' : '⚡⚡⚡ High'}
+                  </strong>
+                </div>
+              </div>
+
+              {!scenario.isInfoOnly && (
+                <button 
+                  type="button"
+                  className="mobile-rec-apply-btn"
+                  onClick={() => {
+                    handleApplyMobileRecommendation(scenario);
+                  }}
+                >
+                  Apply Recommendation
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function MobileFireSimulator({
   inputs,
   updateInput,
@@ -174,14 +257,54 @@ export default function MobileFireSimulator({
   setActiveStep,
   timelineEvents,
   editingEvent,
+  setEditingEvent,
+  handleSaveEvent,
+  handleDeleteEvent,
+  getInputsWithEvent,
   displayedBaselineResults,
-  baselineResults
+  baselineResults,
+  handleApplyMobileRecommendation,
+  improvementPlan
 }) {
   const [activeTab, setActiveTab] = useState('Roadmap'); // 'Overview' | 'Roadmap' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [pulsingPhaseId, setPulsingPhaseId] = useState(null);
+  const prevEventsLength = useRef(inputs.lifeEvents?.length || 0);
+
+  useEffect(() => {
+    if (!editingEvent) {
+      let phaseToPulse = null;
+      if (window.pulsePhaseId) {
+        phaseToPulse = window.pulsePhaseId;
+        window.pulsePhaseId = null;
+      } else {
+        const currentLength = inputs.lifeEvents?.length || 0;
+        if (currentLength > prevEventsLength.current) {
+          const lastEvent = inputs.lifeEvents[inputs.lifeEvents.length - 1];
+          if (lastEvent) {
+            if (lastEvent.type === 'haveChild') phaseToPulse = 'childcare';
+            else if (lastEvent.type === 'marriage') phaseToPulse = 'marriage';
+            else if (lastEvent.type === 'retire') phaseToPulse = 'retire';
+            else if (lastEvent.type === 'buyHouse') phaseToPulse = 'mortgage';
+            else if (lastEvent.type === 'careerChange') phaseToPulse = 'careerChange';
+            else phaseToPulse = lastEvent.type;
+          }
+        }
+      }
+
+      if (phaseToPulse) {
+        setPulsingPhaseId(phaseToPulse);
+        const timer = setTimeout(() => {
+          setPulsingPhaseId(null);
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevEventsLength.current = inputs.lifeEvents?.length || 0;
+  }, [editingEvent, inputs.lifeEvents]);
 
   // Sync scroll positions and tab state
   useEffect(() => {
@@ -455,6 +578,17 @@ export default function MobileFireSimulator({
               </div>
             </div>
 
+            {!isPlanOnTrack && (
+              <div style={{ padding: '0 0.75rem' }}>
+                <MobileRecommendationsPanel
+                  improvementPlan={improvementPlan}
+                  handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+                  targetRetirementAge={inputs.targetRetirementAge}
+                  showHeader={true}
+                />
+              </div>
+            )}
+
             {/* Current Phase Card */}
             {currentAgePhase && (
               <div 
@@ -680,10 +814,18 @@ export default function MobileFireSimulator({
                   const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
                   const badgeColor = colors[idx % colors.length];
 
+                  const isPulsing = pulsingPhaseId && (
+                    p.type === pulsingPhaseId || 
+                    p.id.startsWith(pulsingPhaseId) ||
+                    (pulsingPhaseId === 'childcare' && p.type === 'childcare') ||
+                    (pulsingPhaseId === 'marriage' && p.type === 'marriage') ||
+                    (pulsingPhaseId === 'retire' && p.type === 'retire')
+                  );
+
                   return (
                     <div 
                       key={p.id}
-                      className="mobile-phase-card"
+                      className={`mobile-phase-card ${isPulsing ? 'pulse-highlight-phase' : ''}`}
                       onClick={() => setSelectedMobilePhaseId(p.id)}
                     >
                       <div 
@@ -705,7 +847,26 @@ export default function MobileFireSimulator({
                   );
                 })}
               </div>
+
+              <button
+                type="button"
+                className="mobile-roadmap-edit-btn"
+                style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+              >
+                + Add Life Event
+              </button>
             </section>
+
+            {!editingEvent && (
+              <button
+                type="button"
+                className="mobile-fab-btn animate-scale-in"
+                onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+              >
+                ➕ Add Life Event
+              </button>
+            )}
           </div>
         )}
 
@@ -1461,7 +1622,14 @@ export default function MobileFireSimulator({
               </h3>
 
               <div className="mobile-recs-stack">
-                {selectedPhaseObj.label?.toLowerCase().includes('retirement') || selectedPhaseObj.icon === '🏖️' || selectedPhaseObj.icon === '🏖' ? (
+                {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
+                  <MobileRecommendationsPanel
+                    improvementPlan={improvementPlan}
+                    handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+                    targetRetirementAge={inputs.targetRetirementAge}
+                    showHeader={false}
+                  />
+                ) : selectedPhaseObj.label?.toLowerCase().includes('retirement') || selectedPhaseObj.icon === '🏖️' || selectedPhaseObj.icon === '🏖' ? (
                   <>
                     <div 
                       className="mobile-rec-card"
@@ -1583,43 +1751,61 @@ export default function MobileFireSimulator({
       )}
 
       {/* BOTTOM TAB NAVIGATION */}
-      <nav className="mobile-bottom-nav">
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'Overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Overview')}
-        >
-          <Home size={20} />
-          Overview
-        </button>
+      {!editingEvent && (
+        <nav className="mobile-bottom-nav">
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'Overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Overview')}
+          >
+            <Home size={20} />
+            Overview
+          </button>
 
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'Roadmap' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Roadmap')}
-        >
-          <Map size={20} />
-          Roadmap
-        </button>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'Roadmap' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Roadmap')}
+          >
+            <Map size={20} />
+            Roadmap
+          </button>
 
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'Results' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Results')}
-        >
-          <TrendingUp size={20} />
-          Results
-        </button>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'Results' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Results')}
+          >
+            <TrendingUp size={20} />
+            Results
+          </button>
 
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'Details' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Details')}
-        >
-          <Settings size={20} />
-          Details
-        </button>
-      </nav>
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'Details' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Details')}
+          >
+            <Settings size={20} />
+            Details
+          </button>
+        </nav>
+      )}
+
+      {/* MOBILE EVENT WIZARD OVERLAY */}
+      {editingEvent && (
+        <MobileEventWizard
+          inputs={inputs}
+          editingEvent={editingEvent}
+          setEditingEvent={setEditingEvent}
+          handleSaveEvent={handleSaveEvent}
+          handleDeleteEvent={handleDeleteEvent}
+          onClose={() => setEditingEvent(null)}
+          getInputsWithEvent={getInputsWithEvent}
+          baselineResults={baselineResults}
+          handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+          improvementPlan={improvementPlan}
+        />
+      )}
     </div>
   );
 }

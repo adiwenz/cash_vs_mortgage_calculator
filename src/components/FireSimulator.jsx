@@ -3306,9 +3306,499 @@ export default function FireSimulator() {
     setEditingEvent(defaults);
   };
 
-  const handleSaveEvent = () => {
-    if (!editingEvent) return;
-    const type = editingEvent.type;
+  const getInputsWithEvent = (baseInputs, event) => {
+    let newInputs = JSON.parse(JSON.stringify(baseInputs));
+    const type = event.type;
+    let savedEvent = null;
+    
+    // 1. If editing an existing event, remove it first from the appropriate list
+    if (event.id) {
+      const oldEvent = newInputs.lifeEvents.find(e => e.id === event.id);
+      if (oldEvent && oldEvent.type === 'haveChild') {
+        const oldBirthAge = Number(oldEvent.birthAge !== undefined ? oldEvent.birthAge : oldEvent.parentAgeAtBirth) || 30;
+        const newBirthAge = Number(event.birthAge !== undefined ? event.birthAge : event.parentAgeAtBirth) || 30;
+        const ageDiff = newBirthAge - oldBirthAge;
+        if (ageDiff !== 0) {
+          newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+            if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${event.id}-`)) {
+              return {
+                ...inc,
+                startAge: inc.startAge + ageDiff,
+                endAge: inc.endAge + ageDiff
+              };
+            }
+            return inc;
+          });
+        }
+      }
+      if (newInputs.lifeEvents.some(e => e.id === event.id)) {
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== event.id);
+      } else {
+        const matchSpend = newInputs.spendingPhases.find(p => p.id === event.id);
+        if (matchSpend) {
+          const remaining = newInputs.spendingPhases.filter(p => p.id !== event.id);
+          newInputs.spendingPhases = remaining.map(p => {
+            if (p.endAge === matchSpend.startAge) {
+              return { ...p, endAge: matchSpend.endAge };
+            }
+            return p;
+          });
+        } else {
+          const matchInc = newInputs.incomeList.find(i => i.id === event.id);
+          if (matchInc) {
+            const remaining = newInputs.incomeList.filter(i => i.id !== event.id);
+            newInputs.incomeList = remaining.map(i => {
+              if (i.endAge === matchInc.startAge) {
+                return { ...i, endAge: matchInc.endAge };
+              }
+              return i;
+            });
+          }
+        }
+      }
+    }
+    
+    // 2. Perform save/insert logic
+    if (type === 'retire') {
+      newInputs.targetRetirementAge = event.age;
+      newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.type !== 'retire');
+      let newEventObj = {
+        id: event.id && event.id !== 'retire' ? event.id : `retire-${Date.now()}`,
+        type: 'retire',
+        enabled: true,
+        name: 'Retirement',
+        age: event.age,
+        spendingPercent: event.spendingPercent !== undefined ? event.spendingPercent : 70
+      };
+      newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+      savedEvent = newEventObj;
+    } else if (type === 'move') {
+      const newPhase = {
+        id: event.id && event.id !== 'move' ? event.id : `spend-${Date.now()}`,
+        name: `Moved to ${event.location}`,
+        startAge: event.moveAge,
+        endAge: newInputs.lifeExpectancy,
+        amount: event.newSpending,
+        frequency: 'yearly',
+        annualSpending: event.newSpending,
+        inflationOverride: null,
+        notes: `Lifestyle after moving to ${event.location}`
+      };
+      const updatedPhases = newInputs.spendingPhases.map(p => {
+        if (p.startAge < event.moveAge && p.endAge > event.moveAge) {
+          return { ...p, endAge: event.moveAge };
+        }
+        return p;
+      });
+      newInputs.spendingPhases = [...updatedPhases, newPhase];
+      savedEvent = newPhase;
+    } else if (type === 'careerChange') {
+      const newInc = {
+        id: event.id && event.id !== 'careerChange' ? event.id : `inc-${Date.now()}`,
+        name: event.name,
+        amount: event.amount,
+        frequency: 'yearly',
+        startAge: event.startAge,
+        endAge: newInputs.targetRetirementAge,
+        growthRate: (event.growthRate || 3.0) / 100,
+        isTaxable: true
+      };
+      const updatedIncome = newInputs.incomeList.map(inc => {
+        if (inc.startAge < event.startAge && inc.endAge > event.startAge) {
+          return { ...inc, endAge: event.startAge };
+        }
+        return inc;
+      });
+      newInputs.incomeList = [...updatedIncome, newInc];
+      savedEvent = newInc;
+    } else if (type === 'buyHouse') {
+      const houseId = event.houseId || `house-${Date.now()}`;
+      
+      const houseAssetObj = {
+        id: houseId,
+        name: event.name || 'Primary Home',
+        purchasePrice: Number(event.homePrice),
+        downPayment: Number(event.downPayment),
+        purchaseType: event.purchaseType || 'mortgage',
+        mortgageRate: event.mortgageRate !== undefined ? Number(event.mortgageRate) : 6.5,
+        loanTermYears: event.loanTerm !== undefined ? Number(event.loanTerm) : 30,
+        points: event.points !== undefined ? Number(event.points) : 0,
+        pmi: event.pmi !== undefined ? Number(event.pmi) : 0.5,
+        closingCosts: event.closingCosts !== undefined ? Number(event.closingCosts) : 3,
+        propertyTaxRate: event.propertyTax !== undefined ? Number(event.propertyTax) : 1.1,
+        insuranceCost: event.insurance !== undefined ? Number(event.insurance) : 0.35,
+        hoaCost: event.hoa !== undefined ? Number(event.hoa) : 0,
+        maintenanceRate: event.maintenance !== undefined ? Number(event.maintenance) : 1.0,
+        renovationCost: event.renovationCost !== undefined ? Number(event.renovationCost) : 0,
+        utilitiesIncrease: event.utilitiesIncrease !== undefined ? Number(event.utilitiesIncrease) : 0,
+        appreciationRate: event.appreciationRate !== undefined ? Number(event.appreciationRate) : 3.0,
+        sellingCostRate: event.sellingCost !== undefined ? Number(event.sellingCost) : 6,
+        investmentReturn: event.investmentReturn !== undefined ? Number(event.investmentReturn) : 7,
+        inflation: event.inflation !== undefined ? Number(event.inflation) : 3,
+        currentRent: event.currentRent !== undefined ? Number(event.currentRent) : 0,
+        rentGrowth: event.rentGrowth !== undefined ? Number(event.rentGrowth) : 3,
+        renterInsurance: event.renterInsurance !== undefined ? Number(event.renterInsurance) : 0
+      };
+
+      if (!newInputs.houseAssets) {
+        newInputs.houseAssets = [];
+      }
+      if (newInputs.houseAssets.some(h => h.id === houseId)) {
+        newInputs.houseAssets = newInputs.houseAssets.map(h => h.id === houseId ? houseAssetObj : h);
+      } else {
+        newInputs.houseAssets = [...newInputs.houseAssets, houseAssetObj];
+      }
+
+      const buyEvId = event.id && event.id.startsWith('buy-') ? event.id : `buy-${Date.now()}`;
+      const buyEvObj = {
+        id: buyEvId,
+        type: 'buyHouse',
+        enabled: true,
+        name: 'Buy House',
+        purchaseAge: Number(event.purchaseAge),
+        age: Number(event.purchaseAge),
+        houseId: houseId
+      };
+
+      const existingSell = newInputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === houseId);
+      const purchaseAgeNum = Number(event.purchaseAge);
+      let defaultSellAge = Number(newInputs.lifeExpectancy || 85);
+      if (defaultSellAge <= purchaseAgeNum) {
+        defaultSellAge = purchaseAgeNum + 10;
+      }
+
+      const sellEvObj = existingSell ? {
+        ...existingSell,
+        age: Number(existingSell.age) <= purchaseAgeNum ? purchaseAgeNum + 10 : Number(existingSell.age),
+        sellingCost: event.sellingCost !== undefined ? Number(event.sellingCost) : existingSell.sellingCost
+      } : {
+        id: `sell-${Date.now()}`,
+        type: 'sellHouse',
+        enabled: true,
+        name: 'Sell House',
+        age: defaultSellAge,
+        houseId: houseId,
+        sellingCost: event.sellingCost !== undefined ? Number(event.sellingCost) : 6,
+        proceedsDestination: 'investments'
+      };
+
+      newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== buyEvId && e.id !== sellEvObj.id && e.id !== event.id);
+      newInputs.lifeEvents = [...newInputs.lifeEvents, buyEvObj, sellEvObj];
+      
+      savedEvent = buyEvObj;
+
+    } else if (type === 'sellHouse') {
+      const sellEvId = event.id && event.id.startsWith('sell-') ? event.id : `sell-${Date.now()}`;
+      const sellEvObj = {
+        id: sellEvId,
+        type: 'sellHouse',
+        enabled: true,
+        name: 'Sell House',
+        age: Number(event.age),
+        houseId: event.houseId,
+        sellingCost: event.sellingCost !== undefined ? Number(event.sellingCost) : 6,
+        proceedsDestination: event.proceedsDestination || 'investments'
+      };
+
+      newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== sellEvId && e.id !== event.id);
+      newInputs.lifeEvents = [...newInputs.lifeEvents, sellEvObj];
+
+      if (newInputs.houseAssets) {
+        newInputs.houseAssets = newInputs.houseAssets.map(h => {
+          if (h.id === event.houseId) {
+            return { ...h, sellingCostRate: Number(event.sellingCost) };
+          }
+          return h;
+        });
+      }
+
+      savedEvent = sellEvObj;
+
+    } else if (type === 'borrowing') {
+      const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
+        const r = (apr / 100) / 12;
+        const pmt = monthlyPayment + extraPayment;
+        if (balance <= 0) return startAge;
+        if (pmt <= 0) return Infinity;
+        if (pmt <= balance * r) return Infinity;
+        if (r === 0) {
+          return startAge + (balance / pmt) / 12;
+        }
+        const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
+        return startAge + months / 12;
+      };
+
+      const borrowId = event.id && event.id.startsWith('borrowing-') ? event.id : `borrowing-${Date.now()}`;
+      const newEventObj = {
+        id: borrowId,
+        type: 'borrowing',
+        enabled: true,
+        borrowingType: event.borrowingType,
+        name: event.name || 'Borrowing',
+        balance: Number(event.balance) || 0,
+        interestRate: Number(event.interestRate) || 0,
+        minPayment: Number(event.minPayment) || 0,
+        startAge: event.timing === 'current' ? newInputs.currentAge : (Number(event.startAge) || (newInputs.currentAge + 1)),
+        notes: event.notes || '',
+        isExisting: event.timing === 'current',
+        timing: event.timing || (event.isExisting !== false ? 'current' : 'future'),
+        payoffPlanEnabled: !!event.payoffPlanEnabled
+      };
+
+      newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== borrowId && e.id !== event.id);
+
+      if (newEventObj.payoffPlanEnabled) {
+        const existingPayoff = newInputs.lifeEvents.find(e => e.type === 'payoffPlan' && e.borrowingId === borrowId);
+        const extraPmt = existingPayoff ? (Number(existingPayoff.extraPayment) || 0) : 100;
+        const linkedVal = existingPayoff ? existingPayoff.linked !== false : true;
+
+        const startAgeForPayoff = linkedVal ? newEventObj.startAge : (existingPayoff ? Number(existingPayoff.startAge) : newEventObj.startAge);
+        const payoffAge = calculatePayoffAgeInline(newEventObj.balance, newEventObj.interestRate, newEventObj.minPayment, extraPmt, startAgeForPayoff);
+
+        const payoffObj = {
+          id: existingPayoff ? existingPayoff.id : `payoffPlan-${Date.now()}`,
+          type: 'payoffPlan',
+          enabled: true,
+          name: `Payoff Plan: ${newEventObj.name}`,
+          borrowingId: borrowId,
+          linked: linkedVal,
+          extraPayment: extraPmt,
+          startAge: startAgeForPayoff,
+          payoffAge: payoffAge,
+          notes: existingPayoff ? existingPayoff.notes || '' : ''
+        };
+
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffObj.id && !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
+        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj, payoffObj];
+      } else {
+        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
+        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+      }
+
+      savedEvent = newEventObj;
+
+    } else if (type === 'payoffPlan') {
+      const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
+        const r = (apr / 100) / 12;
+        const pmt = monthlyPayment + extraPayment;
+        if (balance <= 0) return startAge;
+        if (pmt <= 0) return Infinity;
+        if (pmt <= balance * r) return Infinity;
+        if (r === 0) {
+          return startAge + (balance / pmt) / 12;
+        }
+        const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
+        return startAge + months / 12;
+      };
+
+      const payoffId = event.id && event.id.startsWith('payoffPlan-') ? event.id : `payoffPlan-${Date.now()}`;
+      const borrowing = newInputs.lifeEvents.find(b => b.id === event.borrowingId);
+      
+      let startAge = Number(event.startAge);
+      if (event.linked !== false && borrowing) {
+        startAge = Number(borrowing.startAge);
+      }
+
+      const balance = borrowing ? Number(borrowing.balance) || 0 : 0;
+      const interestRate = borrowing ? Number(borrowing.interestRate) || 0 : 0;
+      const minPayment = borrowing ? Number(borrowing.minPayment) || 0 : 0;
+      const extraPayment = Number(event.extraPayment) || 0;
+
+      let payoffAge = calculatePayoffAgeInline(balance, interestRate, minPayment, extraPayment, startAge);
+
+      if (event.targetPayoffAge && event.targetPayoffAge > startAge) {
+        payoffAge = Number(event.targetPayoffAge);
+      }
+
+      const newEventObj = {
+        id: payoffId,
+        type: 'payoffPlan',
+        enabled: true,
+        name: event.name || 'Payoff Plan',
+        borrowingId: event.borrowingId,
+        linked: event.linked !== false,
+        extraPayment: extraPayment,
+        startAge: startAge,
+        payoffAge: payoffAge,
+        targetPayoffAge: event.targetPayoffAge || null,
+        notes: event.notes || ''
+      };
+
+      newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffId && e.id !== event.id);
+      newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+
+      savedEvent = newEventObj;
+
+    } else {
+      const isRetIncomeType = ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(type);
+      let defaultName = 'Other Income';
+      if (type === 'socialSecurity') defaultName = 'Social Security';
+      else if (type === 'pension') defaultName = 'Pension';
+      else if (type === 'rentalIncome') defaultName = 'Rental Income';
+      else if (type === 'annuity') defaultName = 'Annuity';
+
+      let newEventObj = {
+        id: event.id && !['haveChild', 'college', 'windfall', 'debtPayoff', 'custom', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(event.id)
+          ? event.id
+          : `${type}-${Date.now()}`,
+        type,
+        enabled: true,
+        name: type === 'haveChild' ? 'Have a Child' : type === 'college' ? 'College' : type === 'windfall' ? 'Windfall' : isRetIncomeType ? (event.name || defaultName) : event.name
+      };
+      
+      if (type === 'haveChild') {
+        newEventObj = {
+          ...newEventObj,
+          childName: event.childName || '',
+          childStartAge: event.childStartAge !== undefined ? event.childStartAge : 0,
+          birthAge: event.birthAge !== undefined ? event.birthAge : newInputs.currentAge,
+          costMethod: event.costMethod || 'default',
+          customAges0to4: event.customAges0to4 !== undefined ? event.customAges0to4 : 15000,
+          customAges5to12: event.customAges5to12 !== undefined ? event.customAges5to12 : 9000,
+          customAges13to18: event.customAges13to18 !== undefined ? event.customAges13to18 : 12000,
+          customAges19to22: event.customAges19to22 !== undefined ? event.customAges19to22 : 20000,
+          includeCollege: !!event.includeCollege
+        };
+      } else if (type === 'college') {
+        newEventObj = {
+          ...newEventObj,
+          startAge: event.startAge,
+          tuitionCost: event.tuitionCost,
+          duration: event.duration
+        };
+      } else if (type === 'windfall') {
+        newEventObj = {
+          ...newEventObj,
+          ageReceived: event.ageReceived,
+          amount: event.amount,
+          taxRate: event.taxRate
+        };
+      } else if (type === 'debtPayoff') {
+        newEventObj = {
+          ...newEventObj,
+          payoffAge: event.payoffAge,
+          amount: event.amount
+        };
+      } else if (isRetIncomeType) {
+        let claimingAge = event.claimingAge !== undefined ? event.claimingAge : (event.startAge !== undefined ? event.startAge : 65);
+        if (type === 'socialSecurity') {
+          claimingAge = Math.max(62, Math.min(70, claimingAge));
+        }
+        newEventObj = {
+          ...newEventObj,
+          claimingAge,
+          startAge: claimingAge,
+          age: claimingAge,
+          monthlyBenefit: event.monthlyBenefit !== undefined ? event.monthlyBenefit : 1000,
+          inflationAdjusted: event.inflationAdjusted !== false,
+          useEarnings: event.useEarnings === true,
+          ageStartedWorking: event.ageStartedWorking !== undefined 
+            ? Number(event.ageStartedWorking) 
+            : 22
+        };
+      } else if (type === 'custom') {
+        newEventObj = {
+          ...newEventObj,
+          age: event.age,
+          amount: event.amount
+        };
+      } else if (type === 'marriage') {
+        const estimates = calculateMarriageEstimates(event, newInputs);
+        const combinedSpendingVal = estimates ? estimates.combinedSpendingVal : 0;
+        const spouseRetSpendingVal = estimates ? estimates.spouseRetSpendingVal : 0;
+        const housingCostAmount = estimates ? estimates.housingCostAmount : 0;
+        const lifestyleAdjustmentAmount = estimates ? estimates.lifestyleAdjustmentAmount : 0;
+
+        newEventObj = {
+          ...newEventObj,
+          age: Number(event.age),
+          spouseIncome: Number(event.spouseIncome),
+          incomeGrowthRate: Number(event.incomeGrowthRate || 3),
+          cash: Number(event.cash || 0),
+          investments: Number(event.investments || 0),
+          retirement: Number(event.retirement || 0),
+          debtStudent: Number(event.debtStudent || 0),
+          debtCredit: Number(event.debtCredit || 0),
+          debtOther: Number(event.debtOther || 0),
+          savingsRate: Number(event.savingsRate),
+          housingOption: estimates ? estimates.housingOption : 'move',
+          housingSavings: 0,
+          housingCost: housingCostAmount,
+          lifestyleOption: estimates ? estimates.lifestyleOption : 'same',
+          lifestyleAdjustment: lifestyleAdjustmentAmount,
+          includeWeddingCost: !!event.includeWeddingCost,
+          weddingCost: Number(event.weddingCost),
+          weddingFundingMethod: event.weddingFundingMethod || 'savings',
+          weddingAge: Number(event.weddingAge),
+          filingStatus: event.filingStatus || 'jointly',
+          spouseCurrentAge: event.spouseCurrentAge !== undefined && event.spouseCurrentAge !== '' ? Number(event.spouseCurrentAge) : Number(event.age),
+          spouseLifeExpectancy: event.spouseLifeExpectancy !== undefined && event.spouseLifeExpectancy !== '' ? Number(event.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
+          spouseSocialSecurityAge: event.spouseSocialSecurityAge !== undefined && event.spouseSocialSecurityAge !== '' ? Number(event.spouseSocialSecurityAge) : 67,
+          spouseEstimatedSocialSecurityBenefit: event.spouseEstimatedSocialSecurityBenefit !== undefined && event.spouseEstimatedSocialSecurityBenefit !== '' ? Number(event.spouseEstimatedSocialSecurityBenefit) : 0,
+
+          spouseDesiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
+          desiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
+          partnerRetiresWithUser: true,
+          retirementSpendingNeed: spouseRetSpendingVal,
+          combinedSpendingAfterMarriage: combinedSpendingVal
+        };
+        
+        let nextHouseholdMembers = [...(newInputs.householdMembers || [])];
+        const spouseIdx = nextHouseholdMembers.findIndex(m => m.id === 'spouse');
+        const spouseRecord = {
+          id: 'spouse',
+          name: 'Spouse',
+          activeFromDate: Number(event.age),
+          activeUntilDate: null,
+          income: Number(event.spouseIncome),
+          incomeGrowthRate: Number(event.incomeGrowthRate || 3) / 100,
+          assets: {
+            cash: Number(event.cash || 0),
+            investments: Number(event.investments || 0),
+            retirement: Number(event.retirement || 0)
+          },
+          debts: {
+            student: Number(event.debtStudent || 0),
+            credit: Number(event.debtCredit || 0),
+            other: Number(event.debtOther || 0)
+          },
+          savingsRate: Number(event.savingsRate),
+          currentAge: event.spouseCurrentAge !== undefined && event.spouseCurrentAge !== '' ? Number(event.spouseCurrentAge) : Number(event.age),
+          lifeExpectancy: event.spouseLifeExpectancy !== undefined && event.spouseLifeExpectancy !== '' ? Number(event.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
+          spouseSocialSecurityAge: event.spouseSocialSecurityAge !== undefined && event.spouseSocialSecurityAge !== '' ? Number(event.spouseSocialSecurityAge) : 67,
+          spouseEstimatedSocialSecurityBenefit: event.spouseEstimatedSocialSecurityBenefit !== undefined && event.spouseEstimatedSocialSecurityBenefit !== '' ? Number(event.spouseEstimatedSocialSecurityBenefit) : 0,
+          spouseDesiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
+          desiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
+          partnerRetiresWithUser: true,
+          retirementSpendingNeed: spouseRetSpendingVal,
+          growthRate: Number(event.incomeGrowthRate || 3),
+          combinedSpendingAfterMarriage: combinedSpendingVal,
+          housingCost: housingCostAmount,
+          lifestyleAdjustment: lifestyleAdjustmentAmount
+        };
+        if (spouseIdx !== -1) {
+          nextHouseholdMembers[spouseIdx] = spouseRecord;
+        } else {
+          nextHouseholdMembers.push(spouseRecord);
+        }
+        newInputs.householdMembers = nextHouseholdMembers;
+      }
+      
+      savedEvent = newEventObj;
+      newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
+    }
+
+    if (type === 'haveChild') {
+      syncChildcarePhasesAndRules(newInputs);
+    }
+    
+    return { newInputs, savedEvent };
+  };
+
+  const handleSaveEvent = (eventToSave) => {
+    const activeEvent = (eventToSave && !eventToSave.nativeEvent && eventToSave.type !== 'click') ? eventToSave : editingEvent;
+    if (!activeEvent) return;
+    const type = activeEvent.type;
     
     let beforeReadyAge = null;
     let afterReadyAge = null;
@@ -3319,16 +3809,16 @@ export default function FireSimulator() {
       const beforeRes = runFireSimulation(currentScenObj.inputs);
       beforeReadyAge = beforeRes.retirementReadyAge;
 
-      const startAge = editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0;
-      const includeCollege = !!editingEvent.includeCollege;
+      const startAge = activeEvent.childStartAge !== undefined ? activeEvent.childStartAge : 0;
+      const includeCollege = !!activeEvent.includeCollege;
       const maxAge = includeCollege ? 22 : 18;
       let totalCost = 0;
       let activeYears = 0;
       for (let childAge = startAge; childAge < maxAge; childAge++) {
-        const ages0to4 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges0to4 !== undefined ? Number(editingEvent.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
-        const ages5to12 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges5to12 !== undefined ? Number(editingEvent.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
-        const ages13to18 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges13to18 !== undefined ? Number(editingEvent.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
-        const ages19to22 = editingEvent.costMethod === 'custom' ? (editingEvent.customAges19to22 !== undefined ? Number(editingEvent.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+        const ages0to4 = activeEvent.costMethod === 'custom' ? (activeEvent.customAges0to4 !== undefined ? Number(activeEvent.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+        const ages5to12 = activeEvent.costMethod === 'custom' ? (activeEvent.customAges5to12 !== undefined ? Number(activeEvent.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+        const ages13to18 = activeEvent.costMethod === 'custom' ? (activeEvent.customAges13to18 !== undefined ? Number(activeEvent.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+        const ages19to22 = activeEvent.costMethod === 'custom' ? (activeEvent.customAges19to22 !== undefined ? Number(activeEvent.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
 
         if (childAge >= 0 && childAge <= 4) {
           totalCost += ages0to4;
@@ -3348,506 +3838,23 @@ export default function FireSimulator() {
     const nextScenarios = scenarios.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
       
-      let newInputs = { ...scen.inputs };
-      
-      // 1. If editing an existing event, remove it first from the appropriate list
-      if (editingEvent.id) {
-        const oldEvent = newInputs.lifeEvents.find(e => e.id === editingEvent.id);
-        if (oldEvent && oldEvent.type === 'haveChild') {
-          const oldBirthAge = Number(oldEvent.birthAge !== undefined ? oldEvent.birthAge : oldEvent.parentAgeAtBirth) || 30;
-          const newBirthAge = Number(editingEvent.birthAge !== undefined ? editingEvent.birthAge : editingEvent.parentAgeAtBirth) || 30;
-          const ageDiff = newBirthAge - oldBirthAge;
-          if (ageDiff !== 0) {
-            newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-              if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${editingEvent.id}-`)) {
-                return {
-                  ...inc,
-                  startAge: inc.startAge + ageDiff,
-                  endAge: inc.endAge + ageDiff
-                };
-              }
-              return inc;
-            });
-          }
-        }
-        if (newInputs.lifeEvents.some(e => e.id === editingEvent.id)) {
-          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== editingEvent.id);
-        } else {
-          const matchSpend = newInputs.spendingPhases.find(p => p.id === editingEvent.id);
-          if (matchSpend) {
-            const remaining = newInputs.spendingPhases.filter(p => p.id !== editingEvent.id);
-            newInputs.spendingPhases = remaining.map(p => {
-              if (p.endAge === matchSpend.startAge) {
-                return { ...p, endAge: matchSpend.endAge };
-              }
-              return p;
-            });
-          } else {
-            const matchInc = newInputs.incomeList.find(i => i.id === editingEvent.id);
-            if (matchInc) {
-              const remaining = newInputs.incomeList.filter(i => i.id !== editingEvent.id);
-              newInputs.incomeList = remaining.map(i => {
-                if (i.endAge === matchInc.startAge) {
-                  return { ...i, endAge: matchInc.endAge };
-                }
-                return i;
-              });
-            }
-          }
-        }
-      }
-      
-      // 2. Perform save/insert logic
-      if (type === 'retire') {
-        newInputs.targetRetirementAge = editingEvent.age;
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.type !== 'retire');
-        let newEventObj = {
-          id: editingEvent.id && editingEvent.id !== 'retire' ? editingEvent.id : `retire-${Date.now()}`,
-          type: 'retire',
-          enabled: true,
-          name: 'Retirement',
-          age: editingEvent.age,
-          spendingPercent: editingEvent.spendingPercent !== undefined ? editingEvent.spendingPercent : 70
-        };
-        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
-      } else if (type === 'move') {
-        const newPhase = {
-          id: editingEvent.id && editingEvent.id !== 'move' ? editingEvent.id : `spend-${Date.now()}`,
-          name: `Moved to ${editingEvent.location}`,
-          startAge: editingEvent.moveAge,
-          endAge: newInputs.lifeExpectancy,
-          amount: editingEvent.newSpending,
-          frequency: 'yearly',
-          annualSpending: editingEvent.newSpending,
-          inflationOverride: null,
-          notes: `Lifestyle after moving to ${editingEvent.location}`
-        };
-        const updatedPhases = newInputs.spendingPhases.map(p => {
-          if (p.startAge < editingEvent.moveAge && p.endAge > editingEvent.moveAge) {
-            return { ...p, endAge: editingEvent.moveAge };
-          }
-          return p;
-        });
-        newInputs.spendingPhases = [...updatedPhases, newPhase];
-      } else if (type === 'careerChange') {
-        const newInc = {
-          id: editingEvent.id && editingEvent.id !== 'careerChange' ? editingEvent.id : `inc-${Date.now()}`,
-          name: editingEvent.name,
-          amount: editingEvent.amount,
-          frequency: 'yearly',
-          startAge: editingEvent.startAge,
-          endAge: newInputs.targetRetirementAge,
-          growthRate: (editingEvent.growthRate || 3.0) / 100,
-          isTaxable: true
-        };
-        const updatedIncome = newInputs.incomeList.map(inc => {
-          if (inc.startAge < editingEvent.startAge && inc.endAge > editingEvent.startAge) {
-            return { ...inc, endAge: editingEvent.startAge };
-          }
-          return inc;
-        });
-        newInputs.incomeList = [...updatedIncome, newInc];
-      } else if (type === 'buyHouse') {
-        const houseId = editingEvent.houseId || `house-${Date.now()}`;
-        
-        // Construct the updated HouseAsset
-        const houseAssetObj = {
-          id: houseId,
-          name: editingEvent.name || 'Primary Home',
-          purchasePrice: Number(editingEvent.homePrice),
-          downPayment: Number(editingEvent.downPayment),
-          purchaseType: editingEvent.purchaseType || 'mortgage',
-          mortgageRate: editingEvent.mortgageRate !== undefined ? Number(editingEvent.mortgageRate) : 6.5,
-          loanTermYears: editingEvent.loanTerm !== undefined ? Number(editingEvent.loanTerm) : 30,
-          points: editingEvent.points !== undefined ? Number(editingEvent.points) : 0,
-          pmi: editingEvent.pmi !== undefined ? Number(editingEvent.pmi) : 0.5,
-          closingCosts: editingEvent.closingCosts !== undefined ? Number(editingEvent.closingCosts) : 3,
-          propertyTaxRate: editingEvent.propertyTax !== undefined ? Number(editingEvent.propertyTax) : 1.1,
-          insuranceCost: editingEvent.insurance !== undefined ? Number(editingEvent.insurance) : 0.35,
-          hoaCost: editingEvent.hoa !== undefined ? Number(editingEvent.hoa) : 0,
-          maintenanceRate: editingEvent.maintenance !== undefined ? Number(editingEvent.maintenance) : 1.0,
-          renovationCost: editingEvent.renovationCost !== undefined ? Number(editingEvent.renovationCost) : 0,
-          utilitiesIncrease: editingEvent.utilitiesIncrease !== undefined ? Number(editingEvent.utilitiesIncrease) : 0,
-          appreciationRate: editingEvent.appreciationRate !== undefined ? Number(editingEvent.appreciationRate) : 3.0,
-          sellingCostRate: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
-          investmentReturn: editingEvent.investmentReturn !== undefined ? Number(editingEvent.investmentReturn) : 7,
-          inflation: editingEvent.inflation !== undefined ? Number(editingEvent.inflation) : 3,
-          currentRent: editingEvent.currentRent !== undefined ? Number(editingEvent.currentRent) : 0,
-          rentGrowth: editingEvent.rentGrowth !== undefined ? Number(editingEvent.rentGrowth) : 3,
-          renterInsurance: editingEvent.renterInsurance !== undefined ? Number(editingEvent.renterInsurance) : 0
-        };
-
-        if (!newInputs.houseAssets) {
-          newInputs.houseAssets = [];
-        }
-        if (newInputs.houseAssets.some(h => h.id === houseId)) {
-          newInputs.houseAssets = newInputs.houseAssets.map(h => h.id === houseId ? houseAssetObj : h);
-        } else {
-          newInputs.houseAssets = [...newInputs.houseAssets, houseAssetObj];
-        }
-
-        // Construct BuyHouseEvent
-        const buyEvId = editingEvent.id && editingEvent.id.startsWith('buy-') ? editingEvent.id : `buy-${Date.now()}`;
-        const buyEvObj = {
-          id: buyEvId,
-          type: 'buyHouse',
-          enabled: true,
-          name: 'Buy House',
-          purchaseAge: Number(editingEvent.purchaseAge),
-          age: Number(editingEvent.purchaseAge),
-          houseId: houseId
-        };
-
-        // Find or create linked SellHouseEvent
-        const existingSell = newInputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === houseId);
-        const purchaseAgeNum = Number(editingEvent.purchaseAge);
-        let defaultSellAge = Number(newInputs.lifeExpectancy || 85);
-        if (defaultSellAge <= purchaseAgeNum) {
-          defaultSellAge = purchaseAgeNum + 10;
-        }
-
-        const sellEvObj = existingSell ? {
-          ...existingSell,
-          age: Number(existingSell.age) <= purchaseAgeNum ? purchaseAgeNum + 10 : Number(existingSell.age),
-          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : existingSell.sellingCost
-        } : {
-          id: `sell-${Date.now()}`,
-          type: 'sellHouse',
-          enabled: true,
-          name: 'Sell House',
-          age: defaultSellAge,
-          houseId: houseId,
-          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
-          proceedsDestination: 'investments'
-        };
-
-        // Filter out existing buy/sell events and re-add updated ones
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== buyEvId && e.id !== sellEvObj.id && e.id !== editingEvent.id);
-        newInputs.lifeEvents = [...newInputs.lifeEvents, buyEvObj, sellEvObj];
-        
-        savedEvent = buyEvObj;
-
-      } else if (type === 'sellHouse') {
-        const sellEvId = editingEvent.id && editingEvent.id.startsWith('sell-') ? editingEvent.id : `sell-${Date.now()}`;
-        const sellEvObj = {
-          id: sellEvId,
-          type: 'sellHouse',
-          enabled: true,
-          name: 'Sell House',
-          age: Number(editingEvent.age),
-          houseId: editingEvent.houseId,
-          sellingCost: editingEvent.sellingCost !== undefined ? Number(editingEvent.sellingCost) : 6,
-          proceedsDestination: editingEvent.proceedsDestination || 'investments'
-        };
-
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== sellEvId && e.id !== editingEvent.id);
-        newInputs.lifeEvents = [...newInputs.lifeEvents, sellEvObj];
-
-        // Update sellingCostRate in HouseAsset
-        if (newInputs.houseAssets) {
-          newInputs.houseAssets = newInputs.houseAssets.map(h => {
-            if (h.id === editingEvent.houseId) {
-              return { ...h, sellingCostRate: Number(editingEvent.sellingCost) };
-            }
-            return h;
-          });
-        }
-
-        savedEvent = sellEvObj;
-
-      } else if (type === 'borrowing') {
-        const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
-          const r = (apr / 100) / 12;
-          const pmt = monthlyPayment + extraPayment;
-          if (balance <= 0) return startAge;
-          if (pmt <= 0) return Infinity;
-          if (pmt <= balance * r) return Infinity;
-          if (r === 0) {
-            return startAge + (balance / pmt) / 12;
-          }
-          const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
-          return startAge + months / 12;
-        };
-
-        const borrowId = editingEvent.id && editingEvent.id.startsWith('borrowing-') ? editingEvent.id : `borrowing-${Date.now()}`;
-        const newEventObj = {
-          id: borrowId,
-          type: 'borrowing',
-          enabled: true,
-          borrowingType: editingEvent.borrowingType,
-          name: editingEvent.name || 'Borrowing',
-          balance: Number(editingEvent.balance) || 0,
-          interestRate: Number(editingEvent.interestRate) || 0,
-          minPayment: Number(editingEvent.minPayment) || 0,
-          startAge: editingEvent.timing === 'current' ? newInputs.currentAge : (Number(editingEvent.startAge) || (newInputs.currentAge + 1)),
-          notes: editingEvent.notes || '',
-          isExisting: editingEvent.timing === 'current',
-          timing: editingEvent.timing || (editingEvent.isExisting !== false ? 'current' : 'future'),
-          payoffPlanEnabled: !!editingEvent.payoffPlanEnabled
-        };
-
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== borrowId && e.id !== editingEvent.id);
-
-        if (newEventObj.payoffPlanEnabled) {
-          const existingPayoff = newInputs.lifeEvents.find(e => e.type === 'payoffPlan' && e.borrowingId === borrowId);
-          const extraPmt = existingPayoff ? (Number(existingPayoff.extraPayment) || 0) : 100;
-          const linkedVal = existingPayoff ? existingPayoff.linked !== false : true;
-
-          const startAgeForPayoff = linkedVal ? newEventObj.startAge : (existingPayoff ? Number(existingPayoff.startAge) : newEventObj.startAge);
-          const payoffAge = calculatePayoffAgeInline(newEventObj.balance, newEventObj.interestRate, newEventObj.minPayment, extraPmt, startAgeForPayoff);
-
-          const payoffObj = {
-            id: existingPayoff ? existingPayoff.id : `payoffPlan-${Date.now()}`,
-            type: 'payoffPlan',
-            enabled: true,
-            name: `Payoff Plan: ${newEventObj.name}`,
-            borrowingId: borrowId,
-            linked: linkedVal,
-            extraPayment: extraPmt,
-            startAge: startAgeForPayoff,
-            payoffAge: payoffAge,
-            notes: existingPayoff ? existingPayoff.notes || '' : ''
-          };
-
-          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffObj.id && !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
-          newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj, payoffObj];
-        } else {
-          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => !(e.type === 'payoffPlan' && e.borrowingId === borrowId));
-          newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
-        }
-
-        savedEvent = newEventObj;
-
-      } else if (type === 'payoffPlan') {
-        const calculatePayoffAgeInline = (balance, apr, monthlyPayment, extraPayment, startAge) => {
-          const r = (apr / 100) / 12;
-          const pmt = monthlyPayment + extraPayment;
-          if (balance <= 0) return startAge;
-          if (pmt <= 0) return Infinity;
-          if (pmt <= balance * r) return Infinity;
-          if (r === 0) {
-            return startAge + (balance / pmt) / 12;
-          }
-          const months = Math.log(pmt / (pmt - r * balance)) / Math.log(1 + r);
-          return startAge + months / 12;
-        };
-
-        const payoffId = editingEvent.id && editingEvent.id.startsWith('payoffPlan-') ? editingEvent.id : `payoffPlan-${Date.now()}`;
-        const borrowing = newInputs.lifeEvents.find(b => b.id === editingEvent.borrowingId);
-        
-        let startAge = Number(editingEvent.startAge);
-        if (editingEvent.linked !== false && borrowing) {
-          startAge = Number(borrowing.startAge);
-        }
-
-        const balance = borrowing ? Number(borrowing.balance) || 0 : 0;
-        const interestRate = borrowing ? Number(borrowing.interestRate) || 0 : 0;
-        const minPayment = borrowing ? Number(borrowing.minPayment) || 0 : 0;
-        const extraPayment = Number(editingEvent.extraPayment) || 0;
-
-        let payoffAge = calculatePayoffAgeInline(balance, interestRate, minPayment, extraPayment, startAge);
-
-        if (editingEvent.targetPayoffAge && editingEvent.targetPayoffAge > startAge) {
-          payoffAge = Number(editingEvent.targetPayoffAge);
-        }
-
-        const newEventObj = {
-          id: payoffId,
-          type: 'payoffPlan',
-          enabled: true,
-          name: editingEvent.name || 'Payoff Plan',
-          borrowingId: editingEvent.borrowingId,
-          linked: editingEvent.linked !== false,
-          extraPayment: extraPayment,
-          startAge: startAge,
-          payoffAge: payoffAge,
-          targetPayoffAge: editingEvent.targetPayoffAge || null,
-          notes: editingEvent.notes || ''
-        };
-
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== payoffId && e.id !== editingEvent.id);
-        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
-
-        savedEvent = newEventObj;
-
-      } else {
-        const isRetIncomeType = ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(type);
-        let defaultName = 'Other Income';
-        if (type === 'socialSecurity') defaultName = 'Social Security';
-        else if (type === 'pension') defaultName = 'Pension';
-        else if (type === 'rentalIncome') defaultName = 'Rental Income';
-        else if (type === 'annuity') defaultName = 'Annuity';
-
-        let newEventObj = {
-          id: editingEvent.id && !['haveChild', 'college', 'windfall', 'debtPayoff', 'custom', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(editingEvent.id)
-            ? editingEvent.id
-            : `${type}-${Date.now()}`,
-          type,
-          enabled: true,
-          name: type === 'haveChild' ? 'Have a Child' : type === 'college' ? 'College' : type === 'windfall' ? 'Windfall' : isRetIncomeType ? (editingEvent.name || defaultName) : editingEvent.name
-        };
-        
-        if (type === 'haveChild') {
-          newEventObj = {
-            ...newEventObj,
-            childName: editingEvent.childName || '',
-            childStartAge: editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0,
-            birthAge: editingEvent.birthAge !== undefined ? editingEvent.birthAge : newInputs.currentAge,
-            costMethod: editingEvent.costMethod || 'default',
-            customAges0to4: editingEvent.customAges0to4 !== undefined ? editingEvent.customAges0to4 : 15000,
-            customAges5to12: editingEvent.customAges5to12 !== undefined ? editingEvent.customAges5to12 : 9000,
-            customAges13to18: editingEvent.customAges13to18 !== undefined ? editingEvent.customAges13to18 : 12000,
-            customAges19to22: editingEvent.customAges19to22 !== undefined ? editingEvent.customAges19to22 : 20000,
-            includeCollege: !!editingEvent.includeCollege
-          };
-        } else if (type === 'college') {
-          newEventObj = {
-            ...newEventObj,
-            startAge: editingEvent.startAge,
-            tuitionCost: editingEvent.tuitionCost,
-            duration: editingEvent.duration
-          };
-        } else if (type === 'windfall') {
-          newEventObj = {
-            ...newEventObj,
-            ageReceived: editingEvent.ageReceived,
-            amount: editingEvent.amount,
-            taxRate: editingEvent.taxRate
-          };
-        } else if (type === 'debtPayoff') {
-          newEventObj = {
-            ...newEventObj,
-            payoffAge: editingEvent.payoffAge,
-            amount: editingEvent.amount
-          };
-        } else if (isRetIncomeType) {
-          let claimingAge = editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65);
-          if (type === 'socialSecurity') {
-            claimingAge = Math.max(62, Math.min(70, claimingAge));
-          }
-          newEventObj = {
-            ...newEventObj,
-            claimingAge,
-            startAge: claimingAge,
-            age: claimingAge,
-            monthlyBenefit: editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000,
-            inflationAdjusted: editingEvent.inflationAdjusted !== false,
-            useEarnings: editingEvent.useEarnings === true,
-            ageStartedWorking: editingEvent.ageStartedWorking !== undefined 
-              ? Number(editingEvent.ageStartedWorking) 
-              : 22
-          };
-        } else if (type === 'custom') {
-          newEventObj = {
-            ...newEventObj,
-            age: editingEvent.age,
-            amount: editingEvent.amount
-          };
-        } else if (type === 'marriage') {
-          const estimates = calculateMarriageEstimates(editingEvent, newInputs);
-          const combinedSpendingVal = estimates ? estimates.combinedSpendingVal : 0;
-          const spouseRetSpendingVal = estimates ? estimates.spouseRetSpendingVal : 0;
-          const housingCostAmount = estimates ? estimates.housingCostAmount : 0;
-          const lifestyleAdjustmentAmount = estimates ? estimates.lifestyleAdjustmentAmount : 0;
-
-          newEventObj = {
-            ...newEventObj,
-            age: Number(editingEvent.age),
-            spouseIncome: Number(editingEvent.spouseIncome),
-            incomeGrowthRate: Number(editingEvent.incomeGrowthRate || 3),
-            cash: Number(editingEvent.cash || 0),
-            investments: Number(editingEvent.investments || 0),
-            retirement: Number(editingEvent.retirement || 0),
-            debtStudent: Number(editingEvent.debtStudent || 0),
-            debtCredit: Number(editingEvent.debtCredit || 0),
-            debtOther: Number(editingEvent.debtOther || 0),
-            savingsRate: Number(editingEvent.savingsRate),
-            housingOption: estimates ? estimates.housingOption : 'move',
-            housingSavings: 0,
-            housingCost: housingCostAmount,
-            lifestyleOption: estimates ? estimates.lifestyleOption : 'same',
-            lifestyleAdjustment: lifestyleAdjustmentAmount,
-            includeWeddingCost: !!editingEvent.includeWeddingCost,
-            weddingCost: Number(editingEvent.weddingCost),
-            weddingFundingMethod: editingEvent.weddingFundingMethod || 'savings',
-            weddingAge: Number(editingEvent.weddingAge),
-            filingStatus: editingEvent.filingStatus || 'jointly',
-            spouseCurrentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
-            spouseLifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
-            spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
-            spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-
-            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
-            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
-            partnerRetiresWithUser: true,
-            retirementSpendingNeed: spouseRetSpendingVal,
-            combinedSpendingAfterMarriage: combinedSpendingVal
-          };
-          
-          let nextHouseholdMembers = [...(newInputs.householdMembers || [])];
-          const spouseIdx = nextHouseholdMembers.findIndex(m => m.id === 'spouse');
-          const spouseRecord = {
-            id: 'spouse',
-            name: 'Spouse',
-            activeFromDate: Number(editingEvent.age),
-            activeUntilDate: null,
-            income: Number(editingEvent.spouseIncome),
-            incomeGrowthRate: Number(editingEvent.incomeGrowthRate || 3) / 100,
-            assets: {
-              cash: Number(editingEvent.cash || 0),
-              investments: Number(editingEvent.investments || 0),
-              retirement: Number(editingEvent.retirement || 0)
-            },
-            debts: {
-              student: Number(editingEvent.debtStudent || 0),
-              credit: Number(editingEvent.debtCredit || 0),
-              other: Number(editingEvent.debtOther || 0)
-            },
-            savingsRate: Number(editingEvent.savingsRate),
-            currentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
-            lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
-            spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
-            spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-            spouseDesiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
-            desiredRetirementAge: editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null ? Number(editingEvent.spouseDesiredRetirementAge) : null,
-            partnerRetiresWithUser: true,
-            retirementSpendingNeed: spouseRetSpendingVal,
-            growthRate: Number(editingEvent.incomeGrowthRate || 3),
-            combinedSpendingAfterMarriage: combinedSpendingVal,
-            housingCost: housingCostAmount,
-            lifestyleAdjustment: lifestyleAdjustmentAmount
-          };
-          if (spouseIdx !== -1) {
-            nextHouseholdMembers[spouseIdx] = spouseRecord;
-          } else {
-            nextHouseholdMembers.push(spouseRecord);
-          }
-          newInputs.householdMembers = nextHouseholdMembers;
-        }
-        
-        savedEvent = newEventObj;
-        newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
-      }
-
-      if (type === 'haveChild') {
-        syncChildcarePhasesAndRules(newInputs);
-        const afterRes = runFireSimulation(newInputs);
-        afterReadyAge = afterRes.retirementReadyAge;
-      }
-      
+      const res = getInputsWithEvent(scen.inputs, activeEvent);
+      savedEvent = res.savedEvent;
       return {
         ...scen,
-        inputs: newInputs
+        inputs: res.newInputs
       };
     });
 
     setScenarios(nextScenarios);
 
     if (type === 'haveChild' && savedEvent) {
+      const targetScen = nextScenarios.find(s => s.id === currentScenarioId) || nextScenarios[0];
+      const afterRes = runFireSimulation(targetScen.inputs);
+      afterReadyAge = afterRes.retirementReadyAge;
+
       const diff = (afterReadyAge && beforeReadyAge) ? (afterReadyAge - beforeReadyAge) : 0;
-      const currentScenObj = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
-      const targetRetAge = Number(currentScenObj?.inputs?.targetRetirementAge) || 65;
-      const isStillReady = afterReadyAge !== null && (diff <= 0 || afterReadyAge <= targetRetAge);
+      const targetRetAge = Number(targetScen?.inputs?.targetRetirementAge) || 65;
 
       setChildImpactSummary({
         beforeAge: beforeReadyAge,
@@ -3858,7 +3865,9 @@ export default function FireSimulator() {
       });
     }
     
-    setEditingEvent(null);
+    if (!(isMobile && type === 'haveChild')) {
+      setEditingEvent(null);
+    }
     setIsFullPartnerProfileOpen(false);
     setIsZeroSpendingConfirmed(false);
     setIsPartnerZeroSpendingConfirmed(false);
@@ -3942,15 +3951,16 @@ export default function FireSimulator() {
     }
   };
 
-  const handleDeleteEvent = () => {
-    if (!editingEvent) return;
+  const handleDeleteEvent = (eventToDelete) => {
+    const targetEvent = (eventToDelete && !eventToDelete.nativeEvent && eventToDelete.type !== 'click') ? eventToDelete : editingEvent;
+    if (!targetEvent) return;
     
     // Create a proxy event object that handleDeleteRoadmapEvent expects
     const proxyEvent = {
-      originalId: editingEvent.id,
-      id: editingEvent.id,
-      type: editingEvent.type,
-      age: editingEvent.age || editingEvent.purchaseAge || editingEvent.birthAge || editingEvent.claimingAge || editingEvent.moveAge
+      originalId: targetEvent.id,
+      id: targetEvent.id,
+      type: targetEvent.type,
+      age: targetEvent.age || targetEvent.purchaseAge || targetEvent.birthAge || targetEvent.claimingAge || targetEvent.moveAge
     };
     
     handleDeleteRoadmapEvent(proxyEvent);
@@ -3958,6 +3968,216 @@ export default function FireSimulator() {
     setIsFullPartnerProfileOpen(false);
     setIsZeroSpendingConfirmed(false);
     setIsPartnerZeroSpendingConfirmed(false);
+  };
+
+  const handleApplyMobileRecommendation = (scenario) => {
+    const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+    let newInputs = JSON.parse(JSON.stringify(scen.inputs));
+
+    const currentAgeVal = Number(newInputs.currentAge) || 30;
+    const targetRetAgeVal = Number(newInputs.targetRetirementAge) || 65;
+
+    // 1. If child offset, add temporary income boosts
+    if (scenario.type.startsWith('childOffset') && scenario.incomeBoosts) {
+      newInputs.incomeList = [...(newInputs.incomeList || []), ...(scenario.incomeBoosts || [])];
+    }
+
+    // 2. Adjust target retirement age if working longer / retiring at 65/ready age
+    if (scenario.type === 'workLonger') {
+      const yearsDelay = scenario.value;
+      newInputs.targetRetirementAge = targetRetAgeVal + yearsDelay;
+    } else if (scenario.type === 'retire65') {
+      const target65Age = currentAgeVal < 65 ? 65 : currentAgeVal;
+      newInputs.targetRetirementAge = target65Age;
+    } else if (scenario.type === 'retireReadyAge') {
+      newInputs.targetRetirementAge = scenario.value;
+    } else if (scenario.type === 'combined') {
+      const yearsDelay = scenario.value && typeof scenario.value === 'object' ? (scenario.value.delay || 0) : 0;
+      newInputs.targetRetirementAge = targetRetAgeVal + yearsDelay;
+    }
+
+    // Update retire event in lifeEvents to match new target retirement age
+    const targetRetAge = newInputs.targetRetirementAge;
+    newInputs.lifeEvents = (newInputs.lifeEvents || []).map(ev => {
+      if (ev.type === 'retire') {
+        return { ...ev, age: targetRetAge };
+      }
+      return ev;
+    });
+
+    // 3. For budget adjustments (savings, spending, combined, retire65 with value, retireRequestedDate)
+    // We want to adjust the budget phases. Let's get the normalized phases first.
+    let normPhases = getNormalizedPhases(newInputs);
+    
+    // Find the current budget phase
+    const currentPhase = normPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normPhases[0];
+
+    // Check if we need to adjust savings/expenses
+    const isBudgetAdjustment = scenario.type === 'savings' || 
+                               scenario.type === 'spending' || 
+                               scenario.type === 'retireRequestedDate' || 
+                               (scenario.type === 'retire65' && scenario.value > 0) ||
+                               scenario.type === 'combined' ||
+                               scenario.type === 'reduceDiscretionary' ||
+                               scenario.type === 'increaseDebtIncome';
+
+    if (isBudgetAdjustment && currentPhase) {
+      let targetSavingsMap = currentPhase.savings ? { ...currentPhase.savings } : { brokerage: 0 };
+      let targetExpensesMap = currentPhase.expenses ? { ...currentPhase.expenses } : {};
+      let targetIncome = currentPhase.income * 12;
+
+      if (scenario.type === 'savings' || scenario.type === 'retireRequestedDate' || (scenario.type === 'retire65' && scenario.value > 0)) {
+        const additionalSavingsAnnual = scenario.value;
+        const additionalSavingsMonthly = Math.round(additionalSavingsAnnual / 12);
+        
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + additionalSavingsMonthly;
+        
+        // Reduce monthly expenses by the same amount to keep it balanced
+        let remainingReduction = additionalSavingsMonthly;
+        const keysToReduce = ['leisure', 'misc', 'diningOut', 'housing', 'food', 'utilities', 'transportation'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
+      } else if (scenario.type === 'income') {
+        const grossIncreaseAnnual = scenario.value;
+        const netSavingsAnnual = scenario.netSavingsValue || 0;
+        targetIncome = targetIncome + grossIncreaseAnnual;
+        const monthlyNetSavings = Math.round(netSavingsAnnual / 12);
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyNetSavings;
+      } else if (scenario.type === 'combined') {
+        const additionalSavingsAnnual = scenario.value.savings || 0;
+        const additionalSavingsMonthly = Math.round(additionalSavingsAnnual / 12);
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + additionalSavingsMonthly;
+        
+        let remainingReduction = additionalSavingsMonthly;
+        const keysToReduce = ['leisure', 'misc', 'diningOut', 'housing', 'food', 'utilities', 'transportation'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
+
+        const grossIncreaseAnnual = scenario.value.income || 0;
+        const netSavingsAnnual = scenario.value.netSavings || 0;
+        targetIncome = targetIncome + grossIncreaseAnnual;
+        const monthlyNetSavings = Math.round(netSavingsAnnual / 12);
+        targetSavingsMap.brokerage = (targetSavingsMap.brokerage || 0) + monthlyNetSavings;
+      } else if (scenario.type === 'reduceDiscretionary') {
+        let remainingReduction = scenario.value;
+        const keysToReduce = ['leisure', 'diningOut', 'misc'];
+        for (const key of keysToReduce) {
+          if (targetExpensesMap[key] !== undefined && targetExpensesMap[key] > 0) {
+            const reduceAmt = Math.min(targetExpensesMap[key], remainingReduction);
+            targetExpensesMap[key] -= reduceAmt;
+            remainingReduction -= reduceAmt;
+            if (remainingReduction <= 0) break;
+          }
+        }
+      } else if (scenario.type === 'increaseDebtIncome') {
+        const extraIncomeItem = {
+          id: `debt-income-boost-${Date.now()}`,
+          name: `Extra Income (to cover debt)`,
+          amount: scenario.value * 12,
+          frequency: 'yearly',
+          startAge: currentAgeVal,
+          endAge: targetRetAgeVal,
+          growthRate: 0.03,
+          isTaxable: true
+        };
+        newInputs.incomeList = [...(newInputs.incomeList || []), extraIncomeItem];
+      }
+
+      // Apply back to the current phase
+      currentPhase.income = Math.round(targetIncome / 12);
+      currentPhase.savings = targetSavingsMap;
+      currentPhase.expenses = targetExpensesMap;
+    }
+
+    // 4. Save all phases back to budgetDetails.phases
+    if (!newInputs.budgetDetails) newInputs.budgetDetails = {};
+    newInputs.budgetDetails.phases = normPhases.map(p => ({
+      id: p.id,
+      type: p.type,
+      name: p.name,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      income: p.income,
+      savingsAllocMode: p.savingsAllocMode || 'fixed',
+      savings: p.savings,
+      partnerSavings: p.partnerSavings || {},
+      expenses: p.expenses
+    }));
+
+    // Synchronize back to simpleIncome, simpleExpenses, incomeList, and spendingPhases
+    if (currentPhase) {
+      const wsPhase = normPhases.find(p => p.type === 'workSave');
+      const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
+      const childBoost = Math.max(0, currentPhase.income - standardIncomeMonthly);
+      newInputs.simpleIncome = (currentPhase.income - childBoost) * 12;
+      newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
+    }
+
+    // Sync career incomes in incomeList
+    newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+      const matchingPhase = normPhases.find(p => p.startAge === inc.startAge && (p.type === 'careerChange' || p.type === 'current'));
+      if (matchingPhase) {
+        inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;
+      }
+      return inc;
+    });
+
+    // Sync spendingPhases
+    newInputs.spendingPhases = (newInputs.spendingPhases || []).map(sp => {
+      const matchingPhase = normPhases.find(p => p.startAge === sp.startAge && p.type === 'move');
+      if (matchingPhase) {
+        const totalMonthlyExpenses = Object.keys(matchingPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (matchingPhase.expenses[v] || 0), 0);
+        sp.amount = sp.frequency === 'monthly' ? totalMonthlyExpenses : totalMonthlyExpenses * 12;
+        sp.annualSpending = totalMonthlyExpenses * 12;
+      }
+      return sp;
+    });
+
+    // Debt payoff plan scenario
+    if (scenario.type === 'startDebtPayoff') {
+      const activeLoan = scenario.activeDebts.find(d => d.type !== 'mortgage');
+      if (activeLoan) {
+        const payoffId = `payoff-plan-auto-${Date.now()}`;
+        const payoffEvent = {
+          id: payoffId,
+          type: 'payoffPlan',
+          borrowingId: activeLoan.id,
+          extraPayment: 100,
+          startAge: currentAgeVal,
+          linked: true,
+          enabled: true,
+          name: `Payoff Plan: ${activeLoan.name}`
+        };
+        newInputs.lifeEvents = [...(newInputs.lifeEvents || []), payoffEvent];
+      }
+    }
+
+    // Let the single source of truth properly build childcare phases, spending phases and rules
+    syncChildcarePhasesAndRules(newInputs);
+
+    // Save changes to scenarios
+    setScenarios(prev => prev.map(scen => {
+      if (scen.id !== currentScenarioId) return scen;
+      return {
+        ...scen,
+        inputs: newInputs
+      };
+    }));
+
+    // Glow effect or pulse target childcare phase
+    window.pulsePhaseId = 'childcare';
   };
 
   const commitEventAgeChange = (evt, newAge) => {
@@ -5101,11 +5321,17 @@ export default function FireSimulator() {
           setActiveStep={setActiveStep}
           timelineEvents={timelineEvents}
           editingEvent={editingEvent}
+          setEditingEvent={setEditingEvent}
+          handleSaveEvent={handleSaveEvent}
+          handleDeleteEvent={handleDeleteEvent}
+          getInputsWithEvent={getInputsWithEvent}
           displayedBaselineResults={displayedBaselineResults}
           baselineResults={baselineResults}
+          handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+          improvementPlan={improvementPlan}
         />
         
-        {editingEvent && (
+        {editingEvent && !isMobile && (
           <EventModalForm
             inputs={inputs}
             editingEvent={editingEvent}
@@ -5123,13 +5349,15 @@ export default function FireSimulator() {
             tempSocialSecurityDetails={tempSocialSecurityDetails}
           />
         )}
-        <ChildImpactModal
-          childImpactSummary={childImpactSummary}
-          inputs={inputs}
-          setChildImpactSummary={setChildImpactSummary}
-          setEditingEvent={setEditingEvent}
-          setShowImprovementModal={setShowImprovementModal}
-        />
+        {!isMobile && (
+          <ChildImpactModal
+            childImpactSummary={childImpactSummary}
+            inputs={inputs}
+            setChildImpactSummary={setChildImpactSummary}
+            setEditingEvent={setEditingEvent}
+            setShowImprovementModal={setShowImprovementModal}
+          />
+        )}
         {isBudgetModalOpen && (
           <BudgetModal
             inputs={inputs}
