@@ -305,6 +305,36 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     state.annualEarlyWithdrawalPenalties = 0;
     const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge);
 
+    state.weddingFinancedAmount = 0;
+    state.weddingPaidFromSavings = 0;
+    state.sellingCosts = 0;
+    state.lumpSumDebtPayoffs = 0;
+    state.annualInterestPaid = 0;
+    state.housePurchaseTransactionCosts = 0;
+    state.yearInvestmentGrowth = 0;
+    state.mortgagePayoffFromSale = 0;
+
+    const startAssets = year === 0
+      ? (
+          (balances.cash || 0) +
+          (balances.emergencyFund || 0) +
+          (balances.brokerage || 0) +
+          (balances.trad401k || 0) +
+          (balances.tradIra || 0) +
+          (balances.rothIra || 0) +
+          (balances.hsa || 0) +
+          (balances.other || 0) +
+          customAssets.reduce((sum, ca) => sum + ca.balance, 0) +
+          homeEquityBaseline
+        )
+      : logs[year - 1].assets;
+
+    const startDebt = year === 0
+      ? (activeLoans.reduce((sum, l) => sum + l.balance, 0) + debtBalance + state.cumulativeShortfall)
+      : logs[year - 1].debt;
+
+    const startNetWorth = startAssets - startDebt;
+
     // Activate future borrowing events starting this year
     activeLoans.forEach(loan => {
       if (loan.isFutureBorrowing && age === loan.startAge && !loan.activated) {
@@ -372,6 +402,18 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     if (year > 0) {
       const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
+      
+      const brokerageGrowth = (balances.brokerage || 0) * activeReturnRate;
+      const trad401kGrowth = (balances.trad401k || 0) * activeReturnRate;
+      const tradIraGrowth = (balances.tradIra || 0) * activeReturnRate;
+      const rothIraGrowth = (balances.rothIra || 0) * activeReturnRate;
+      const hsaGrowth = (balances.hsa || 0) * activeReturnRate;
+      const otherGrowth = (balances.other || 0) * activeReturnRate;
+      const cashGrowth = (balances.cash || 0) * activeReturnRate;
+      const emergencyFundGrowth = (balances.emergencyFund || 0) * activeReturnRate;
+
+      state.yearInvestmentGrowth = brokerageGrowth + trad401kGrowth + tradIraGrowth + rothIraGrowth + hsaGrowth + otherGrowth + cashGrowth + emergencyFundGrowth;
+
       balances.brokerage *= (1 + activeReturnRate);
       balances.trad401k *= (1 + activeReturnRate);
       balances.tradIra *= (1 + activeReturnRate);
@@ -382,6 +424,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       balances.emergencyFund *= (1 + activeReturnRate);
 
       if (state.cumulativeShortfall > 0) {
+        state.yearInvestmentGrowth -= state.cumulativeShortfall * activeReturnRate;
         state.cumulativeShortfall *= (1 + activeReturnRate);
       }
 
@@ -395,6 +438,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         if (rateToApply === null) {
           rateToApply = activeReturnRate;
         }
+        state.yearInvestmentGrowth += ca.balance * rateToApply;
         ca.balance *= (1 + rateToApply);
       });
 
@@ -621,6 +665,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     );
     annualMinPayments = debtPayments.annualMinPayments;
     annualExtraPayments = debtPayments.annualExtraPayments;
+    state.annualInterestPaid = debtPayments.annualInterestPaid || 0;
     annualExpenses += annualMinPayments;
 
     const extraDebtShortfall = deductFromLiquidAssets(annualExtraPayments, age, state);
@@ -641,6 +686,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
             state.runOutAge = age;
           }
         }
+        state.lumpSumDebtPayoffs = (state.lumpSumDebtPayoffs || 0) + amt;
         debtBalance = 0;
       }
     });
@@ -926,7 +972,219 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     const customAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
     const liquidNW = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
-    const netWorth = liquidNW + totalHomeValue - totalMortgageBalance - currentDebtSum - state.cumulativeShortfall;
+    const endingAssets = liquidNW + totalHomeValue;
+    const endingDebt = currentDebtSum + totalMortgageBalance + state.cumulativeShortfall;
+    const endingNetWorth = endingAssets - endingDebt;
+    const netWorth = endingNetWorth;
+
+    // Audited ledger variables calculation
+    const weddingFinancedAmount = state.weddingFinancedAmount || 0;
+    const weddingPaidFromSavings = state.weddingPaidFromSavings || 0;
+    const weddingCostTotal = weddingFinancedAmount + weddingPaidFromSavings;
+    const weddingLoan = activeLoans.find(l => l.id === 'wedding-debt');
+    const weddingDebtBalance = weddingLoan ? weddingLoan.balance : 0;
+
+    const sellingCosts = state.sellingCosts || 0;
+
+    const spouseAssetsAdded = (hasMarriage && age === marriageAge)
+      ? (spouseCash + spouseInvestments + spouseRetirement) * nominalFactor
+      : 0;
+    const spouseDebtAdded = (hasMarriage && age === marriageAge)
+      ? (spouseDebtStudent + spouseDebtCredit + spouseDebtOther) * nominalFactor
+      : 0;
+    const spouseNetWorthAdded = spouseAssetsAdded - spouseDebtAdded;
+
+    let newMortgageDebt = 0;
+    purchasedProperties.forEach(prop => {
+      if (prop.purchaseAge === age && prop.purchaseType === 'mortgage') {
+        newMortgageDebt += prop.loanAmount || 0;
+      }
+    });
+
+    let futureBorrowingActivated = 0;
+    activeLoans.forEach(loan => {
+      if (loan.isFutureBorrowing && age === loan.startAge && loan.activated) {
+        futureBorrowingActivated += loan.startingBalance || 0;
+      }
+    });
+
+    const shortfallVal = shortfall || 0;
+    const newDebtAdded = weddingFinancedAmount + newMortgageDebt + futureBorrowingActivated + shortfallVal;
+
+    const activeLoansInterestPaid = state.annualInterestPaid || 0;
+
+    let annualMortgageInterest = 0;
+    let annualMortgagePrincipal = 0;
+    purchasedProperties.forEach(prop => {
+      if (prop.purchaseType === 'mortgage') {
+        if (age >= prop.purchaseAge && age < prop.purchaseAge + prop.loanTerm) {
+          let startBal = 0;
+          if (age === prop.purchaseAge) {
+            startBal = prop.loanAmount || 0;
+          } else {
+            const prevElapsed = age - 1 - prop.purchaseAge;
+            const r = prop.mortgageRate / 12;
+            const n = prop.loanTerm * 12;
+            const prevElapsedMonths = prevElapsed * 12;
+            const remainingMonths = n - prevElapsedMonths;
+            const pmt = prop.annualPI / 12;
+            startBal = r === 0 ? pmt * remainingMonths : pmt * (1 - Math.pow(1 + r, -remainingMonths)) / r;
+          }
+          const endBal = prop.mortgageBalance || 0;
+          const principalPaid = Math.max(0, startBal - endBal);
+          const interestPaidVal = Math.max(0, prop.annualPI - principalPaid);
+          annualMortgageInterest += interestPaidVal;
+          annualMortgagePrincipal += principalPaid;
+        }
+      }
+    });
+
+    const interestPaid = activeLoansInterestPaid + annualMortgageInterest;
+
+    // Savings represents net cash flow from income/spending (after min interest/principal but before extra payments/payoffs)
+    const grossIncome = annualIncome + windfallReceived;
+    const grossExpenses = annualExpenses;
+    const savingsAfterInterest = grossIncome - grossExpenses - taxes - annualExtraPayments - (state.lumpSumDebtPayoffs || 0);
+
+    // Savings before interest to reconcile with -interestPaid in formula
+    const savings = savingsAfterInterest + interestPaid;
+
+    // Investment Growth calculated directly on assets
+    let investmentGrowth = 0;
+    if (year > 0) {
+      investmentGrowth += state.yearInvestmentGrowth || 0;
+
+      // Real estate appreciation
+      const prevNominalFactor = Math.pow(1 + inflationRate, year - 1);
+      let homeAppreciation = homeEquityBaseline * (nominalFactor - prevNominalFactor);
+      purchasedProperties.forEach(prop => {
+        if (age >= prop.purchaseAge) {
+          const prevVal = prop.currentValue / (1 + prop.appreciationRate);
+          homeAppreciation += prop.currentValue - prevVal;
+        }
+      });
+      investmentGrowth += homeAppreciation;
+    }
+
+    const lifeEventCosts = weddingPaidFromSavings + sellingCosts + (state.housePurchaseTransactionCosts || 0);
+    const startDebtExcludingShortfall = startDebt - (year === 0 ? 0 : (logs[year - 1]?.cumulativeShortfall || 0));
+    const endingDebtExcludingShortfall = endingDebt - (state.cumulativeShortfall || 0);
+    const newDebtAddedExcludingShortfall = newDebtAdded - shortfallVal;
+    const debtPrincipalPaid = Math.max(0, startDebtExcludingShortfall + newDebtAddedExcludingShortfall + spouseDebtAdded - endingDebtExcludingShortfall - (state.mortgagePayoffFromSale || 0));
+
+    // Validate reconciliation
+    const expectedEndingNetWorth = startNetWorth + savings + investmentGrowth - lifeEventCosts - newDebtAdded + debtPrincipalPaid - interestPaid + spouseNetWorthAdded + shortfallVal + newMortgageDebt;
+    const reconciliationDifference = endingNetWorth - expectedEndingNetWorth;
+    if (Math.abs(reconciliationDifference) > 1.0) {
+      console.warn(`[WARNING] Net Worth Reconciliation failed at Age ${age}! Difference: ${reconciliationDifference}`);
+    }
+
+    const netWorthLedgerDebug = {
+      startingNetWorth: startNetWorth,
+      savings,
+      investmentGrowth,
+      lifeEventCosts,
+      newDebtAdded,
+      debtPrincipalPaid,
+      interestPaid,
+      endingNetWorth,
+      reconciliationDifference
+    };
+
+    // Build UI ledger rows
+    const rows = [];
+    if (Math.abs(savingsAfterInterest) > 0.01) {
+      rows.push({
+        label: 'Savings',
+        value: savingsAfterInterest,
+        type: savingsAfterInterest > 0 ? 'positive' : 'negative',
+        section: 'incomeInvesting'
+      });
+    }
+    if (Math.abs(investmentGrowth) > 0.01) {
+      rows.push({
+        label: investmentGrowth > 0 ? 'Investment Growth' : 'Investment Loss',
+        value: investmentGrowth,
+        type: investmentGrowth > 0 ? 'positive' : 'negative',
+        section: 'incomeInvesting'
+      });
+    }
+    if (weddingCostTotal > 0) {
+      rows.push({
+        label: 'Wedding Cost',
+        value: -weddingCostTotal,
+        type: 'negative',
+        section: 'lifeEvents',
+        expandable: true,
+        details: {
+          paidFromSavings: weddingPaidFromSavings,
+          financed: weddingFinancedAmount,
+          currentDebtBalance: weddingDebtBalance
+        }
+      });
+    }
+    if (spouseAssetsAdded > 0) {
+      rows.push({
+        label: 'Spouse Assets Added',
+        value: spouseAssetsAdded,
+        type: 'positive',
+        section: 'lifeEvents'
+      });
+    }
+    if (spouseDebtAdded > 0) {
+      rows.push({
+        label: 'Spouse Debt Added',
+        value: -spouseDebtAdded,
+        type: 'negative',
+        section: 'lifeEvents'
+      });
+    }
+    if (sellingCosts > 0) {
+      rows.push({
+        label: 'House Sale transaction costs',
+        value: -sellingCosts,
+        type: 'negative',
+        section: 'lifeEvents'
+      });
+    }
+    if (newDebtAdded > 0 && newDebtAdded !== weddingFinancedAmount) {
+      rows.push({
+        label: 'Debt Added',
+        value: -newDebtAdded,
+        type: 'negative',
+        section: 'debtActivity'
+      });
+    }
+    if (debtPrincipalPaid > 0) {
+      rows.push({
+        label: 'Principal Repaid',
+        value: debtPrincipalPaid,
+        type: 'positive',
+        section: 'debtActivity'
+      });
+    }
+    if (interestPaid > 0) {
+      rows.push({
+        label: 'Interest Paid',
+        value: -interestPaid,
+        type: 'negative',
+        section: 'debtActivity'
+      });
+    }
+
+    const netWorthLedger = {
+      startingNetWorth: startNetWorth,
+      savings: savingsAfterInterest,
+      withdrawals: withdrawal,
+      investmentGrowth,
+      newDebtAdded,
+      debtPrincipalPaid,
+      majorEventCosts: lifeEventCosts,
+      endingNetWorth,
+      weddingFinancedAmount,
+      weddingPaidFromSavings,
+      rows
+    };
 
     let retirementBaseExpenses = spendingForYear + taxes;
     if (age < targetRetirementAge) {
@@ -1017,8 +1275,6 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const incomeAvailable = annualIncome + windfallReceived;
     const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
     const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
-    const weddingLoan = activeLoans.find(l => l.id === 'wedding-debt');
-    const weddingDebtBalance = weddingLoan ? weddingLoan.balance : 0;
     logs.push({
       intervalId: activePhaseForAge ? activePhaseForAge.id : null,
       year,
@@ -1040,6 +1296,10 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       mortgageBalance: totalMortgageBalance,
       debtBalance: currentDebtSum,
       netWorth,
+      assets: endingAssets,
+      debt: endingDebt,
+      netWorthLedger,
+      netWorthLedgerDebug,
       isFI: liquidNW >= retirementReadyTargetForYear,
       fiNumber: retirementReadyTargetForYear,
       ssIncome: yearSocialSecurityIncome,
@@ -1078,10 +1338,13 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     });
 
+    const paidFromSavingsVal = weddingLog && weddingLog.netWorthLedger ? weddingLog.netWorthLedger.weddingPaidFromSavings : 0;
+    const financedAmountVal = weddingLog && weddingLog.netWorthLedger ? weddingLog.netWorthLedger.weddingFinancedAmount : 0;
+
     weddingFinancingDetails = {
       weddingCost: weddingCost,
-      paidFromSavings: state.weddingPaidFromSavings ?? 0,
-      financedAmount: state.weddingFinancedAmount ?? 0,
+      paidFromSavings: paidFromSavingsVal,
+      financedAmount: financedAmountVal,
       weddingDebtBalanceByYear,
       netWorthBeforeWedding: preWeddingLog ? preWeddingLog.netWorth : null,
       netWorthAfterWedding: weddingLog ? weddingLog.netWorth : null

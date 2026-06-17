@@ -245,6 +245,8 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
       debtBalance: log.debtBalance ?? 0,
       assetBalance: log.portfolio ?? 0,
       netWorth: log.netWorth ?? 0,
+      netWorthLedger: log.netWorthLedger || null,
+      netWorthLedgerDebug: log.netWorthLedgerDebug || null,
       retirementStatus: log.age >= (normInputs.targetRetirementAge ?? 65) ? 'Retired' : 'Working',
       intervalId: log.intervalId ?? null,
       activeEvents: activeEventsThisAge,
