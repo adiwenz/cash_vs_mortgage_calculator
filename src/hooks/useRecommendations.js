@@ -1,0 +1,385 @@
+import { useMemo } from 'react';
+import { getNormalizedPhases, runFireSimulation } from '../fireCalculations';
+import { 
+  calculateRetireAt65Recommendation, 
+  calculateSaveMoreRecommendation, 
+  calculateEarnMoreRecommendation,
+  getChildCostOffsetRecommendations
+} from '../recommendations';
+import { getActiveDebtsForAge } from '../calculators/fire/debts';
+import {
+  getActiveChildrenCountAtAge,
+  getChildCountIntervals,
+  calculateUSTaxForModal
+} from '../simulatorMathUtils';
+
+const formatCurrency = (val) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(val);
+};
+
+export function useRecommendations(inputs, activeResults) {
+  const improvementPlan = useMemo(() => {
+    if (!inputs || !activeResults) return null;
+
+    const currentAge = Number(inputs.currentAge) || 30;
+    const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+    const yearsUntilRetirement = Math.max(0, targetRetirementAge - currentAge);
+    const rateOfReturn = (Number(inputs.expectedReturn) || 7) / 100;
+    const swr = (Number(inputs.swr) || 4) / 100;
+    const marginalTaxRate = inputs.includeTaxes ? 0.25 : 0.0;
+
+    // Run a temporary simulation with the default childcare boost enabled
+    // so recommendations are calculated against the post-boost baseline.
+    const recInputs = JSON.parse(JSON.stringify(inputs));
+    const normPhases = getNormalizedPhases(recInputs);
+    if (!recInputs.budgetDetails) recInputs.budgetDetails = {};
+    recInputs.budgetDetails.phases = normPhases.map(p => ({
+      id: p.id,
+      type: p.type,
+      name: p.name,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      income: p.income,
+      savingsAllocMode: p.smartRule || p.savingsAllocMode || 'fixed',
+      savings: p.savings,
+      partnerSavings: p.partnerSavings,
+      expenses: p.expenses
+    }));
+    const recResults = runFireSimulation(recInputs);
+    const currentReadyAge = recResults.retirementReadyAge;
+
+    const retirementExpenses = recResults.annualRetirementSpending || 40000;
+    const shortfall = recResults.endingSurplusShortfall < 0 ? -recResults.endingSurplusShortfall : 0;
+
+    // Determine childcare phase and peak monthly child cost
+    const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+    let hasChildcarePhase = false;
+    let maxChildCostsAnnual = 0;
+    if (childEvents.length > 0) {
+      let minChildParentAge = Infinity;
+      let maxChildParentAge = -Infinity;
+      childEvents.forEach(ev => {
+        const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+        const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+        const maxAge = includeCollege ? 22 : 18;
+        if (birthAge < minChildParentAge) minChildParentAge = birthAge;
+        if (birthAge + maxAge > maxChildParentAge) maxChildParentAge = birthAge + maxAge;
+      });
+      hasChildcarePhase = minChildParentAge < maxChildParentAge && maxChildParentAge > currentAge;
+
+      if (hasChildcarePhase) {
+        for (let age = currentAge; age < targetRetirementAge; age++) {
+          let yearCost = 0;
+          childEvents.forEach(ev => {
+            const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+            const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
+            const childAge = age - birthAge;
+            if (childAge >= childStartAge) {
+              const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
+              const maxAge = includeCollege ? 22 : 18;
+              if (childAge < maxAge) {
+                const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
+                const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
+                const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
+                const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
+
+                let annualCost = 0;
+                if (childAge >= 0 && childAge <= 4) annualCost = ages0to4;
+                else if (childAge >= 5 && childAge <= 12) annualCost = ages5to12;
+                else if (childAge >= 13 && childAge <= 18) annualCost = ages13to18;
+                else if (childAge >= 19 && childAge <= 22) annualCost = ages19to22;
+                
+                yearCost += annualCost;
+              }
+            }
+          });
+          if (yearCost > maxChildCostsAnnual) {
+            maxChildCostsAnnual = yearCost;
+          }
+        }
+      }
+    }
+    const maxChildCostsMonthly = Math.round(maxChildCostsAnnual / 12);
+
+    let peakCount = 0;
+    const currentAgeVal = Number(inputs.currentAge) || 30;
+    const targetRetAgeVal = Number(inputs.targetRetirementAge) || 65;
+    for (let age = currentAgeVal; age < targetRetAgeVal; age++) {
+      const count = getActiveChildrenCountAtAge(age, inputs.lifeEvents);
+      if (count > peakCount) {
+        peakCount = count;
+      }
+    }
+    const savingIntervals = getChildCountIntervals(currentAgeVal, targetRetAgeVal, inputs.lifeEvents, inputs.incomeList);
+    const peakIntervalIdx = savingIntervals.findIndex(inv => inv.childCount === peakCount);
+    let ccIncomeVal = (Number(inputs.simpleIncome) || 50000) / 12;
+    if (inputs.budgetDetails) {
+      if (inputs.budgetDetails.childcareBudgets && peakIntervalIdx !== -1 && inputs.budgetDetails.childcareBudgets[peakIntervalIdx]) {
+        ccIncomeVal = Number(inputs.budgetDetails.childcareBudgets[peakIntervalIdx].income);
+      } else if (inputs.budgetDetails.childcareIncome !== undefined) {
+        ccIncomeVal = Number(inputs.budgetDetails.childcareIncome);
+      }
+    }
+    const wsIncomeVal = inputs.budgetDetails && inputs.budgetDetails.income !== undefined
+      ? Number(inputs.budgetDetails.income)
+      : (Number(inputs.simpleIncome) || 50000) / 12;
+    const currentChildcareIncomeBoostMonthly = Math.max(0, ccIncomeVal - wsIncomeVal);
+
+    const unfundedMaxChildCostsMonthly = Math.max(0, maxChildCostsMonthly - currentChildcareIncomeBoostMonthly);
+
+    const activePhaseObj = normPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || normPhases[0];
+    const activeDebts = getActiveDebtsForAge(inputs, currentAge);
+    const activeDebtsTotal = activeDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+    const baseExpenses = Object.keys(activePhaseObj?.expenses || {}).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (activePhaseObj.expenses[v] || 0), 0);
+    const activeSavings = activePhaseObj?.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(activePhaseObj?.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const activeTaxes = inputs.includeTaxes ? Math.round(calculateUSTaxForModal(activePhaseObj?.income * 12 || 0, 0, inputs.filingStatus || 'single') / 12) : 0;
+    const totalAllocated = baseExpenses + activeDebtsTotal + activeSavings + activeTaxes;
+    const debtDeficit = Math.max(0, totalAllocated - (activePhaseObj?.income || 0));
+
+    const hasShortfall = recResults.endingSurplusShortfall < 0 || 
+                         !recResults.moneyLasts ||
+                         (recResults.retirementReadyAge && inputs.targetRetirementAge < recResults.retirementReadyAge) ||
+                         (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
+
+    const hasBuyHouse = (inputs.lifeEvents || []).some(e => e.type === 'buyHouse' && e.enabled);
+    if (!hasShortfall && !hasBuyHouse && !(debtDeficit > 0)) return null;
+
+    const currentAssets = (Number(inputs.assets?.cash) || 0) +
+                          (Number(inputs.assets?.emergencyFund) || 0) +
+                          (Number(inputs.assets?.brokerage) || 0) +
+                          (Number(inputs.assets?.trad401k) || 0) +
+                          (Number(inputs.assets?.tradIra) || 0) +
+                          (Number(inputs.assets?.rothIra) || 0) +
+                          (Number(inputs.assets?.hsa) || 0) +
+                          (Number(inputs.assets?.other) || 0);
+
+    const annualSavings = (Number(inputs.simpleIncome) || 0) - (Number(inputs.simpleExpenses) || 0);
+    const standardMonthlySavings = Math.round(annualSavings / 12);
+
+    const childcarePeakGrossBoost = Math.round(unfundedMaxChildCostsMonthly / (1 - marginalTaxRate));
+    const childcarePeakGrossBoostZeroSavings = Math.round(Math.max(0, unfundedMaxChildCostsMonthly - standardMonthlySavings) / (1 - marginalTaxRate));
+
+    const list = [];
+
+    // 1. Retire at Age 65
+    if (currentAge >= 65) {
+      list.push({
+        type: 'retire65',
+        icon: '📅',
+        title: 'Retire at Age 65',
+        details: 'You are already age 65 or older.',
+        bulletPoints: [
+          'This option is not applicable because your current age is 65 or older.'
+        ],
+        readyAge: currentAge,
+        yearsImprovement: null,
+        value: 0,
+        savingsFocus: 'Retire at 65',
+        savingsEffortScore: 1
+      });
+    } else {
+      const yearsTo65 = 65 - currentAge;
+      let projectedAssetsAt65 = currentAssets * Math.pow(1 + rateOfReturn, yearsTo65);
+      if (rateOfReturn > 0) {
+        const fvFactor = (Math.pow(1 + rateOfReturn, yearsTo65) - 1) / rateOfReturn;
+        projectedAssetsAt65 += annualSavings * fvFactor;
+      } else {
+        projectedAssetsAt65 += annualSavings * yearsTo65;
+      }
+
+      const targetAssetsAt65 = swr > 0 ? retirementExpenses / swr : 0;
+      const newShortfall = Math.max(0, targetAssetsAt65 - projectedAssetsAt65);
+      const saveMoreAmtAt65 = calculateSaveMoreRecommendation(
+        newShortfall,
+        rateOfReturn,
+        yearsTo65,
+        1.0
+      );
+      const hasShortfallAt65 = newShortfall > 0;
+
+      list.push({
+        type: 'retire65',
+        icon: '📅',
+        title: 'Retire at Age 65',
+        details: hasShortfallAt65
+          ? 'Delay your retirement to Age 65 and adjust your budget to save more to bridge the remaining shortfall.'
+          : 'Delay your retirement to Age 65. Under your current plan, your assets are projected to fully support you at age 65 with no additional savings needed.',
+        bulletPoints: [
+          `Working until 65 adds ${65 - targetRetirementAge} more working/saving years to your plan.`,
+          ...(hasShortfallAt65
+            ? [
+                `Save and invest an additional ${formatCurrency(saveMoreAmtAt65)}/year (approx. ${formatCurrency(Math.round(saveMoreAmtAt65 / 12))}/month) starting now.`,
+                `This will compound over your remaining ${65 - currentAge} working years to bridge the remaining ${formatCurrency(newShortfall)} shortfall at age 65.`
+              ]
+            : [
+                'This completely resolves your projected retirement shortfall with no other changes needed!'
+              ])
+        ],
+        readyAge: 65,
+        yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - 65) : null,
+        value: saveMoreAmtAt65,
+        savingsFocus: 'Retire at 65',
+        savingsEffortScore: 1
+      });
+    }
+
+    // 2. Retire at the retirement ready age
+    if (currentReadyAge) {
+      list.push({
+        type: 'retireReadyAge',
+        icon: '⏳',
+        title: 'Retire at Retirement Ready Age',
+        details: `Delay your retirement to Age ${currentReadyAge} (your Retirement Ready Age) so that your current saving and spending rates are sufficient to support you without any additional changes.`,
+        bulletPoints: [
+          `Working until Age ${currentReadyAge} allows your assets to compound for ${currentReadyAge - targetRetirementAge} more years.`,
+          'No additional savings or income changes are required under your current budget.',
+          'This completely resolves your projected retirement gap.'
+        ],
+        readyAge: currentReadyAge,
+        yearsImprovement: null,
+        value: currentReadyAge,
+        savingsFocus: 'Retire Ready',
+        savingsEffortScore: 2
+      });
+    }
+
+    // 3. Retire at requested date
+    const saveMoreAmt100 = calculateSaveMoreRecommendation(
+      shortfall,
+      rateOfReturn,
+      yearsUntilRetirement,
+      1.0
+    );
+
+    list.push({
+      type: 'retireRequestedDate',
+      icon: '🎯',
+      title: 'Retire at Requested Retirement Date',
+      details: `Maintain your target retirement age of Age ${targetRetirementAge} and adjust your budget to save more to bridge the shortfall.`,
+      bulletPoints: [
+        `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before retirement.`,
+        `This will compound over your remaining ${yearsUntilRetirement} working years at an assumed ${(rateOfReturn * 100).toFixed(0)}% annual rate of return.`,
+        `This completely bridges your projected retirement gap at Age ${targetRetirementAge}.`
+      ],
+      readyAge: targetRetirementAge,
+      yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - targetRetirementAge) : null,
+      value: saveMoreAmt100,
+      savingsFocus: 'Save More',
+      savingsEffortScore: 3
+    });
+
+    // 4. Temporary Childcare Offset Recommendation
+    const childRecommendations = getChildCostOffsetRecommendations(inputs);
+    childRecommendations.forEach(rec => {
+      const clonedInputs = JSON.parse(JSON.stringify(inputs));
+      clonedInputs.incomeList = [...(clonedInputs.incomeList || []), ...rec.incomeBoosts];
+      
+      const boostResults = runFireSimulation(clonedInputs);
+      const readyAge = boostResults.retirementReadyAge;
+      const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
+      
+      list.push({
+        type: `childOffset-${rec.childEventId}`,
+        icon: '👶',
+        title: 'Offset child costs with temporary income',
+        details: `Your plan includes about ${formatCurrency(rec.peakCost)}/year in child-related costs for ${rec.duration} years. One way to keep your retirement plan on track is to earn an extra ${formatCurrency(rec.peakCost)}/year during those years.`,
+        bulletPoints: [
+          `Earn an extra ${formatCurrency(rec.peakCost)}/year from parent age ${rec.parentStartAge} to ${rec.parentEndAge}.`,
+          `This temporary income boost is designed to align precisely with your child-rearing years.`,
+          `This recommendation improves or preserves your retirement readiness without requiring a permanent budget cut.`
+        ],
+        readyAge: readyAge || targetRetirementAge,
+        yearsImprovement: yearsImprovement,
+        value: rec.peakCost,
+        incomeBoosts: rec.incomeBoosts,
+        savingsFocus: 'Earn More',
+        savingsEffortScore: 2
+      });
+    });
+
+    // 5. Homeownership tip
+    const buyHouseEvs = (inputs.lifeEvents || []).filter(e => e.type === 'buyHouse' && e.enabled);
+    buyHouseEvs.forEach(ev => {
+      const sellEv = (inputs.lifeEvents || []).find(e => e.type === 'sellHouse' && e.houseId === ev.houseId);
+      const sellAge = sellEv ? Number(sellEv.age) : Number(inputs.lifeExpectancy || 85);
+      list.push({
+        type: `houseSaleTip-${ev.id}`,
+        icon: '🏠',
+        title: 'Home ownership added',
+        details: `This assumes you'll sell the home at age ${sellAge}.`,
+        bulletPoints: [
+          'You can drag the sale event later directly on the timeline.'
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: 0,
+        savingsFocus: 'Tip',
+        savingsEffortScore: 0,
+        isInfoOnly: true
+      });
+    });
+
+    if (debtDeficit > 0 && activeDebts.length > 0) {
+      list.push({
+        type: 'startDebtPayoff',
+        icon: '📈',
+        title: 'Start a debt payoff plan',
+        details: `Create a debt payoff plan to pay down your highest-interest debts faster and eliminate the deficit.`,
+        bulletPoints: [
+          `Add an extra monthly payment to accelerate your payoff timeline.`,
+          `Once paid off, your Needs expenses will drop, increasing your future savings.`,
+          `This helps you reach financial independence sooner.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: debtDeficit,
+        savingsFocus: 'Debt Payoff',
+        savingsEffortScore: 2,
+        activeDebts
+      });
+
+      list.push({
+        type: 'increaseDebtIncome',
+        icon: '💰',
+        title: `Increase income by $${debtDeficit}/month`,
+        details: `Increase your monthly gross income by earning extra money to fully cover your new debt obligations.`,
+        bulletPoints: [
+          `Earn an extra $${debtDeficit}/month ($${debtDeficit * 12}/year) gross income.`,
+          `This covers the monthly deficit without changing your savings or wants allocations.`,
+          `Your retirement timeline remains fully on track.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: debtDeficit,
+        savingsFocus: 'Earn More',
+        savingsEffortScore: 2
+      });
+    }
+
+    return {
+      rankedPlan: list.sort((a, b) => {
+        if (a.isInfoOnly && !b.isInfoOnly) return 1;
+        if (!a.isInfoOnly && b.isInfoOnly) return -1;
+        
+        const aDiff = a.readyAge - targetRetirementAge;
+        const bDiff = b.readyAge - targetRetirementAge;
+        if (Math.abs(aDiff) !== Math.abs(bDiff)) {
+          return Math.abs(aDiff) - Math.abs(bDiff);
+        }
+        return a.savingsEffortScore - b.savingsEffortScore;
+      }),
+      moneyLasts: recResults.moneyLasts,
+      shortfall: shortfall,
+      childcarePeakGrossBoost,
+      childcarePeakGrossBoostZeroSavings
+    };
+  }, [inputs, activeResults]);
+
+  return {
+    improvementPlan
+  };
+}

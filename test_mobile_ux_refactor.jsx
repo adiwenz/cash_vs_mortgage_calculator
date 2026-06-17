@@ -2,7 +2,7 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
-import MobileFireSimulator from './src/components/fire-simulator/MobileFireSimulator';
+import MobileFireSimulator from './src/components/fire-simulator/MobileFireSimulatorView';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs';
 import { runFireSimulation } from './src/fireCalculations';
 
@@ -242,5 +242,141 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const editBtn = screen.getByRole('button', { name: /Edit Event/i });
     fireEvent.click(editBtn);
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
+  });
+
+  test('Overview tab renders MobileRecommendationsPanel when plan is not on track', () => {
+    const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    const activeRes = runFireSimulation(inputs);
+    const displayedRes = {
+      ...activeRes,
+      phases: activeRes.phases || []
+    };
+
+    const mockImprovementPlan = {
+      rankedPlan: [
+        {
+          type: 'savings',
+          icon: '💸',
+          title: 'Save More',
+          details: 'Save an additional $500/month.',
+          bulletPoints: ['Reduces discretionary spending'],
+          readyAge: 63,
+          savingsFocus: 'Save More',
+          savingsEffortScore: 2
+        }
+      ]
+    };
+
+    const handleApplyImprovementScenario = vi.fn();
+
+    render(
+      <MobileFireSimulator
+        inputs={inputs}
+        updateInput={vi.fn()}
+        displayMode="deflated"
+        setDisplayMode={vi.fn()}
+        activeResults={{ ...activeRes, retirementOutcome: 'shortfall' }} // Force not on track
+        displayedResults={displayedRes}
+        selectedYear={35}
+        setSelectedYear={vi.fn()}
+        chartData={[]}
+        validation={{}}
+        handleCreateEvent={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+        handleSetBudgetClick={vi.fn()}
+        handleOpenSavingsDetails={vi.fn()}
+        isMobile={true}
+        totalNetWorth={5000}
+        activeStep={2}
+        setActiveStep={vi.fn()}
+        timelineEvents={[]}
+        editingEvent={null}
+        displayedBaselineResults={displayedRes}
+        baselineResults={activeRes}
+        handleApplyImprovementScenario={handleApplyImprovementScenario}
+        improvementPlan={mockImprovementPlan}
+      />
+    );
+
+    // Default tab is Roadmap, click Overview to switch
+    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
+    fireEvent.click(overviewBtn);
+
+    // Verify recommendations header and cards are rendered
+    expect(screen.getByText('💡 Actionable Recommendations')).toBeDefined();
+    expect(screen.getByText('Save More')).toBeDefined();
+    expect(screen.getByText('Save an additional $500/month.')).toBeDefined();
+
+    // Verify apply button works
+    const applyBtn = screen.getByRole('button', { name: 'Apply Recommendation' });
+    fireEvent.click(applyBtn);
+    expect(handleApplyImprovementScenario).toHaveBeenCalledWith(mockImprovementPlan.rankedPlan[0]);
+  });
+
+  test('Roadmap tab renders MobileRecommendationsPanel inside recommendations stack when plan is not on track', () => {
+    const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    const activeRes = runFireSimulation(inputs);
+    const displayedRes = {
+      ...activeRes,
+      phases: activeRes.phases || []
+    };
+
+    const mockImprovementPlan = {
+      rankedPlan: [
+        {
+          type: 'savings',
+          icon: '💸',
+          title: 'Save More',
+          details: 'Save an additional $500/month.',
+          bulletPoints: ['Reduces discretionary spending'],
+          readyAge: 63,
+          savingsFocus: 'Save More',
+          savingsEffortScore: 2
+        }
+      ]
+    };
+
+    render(
+      <MobileFireSimulator
+        inputs={inputs}
+        updateInput={vi.fn()}
+        displayMode="deflated"
+        setDisplayMode={vi.fn()}
+        activeResults={{ ...activeRes, retirementOutcome: 'shortfall' }} // Force not on track
+        displayedResults={displayedRes}
+        selectedYear={35}
+        setSelectedYear={vi.fn()}
+        chartData={[]}
+        validation={{}}
+        handleCreateEvent={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+        handleSetBudgetClick={vi.fn()}
+        handleOpenSavingsDetails={vi.fn()}
+        isMobile={true}
+        totalNetWorth={5000}
+        activeStep={2}
+        setActiveStep={vi.fn()}
+        timelineEvents={[]}
+        editingEvent={null}
+        displayedBaselineResults={displayedRes}
+        baselineResults={activeRes}
+        handleApplyImprovementScenario={vi.fn()}
+        improvementPlan={mockImprovementPlan}
+      />
+    );
+
+    // We should be on Roadmap tab by default. Tap the Working phase to open details
+    const workSavePhaseBtn = screen.getByText('Working', { selector: '.mobile-phase-card-title' });
+    fireEvent.click(workSavePhaseBtn);
+
+    // Verify recommendations header is rendered
+    expect(screen.getByText('💡 Recommendations')).toBeDefined();
+
+    // Since plan is not on track, it should render MobileRecommendationsPanel instead of static mockup recommendations
+    expect(screen.getByText('Save More')).toBeDefined();
+    expect(screen.getByText('Save an additional $500/month.')).toBeDefined();
+
+    // It should NOT render "Delay Social Security" or "Reduce Spending" which are mockup recommendations
+    expect(screen.queryByText('Delay Social Security')).toBeNull();
   });
 });

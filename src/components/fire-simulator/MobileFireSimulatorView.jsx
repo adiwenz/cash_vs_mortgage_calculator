@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Home, 
   Map, 
@@ -10,147 +10,37 @@ import {
   Sparkles,
   Info
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine
-} from 'recharts';
-import { formatCurrency, formatYAxis, getOutcomeDetails, getAssetLabel, isEditableEvent } from './helpers';
+import { formatCurrency, getAssetLabel, isEditableEvent } from './helpers';
 import { getNormalizedPhases } from '../../fireCalculations';
+import MobileTimeline from './MobileTimeline';
+import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
+import EventModalForm from './EventModalForm';
+import ChildImpactModal from './ChildImpactModal';
+import BudgetModal from './BudgetModal';
+import SavingsDetailsModal from './SavingsDetailsModal';
+import { CurrentConditionModal } from './CurrentConditionsPanel';
 import './MobileFireSimulator.css';
 
-const getShortLabel = (evt) => {
-  if (!evt) return '';
-  if (evt.type === 'socialSecurity') return 'Social Sec.';
-  if (evt.type === 'medicareEligibility') return 'Medicare';
-  if (evt.type === 'retire') return 'Retire';
-  if (evt.type === 'haveChild') {
-    return evt.label.replace('Have Child:', '').trim() || 'Have Child';
+const getPaceBadgeStyles = (pace) => {
+  if (pace === 'Aggressive') {
+    return {
+      background: 'rgba(16, 185, 129, 0.1)',
+      color: '#10b981',
+      border: '1px solid rgba(16, 185, 129, 0.2)'
+    };
   }
-  if (evt.type === 'childSupportEnds') return 'Support Ends';
-  if (evt.type === 'marriage') return 'Marriage';
-  if (evt.type === 'buyHouse') return 'Buy Home';
-  if (evt.type === 'sellHouse') return 'Sell Home';
-  if (evt.type === 'mortgageOff') return 'Mortgage Ends';
-  if (evt.type === 'college') return 'College';
-  if (evt.type === 'sabbatical') return 'Sabbatical';
-  if (evt.type === 'career') return 'Career';
-  if (evt.type === 'lifestyle') return 'Lifestyle';
-  if (evt.type === 'windfall') return 'Windfall';
-  if (evt.type === 'assetTransfer') return 'Transfer';
-  if (evt.type === 'borrowing') return 'Borrowing';
-  if (evt.type === 'payoffPlanEnd') return 'Loan Off';
-  if (evt.type === 'coastFire') return 'Coast FIRE';
-  if (evt.type.startsWith('retirementReady')) return 'Retire Ready';
-  
-  let cleanLabel = evt.label || '';
-  if (cleanLabel.includes(':')) {
-    cleanLabel = cleanLabel.split(':')[0];
+  if (pace === 'Moderate') {
+    return {
+      background: 'rgba(245, 158, 11, 0.1)',
+      color: '#f59e0b',
+      border: '1px solid rgba(245, 158, 11, 0.2)'
+    };
   }
-  return cleanLabel;
-};
-
-const getRoadmapDetails = (evt, formatCurrency) => {
-  if (!evt) return null;
-
-  let title = getShortLabel(evt);
-  let ageLabel = `Starts at Age ${evt.age}`;
-  let benefitLabel = null;
-  let benefitValue = null;
-  let whyItMatters = '';
-
-  if (evt.description) {
-    const yrMatch = evt.description.match(/(\$[0-9,]+)\/year/);
-    const moMatch = evt.description.match(/(\$[0-9,]+)\/month/);
-    if (yrMatch) {
-      benefitLabel = 'Estimated Benefit';
-      benefitValue = `${yrMatch[1]}/year`;
-      if (moMatch) {
-        benefitValue += ` (${moMatch[1]}/month)`;
-      }
-    }
-  }
-
-  switch (evt.type) {
-    case 'socialSecurity':
-      title = 'Social Security';
-      whyItMatters = 'Provides guaranteed, inflation-adjusted retirement income and reduces the drawdown rate required from your investment portfolios.';
-      break;
-    case 'medicareEligibility':
-      title = 'Medicare';
-      whyItMatters = 'You become eligible for Medicare. Healthcare insurance premium expenses drop significantly, which increases portfolio longevity.';
-      const premMatch = evt.description?.match(/(\$[0-9,]+)\/yr/g);
-      if (premMatch && premMatch.length >= 2) {
-        benefitLabel = 'Healthcare Premium Impact';
-        benefitValue = `Drops from ${premMatch[0]} to ${premMatch[1]} annually`;
-      }
-      break;
-    case 'retire':
-      title = 'Target Retirement';
-      ageLabel = `Begins at Age ${evt.age}`;
-      whyItMatters = 'Transition from the wealth accumulation stage to the wealth preservation and portfolio distribution stage.';
-      break;
-    case 'haveChild':
-      whyItMatters = 'Welcoming a child introduces childcare, support, and education expenses, reducing your monthly savings capacity temporarily.';
-      break;
-    case 'childSupportEnds':
-      whyItMatters = 'Child support and childcare expenses end, freeing up significant cash flow to accelerate retirement savings.';
-      break;
-    case 'marriage':
-      title = 'Marriage';
-      whyItMatters = 'Combines household incomes, tax brackets, and sharing living expenses (like housing and utilities) to increase savings rate.';
-      if (evt.spouseIncome) {
-        benefitLabel = 'Spouse Details';
-        benefitValue = `Income: ${formatCurrency(evt.spouseIncome)}/yr | Savings: ${evt.savingsRate || 0}%`;
-      }
-      break;
-    case 'buyHouse':
-      whyItMatters = 'Purchasing a home builds equity but introduces mortgage debt, property taxes, and ongoing maintenance costs.';
-      break;
-    case 'sellHouse':
-      whyItMatters = 'Liquidates home equity, converting real estate value into investable brokerage assets to generate passive income.';
-      break;
-    case 'mortgageOff':
-      whyItMatters = 'Eliminates monthly mortgage payments, dramatically reducing core living expenses and decreasing FI requirements.';
-      break;
-    case 'college':
-      title = 'College Tuition';
-      whyItMatters = 'Covers tuition and college costs. Temporary high spending phase funded via cash flow or dedicated child savings.';
-      break;
-    case 'sabbatical':
-      title = 'Sabbatical';
-      whyItMatters = 'Temporary break from work. Reduces income short-term to prioritize life experiences and well-being.';
-      break;
-    case 'coastFire':
-      title = 'Coast FIRE Reached';
-      ageLabel = `Achieved at Age ${evt.age}`;
-      whyItMatters = 'Your existing portfolio is large enough to grow and fully cover retirement expenses by your target age without further savings.';
-      break;
-    case 'retirementReadySurvival':
-    case 'retirementReadyComfortable':
-    case 'retirementReadySWR':
-      title = 'Retirement Ready';
-      ageLabel = `Achieved at Age ${evt.age}`;
-      whyItMatters = 'Your assets have reached the sustainability threshold, meaning you can stop working and support your lifestyle forever.';
-      break;
-    default:
-      whyItMatters = evt.description || 'Occurs as part of your financial and life journey.';
-      break;
-  }
-
   return {
-    title,
-    ageLabel,
-    benefitLabel,
-    benefitValue,
-    whyItMatters,
-    description: evt.description
+    background: 'rgba(239, 68, 68, 0.1)',
+    color: '#ef4444',
+    border: '1px solid rgba(239, 68, 68, 0.2)'
   };
 };
 
@@ -236,7 +126,39 @@ export function MobileRecommendationsPanel({
   );
 }
 
-export default function MobileFireSimulator({
+
+const getShortLabel = (evt) => {
+  if (!evt) return '';
+  if (evt.type === 'socialSecurity') return 'Social Sec.';
+  if (evt.type === 'medicareEligibility') return 'Medicare';
+  if (evt.type === 'retire') return 'Retire';
+  if (evt.type === 'haveChild') {
+    return evt.label.replace('Have Child:', '').trim() || 'Have Child';
+  }
+  if (evt.type === 'childSupportEnds') return 'Support Ends';
+  if (evt.type === 'marriage') return 'Marriage';
+  if (evt.type === 'buyHouse') return 'Buy Home';
+  if (evt.type === 'sellHouse') return 'Sell Home';
+  if (evt.type === 'mortgageOff') return 'Mortgage Ends';
+  if (evt.type === 'college') return 'College';
+  if (evt.type === 'sabbatical') return 'Sabbatical';
+  if (evt.type === 'career') return 'Career';
+  if (evt.type === 'lifestyle') return 'Lifestyle';
+  if (evt.type === 'windfall') return 'Windfall';
+  if (evt.type === 'assetTransfer') return 'Transfer';
+  if (evt.type === 'borrowing') return 'Borrowing';
+  if (evt.type === 'payoffPlanEnd') return 'Loan Off';
+  if (evt.type === 'coastFire') return 'Coast FIRE';
+  if (evt.type.startsWith('retirementReady')) return 'Retire Ready';
+  
+  let cleanLabel = evt.label || '';
+  if (cleanLabel.includes(':')) {
+    cleanLabel = cleanLabel.split(':')[0];
+  }
+  return cleanLabel;
+};
+
+export default function MobileFireSimulatorView({
   inputs,
   updateInput,
   displayMode,
@@ -258,55 +180,69 @@ export default function MobileFireSimulator({
   timelineEvents,
   editingEvent,
   setEditingEvent,
-  handleSaveEvent,
+  dragOccurredRef,
+  isFullPartnerProfileOpen,
+  setIsFullPartnerProfileOpen,
+  isZeroSpendingConfirmed,
+  setIsZeroSpendingConfirmed,
+  isPartnerZeroSpendingConfirmed,
+  setIsPartnerZeroSpendingConfirmed,
   handleDeleteEvent,
+  handleSaveEvent,
   getInputsWithEvent,
+  handleApplyMobileRecommendation,
+  setIsBudgetOpenFromMarriageWizard,
+  isBudgetOpenFromMarriageWizard,
+  tempSocialSecurityDetails,
+  childImpactSummary,
+  setChildImpactSummary,
+  isBudgetModalOpen,
+  handleCloseBudgetModal,
+  budgetMonthlyIncome,
+  setBudgetMonthlyIncome,
+  budgetExpenses,
+  setBudgetExpenses,
+  budgetSavings,
+  setBudgetSavings,
+  budgetPartnerSavings,
+  setBudgetPartnerSavings,
+  activeBudgetPhase,
+  handleSwitchBudgetPhase,
+  savingsAllocMode,
+  handleToggleSavingsAllocMode,
+  budgetHsaCoverage,
+  setBudgetHsaCoverage,
+  budgetFilingStatus,
+  setBudgetFilingStatus,
+  budgetMonthlySpending,
+  setBudgetMonthlySpending,
+  budgetMonthlySavings,
+  setBudgetMonthlySavings,
+  pendingImprovement,
+  handleSaveBudget,
+  isSavingsDetailsOpen,
+  savingsDetails,
+  setSavingsDetails,
+  setIsSavingsDetailsOpen,
+  handleSaveSavingsDetails,
+  editingCondition,
+  handleSaveCurrentCondition,
+  setEditingCondition,
+  notification,
   displayedBaselineResults,
   baselineResults,
-  handleApplyMobileRecommendation,
-  improvementPlan
+  handleApplyImprovementScenario,
+  improvementPlan,
+  showImprovementModal,
+  setShowImprovementModal
 }) {
   const [activeTab, setActiveTab] = useState('Roadmap'); // 'Overview' | 'Roadmap' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
-  const [pulsingPhaseId, setPulsingPhaseId] = useState(null);
-  const prevEventsLength = useRef(inputs.lifeEvents?.length || 0);
 
-  useEffect(() => {
-    if (!editingEvent) {
-      let phaseToPulse = null;
-      if (window.pulsePhaseId) {
-        phaseToPulse = window.pulsePhaseId;
-        window.pulsePhaseId = null;
-      } else {
-        const currentLength = inputs.lifeEvents?.length || 0;
-        if (currentLength > prevEventsLength.current) {
-          const lastEvent = inputs.lifeEvents[inputs.lifeEvents.length - 1];
-          if (lastEvent) {
-            if (lastEvent.type === 'haveChild') phaseToPulse = 'childcare';
-            else if (lastEvent.type === 'marriage') phaseToPulse = 'marriage';
-            else if (lastEvent.type === 'retire') phaseToPulse = 'retire';
-            else if (lastEvent.type === 'buyHouse') phaseToPulse = 'mortgage';
-            else if (lastEvent.type === 'careerChange') phaseToPulse = 'careerChange';
-            else phaseToPulse = lastEvent.type;
-          }
-        }
-      }
-
-      if (phaseToPulse) {
-        setPulsingPhaseId(phaseToPulse);
-        const timer = setTimeout(() => {
-          setPulsingPhaseId(null);
-        }, 5000);
-        return () => clearTimeout(timer);
-      }
-    }
-    prevEventsLength.current = inputs.lifeEvents?.length || 0;
-  }, [editingEvent, inputs.lifeEvents]);
-
-  // Sync scroll positions and tab state
+  // Sync scroll positions
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab, selectedMobilePhaseId]);
@@ -363,15 +299,6 @@ export default function MobileFireSimulator({
     });
     return nextEv;
   }, [inputs.lifeEvents, inputs.currentAge]);
-
-  // Selected Event Object for Details Card
-  const selectedEvent = useMemo(() => {
-    if (!timelineEvents || timelineEvents.length === 0) return null;
-    if (selectedEventIndex >= timelineEvents.length) {
-      return timelineEvents[0];
-    }
-    return timelineEvents[selectedEventIndex];
-  }, [timelineEvents, selectedEventIndex]);
 
   // Helper to generate phase driver description
   const getPhaseDriverDesc = (p, index) => {
@@ -509,10 +436,9 @@ export default function MobileFireSimulator({
     updateInput('simpleInvestments', total);
   };
 
-  // Determine Retirement Delay/Outcome
+  const isPlanOnTrack = activeResults.retirementOutcome === 'comfortable' || activeResults.retirementOutcome === 'sustainable';
   const isRetirementReadyDelayed = activeResults.retirementReadyAge > inputs.targetRetirementAge;
   const retirementReadyDifference = activeResults.retirementReadyAge - inputs.targetRetirementAge;
-  const isPlanOnTrack = activeResults.retirementOutcome === 'comfortable' || activeResults.retirementOutcome === 'sustainable';
 
   return (
     <div className="mobile-layout-container">
@@ -582,12 +508,12 @@ export default function MobileFireSimulator({
               <div style={{ padding: '0 0.75rem' }}>
                 <MobileRecommendationsPanel
                   improvementPlan={improvementPlan}
-                  handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+                  handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
                   targetRetirementAge={inputs.targetRetirementAge}
                   showHeader={true}
                 />
               </div>
-            )}
+            ) }
 
             {/* Current Phase Card */}
             {currentAgePhase && (
@@ -666,7 +592,7 @@ export default function MobileFireSimulator({
             <h1 className="mobile-tab-title">Interactive Roadmap</h1>
             <p className="mobile-tab-subtitle">Your life plan at a glance</p>
 
-            {/* Top Overview Badges (Retirement Age and Current Child Costs) */}
+            {/* Top Overview Badges */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
               <div className="mobile-snapshot-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.75rem' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>🏖️ Retirement Age</span>
@@ -690,119 +616,16 @@ export default function MobileFireSimulator({
               )}
             </div>
 
-            {/* Life Events Scrolling Row (Roadmap Style) */}
-            <section className="mobile-milestones-section">
-              <div className="mobile-section-header">
-                <h2 className="mobile-section-title">Life Events</h2>
-                <span className="mobile-section-subtitle">Tap a milestone to view details</span>
-              </div>
-              
-              <div className="mobile-roadmap-track">
-                <div className="mobile-roadmap-scroll-container">
-                  {/* Connecting Roadmap Line */}
-                  {timelineEvents.length > 0 && (
-                    <div 
-                      className="mobile-roadmap-line-container"
-                      style={{
-                        width: `${timelineEvents.length * 6}rem`,
-                      }}
-                    >
-                      <div 
-                        className="mobile-roadmap-line" 
-                        style={{
-                          left: '3rem',
-                          right: '3rem',
-                        }}
-                      />
-                      <div 
-                        className="mobile-roadmap-line-active" 
-                        style={{
-                          left: '3rem',
-                          width: `${selectedEventIndex * 6}rem`,
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {timelineEvents.map((evt, idx) => {
-                    let circleColor = 'circle-purple';
-                    if (evt.type === 'haveChild') circleColor = 'circle-blue';
-                    else if (evt.type === 'retire') circleColor = 'circle-green';
-                    else if (evt.type === 'socialSecurity') circleColor = 'circle-gold';
-
-                    const isSelected = selectedEventIndex === idx;
-                    const shortLabel = getShortLabel(evt);
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
-                        onClick={() => setSelectedEventIndex(idx)}
-                      >
-                        <div className={`mobile-roadmap-circle ${isSelected ? 'active' : ''} ${circleColor}`}>
-                          <span>{evt.icon}</span>
-                        </div>
-                        <span className="mobile-roadmap-age">{evt.age}</span>
-                        <span className="mobile-roadmap-label-text">{shortLabel}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Selected Event Details Card */}
-              {selectedEvent && (() => {
-                const details = getRoadmapDetails(selectedEvent, formatCurrency);
-                return (
-                  <div className="mobile-roadmap-details-card">
-                    <div className="mobile-roadmap-details-header">
-                      <span className="mobile-roadmap-details-icon">{selectedEvent.icon}</span>
-                      <div className="mobile-roadmap-details-title-col">
-                        <h3 className="mobile-roadmap-details-title">{details.title}</h3>
-                        <span className="mobile-roadmap-details-age-badge">{details.ageLabel}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="mobile-roadmap-details-content">
-                      {details.benefitLabel && (
-                        <div className="mobile-roadmap-details-section-item">
-                          <span className="mobile-roadmap-details-lbl">{details.benefitLabel}</span>
-                          <span className="mobile-roadmap-details-val highlight-purple">{details.benefitValue}</span>
-                        </div>
-                      )}
-
-                      {details.whyItMatters && (
-                        <div className="mobile-roadmap-details-section-item">
-                          <span className="mobile-roadmap-details-lbl">Why it matters</span>
-                          <p className="mobile-roadmap-details-desc">{details.whyItMatters}</p>
-                        </div>
-                      )}
-
-                      {details.description && details.description !== details.whyItMatters && (!details.whyItMatters || !details.whyItMatters.includes(details.description)) && (
-                        <div className="mobile-roadmap-details-section-item">
-                          <span className="mobile-roadmap-details-lbl">Details</span>
-                          <p className="mobile-roadmap-details-desc">{details.description}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {isEditableEvent(selectedEvent) && (
-                      <button
-                        type="button"
-                        className="mobile-roadmap-edit-btn"
-                        onClick={() => handleEditRoadmapEvent(selectedEvent)}
-                      >
-                        ⚙️ Edit Event
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-            </section>
+            {/* Roadmap Timeline component */}
+            <MobileTimeline
+              timelineEvents={timelineEvents}
+              selectedEventIndex={selectedEventIndex}
+              setSelectedEventIndex={setSelectedEventIndex}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
+            />
 
             {/* Budget Phases Stack */}
-            <section style={{ textAlign: 'left' }}>
+            <section style={{ textAlign: 'left', marginTop: '1.5rem' }}>
               <div className="mobile-section-header">
                 <h2 className="mobile-section-title">Budget Phases</h2>
                 <span className="mobile-section-subtitle">Tap a phase to view budget details</span>
@@ -810,22 +633,13 @@ export default function MobileFireSimulator({
 
               <div className="mobile-phase-card-list">
                 {normalizedPhases.map((p, idx) => {
-                  // Cycle phase badge colors
                   const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
                   const badgeColor = colors[idx % colors.length];
-
-                  const isPulsing = pulsingPhaseId && (
-                    p.type === pulsingPhaseId || 
-                    p.id.startsWith(pulsingPhaseId) ||
-                    (pulsingPhaseId === 'childcare' && p.type === 'childcare') ||
-                    (pulsingPhaseId === 'marriage' && p.type === 'marriage') ||
-                    (pulsingPhaseId === 'retire' && p.type === 'retire')
-                  );
 
                   return (
                     <div 
                       key={p.id}
-                      className={`mobile-phase-card ${isPulsing ? 'pulse-highlight-phase' : ''}`}
+                      className="mobile-phase-card"
                       onClick={() => setSelectedMobilePhaseId(p.id)}
                     >
                       <div 
@@ -847,7 +661,6 @@ export default function MobileFireSimulator({
                   );
                 })}
               </div>
-
               <button
                 type="button"
                 className="mobile-roadmap-edit-btn"
@@ -896,157 +709,12 @@ export default function MobileFireSimulator({
             </div>
 
             {/* Active Chart Box */}
-            <div className="mobile-card mobile-chart-carousel" style={{ padding: '1.0rem 0.5rem' }}>
-              <div className="mobile-chart-header" style={{ padding: '0 0.75rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary)' }}>
-                  {activeChart === 'netWorth' ? '📈 Projected Net Worth Timeline' :
-                   activeChart === 'assetsDebt' ? '📊 Assets and Debt Breakdown' :
-                   activeChart === 'progress' ? '🎯 Portfolio vs FI Target' :
-                   '💵 Cash Flow (Income vs Expenses)'}
-                </span>
-              </div>
-
-              <div style={{ height: '240px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={chartData}
-                    margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
-                    <XAxis
-                      dataKey="age"
-                      stroke="var(--text-tertiary)"
-                      fontSize={9}
-                    />
-                    <YAxis
-                      stroke="var(--text-tertiary)"
-                      fontSize={9}
-                      tickFormatter={formatYAxis}
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem' }}>
-                              <p style={{ fontWeight: '700', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
-                              {payload.map((item) => (
-                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.0rem', margin: '0.1rem 0' }}>
-                                  <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                  <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    
-                    {activeChart === 'netWorth' && (
-                      <Line
-                        type="monotone"
-                        dataKey="netWorth"
-                        name="Net Worth"
-                        stroke="#8b5cf6"
-                        strokeWidth={2.5}
-                        dot={false}
-                      />
-                    )}
-
-                    {activeChart === 'assetsDebt' && (
-                      <>
-                        <Line
-                          type="monotone"
-                          dataKey="assets"
-                          name="Assets"
-                          stroke="#10b981"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="debt"
-                          name="Debt"
-                          stroke="#f43f5e"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </>
-                    )}
-
-                    {activeChart === 'progress' && (
-                      <>
-                        <Line
-                          type="monotone"
-                          dataKey="portfolio"
-                          name="Portfolio Balance"
-                          stroke="#3b82f6"
-                          strokeWidth={2.5}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="fiNumber"
-                          name="FI Target"
-                          stroke="#f59e0b"
-                          strokeWidth={1.5}
-                          strokeDasharray="4 4"
-                          dot={false}
-                        />
-                        {activeResults.retirementReadyAge && (
-                          <ReferenceLine
-                            x={activeResults.retirementReadyAge}
-                            stroke="#10b981"
-                            strokeWidth={1.5}
-                            label={{ value: `Age ${activeResults.retirementReadyAge} Ready`, fill: '#10b981', fontSize: 8, position: 'top' }}
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {activeChart === 'incomeSpending' && (
-                      <>
-                        <Line
-                          type="monotone"
-                          dataKey="income"
-                          name="Income"
-                          stroke="#0d9488"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="expenses"
-                          name="Expenses"
-                          stroke="#f97316"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="taxes"
-                          name="Taxes"
-                          stroke="#64748b"
-                          strokeWidth={1.5}
-                          dot={false}
-                        />
-                      </>
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Dots Controls */}
-              <div className="mobile-chart-dots">
-                {['netWorth', 'assetsDebt', 'progress', 'incomeSpending'].map(chart => (
-                  <span
-                    key={chart}
-                    className={`mobile-chart-dot ${activeChart === chart ? 'active' : ''}`}
-                    onClick={() => setActiveChart(chart)}
-                  />
-                ))}
-              </div>
-            </div>
+            <MobileResults
+              chartData={chartData}
+              activeResults={activeResults}
+              activeChart={activeChart}
+              setActiveChart={setActiveChart}
+            />
           </div>
         )}
 
@@ -1448,7 +1116,6 @@ export default function MobileFireSimulator({
 
               const allocations = [];
               if (phaseSavingsTotal >= 0) {
-                // Pre-retirement contributions
                 const combined = {};
                 const addSavings = (obj) => {
                   if (!obj) return;
@@ -1470,7 +1137,6 @@ export default function MobileFireSimulator({
                   });
                 });
               } else {
-                // Post-retirement withdrawals
                 const withdrawalAmt = Math.abs(phaseSavingsTotal);
                 allocations.push(
                   { key: 'brokerage', label: 'Taxable Brokerage', amount: Math.round(withdrawalAmt * 0.5), pct: 50 },
@@ -1479,7 +1145,6 @@ export default function MobileFireSimulator({
                 );
               }
 
-              // Color classes cycling
               const barColors = ['bar-green', 'bar-blue', 'bar-purple', 'bar-orange', 'bar-teal'];
 
               return (
@@ -1625,7 +1290,7 @@ export default function MobileFireSimulator({
                 {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
                   <MobileRecommendationsPanel
                     improvementPlan={improvementPlan}
-                    handleApplyMobileRecommendation={handleApplyMobileRecommendation}
+                    handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
                     targetRetirementAge={inputs.targetRetirementAge}
                     showHeader={false}
                   />
@@ -1667,7 +1332,6 @@ export default function MobileFireSimulator({
                     <div 
                       className="mobile-rec-card"
                       onClick={() => {
-                        // Open Career/Income addition
                         handleCreateEvent('careerChange');
                       }}
                     >
@@ -1714,7 +1378,6 @@ export default function MobileFireSimulator({
                     <div 
                       className="mobile-rec-card"
                       onClick={() => {
-                        // Switch to Details to adjust return rates
                         setSelectedMobilePhaseId(null);
                         setActiveTab('Details');
                       }}
@@ -1791,7 +1454,7 @@ export default function MobileFireSimulator({
         </nav>
       )}
 
-      {/* MOBILE EVENT WIZARD OVERLAY */}
+      {/* Overlays / Modals */}
       {editingEvent && (
         <MobileEventWizard
           inputs={inputs}
@@ -1806,6 +1469,213 @@ export default function MobileFireSimulator({
           improvementPlan={improvementPlan}
         />
       )}
+      <ChildImpactModal
+        childImpactSummary={childImpactSummary}
+        inputs={inputs}
+        setChildImpactSummary={setChildImpactSummary}
+        setEditingEvent={setEditingEvent}
+        setShowImprovementModal={setShowImprovementModal}
+      />
+      {isBudgetModalOpen && (
+        <BudgetModal
+          inputs={inputs}
+          isBudgetOpenFromMarriageWizard={isBudgetOpenFromMarriageWizard}
+          editingEvent={editingEvent}
+          budgetMonthlyIncome={budgetMonthlyIncome}
+          setBudgetMonthlyIncome={setBudgetMonthlyIncome}
+          budgetExpenses={budgetExpenses}
+          setBudgetExpenses={setBudgetExpenses}
+          budgetSavings={budgetSavings}
+          setBudgetSavings={setBudgetSavings}
+          budgetPartnerSavings={budgetPartnerSavings}
+          setBudgetPartnerSavings={setBudgetPartnerSavings}
+          activeBudgetPhase={activeBudgetPhase}
+          handleSwitchBudgetPhase={handleSwitchBudgetPhase}
+          savingsAllocMode={savingsAllocMode}
+          handleToggleSavingsAllocMode={handleToggleSavingsAllocMode}
+          budgetHsaCoverage={budgetHsaCoverage}
+          setBudgetHsaCoverage={setBudgetHsaCoverage}
+          budgetFilingStatus={budgetFilingStatus}
+          setBudgetFilingStatus={setBudgetFilingStatus}
+          budgetMonthlySpending={budgetMonthlySpending}
+          setBudgetMonthlySpending={setBudgetMonthlySpending}
+          budgetMonthlySavings={budgetMonthlySavings}
+          setBudgetMonthlySavings={setBudgetMonthlySavings}
+          pendingImprovement={pendingImprovement}
+          handleCloseBudgetModal={handleCloseBudgetModal}
+          handleSaveBudget={handleSaveBudget}
+          isMobile={isMobile}
+        />
+      )}
+      {isSavingsDetailsOpen && (
+        <SavingsDetailsModal
+          savingsDetails={savingsDetails}
+          setSavingsDetails={setSavingsDetails}
+          setIsSavingsDetailsOpen={setIsSavingsDetailsOpen}
+          handleSaveSavingsDetails={handleSaveSavingsDetails}
+        />
+      )}
+      <CurrentConditionModal
+        editingCondition={editingCondition}
+        inputs={inputs}
+        setEditingCondition={setEditingCondition}
+        handleSaveCurrentCondition={handleSaveCurrentCondition}
+      />
+
+      {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+        <div className="modal-backdrop" onClick={() => setShowImprovementModal(false)}>
+          <div className="improvement-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="improvement-modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                💡 Retirement Improvement Plan
+              </h3>
+              <button 
+                type="button" 
+                className="improvement-modal-close-btn"
+                onClick={() => setShowImprovementModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: '1.45' }}>
+              Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or retiring slightly later can make a massive difference:
+            </p>
+
+            <div className="improvement-plan-grid">
+              {improvementPlan.rankedPlan.map((scenario) => {
+                const isBalanced = scenario.type === 'combined';
+                const badgeStyle = getPaceBadgeStyles(scenario.savingsFocus);
+                return (
+                  <div 
+                    key={scenario.type} 
+                    className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
+                  >
+                    <div className="improvement-plan-card-main-content">
+                      <div className="improvement-plan-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <h4 className="improvement-plan-card-title" style={{ margin: 0 }}>
+                          <span style={{ marginRight: '0.3rem' }}>{scenario.icon}</span>
+                          <span>{scenario.title}</span>
+                        </h4>
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                          {isBalanced && (
+                            <span className="improvement-plan-card-badge improvement-plan-card-badge-recommended" style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '800', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.3)', letterSpacing: '0.05em' }}>
+                              {scenario.badge}
+                            </span>
+                          )}
+                          <span 
+                            className="improvement-plan-card-badge" 
+                            style={{ 
+                              fontSize: '0.65rem', 
+                              textTransform: 'uppercase', 
+                              fontWeight: '800', 
+                              padding: '0.15rem 0.45rem', 
+                              borderRadius: '4px', 
+                              letterSpacing: '0.05em',
+                              background: badgeStyle.background,
+                              color: badgeStyle.color,
+                              border: badgeStyle.border
+                            }}
+                          >
+                            {scenario.savingsFocus}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="improvement-plan-card-details">
+                        <p className="improvement-plan-card-description">
+                          {scenario.details}
+                        </p>
+                        {scenario.bulletPoints && scenario.bulletPoints.length > 0 && (
+                          <ul className="improvement-plan-card-bullets">
+                            {scenario.bulletPoints.map((pt, i) => (
+                              <li key={i}>{pt}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {scenario.extraAction && (
+                          <p className="improvement-plan-card-extra">
+                            {scenario.extraAction}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="improvement-plan-card-kpi-block">
+                      <div className="improvement-plan-kpi-item">
+                        <span className="kpi-item-label">Estimated Ready Age</span>
+                        <strong className="kpi-item-value">Age {scenario.readyAge}</strong>
+                      </div>
+                      <div className="improvement-plan-kpi-item">
+                        <span className="kpi-item-label">Retirement Gain</span>
+                        <strong className="kpi-item-value gain-value" style={{ fontSize: '0.8rem' }}>
+                          {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
+                            `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner (vs. Age ${activeResults.retirementReadyAge} on current path)`
+                          ) : (
+                            '✨ Sustainable!'
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {scenario.isInfoOnly ? (
+                      <button
+                        type="button"
+                        className="improvement-plan-card-apply-btn"
+                        style={{ background: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                        onClick={() => setShowImprovementModal(false)}
+                      >
+                        Got it
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="improvement-plan-card-apply-btn"
+                        onClick={() => handleApplyImprovementScenario(scenario)}
+                      >
+                        Apply Scenario
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem', borderRadius: '6px' }}
+                onClick={() => setShowImprovementModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          backgroundColor: 'var(--bg-secondary, #1f2937)',
+          borderLeft: '4px solid var(--accent-rose, #f43f5e)',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+          color: 'var(--text-primary, #f3f4f6)',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '0.375rem',
+          zIndex: 9999,
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          ⚠️ {notification}
+        </div>
+      )}
+
     </div>
   );
 }

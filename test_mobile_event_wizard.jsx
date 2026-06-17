@@ -2,7 +2,7 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
-import MobileFireSimulator from './src/components/fire-simulator/MobileFireSimulator';
+import MobileFireSimulator from './src/components/fire-simulator/MobileFireSimulatorView';
 import MobileEventWizard from './src/components/fire-simulator/MobileEventWizard';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs';
 import { runFireSimulation } from './src/fireCalculations';
