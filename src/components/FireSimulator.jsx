@@ -1580,6 +1580,7 @@ export default function FireSimulator() {
     setActiveStep,
     inputs,
     updateInput,
+    handleStep1Change: updateInput,
     updateAsset,
     displayMode,
     setDisplayMode,
