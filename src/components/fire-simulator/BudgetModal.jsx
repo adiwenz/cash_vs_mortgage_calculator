@@ -250,6 +250,53 @@ export default function BudgetModal({
     }
   };
 
+  const handleClearNeeds = () => {
+    setBudgetExpenses(prev => {
+      const next = { ...prev };
+      next.housing = 0;
+      next.utilities = 0;
+      next.food = 0;
+      next.transportation = 0;
+      next.healthcare = 0;
+      next.debt = 0;
+      next.childcare = 0;
+      Object.keys(next).forEach(key => {
+        if (key.startsWith('debt_')) {
+          next[key] = 0;
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleClearWants = () => {
+    setBudgetExpenses(prev => ({
+      ...prev,
+      leisure: 0,
+      diningOut: 0,
+      misc: 0
+    }));
+  };
+
+  const handleClearSavings = () => {
+    setBudgetSavings(prev => {
+      const next = {};
+      Object.keys(prev).forEach(k => {
+        next[k] = 0;
+      });
+      return next;
+    });
+    if (isMarriedMode) {
+      setBudgetPartnerSavings(prev => {
+        const next = {};
+        Object.keys(prev).forEach(k => {
+          next[k] = 0;
+        });
+        return next;
+      });
+    }
+  };
+
   const handleReduceWants = () => {
     const deficit = Math.abs(remainingBalance);
     if (wantsTotal <= 0) return;
@@ -598,7 +645,10 @@ export default function BudgetModal({
     handleAllocateRemaining,
     handleToggleSavingsAllocMode,
     decideLater,
-    setDecideLater
+    setDecideLater,
+    handleClearNeeds,
+    handleClearWants,
+    handleClearSavings
   };
 
   return (

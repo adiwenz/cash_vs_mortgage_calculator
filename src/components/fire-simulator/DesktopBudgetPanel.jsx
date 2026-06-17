@@ -57,7 +57,10 @@ export default function DesktopBudgetPanel({
   handleAllocateRemaining,
   handleToggleSavingsAllocMode,
   decideLater,
-  setDecideLater
+  setDecideLater,
+  handleClearNeeds,
+  handleClearWants,
+  handleClearSavings
 }) {
   return (
     <div className="budget-modal-layout">
@@ -601,13 +604,24 @@ export default function DesktopBudgetPanel({
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  className="breakdown-edit-link"
-                  onClick={() => setIsEditingNeeds(!isEditingNeeds)}
-                >
-                  {isEditingNeeds ? 'Done Editing ✓' : 'Edit Needs →'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="breakdown-edit-link"
+                    style={{ color: 'var(--accent-rose, #f43f5e)', marginTop: 0 }}
+                    onClick={handleClearNeeds}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    className="breakdown-edit-link"
+                    style={{ marginTop: 0 }}
+                    onClick={() => setIsEditingNeeds(!isEditingNeeds)}
+                  >
+                    {isEditingNeeds ? 'Done Editing ✓' : 'Edit Needs →'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -651,13 +665,24 @@ export default function DesktopBudgetPanel({
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  className="breakdown-edit-link"
-                  onClick={() => setIsEditingWants(!isEditingWants)}
-                >
-                  {isEditingWants ? 'Done Editing ✓' : 'Edit Wants →'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="breakdown-edit-link"
+                    style={{ color: 'var(--accent-rose, #f43f5e)', marginTop: 0 }}
+                    onClick={handleClearWants}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    className="breakdown-edit-link"
+                    style={{ marginTop: 0 }}
+                    onClick={() => setIsEditingWants(!isEditingWants)}
+                  >
+                    {isEditingWants ? 'Done Editing ✓' : 'Edit Wants →'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -814,13 +839,24 @@ export default function DesktopBudgetPanel({
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      className="breakdown-edit-link"
-                      onClick={() => setIsEditingSavings(!isEditingSavings)}
-                    >
-                      {isEditingSavings ? 'Done Editing ✓' : 'Edit Savings →'}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="breakdown-edit-link"
+                        style={{ color: 'var(--accent-rose, #f43f5e)', marginTop: 0 }}
+                        onClick={handleClearSavings}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        className="breakdown-edit-link"
+                        style={{ marginTop: 0 }}
+                        onClick={() => setIsEditingSavings(!isEditingSavings)}
+                      >
+                        {isEditingSavings ? 'Done Editing ✓' : 'Edit Savings →'}
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
