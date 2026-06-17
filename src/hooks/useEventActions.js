@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { runFireSimulation } from '../fireCalculations';
-import { calculateMarriageEstimates, getDefaultValuesForType } from '../components/fire-simulator/helpers';
+import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
 
 export function useEventActions(
   scenarios,
@@ -9,7 +9,8 @@ export function useEventActions(
   inputs,
   updateInput,
   handleSetBudgetClick,
-  setIsBudgetOpenFromMarriageWizard
+  setIsBudgetOpenFromMarriageWizard,
+  isMobile
 ) {
   const [editingEvent, setEditingEvent] = useState(null);
   const [childImpactSummary, setChildImpactSummary] = useState(null);
@@ -810,7 +811,9 @@ export function useEventActions(
       });
     }
     
-    setEditingEvent(null);
+    if (!isMobile) {
+      setEditingEvent(null);
+    }
     setIsFullPartnerProfileOpen(false);
     setIsZeroSpendingConfirmed(false);
     setIsPartnerZeroSpendingConfirmed(false);

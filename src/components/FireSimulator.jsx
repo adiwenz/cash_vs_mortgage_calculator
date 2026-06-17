@@ -10,7 +10,7 @@ import { useEventActions } from '../hooks/useEventActions';
 import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView';
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
 
-import { isEditableEvent } from './fire-simulator/helpers';
+import { isEditableEvent, calculateMarriageEstimates } from './fire-simulator/helpers';
 import { 
   validateSocialSecurityClaimAge, 
   getIncomeHistory, 
@@ -75,7 +75,8 @@ export default function FireSimulator() {
     inputs,
     updateInput,
     (phaseId) => handleSetBudgetClickRef.current?.(phaseId),
-    setIsBudgetOpenFromMarriageWizard
+    setIsBudgetOpenFromMarriageWizard,
+    isMobile
   );
   const {
     editingEvent,
@@ -115,7 +116,9 @@ export default function FireSimulator() {
     isBudgetOpenFromMarriageWizard,
     setIsBudgetOpenFromMarriageWizard
   );
-  handleSetBudgetClickRef.current = budgetState.handleSetBudgetClick;
+  useEffect(() => {
+    handleSetBudgetClickRef.current = budgetState.handleSetBudgetClick;
+  }, [budgetState.handleSetBudgetClick]);
 
   const {
     isBudgetModalOpen,
@@ -1023,7 +1026,7 @@ export default function FireSimulator() {
           
           let rateFraction = (Number(event.mortgageRate) || 6.5) / 100 / 12;
           let totalMonths = (Number(event.loanTerm) || 30) * 12;
-          let monthlyPayment = 0;
+          let monthlyPayment;
           if (rateFraction === 0) {
             monthlyPayment = principal / totalMonths;
           } else {
