@@ -295,7 +295,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     includeTaxes,
     enforceEarlyWithdrawalPenalty,
     standardDeduction,
-    nominalBrackets
+    nominalBrackets,
+    currentAge
   };
 
   for (let year = 0; year <= simYearsToCompute; year++) {
@@ -336,7 +337,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     if (hasMarriage && includeWeddingCost && age === weddingAge) {
       handleWeddingCost(
         age, weddingAge, weddingCost, nominalFactor,
-        deductFromLiquidAssets, state, dynamicMilestones, formatCurrency
+        deductFromLiquidAssets, state, dynamicMilestones, formatCurrency,
+        marriageEvent, activeLoans
       );
     }
 
@@ -924,7 +926,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     const customAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
     const liquidNW = balances.cash + balances.emergencyFund + balances.brokerage + balances.trad401k + balances.tradIra + balances.rothIra + balances.hsa + balances.other + customAssetsSum;
-    const netWorth = liquidNW + totalHomeValue - totalMortgageBalance - currentDebtSum;
+    const netWorth = liquidNW + totalHomeValue - totalMortgageBalance - currentDebtSum - state.cumulativeShortfall;
 
     let retirementBaseExpenses = spendingForYear + taxes;
     if (age < targetRetirementAge) {
@@ -1015,6 +1017,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const incomeAvailable = annualIncome + windfallReceived;
     const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
     const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
+    const weddingLoan = activeLoans.find(l => l.id === 'wedding-debt');
+    const weddingDebtBalance = weddingLoan ? weddingLoan.balance : 0;
     logs.push({
       intervalId: activePhaseForAge ? activePhaseForAge.id : null,
       year,
@@ -1022,6 +1026,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       income: annualIncome + windfallReceived,
       expenses: annualExpenses + taxes,
       taxes,
+      weddingDebtBalance,
       debtPayoffAllocation: annualExtraPayments,
       minDebtPayment: annualMinPayments,
       savings: savingsContribution,
@@ -1062,6 +1067,27 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     payoffAge: loan.balance <= 0 ? loan.payoffAge : null
   }));
 
+  let weddingFinancingDetails = null;
+  if (hasMarriage && includeWeddingCost) {
+    const weddingLog = logs.find(l => l.age === weddingAge);
+    const preWeddingLog = logs.find(l => l.age === weddingAge - 1);
+    const weddingDebtBalanceByYear = {};
+    logs.forEach(l => {
+      if (l.age >= weddingAge && l.weddingDebtBalance !== undefined) {
+        weddingDebtBalanceByYear[l.age] = l.weddingDebtBalance;
+      }
+    });
+
+    weddingFinancingDetails = {
+      weddingCost: weddingCost,
+      paidFromSavings: state.weddingPaidFromSavings ?? 0,
+      financedAmount: state.weddingFinancedAmount ?? 0,
+      weddingDebtBalanceByYear,
+      netWorthBeforeWedding: preWeddingLog ? preWeddingLog.netWorth : null,
+      netWorthAfterWedding: weddingLog ? weddingLog.netWorth : null
+    };
+  }
+
   return {
     moneyLasts: !state.hasRunOut,
     runOutAge: state.runOutAge,
@@ -1070,6 +1096,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     dynamicMilestones,
     coastAge,
     lastWorkingYearSpendingNominal,
-    debtSummaries
+    debtSummaries,
+    weddingFinancingDetails
   };
 }

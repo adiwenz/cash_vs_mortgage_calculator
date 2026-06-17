@@ -221,6 +221,9 @@ console.log('Verifying child removal reverts trajectory to baseline...');
 
 const removedTestInputs = {
   ...offsetTestInputs,
+  budgetDetails: null,
+  incomeList: baseTestInputs.incomeList,
+  spendingPhases: baseTestInputs.spendingPhases,
   lifeEvents: offsetTestInputs.lifeEvents.filter(e => e.type !== 'haveChild')
 };
 
@@ -232,6 +235,9 @@ for (let i = 0; i < baselineRes.data.length; i++) {
   if (!b || !r) continue;
 
   const nwDiff = Math.abs(b.netWorth - r.netWorth);
+  if (nwDiff > 1.0) {
+    console.log(`Divergence at age ${b.age}: Baseline NW=${b.netWorth}, Removed NW=${r.netWorth}, Diff=${nwDiff}`);
+  }
   if (nwDiff > 1000.0) {
     console.error(`FAIL (Post-Removal): Net worth divergence at age ${b.age}: Baseline=${b.netWorth}, Removed=${r.netWorth}, Diff=${nwDiff}`);
     process.exit(1);

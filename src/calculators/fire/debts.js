@@ -224,6 +224,63 @@ export function getActiveDebtsForAge(profile, events, age) {
       }
     }
   });
+
+  // 5. Wedding/Marriage Financed Debt
+  const marriageEvents = lifeEvents.filter(e => e.type === 'marriage' && e.enabled && e.includeWeddingCost && ['debt', 'finance', 'financed', 'loan'].includes(e.weddingFundingMethod));
+  marriageEvents.forEach(me => {
+    const startAge = me.weddingAge !== undefined ? Number(me.weddingAge) : (me.age !== undefined ? Number(me.age) : currentAge);
+    
+    // Calculate total liquid assets before deduction
+    const userAssets = (profile.assets?.cash || 0) + 
+                       (profile.assets?.emergencyFund || 0) + 
+                       (profile.assets?.brokerage || 0) + 
+                       (profile.assets?.trad401k || 0) + 
+                       (profile.assets?.tradIra || 0) + 
+                       (profile.assets?.rothIra || 0) + 
+                       (profile.assets?.hsa || 0) + 
+                       (profile.assets?.other || 0);
+    const spouseAssets = Number(me.cash || 0) + Number(me.investments || 0) + Number(me.retirement || 0);
+    const totalLiquidAssets = userAssets + spouseAssets;
+    
+    const inflationRateVal = (profile.inflationRate !== undefined ? Number(profile.inflationRate) : 3) / 100;
+    const nominalFactor = Math.pow(1 + inflationRateVal, Math.max(0, startAge - currentAge));
+    const totalCost = (Number(me.weddingCost) || 0) * nominalFactor;
+    
+    const isEntire = ['finance', 'financed', 'loan'].includes(me.weddingFundingMethod);
+    const financedAmount = isEntire ? totalCost : Math.max(0, totalCost - totalLiquidAssets);
+    
+    if (financedAmount > 0) {
+      const apr = me.weddingInterestRate !== undefined ? Number(me.weddingInterestRate) : 7;
+      const timelineYears = me.weddingPayoffTimeline !== undefined ? Number(me.weddingPayoffTimeline) : 10;
+      const hasPaymentPlan = me.weddingHasPaymentPlan !== undefined ? !!me.weddingHasPaymentPlan : true;
+      
+      const r = apr / 100 / 12;
+      let monthlyPayment = 0;
+      if (hasPaymentPlan) {
+        const termMonths = timelineYears * 12;
+        if (r === 0) {
+          monthlyPayment = financedAmount / termMonths;
+        } else {
+          monthlyPayment = (financedAmount * r) / (1 - Math.pow(1 + r, -termMonths));
+        }
+      } else {
+        monthlyPayment = financedAmount * 0.01;
+      }
+      
+      const payoffAge = calculateAmortizedLoanPayoffAge(financedAmount, apr, monthlyPayment, startAge);
+      
+      if (age >= startAge && age < payoffAge) {
+        activeDebts.push({
+          id: `wedding-debt-${me.id}`,
+          name: 'Wedding Debt',
+          type: 'weddingDebt',
+          monthlyPayment: Math.round(monthlyPayment),
+          icon: '💸',
+          payoffAge
+        });
+      }
+    }
+  });
   
   return activeDebts;
 }

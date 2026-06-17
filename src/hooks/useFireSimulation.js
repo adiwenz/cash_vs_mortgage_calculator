@@ -126,28 +126,17 @@ export function useFireSimulation() {
         baselineRow = displayedBaselineResults.data[displayedBaselineResults.data.length - 1];
       }
       
-      const realIndex = idx;
       let netWorth = row.netWorth;
       let baselineNetWorth = baselineRow ? baselineRow.netWorth : 0;
       
-      if (realIndex === 0) {
-        netWorth = startingValue;
-        if (baselineRow) {
-          const baseCash = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.cash) || 0;
-          const baseEmerg = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.emergencyFund) || 0;
-          const baseBrokerage = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.brokerage) || 0;
-          const base401k = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.trad401k) || 0;
-          const baseIra = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.tradIra) || 0;
-          const baseRoth = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.rothIra) || 0;
-          const baseHsa = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.hsa) || 0;
-          const baseOther = Number(scenarios.find(s => s.id === 'baseline')?.inputs?.assets?.other) || 0;
-          baselineNetWorth = baseCash + baseEmerg + baseBrokerage + base401k + baseIra + baseRoth + baseHsa + baseOther;
-        }
-      }
-      
+      const assets = row.assets !== undefined ? row.assets : (row.portfolio + (row.homeValue || 0));
+      const debt = row.debt !== undefined ? row.debt : ((row.debtBalance || 0) + (row.mortgageBalance || 0) + (row.cumulativeShortfall || 0));
+
       return {
         ...row,
         netWorth,
+        assets,
+        debt,
         baselineNetWorth: baselineNetWorth,
         baselinePortfolio: baselineRow ? baselineRow.portfolio : 0,
         fiNumber: displayedResults.fiNumber
@@ -158,23 +147,8 @@ export function useFireSimulation() {
   const baselineChartData = useMemo(() => {
     if (!displayedBaselineResults.data || displayedBaselineResults.data.length === 0) return [];
     
-    const baseScen = scenarios.find(s => s.id === 'baseline') || scenarios[0];
-    const cash = Number(baseScen.inputs.assets?.cash) || 0;
-    const emergencyFund = Number(baseScen.inputs.assets?.emergencyFund) || 0;
-    const brokerage = Number(baseScen.inputs.assets?.brokerage) || 0;
-    const trad401k = Number(baseScen.inputs.assets?.trad401k) || 0;
-    const tradIra = Number(baseScen.inputs.assets?.tradIra) || 0;
-    const rothIra = Number(baseScen.inputs.assets?.rothIra) || 0;
-    const hsa = Number(baseScen.inputs.assets?.hsa) || 0;
-    const other = Number(baseScen.inputs.assets?.other) || 0;
-    
-    const startingValue = cash + emergencyFund + brokerage + trad401k + tradIra + rothIra + hsa + other;
-
     return displayedBaselineResults.data.map((row, idx) => {
       let netWorth = row.netWorth;
-      if (idx === 0) {
-        netWorth = startingValue;
-      }
       return {
         age: row.age,
         portfolio: row.portfolio,

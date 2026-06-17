@@ -685,6 +685,462 @@ try {
     console.log('✅ Test 7: Budget modal switches to Married Household Budget mode passed.');
   }
 
+  // Test 8: Wedding financing debt modeling - cost $20,000, assets $10,000, finance $10,000 -> net worth becomes -$10,000 (after wedding)
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 10000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 40,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 20000,
+      weddingAge: 40,
+      weddingFundingMethod: 'debt',
+      weddingInterestRate: 7,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age39 = results.nominalData.find(d => d.age === 39);
+    const age40 = results.nominalData.find(d => d.age === 40);
+
+    expect(age39.netWorth).toBe(10000);
+    expect(age39.portfolio).toBe(10000);
+    expect(age39.debtBalance).toBe(0);
+
+    expect(age40.portfolio).toBe(0);
+    expect(age40.debtBalance).toBeCloseTo(9306.70, 0);
+    expect(age40.netWorth).toBeCloseTo(-10700, 0);
+
+    const debugSnap = results.weddingFinancingDetails;
+    expect(!!debugSnap).toBe(true);
+    expect(debugSnap.weddingCost).toBe(20000);
+    expect(debugSnap.paidFromSavings).toBe(10000);
+    expect(debugSnap.financedAmount).toBe(10000);
+    expect(debugSnap.netWorthBeforeWedding).toBe(10000);
+    expect(debugSnap.netWorthAfterWedding).toBeCloseTo(-10700, 0);
+
+    console.log('✅ Test 8: Wedding financing debt modeling (10k savings, 20k cost, 10k financed) passed.');
+  }
+
+  // Test 9: Wedding financing debt modeling - cost $20,000, assets $5,000, finance $15,000 -> net worth becomes -$15,000
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 5000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 40,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 20000,
+      weddingAge: 40,
+      weddingFundingMethod: 'debt',
+      weddingInterestRate: 7,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age39 = results.nominalData.find(d => d.age === 39);
+    const age40 = results.nominalData.find(d => d.age === 40);
+
+    expect(age39.netWorth).toBe(5000);
+    expect(age40.portfolio).toBe(0);
+    expect(age40.debtBalance).toBeCloseTo(13960.05, 0);
+    expect(age40.netWorth).toBeCloseTo(-16050, 0);
+    console.log('✅ Test 9: Wedding financing debt modeling (5k savings, 20k cost, 15k financed) passed.');
+  }
+
+  // Test 10: Wedding paid fully from savings reduces assets but does not create debt
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 30000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 40,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 20000,
+      weddingAge: 40,
+      weddingFundingMethod: 'savings'
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age39 = results.nominalData.find(d => d.age === 39);
+    const age40 = results.nominalData.find(d => d.age === 40);
+
+    expect(age39.netWorth).toBe(30000);
+    expect(age40.portfolio).toBe(10000);
+    expect(age40.debtBalance).toBe(0);
+    expect(age40.netWorth).toBe(10000);
+    console.log('✅ Test 10: Wedding paid fully from savings reduces assets without creating debt passed.');
+  }
+
+  // Test 11: Finance $10,000 wedding debt at age 35 with portfolio $25,079
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 25079,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 35,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 10000,
+      weddingAge: 35,
+      weddingFundingMethod: 'finance',
+      weddingInterestRate: 0,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age35 = results.nominalData.find(d => d.age === 35);
+
+    expect(age35.portfolio).toBe(24079);
+    expect(age35.debtBalance).toBe(9000);
+    expect(age35.netWorth).toBe(15079);
+    
+    const debugSnap = results.weddingFinancingDetails;
+    expect(debugSnap.weddingCost).toBe(10000);
+    expect(debugSnap.paidFromSavings).toBe(0);
+    expect(debugSnap.financedAmount).toBe(10000);
+
+    console.log('✅ Test 11: Finance $10,000 wedding debt at age 35 with portfolio $25,079 passed.');
+  }
+
+  // Test 12: Finance $10,000 wedding debt with portfolio $5,000
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 5000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 35,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 10000,
+      weddingAge: 35,
+      weddingFundingMethod: 'finance',
+      weddingInterestRate: 0,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age35 = results.nominalData.find(d => d.age === 35);
+
+    expect(age35.portfolio).toBe(4000);
+    expect(age35.debtBalance).toBe(9000);
+    expect(age35.netWorth).toBe(-5000);
+
+    console.log('✅ Test 12: Finance $10,000 wedding debt with portfolio $5,000 passed.');
+  }
+
+  // Test 13: Wedding partially paid from savings and partially financed
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 5000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 35,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 20000,
+      weddingAge: 35,
+      weddingFundingMethod: 'debt',
+      weddingInterestRate: 0,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age35 = results.nominalData.find(d => d.age === 35);
+
+    expect(age35.portfolio).toBe(0);
+    expect(age35.debtBalance).toBe(13500);
+    expect(age35.netWorth).toBe(-15000);
+    
+    const debugSnap = results.weddingFinancingDetails;
+    expect(debugSnap.weddingCost).toBe(20000);
+    expect(debugSnap.paidFromSavings).toBe(5000);
+    expect(debugSnap.financedAmount).toBe(15000);
+
+    console.log('✅ Test 13: Wedding partially paid from savings and partially financed passed.');
+  }
+
+  // Test 14: Starting with $0 assets, finance $10,000 wedding -> Net Worth = -$10,000
+  {
+    const inputs = getMappedDefaultInputs();
+    inputs.currentAge = 35;
+    inputs.lifeExpectancy = 85;
+    inputs.simpleIncome = 0;
+    inputs.simpleExpenses = 0;
+    inputs.inflationRate = 0;
+    inputs.expectedReturn = 0;
+    inputs.includeTaxes = false;
+    inputs.assets = {
+      cash: 0,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0,
+      debts: 0
+    };
+    inputs.debtList = [];
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {}
+    };
+    inputs.spendingPhases = [];
+    inputs.incomeList = [];
+
+    const marriageEvent = {
+      id: 'marriage-1',
+      type: 'marriage',
+      enabled: true,
+      age: 35,
+      spouseIncome: 0,
+      incomeGrowthRate: 0,
+      cash: 0,
+      investments: 0,
+      retirement: 0,
+      savingsRate: 0,
+      includeWeddingCost: true,
+      weddingCost: 10000,
+      weddingAge: 35,
+      weddingFundingMethod: 'finance',
+      weddingInterestRate: 0,
+      weddingPayoffTimeline: 10,
+      weddingHasPaymentPlan: true
+    };
+    inputs.lifeEvents = [marriageEvent];
+    inputs.householdMembers = [];
+
+    const results = runFireSimulation(inputs);
+    const age35 = results.nominalData.find(d => d.age === 35);
+
+    expect(age35.portfolio).toBe(0);
+    expect(age35.debtBalance).toBe(9000);
+    expect(age35.netWorth).toBe(-10000);
+
+    console.log('✅ Test 14: Starting with $0 assets, finance $10,000 wedding -> Net Worth = -$10,000 passed.');
+  }
+
   console.log('\n✅ All marriage event tests passed successfully!');
   process.exit(0);
 } catch (err) {

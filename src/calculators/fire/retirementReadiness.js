@@ -286,6 +286,7 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     coastAge: plannedProjection.coastAge,
     dynamicMilestones: plannedProjection.dynamicMilestones,
     debtSummaries: plannedProjection.debtSummaries,
+    weddingFinancingDetails: plannedProjection.weddingFinancingDetails,
     data: deflatedLogs,
     socialSecurityDetails,
     deflatedData: deflatedLogs,

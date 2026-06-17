@@ -13,6 +13,7 @@ export const formatYAxis = (val) => {
   if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}K`;
   if (val <= -1e6) return `-$${(Math.abs(val) / 1e6).toFixed(1)}M`;
   if (val <= -1e3) return `-$${(Math.abs(val) / 1e3).toFixed(0)}K`;
+  if (val < 0) return `-$${Math.abs(val)}`;
   return `$${val}`;
 };
 

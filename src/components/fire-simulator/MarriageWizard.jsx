@@ -56,6 +56,11 @@ export default function MarriageWizard({
                      Number(editingEvent.debtCredit || 0) +
                      Number(editingEvent.debtOther || 0);
   const combinedDebt = userDebt + spouseDebt;
+  
+  const isSavingsDisabled = Number(editingEvent.weddingCost || 0) > combinedAssets;
+  const postWeddingFinancedDebt = (editingEvent.weddingFundingMethod === 'debt') ? Math.max(0, Number(editingEvent.weddingCost || 0) - combinedAssets) : 0;
+  const postWeddingNetWorth = combinedAssets - combinedDebt - postWeddingFinancedDebt;
+  const isNetWorthBelowZero = postWeddingNetWorth < 0;
 
   // Calculate user spending baseline pre-retirement
   let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
@@ -471,7 +476,12 @@ export default function MarriageWizard({
                           color: (editingEvent.weddingCost === preset.value) ? 'var(--primary)' : 'var(--text-primary)',
                           cursor: 'pointer'
                         }}
-                        onClick={() => setEditingEvent(Object.assign({}, editingEvent, { weddingCost: preset.value }))}
+                        onClick={() => {
+                          const val = preset.value;
+                          const willBeDisabled = val > combinedAssets;
+                          const nextMethod = (willBeDisabled && (editingEvent.weddingFundingMethod || 'savings') === 'savings') ? 'debt' : (editingEvent.weddingFundingMethod || 'savings');
+                          setEditingEvent(Object.assign({}, editingEvent, { weddingCost: val, weddingFundingMethod: nextMethod }));
+                        }}
                       >
                         {preset.label}
                       </button>
@@ -505,7 +515,12 @@ export default function MarriageWizard({
                         fontWeight: (editingEvent.weddingCost || 0) > 0 ? 'bold' : 'normal'
                       }}
                       value={editingEvent.weddingCost !== undefined ? editingEvent.weddingCost : 20000}
-                      onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingCost: parseFloat(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        const willBeDisabled = val > combinedAssets;
+                        const nextMethod = (willBeDisabled && (editingEvent.weddingFundingMethod || 'savings') === 'savings') ? 'debt' : (editingEvent.weddingFundingMethod || 'savings');
+                        setEditingEvent(Object.assign({}, editingEvent, { weddingCost: val, weddingFundingMethod: nextMethod }));
+                      }}
                     />
                   </div>
                   <div className="input-wrapper">
@@ -528,20 +543,72 @@ export default function MarriageWizard({
                       { label: '🏦 Use Available Savings (Deduct from liquid assets)', value: 'savings' },
                       { label: '📈 Save Until Wedding (Extra savings targeted before wedding)', value: 'save_targeted' },
                       { label: '💳 Finance Difference (Create credit card or other debt)', value: 'debt' }
-                    ].map((opt) => (
-                      <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="weddingFundingMethod"
-                          value={opt.value}
-                          checked={(editingEvent.weddingFundingMethod || 'savings') === opt.value}
-                          onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingFundingMethod: e.target.value }))}
-                        />
-                        {opt.label}
-                      </label>
-                    ))}
+                    ].map((opt) => {
+                      const isDisabled = opt.value === 'savings' && isSavingsDisabled;
+                      return (
+                        <label key={opt.value} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.4rem', 
+                          fontSize: '0.75rem', 
+                          color: 'var(--text-primary)', 
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          opacity: isDisabled ? 0.5 : 1
+                        }}>
+                          <input
+                            type="radio"
+                            name="weddingFundingMethod"
+                            value={opt.value}
+                            checked={(editingEvent.weddingFundingMethod || 'savings') === opt.value}
+                            disabled={isDisabled}
+                            onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingFundingMethod: e.target.value }))}
+                          />
+                          {opt.label}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {editingEvent.weddingFundingMethod === 'debt' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', padding: '0.65rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)', marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>Wedding Financing Details</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      <div className="input-wrapper">
+                        <span className="input-name" style={{ fontSize: '0.7rem' }}>Interest Rate (%)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+                          value={editingEvent.weddingInterestRate !== undefined ? editingEvent.weddingInterestRate : 7}
+                          onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingInterestRate: parseFloat(e.target.value) || 0 }))}
+                        />
+                      </div>
+                      <div className="input-wrapper">
+                        <span className="input-name" style={{ fontSize: '0.7rem' }}>Payoff Timeline (Years)</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+                          value={editingEvent.weddingPayoffTimeline !== undefined ? editingEvent.weddingPayoffTimeline : 10}
+                          onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingPayoffTimeline: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
+                      <input
+                        type="checkbox"
+                        id="wedding-has-payment-plan"
+                        checked={editingEvent.weddingHasPaymentPlan !== undefined ? !!editingEvent.weddingHasPaymentPlan : true}
+                        onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { weddingHasPaymentPlan: e.target.checked }))}
+                        style={{ width: '0.85rem', height: '0.85rem', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="wedding-has-payment-plan" className="input-name" style={{ margin: 0, cursor: 'pointer', fontSize: '0.7rem' }}>
+                        Set up a structured payment plan
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 {/* Funding Gap Calculation Display */}
                 {Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
@@ -553,8 +620,13 @@ export default function MarriageWizard({
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                       {(editingEvent.weddingFundingMethod || 'savings') === 'savings' && 'Note: This gap will result in negative liquid assets at the wedding age.'}
                       {(editingEvent.weddingFundingMethod || 'savings') === 'save_targeted' && 'Note: You will need to save this difference before the wedding.'}
-                      {(editingEvent.weddingFundingMethod || 'savings') === 'debt' && `Note: This will add ${formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))} of debt.`}
+                      {(editingEvent.weddingFundingMethod || 'savings') === 'debt' && `Financing this wedding adds ${formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))} of debt. Your net worth may go negative until the debt is paid down.`}
                     </span>
+                    {editingEvent.weddingFundingMethod === 'debt' && isNetWorthBelowZero && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', fontWeight: 'bold', marginTop: '0.15rem' }}>
+                        Your net worth is below $0 because the wedding debt is larger than your available assets.
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -784,7 +856,7 @@ export default function MarriageWizard({
 
             {/* Wedding details summary */}
             {editingEvent.includeWeddingCost && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Wedding Cost:</span>
                   <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(editingEvent.weddingCost || 0)}</strong>
@@ -798,9 +870,19 @@ export default function MarriageWizard({
                   </strong>
                 </div>
                 {editingEvent.weddingFundingMethod === 'debt' && Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
-                    <span>Debt Created:</span>
-                    <span>+{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</span>
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
+                      <span>Debt Created:</span>
+                      <span>+{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.15rem' }}>
+                      Financing this wedding adds {formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))} of debt. Your net worth may go negative until the debt is paid down.
+                    </div>
+                  </>
+                )}
+                {isNetWorthBelowZero && (
+                  <div style={{ color: 'var(--accent-rose)', fontSize: '0.75rem', marginTop: '0.15rem', fontWeight: 'bold' }}>
+                    Your net worth is below $0 because the wedding debt is larger than your available assets.
                   </div>
                 )}
               </div>

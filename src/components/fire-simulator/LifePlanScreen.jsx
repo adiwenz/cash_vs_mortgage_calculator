@@ -82,6 +82,43 @@ const generateLifeStory = (inp, results) => {
           age: claimingAge,
           text: `Receive ${label} benefits (${formatCurrency(monthlyBenefit)}/mo${ev.type === 'socialSecurity' && claimingAge !== 67 ? ' - claiming age adjusted' : ''})`
         });
+      } else if (ev.type === 'marriage') {
+        const startAge = ev.weddingAge !== undefined ? Number(ev.weddingAge) : Number(ev.age);
+        let text = `Get married`;
+        if (ev.includeWeddingCost) {
+          const isFinanced = ['debt', 'finance', 'financed', 'loan'].includes(ev.weddingFundingMethod);
+          if (isFinanced) {
+            const userAssets = (inp.assets?.cash || 0) + 
+                               (inp.assets?.emergencyFund || 0) + 
+                               (inp.assets?.brokerage || 0) + 
+                               (inp.assets?.trad401k || 0) + 
+                               (inp.assets?.tradIra || 0) + 
+                               (inp.assets?.rothIra || 0) + 
+                               (inp.assets?.hsa || 0) + 
+                               (inp.assets?.other || 0);
+            const spouseAssets = Number(ev.cash || 0) + Number(ev.investments || 0) + Number(ev.retirement || 0);
+            const totalLiquidAssets = userAssets + spouseAssets;
+            const inflationRateVal = (Number(inp.inflationRate) || 3) / 100;
+            const nominalFactor = Math.pow(1 + inflationRateVal, Math.max(0, startAge - curAge));
+            const totalCost = (Number(ev.weddingCost) || 0) * nominalFactor;
+            
+            const isEntire = ['finance', 'financed', 'loan'].includes(ev.weddingFundingMethod);
+            const financedAmount = isEntire ? totalCost : Math.max(0, totalCost - totalLiquidAssets);
+            const paidFromSavings = totalCost - financedAmount;
+
+            if (financedAmount > 0) {
+              text = `Get married (Wedding financed: ${formatCurrency(financedAmount)} debt added)`;
+            } else {
+              text = `Get married (Wedding paid from savings: ${formatCurrency(totalCost)})`;
+            }
+          } else {
+            text = `Get married (Wedding paid from savings)`;
+          }
+        }
+        list.push({
+          age: startAge,
+          text
+        });
       } else {
         const age = Number(ev.age || ev.startAge || ev.payoffAge || ev.purchaseAge || ev.birthAge || ev.ageReceived || ev.claimingAge || ev.transferAge || 0);
         let desc = `Event: ${ev.name || 'Custom'}`;
@@ -1769,12 +1806,18 @@ export default function LifePlanScreen({
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                             <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Net Worth</span>
-                              <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
+                              <strong style={{ fontSize: '1.05rem', color: yearData.netWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
                             </div>
                             <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio Value</span>
                               <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.portfolio)}</strong>
                             </div>
+                            {((yearData.debt !== undefined ? yearData.debt : yearData.debtBalance) > 0) && (
+                              <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Total Debt</span>
+                                <strong style={{ fontSize: '1.05rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.debt !== undefined ? yearData.debt : yearData.debtBalance)}</strong>
+                              </div>
+                            )}
                             <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Income</span>
                               <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.income)}</strong>
@@ -1930,7 +1973,7 @@ export default function LifePlanScreen({
                           </div>
       
                           {/* Property / Debt info if active */}
-                          {(yearData.homeValue > 0 || yearData.mortgageBalance > 0 || yearData.debtBalance > 0) && (
+                          {(yearData.homeValue > 0 || yearData.mortgageBalance > 0 || yearData.debtBalance > 0 || yearData.weddingDebtBalance > 0) && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
                               {yearData.homeValue > 0 && (
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -1942,6 +1985,12 @@ export default function LifePlanScreen({
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                   📝 <span>Mortgage Balance: </span>
                                   <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(yearData.mortgageBalance)}</strong>
+                                </div>
+                              )}
+                              {yearData.weddingDebtBalance > 0 && (
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                  💍 <span>Wedding Debt: </span>
+                                  <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(yearData.weddingDebtBalance)}</strong>
                                 </div>
                               )}
                               {yearData.debtBalance > 0 && (

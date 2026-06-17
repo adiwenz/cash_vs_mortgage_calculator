@@ -263,6 +263,13 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
 
   const boundaries = Array.from(new Set(simPhases.flatMap(p => [p.startAge, p.endAge]))).sort((a, b) => a - b);
 
+  const marriageEvent = rawInputs.lifeEvents?.find(e => e.type === 'marriage' && e.enabled);
+  const weddingAge = marriageEvent 
+    ? (marriageEvent.weddingAge !== undefined ? Number(marriageEvent.weddingAge) : (marriageEvent.age !== undefined ? Number(marriageEvent.age) : globalAssumptions.currentAge))
+    : null;
+  const weddingDebtBalance = weddingAge !== null ? (res.weddingFinancingDetails?.weddingDebtBalanceByYear?.[weddingAge] ?? 0) : null;
+  const totalDebt = weddingAge !== null ? (timeline.find(t => t.age === weddingAge)?.debtBalance ?? 0) : null;
+
   return {
     rawInputs,
     normalizedInputs: normInputs,
@@ -275,6 +282,14 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     yearlyTimeline: computedTimeline,
     finalResult,
     boundaries,
+    weddingCost: res.weddingFinancingDetails?.weddingCost ?? null,
+    paidFromSavings: res.weddingFinancingDetails?.paidFromSavings ?? null,
+    financedAmount: res.weddingFinancingDetails?.financedAmount ?? null,
+    weddingDebtBalance,
+    totalDebt,
+    weddingDebtBalanceByYear: res.weddingFinancingDetails?.weddingDebtBalanceByYear ?? {},
+    netWorthBeforeWedding: res.weddingFinancingDetails?.netWorthBeforeWedding ?? null,
+    netWorthAfterWedding: res.weddingFinancingDetails?.netWorthAfterWedding ?? null,
     generatedBudgetIntervals: simPhases.map(p => ({
       id: p.id,
       startAge: p.startAge,
