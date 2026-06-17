@@ -12,7 +12,8 @@ export function useEventActions(
   setIsBudgetOpenFromMarriageWizard,
   isMobile
 ) {
-  const [editingEvent, setEditingEvent] = useState(null);
+  const [hookEditingEvent, setEditingEvent] = useState(null);
+  const editingEvent = hookEditingEvent;
   const [childImpactSummary, setChildImpactSummary] = useState(null);
   const [editingCondition, setEditingCondition] = useState(null);
   const [draggingInfo, setDraggingInfo] = useState(null);
@@ -279,7 +280,9 @@ export function useEventActions(
     }
   };
 
-  const handleSaveEvent = () => {
+  const handleSaveEvent = (passedEvent) => {
+    const isSyntheticEvent = passedEvent && (passedEvent.nativeEvent || passedEvent.preventDefault);
+    const editingEvent = (passedEvent && !isSyntheticEvent) ? passedEvent : hookEditingEvent;
     if (!editingEvent) return;
     const type = editingEvent.type;
     
@@ -894,7 +897,9 @@ export function useEventActions(
     }
   };
 
-  const handleDeleteEvent = () => {
+  const handleDeleteEvent = (passedEvent) => {
+    const isSyntheticEvent = passedEvent && (passedEvent.nativeEvent || passedEvent.preventDefault);
+    const editingEvent = (passedEvent && !isSyntheticEvent) ? passedEvent : hookEditingEvent;
     if (!editingEvent) return;
     const proxyEvent = {
       originalId: editingEvent.id,
