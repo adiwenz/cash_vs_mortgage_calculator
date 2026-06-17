@@ -157,6 +157,79 @@ const getShortLabel = (evt) => {
   return cleanLabel;
 };
 
+function LedgerRow({ row, formatCurrency }) {
+  const [expanded, setExpanded] = useState(false);
+  const isPos = row.type === 'positive';
+  const sign = isPos ? '+' : '-';
+  const color = isPos ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <div 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          fontSize: '0.75rem', 
+          color: 'var(--text-secondary)',
+          cursor: row.expandable ? 'pointer' : 'default',
+          padding: '0.15rem 0',
+          borderRadius: '4px',
+          transition: 'background-color 0.2s'
+        }}
+        onClick={() => row.expandable && setExpanded(!expanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <span>{sign} {row.label}</span>
+          {row.expandable && (
+            <span style={{ fontSize: '0.55rem', color: 'var(--text-muted, #a1a1aa)' }}>
+              {expanded ? '▲' : '▼'}
+            </span>
+          )}
+        </div>
+        <strong style={{ color }}>
+          {isPos ? '+' : '-'}{formatCurrency(Math.abs(row.value))}
+        </strong>
+      </div>
+      
+      {row.expandable && expanded && row.details && (
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.25rem', 
+          paddingLeft: '1rem', 
+          fontSize: '0.7rem', 
+          color: 'var(--text-secondary)',
+          opacity: 0.9,
+          borderLeft: '1px dashed var(--border-color)',
+          marginLeft: '0.25rem',
+          marginTop: '0.1rem',
+          marginBottom: '0.25rem'
+        }}>
+          {row.details.paidFromSavings !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Paid From Savings</span>
+              <span style={{ color: 'var(--text-primary)' }}>{formatCurrency(row.details.paidFromSavings)}</span>
+            </div>
+          )}
+          {row.details.financed !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Financed</span>
+              <span style={{ color: 'var(--text-primary)' }}>{formatCurrency(row.details.financed)}</span>
+            </div>
+          )}
+          {row.details.currentDebtBalance !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Current Debt Balance</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{formatCurrency(row.details.currentDebtBalance)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MobileFireSimulatorView({
   inputs,
   updateInput,
@@ -240,6 +313,7 @@ export default function MobileFireSimulatorView({
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
 
   // Sync scroll positions
   useEffect(() => {
@@ -710,7 +784,200 @@ export default function MobileFireSimulatorView({
               activeResults={activeResults}
               activeChart={activeChart}
               setActiveChart={setActiveChart}
+              selectedYear={selectedYear}
+              setSelectedYear={setSelectedYear}
             />
+
+            {/* Financial Snapshot Card */}
+            {(() => {
+              const activeYear = selectedYear !== null ? selectedYear : Number(inputs.currentAge);
+              const yearData = chartData.find(d => d.age === activeYear);
+              if (!yearData) return null;
+
+              const isWorking = activeYear < displayedResults.targetRetirementAge;
+
+              return (
+                <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem', marginBottom: '0.8rem' }}>
+                    <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                      🔍 Age {activeYear} Financial Snapshot
+                    </h3>
+                    <span className="badge" style={{ 
+                      fontSize: '0.65rem', 
+                      padding: '0.15rem 0.45rem', 
+                      background: isWorking ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
+                      color: isWorking ? 'var(--primary)' : 'var(--accent-emerald)',
+                      border: `1px solid ${isWorking ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                      borderRadius: '12px',
+                      fontWeight: '600'
+                    }}>
+                      {isWorking ? 'Working' : 'Retired'}
+                    </span>
+                  </div>
+
+                  {/* KPI Stats Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1rem' }}>
+                    <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Net Worth</span>
+                      <strong style={{ fontSize: '0.95rem', color: yearData.netWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
+                        {formatCurrency(yearData.netWorth)}
+                      </strong>
+                    </div>
+                    <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio / Assets</span>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
+                        {formatCurrency(yearData.assets)}
+                      </strong>
+                    </div>
+                    {yearData.debt > 0 && (
+                      <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Total Debt</span>
+                        <strong style={{ fontSize: '0.95rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.15rem' }}>
+                          {formatCurrency(yearData.debt)}
+                        </strong>
+                      </div>
+                    )}
+                    <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Income</span>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
+                        {formatCurrency(yearData.income)}
+                      </strong>
+                    </div>
+                    <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Spending</span>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
+                        {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
+                      </strong>
+                    </div>
+                    <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>
+                        {yearData.withdrawals > 0 ? 'Withdrawals' : 'Net Savings'}
+                      </span>
+                      <strong style={{ 
+                        fontSize: '0.95rem', 
+                        color: yearData.withdrawals > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', 
+                        display: 'block', 
+                        marginTop: '0.15rem' 
+                      }}>
+                        {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Net Worth Ledger */}
+                  {yearData.netWorthLedger && (
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', marginTop: '0.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>
+                          📒 Net Worth Change
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsMobileLedgerExpanded(!isMobileLedgerExpanded)}
+                          style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--primary)',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.15rem 0.4rem',
+                            fontWeight: '600'
+                          }}
+                        >
+                          {isMobileLedgerExpanded ? 'Hide details ▴' : 'Show details ▾'}
+                        </button>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.01)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '0.6rem 0.8rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          <span>Starting Net Worth:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {formatCurrency(yearData.netWorthLedger.startingNetWorth)}
+                          </strong>
+                        </div>
+
+                        {isMobileLedgerExpanded && [
+                          { key: 'incomeInvesting', label: 'Income & Investing' },
+                          { key: 'lifeEvents', label: 'Life Events' },
+                          { key: 'debtActivity', label: 'Debt Activity' }
+                        ].map(sec => {
+                          const secRows = yearData.netWorthLedger.rows.filter(r => r.section === sec.key);
+                          if (secRows.length === 0) return null;
+                          return (
+                            <div key={sec.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.3rem' }}>
+                              <div style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', opacity: 0.6 }}>
+                                {sec.label}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '0.4rem' }}>
+                                {secRows.map((row, rIdx) => (
+                                  <LedgerRow key={rIdx} row={row} formatCurrency={formatCurrency} />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-primary)',
+                          borderTop: isMobileLedgerExpanded ? '1px solid var(--border-color)' : 'none',
+                          paddingTop: isMobileLedgerExpanded ? '0.35rem' : '0',
+                          fontWeight: '700'
+                        }}>
+                          <span>Ending Net Worth:</span>
+                          <strong style={{ color: yearData.netWorthLedger.endingNetWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>
+                            {formatCurrency(yearData.netWorthLedger.endingNetWorth)}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cash Flow Details Breakdown */}
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', marginTop: '0.8rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>
+                      📊 Cash Flow Details
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <span>Base Annual Spending:</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {formatCurrency(Math.max(0, yearData.expenses - (yearData.taxes || 0) - (yearData.childCosts || 0)))}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <span>Child Costs:</span>
+                        <strong style={{ color: yearData.childCosts > 0 ? 'var(--accent-orange, #f59e0b)' : 'var(--text-primary)' }}>
+                          {formatCurrency(yearData.childCosts || 0)}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <span>Total Annual Spending:</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <span>Net Savings:</span>
+                        <strong style={{ color: yearData.withdrawals > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                          {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

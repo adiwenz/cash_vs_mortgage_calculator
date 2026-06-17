@@ -81,9 +81,34 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
       homeEquity: log.homeEquity / factor,
       mortgageBalance: log.mortgageBalance / factor,
       debtBalance: log.debtBalance / factor,
-      netWorth: (log.netWorth - (log.cumulativeShortfall || 0)) / factor,
-      assets: (log.portfolio + log.homeValue) / factor,
-      debt: (log.debtBalance + log.mortgageBalance + (log.cumulativeShortfall || 0)) / factor,
+      netWorth: log.netWorth / factor,
+      assets: log.assets / factor,
+      debt: log.debt / factor,
+      netWorthLedger: log.netWorthLedger ? {
+        startingNetWorth: log.netWorthLedger.startingNetWorth / factor,
+        savings: log.netWorthLedger.savings / factor,
+        withdrawals: log.netWorthLedger.withdrawals / factor,
+        investmentGrowth: log.netWorthLedger.investmentGrowth / factor,
+        newDebtAdded: log.netWorthLedger.newDebtAdded / factor,
+        debtPrincipalPaid: log.netWorthLedger.debtPrincipalPaid / factor,
+        majorEventCosts: log.netWorthLedger.majorEventCosts / factor,
+        endingNetWorth: log.netWorthLedger.endingNetWorth / factor,
+        rows: log.netWorthLedger.rows.map(r => ({
+          ...r,
+          value: r.value / factor
+        }))
+      } : null,
+      netWorthLedgerDebug: log.netWorthLedgerDebug ? {
+        startingNetWorth: log.netWorthLedgerDebug.startingNetWorth / factor,
+        savings: log.netWorthLedgerDebug.savings / factor,
+        investmentGrowth: log.netWorthLedgerDebug.investmentGrowth / factor,
+        lifeEventCosts: log.netWorthLedgerDebug.lifeEventCosts / factor,
+        newDebtAdded: log.netWorthLedgerDebug.newDebtAdded / factor,
+        debtPrincipalPaid: log.netWorthLedgerDebug.debtPrincipalPaid / factor,
+        interestPaid: log.netWorthLedgerDebug.interestPaid / factor,
+        endingNetWorth: log.netWorthLedgerDebug.endingNetWorth / factor,
+        reconciliationDifference: log.netWorthLedgerDebug.reconciliationDifference / factor
+      } : null,
       fiNumber: log.fiNumber / factor,
       fiNumberNoSS: log.fiNumberNoSS / factor,
       ssIncome: log.ssIncome / factor,

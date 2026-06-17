@@ -126,11 +126,13 @@ export function useFireSimulation() {
         baselineRow = displayedBaselineResults.data[displayedBaselineResults.data.length - 1];
       }
       
-      let netWorth = row.netWorth;
-      let baselineNetWorth = baselineRow ? baselineRow.netWorth : 0;
-      
       const assets = row.assets !== undefined ? row.assets : (row.portfolio + (row.homeValue || 0));
       const debt = row.debt !== undefined ? row.debt : ((row.debtBalance || 0) + (row.mortgageBalance || 0) + (row.cumulativeShortfall || 0));
+      const netWorth = assets - debt;
+
+      const baselineAssets = baselineRow ? (baselineRow.assets !== undefined ? baselineRow.assets : (baselineRow.portfolio + (baselineRow.homeValue || 0))) : 0;
+      const baselineDebt = baselineRow ? (baselineRow.debt !== undefined ? baselineRow.debt : ((baselineRow.debtBalance || 0) + (baselineRow.mortgageBalance || 0) + (baselineRow.cumulativeShortfall || 0))) : 0;
+      const baselineNetWorth = baselineRow ? (baselineAssets - baselineDebt) : 0;
 
       return {
         ...row,

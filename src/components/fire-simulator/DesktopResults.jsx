@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
 import { formatCurrency, formatYAxis } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
@@ -119,6 +120,79 @@ const generateLifeStory = (inp, results) => {
   );
 };
 
+function LedgerRow({ row, formatCurrency }) {
+  const [expanded, setExpanded] = useState(false);
+  const isPos = row.type === 'positive';
+  const sign = isPos ? '+' : '-';
+  const color = isPos ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <div 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          fontSize: '0.8rem', 
+          color: 'var(--text-secondary)',
+          cursor: row.expandable ? 'pointer' : 'default',
+          padding: '0.15rem 0',
+          borderRadius: '4px',
+          transition: 'background-color 0.2s'
+        }}
+        onClick={() => row.expandable && setExpanded(!expanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <span>{sign} {row.label}</span>
+          {row.expandable && (
+            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted, #a1a1aa)' }}>
+              {expanded ? '▲' : '▼'}
+            </span>
+          )}
+        </div>
+        <strong style={{ color }}>
+          {isPos ? '+' : '-'}{formatCurrency(Math.abs(row.value))}
+        </strong>
+      </div>
+      
+      {row.expandable && expanded && row.details && (
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.25rem', 
+          paddingLeft: '1rem', 
+          fontSize: '0.75rem', 
+          color: 'var(--text-secondary)',
+          opacity: 0.9,
+          borderLeft: '1px dashed var(--border-color)',
+          marginLeft: '0.25rem',
+          marginTop: '0.1rem',
+          marginBottom: '0.25rem'
+        }}>
+          {row.details.paidFromSavings !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Paid From Savings</span>
+              <span style={{ color: 'var(--text-primary)' }}>{formatCurrency(row.details.paidFromSavings)}</span>
+            </div>
+          )}
+          {row.details.financed !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Financed</span>
+              <span style={{ color: 'var(--text-primary)' }}>{formatCurrency(row.details.financed)}</span>
+            </div>
+          )}
+          {row.details.currentDebtBalance !== undefined && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Current Debt Balance</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{formatCurrency(row.details.currentDebtBalance)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DesktopResults({
   inputs,
   displayedResults,
@@ -134,6 +208,7 @@ export default function DesktopResults({
   setShowNetWorth,
   handleEditRoadmapEvent
 }) {
+  const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
   return (
     <>
       {/* Wealth Journey Graph (Full Width, directly below timeline) */}
@@ -380,12 +455,18 @@ export default function DesktopResults({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                   <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Net Worth</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
+                    <strong style={{ fontSize: '1.05rem', color: yearData.netWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
                   </div>
                   <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio Value</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.portfolio)}</strong>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio Value / Total Assets</span>
+                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.assets)}</strong>
                   </div>
+                  {yearData.debt > 0 && (
+                    <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Total Debt</span>
+                      <strong style={{ fontSize: '1.05rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.debt)}</strong>
+                    </div>
+                  )}
                   <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Income</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.income)}</strong>
@@ -394,12 +475,6 @@ export default function DesktopResults({
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Spending</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>
                       {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
-                    </strong>
-                  </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Taxes Paid</span>
-                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>
-                      {formatCurrency(yearData.taxes || 0)}
                     </strong>
                   </div>
                   <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
@@ -416,6 +491,85 @@ export default function DesktopResults({
                     </strong>
                   </div>
                 </div>
+
+                {/* Net Worth Ledger */}
+                {yearData.netWorthLedger && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', margin: 0 }}>
+                        📒 Net Worth Change This Year
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsLedgerExpanded(!isLedgerExpanded)}
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--primary)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0.15rem 0.4rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {isLedgerExpanded ? 'Hide details ▴' : 'Show details ▾'}
+                      </button>
+                    </div>
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '0.75rem 1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        <span>Starting Net Worth:</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {formatCurrency(yearData.netWorthLedger.startingNetWorth)}
+                        </strong>
+                      </div>
+                      
+                      {isLedgerExpanded && [
+                        { key: 'incomeInvesting', label: 'Income & Investing' },
+                        { key: 'lifeEvents', label: 'Life Events' },
+                        { key: 'debtActivity', label: 'Debt Activity' }
+                      ].map(sec => {
+                        const secRows = yearData.netWorthLedger.rows.filter(r => r.section === sec.key);
+                        if (secRows.length === 0) return null;
+                        return (
+                          <div key={sec.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.35rem' }}>
+                            <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-secondary)', opacity: 0.6 }}>
+                              {sec.label}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '0.4rem' }}>
+                              {secRows.map((row, rIdx) => (
+                                <LedgerRow key={rIdx} row={row} formatCurrency={formatCurrency} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-primary)',
+                        borderTop: isLedgerExpanded ? '1px solid var(--border-color)' : 'none',
+                        paddingTop: isLedgerExpanded ? '0.4rem' : '0',
+                        marginTop: '0.1rem',
+                        fontWeight: '700'
+                      }}>
+                        <span>Ending Net Worth:</span>
+                        <strong style={{ color: yearData.netWorthLedger.endingNetWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>
+                          {formatCurrency(yearData.netWorthLedger.endingNetWorth)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Cash Flow Details Breakdown */}
                 <div style={{ marginTop: '0.75rem' }}>

@@ -17,6 +17,7 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
       const renovationCost = asset.renovationCost !== undefined ? Number(asset.renovationCost) : 0;
 
       let totalCashNeeded = closingCosts + points + renovationCost;
+      state.housePurchaseTransactionCosts = (state.housePurchaseTransactionCosts || 0) + totalCashNeeded;
       if (isCash) {
         totalCashNeeded += p;
       } else {
@@ -130,6 +131,8 @@ export function handleHouseSale(age, currentAge, enabledEvents, purchasedPropert
 
     if (shouldSell) {
       const sellingCosts = prop.currentValue * (sellingCostRate / 100);
+      state.sellingCosts = (state.sellingCosts || 0) + sellingCosts;
+      state.mortgagePayoffFromSale = (state.mortgagePayoffFromSale || 0) + prop.mortgageBalance;
       const netProceeds = prop.currentValue - sellingCosts - prop.mortgageBalance;
       
       if (proceedsDestination === 'cash') {

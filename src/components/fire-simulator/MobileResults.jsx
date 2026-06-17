@@ -5,7 +5,9 @@ export default function MobileResults({
   chartData,
   activeResults,
   activeChart,
-  setActiveChart
+  setActiveChart,
+  selectedYear,
+  setSelectedYear
 }) {
   return (
     <div className="mobile-chart-card-wrapper" style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
@@ -26,6 +28,11 @@ export default function MobileResults({
           <LineChart
             data={chartData}
             margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+            onClick={(data) => {
+              if (data && data.activeLabel && setSelectedYear) {
+                setSelectedYear(Number(data.activeLabel));
+              }
+            }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
             <XAxis
@@ -146,6 +153,16 @@ export default function MobileResults({
                   dot={false}
                 />
               </>
+            )}
+
+            {selectedYear !== null && (
+              <ReferenceLine
+                x={selectedYear}
+                stroke="var(--primary)"
+                strokeDasharray="3 3"
+                strokeWidth={1.5}
+                label={{ value: `Age ${selectedYear}`, fill: 'var(--primary)', fontSize: 8, position: 'top' }}
+              />
             )}
           </LineChart>
         </ResponsiveContainer>

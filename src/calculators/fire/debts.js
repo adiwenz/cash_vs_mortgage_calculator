@@ -382,11 +382,13 @@ export function initializeActiveLoans(profile, currentConditions, currentAge) {
 export function processYearlyDebtPayments(age, activeLoans, dynamicMilestones) {
   let annualMinPayments = 0;
   let annualExtraPayments = 0;
+  let annualInterestPaid = 0;
 
   activeLoans.forEach(loan => {
     if (loan.balance > 0) {
       const interest = loan.balance * loan.interestRate;
       loan.totalInterestPaid = (loan.totalInterestPaid || 0) + interest;
+      annualInterestPaid += interest;
 
       let minPayment = loan.payment;
       let extraPayment = 0;
@@ -434,6 +436,7 @@ export function processYearlyDebtPayments(age, activeLoans, dynamicMilestones) {
 
   return {
     annualMinPayments,
-    annualExtraPayments
+    annualExtraPayments,
+    annualInterestPaid
   };
 }

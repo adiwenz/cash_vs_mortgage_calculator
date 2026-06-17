@@ -84,7 +84,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(screen.getByText('Compare projections and view progress charts')).toBeDefined();
 
     // Switch to Details Tab
-    const detailsBtn = screen.getByRole('button', { name: /Details/i });
+    const detailsBtn = screen.getByRole('button', { name: /^Details$/i });
     fireEvent.click(detailsBtn);
     expect(detailsBtn.className).toContain('active');
     expect(screen.getByText(/Starting Account Balances/i)).toBeDefined();
