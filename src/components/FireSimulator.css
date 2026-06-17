@@ -420,13 +420,13 @@
   align-items: center;
   pointer-events: auto;
   cursor: pointer;
-  z-index: 5;
+  z-index: 25;
   transition: transform 0.2s ease;
 }
 
 .milestone-circle-wrapper:hover {
   transform: translateX(-50%) scale(1.08);
-  z-index: 10;
+  z-index: 35;
 }
 
 .milestone-glow-circle {
@@ -529,13 +529,13 @@
   align-items: center;
   pointer-events: auto;
   cursor: pointer;
-  z-index: 4;
+  z-index: 20;
   transition: transform 0.2s ease;
 }
 
 .financial-milestone-wrapper:hover {
   transform: translateX(-50%) scale(1.08);
-  z-index: 10;
+  z-index: 30;
 }
 
 .financial-milestone-dot {
@@ -631,7 +631,7 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  z-index: 100;
+  z-index: 1500;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
   transition: all 0.2s ease;
@@ -1320,7 +1320,7 @@
   height: 100vh;
   background-color: rgba(10, 10, 18, 0.75);
   backdrop-filter: blur(8px);
-  z-index: 1200;
+  z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -3041,6 +3041,231 @@
     margin-top: 0;
     margin-left: 0.5rem;
   }
+}
+
+/* Budget timeline lane segment inside the roadmap grid */
+.budget-phases-track {
+  height: 36px;
+}
+
+/* Color system variables for Budget Phases flat design */
+.theme-working-standard {
+  --theme-bg: linear-gradient(135deg, rgba(79, 70, 229, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%);
+  --theme-border: rgba(129, 140, 248, 0.35);
+  --theme-border-selected: #818cf8;
+  --theme-glow: rgba(99, 102, 241, 0.4);
+}
+.theme-working-student-loan {
+  --theme-bg: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%);
+  --theme-border: rgba(192, 132, 252, 0.35);
+  --theme-border-selected: #c084fc;
+  --theme-glow: rgba(168, 85, 247, 0.4);
+}
+.theme-working-childcare {
+  --theme-bg: linear-gradient(135deg, rgba(219, 39, 119, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%);
+  --theme-border: rgba(244, 114, 182, 0.35);
+  --theme-border-selected: #f472b6;
+  --theme-glow: rgba(236, 72, 153, 0.4);
+}
+.theme-working-childcare-debt {
+  --theme-bg: linear-gradient(135deg, rgba(244, 63, 94, 0.25) 0%, rgba(251, 113, 133, 0.25) 100%);
+  --theme-border: rgba(251, 113, 133, 0.35);
+  --theme-border-selected: #fda4af;
+  --theme-glow: rgba(251, 113, 133, 0.4);
+}
+.theme-working-house {
+  --theme-bg: linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 165, 233, 0.25) 100%);
+  --theme-border: rgba(56, 189, 248, 0.35);
+  --theme-border-selected: #38bdf8;
+  --theme-glow: rgba(14, 165, 233, 0.4);
+}
+.theme-retired {
+  --theme-bg: linear-gradient(135deg, rgba(217, 119, 6, 0.25) 0%, rgba(245, 158, 11, 0.25) 100%);
+  --theme-border: rgba(251, 191, 36, 0.35);
+  --theme-border-selected: #fbbf24;
+  --theme-glow: rgba(245, 158, 11, 0.4);
+}
+.theme-retired-ss {
+  --theme-bg: linear-gradient(135deg, rgba(5, 150, 105, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%);
+  --theme-border: rgba(52, 211, 153, 0.35);
+  --theme-border-selected: #34d399;
+  --theme-glow: rgba(16, 185, 129, 0.4);
+}
+
+.budget-timeline-lane-segment {
+  height: 30px;
+  top: 3px;
+  border-radius: 12px; /* Rounded segments: 12-16px */
+  border: 1px solid var(--theme-border); /* Thin border */
+  background: var(--theme-bg); /* Subtle gradient background */
+  box-shadow: none; /* Flat design - no drop shadows */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  color: #ffffff;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease, border-color 200ms ease;
+  user-select: none;
+  min-width: 0 !important; /* Disable min-width inheritance to prevent visual overlap on short phases */
+}
+
+.budget-timeline-lane-segment:hover,
+.budget-timeline-lane-segment:focus,
+.budget-timeline-lane-segment:focus-within {
+  filter: brightness(1.15); /* Slight brightness increase */
+  box-shadow: none; /* No drop shadows */
+  z-index: 1200 !important; /* Raise z-index on active segments to draw tooltips above event layer */
+}
+
+.budget-phases-timeline-row:hover,
+.budget-phases-timeline-row:focus-within {
+  z-index: 1100 !important; /* Raise row stacking context when active to overlay timeline siblings */
+}
+
+.budget-timeline-lane-segment.selected {
+  border: 1.5px solid var(--theme-border-selected) !important; /* Thin border */
+  box-shadow: 0 0 10px var(--theme-glow) !important; /* Thin glowing outline, subtle glow only */
+  z-index: 10;
+  filter: brightness(1.25); /* Slightly brighter gradient */
+}
+
+.budget-timeline-lane-segment.selected::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  bottom: auto; /* Override bottom from .budget-segment.selected::after */
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 5px 5px 5px; /* point up towards the segment */
+  border-style: solid;
+  border-color: transparent transparent var(--theme-border-selected) transparent;
+  display: block;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 15;
+  margin-top: 2px;
+}
+
+.budget-timeline-lane-segment.current-age-phase {
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+}
+
+.budget-timeline-lane-segment.selected.current-age-phase {
+  border: 1.5px solid var(--theme-border-selected) !important;
+}
+
+/* Custom Tooltip Hover & Focus Rules */
+.budget-timeline-lane-segment:hover .timeline-tooltip,
+.budget-timeline-lane-segment:focus .timeline-tooltip,
+.budget-timeline-lane-segment:focus-within .timeline-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.budget-timeline-lane-segment:hover .timeline-tooltip.align-left,
+.budget-timeline-lane-segment:focus .timeline-tooltip.align-left,
+.budget-timeline-lane-segment:focus-within .timeline-tooltip.align-left {
+  transform: translateY(0);
+}
+
+.budget-timeline-lane-segment:hover .timeline-tooltip.align-right,
+.budget-timeline-lane-segment:focus .timeline-tooltip.align-right,
+.budget-timeline-lane-segment:focus-within .timeline-tooltip.align-right {
+  transform: translateY(0);
+}
+
+/* Modal Tabs container and buttons */
+.budget-modal-tabs {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.5rem 0.5rem 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  scrollbar-width: thin;
+}
+
+.budget-modal-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.budget-modal-tabs::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.budget-modal-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.budget-modal-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 120px;
+  text-align: left;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.budget-modal-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.budget-modal-tab.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--primary);
+  color: var(--primary-light);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+}
+
+.budget-modal-tab-age {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.budget-modal-tab-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+/* Active Event Chips section inside the modal */
+.active-events-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0 0.25rem;
+}
+
+.active-event-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
 }
 
 

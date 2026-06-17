@@ -106,7 +106,6 @@ export function getActiveEventsForInterval(startAge, endAge, enabledEvents, prof
 
 function generateIntervalLabel(startAge, endAge, activeEventsList, enabledEvents, profile, hasHadDebts) {
   const isRetired = startAge >= profile.targetRetirementAge;
-  const isMarried = enabledEvents.some(e => e.type === 'marriage' && startAge >= Number(e.age));
   const childCount = getActiveChildrenCountAtAge(startAge, enabledEvents);
   const activeDebts = getActiveDebtsForAge(profile, enabledEvents, startAge);
 
@@ -117,18 +116,9 @@ function generateIntervalLabel(startAge, endAge, activeEventsList, enabledEvents
       parts.push("Social Security");
     }
   } else {
-    if (isMarried) {
-      if (childCount > 0) {
-        parts.push("Married");
-        parts.push("Childcare");
-      } else {
-        parts.push("Working");
-      }
-    } else {
-      parts.push("Working");
-      if (childCount > 0) {
-        parts.push("Childcare");
-      }
+    parts.push("Working");
+    if (childCount > 0) {
+      parts.push("Childcare");
     }
 
     if (activeDebts.length > 0) {
@@ -168,7 +158,7 @@ function generateIntervalLabel(startAge, endAge, activeEventsList, enabledEvents
 }
 
 function getRepresentativeIcon(type, activeEventsList, enabledEvents) {
-  if (type === 'retire') return '🌴';
+  if (type === 'retire') return '🏖️';
   if (activeEventsList.some(id => {
     const e = enabledEvents.find(ev => ev.id === id);
     return e?.type === 'haveChild';
@@ -178,10 +168,11 @@ function getRepresentativeIcon(type, activeEventsList, enabledEvents) {
     return e?.type === 'borrowing' || e?.type === 'debtItem';
   })) {
     const debtEv = enabledEvents.find(ev => activeEventsList.includes(ev.id) && (ev.type === 'borrowing' || ev.type === 'debtItem'));
-    if (debtEv?.borrowingType === 'studentLoan') return '🎓';
-    if (debtEv?.borrowingType === 'creditCard') return '💳';
-    if (debtEv?.borrowingType === 'carLoan') return '🚗';
-    if (debtEv?.borrowingType === 'mortgage') return '🏠';
+    const bType = debtEv?.borrowingType || debtEv?.type;
+    if (bType === 'studentLoan') return '🎓';
+    if (bType === 'creditCard') return '💳';
+    if (bType === 'carLoan') return '🚗';
+    if (bType === 'mortgage') return '🏡';
     return '💸';
   }
   if (type === 'marriage') return '💍';
@@ -825,7 +816,19 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     const label = generateIntervalLabel(start, end, activeEventsList, enabledEvents, profile, hasHadDebts);
     let icon = getRepresentativeIcon(type, activeEventsList, enabledEvents);
     if (isReceivingSS) {
-      icon = '🇺🇸';
+      icon = '💰';
+    } else if (start >= targetRetirementAge) {
+      icon = '🏖️';
+    } else if (childCount > 0) {
+      icon = '👶';
+    } else if (activeDebts.length > 0) {
+      const studentLoan = activeDebts.find(d => d.type === 'studentLoan');
+      const mortgage = activeDebts.find(d => d.type === 'mortgage');
+      if (studentLoan) {
+        icon = '🎓';
+      } else if (mortgage) {
+        icon = '🏡';
+      }
     }
 
     const effectsApplied = ["Base/default budget"];
@@ -959,32 +962,45 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
     explanations.push({
       text: "Starting phase for your financial timeline.",
       icon: "💼",
-      type: "info"
+      type: "info",
+      impacts: []
     });
     
     if (activePhaseObj.childCount > 0) {
       explanations.push({
-        text: `Starting with childcare active for ${activePhaseObj.childCount} child${activePhaseObj.childCount === 1 ? '' : 'ren'}.`,
+        text: "This phase begins when childcare expenses start.",
         icon: "👶",
-        type: "childcare"
+        type: "childcare",
+        impacts: [
+          `+ $${(activePhaseObj.childCount * 15000).toLocaleString()}/year childcare`,
+          `+ $${(activePhaseObj.childCount * 1250).toLocaleString()}/month added to Needs`
+        ]
       });
     }
     
     if (activePhaseObj.activeDebts && activePhaseObj.activeDebts.length > 0) {
       activePhaseObj.activeDebts.forEach(debt => {
+        const typeLabel = debt.type === 'studentLoan' ? 'student loan' : debt.name.toLowerCase();
         explanations.push({
-          text: `Starting with active debt payment: ${debt.name} (${fmt(debt.monthlyPayment)}/mo).`,
+          text: `This phase begins when ${typeLabel} payments start.`,
           icon: debt.icon || "💳",
-          type: "debt"
+          type: "debt",
+          impacts: [
+            `+ ${fmt(debt.monthlyPayment)}/month debt payment`
+          ]
         });
       });
     }
     
     if (activePhaseObj.isMarried) {
       explanations.push({
-        text: "Starting timeline as married with combined income.",
+        text: "This phase begins when you get married.",
         icon: "💍",
-        type: "marriage"
+        type: "marriage",
+        impacts: [
+          "Employment income combined",
+          "Household savings merged"
+        ]
       });
     }
     
@@ -995,44 +1011,63 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
   
   if (activePhaseObj.type === 'retire' && prior.type !== 'retire') {
     explanations.push({
-      text: "Reaching retirement! Active career income ends, and you transition to retirement spending rules.",
+      text: "This phase begins when retirement starts.",
       icon: "🌴",
       type: "retirement",
-      changeType: "neutral"
+      changeType: "neutral",
+      impacts: [
+        "- Employment income removed",
+        "+ Retirement withdrawals begin"
+      ]
     });
   }
   
   if (activePhaseObj.childCount !== prior.childCount) {
     if (activePhaseObj.childCount > prior.childCount) {
+      const diff = activePhaseObj.childCount - prior.childCount;
       explanations.push({
-        text: `Child count increased to ${activePhaseObj.childCount}, adding childcare costs.`,
+        text: "This phase begins when childcare expenses start.",
         icon: "👶",
         type: "childcare",
-        changeType: "negative"
+        changeType: "negative",
+        impacts: [
+          `+ $${(diff * 15000).toLocaleString()}/year childcare`,
+          `+ $${(diff * 1250).toLocaleString()}/month added to Needs`
+        ]
       });
     } else {
+      const diff = prior.childCount - activePhaseObj.childCount;
       explanations.push({
-        text: `Child count decreased to ${activePhaseObj.childCount}, reducing childcare costs.`,
+        text: "This phase begins when childcare expenses end.",
         icon: "🎉",
         type: "childcare",
-        changeType: "positive"
+        changeType: "positive",
+        impacts: [
+          `- $${(diff * 15000).toLocaleString()}/year childcare`,
+          `- $${(diff * 1250).toLocaleString()}/month removed from Needs`
+        ]
       });
     }
   }
   
   if (activePhaseObj.isMarried && !prior.isMarried) {
     explanations.push({
-      text: "Got married! Combined budget inherits spouse's income and savings allocations.",
+      text: "This phase begins when you get married.",
       icon: "💍",
       type: "marriage",
-      changeType: "positive"
+      changeType: "positive",
+      impacts: [
+        "Employment income combined",
+        "Household savings merged"
+      ]
     });
   } else if (!activePhaseObj.isMarried && prior.isMarried) {
     explanations.push({
       text: "No longer married phase.",
       icon: "💔",
       type: "marriage",
-      changeType: "negative"
+      changeType: "negative",
+      impacts: []
     });
   }
   
@@ -1044,32 +1079,44 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
         text: `Income increased from ${fmt(priorSalary)} to ${fmt(activeSalary)}/mo.`,
         icon: "📈",
         type: "income",
-        changeType: "positive"
+        changeType: "positive",
+        impacts: [
+          `+ ${fmt(activeSalary - priorSalary)}/mo salary increase`
+        ]
       });
     } else if (activeSalary < priorSalary && activePhaseObj.type !== 'retire') {
       explanations.push({
         text: `Income decreased from ${fmt(priorSalary)} to ${fmt(activeSalary)}/mo (e.g. sabbatical or part-time work).`,
         icon: "📉",
         type: "income",
-        changeType: "negative"
+        changeType: "negative",
+        impacts: [
+          `- ${fmt(priorSalary - activeSalary)}/mo salary reduction`
+        ]
       });
     }
   }
   
   if (activePhaseObj.ssMonthlyIncome > 0 && prior.ssMonthlyIncome === 0) {
     explanations.push({
-      text: `Claimed Social Security: adding ${fmt(activePhaseObj.ssMonthlyIncome)}/mo to your income.`,
+      text: "Claimed Social Security.",
       icon: "💰",
       type: "income",
-      changeType: "positive"
+      changeType: "positive",
+      impacts: [
+        `+ ${fmt(activePhaseObj.ssMonthlyIncome)}/mo Social Security benefit`
+      ]
     });
   }
   if (activePhaseObj.partnerSSMonthlyIncome > 0 && prior.partnerSSMonthlyIncome === 0) {
     explanations.push({
-      text: `Partner claimed Social Security: adding ${fmt(activePhaseObj.partnerSSMonthlyIncome)}/mo to combined income.`,
+      text: "Partner claimed Social Security.",
       icon: "💰",
       type: "income",
-      changeType: "positive"
+      changeType: "positive",
+      impacts: [
+        `+ ${fmt(activePhaseObj.partnerSSMonthlyIncome)}/mo partner benefit`
+      ]
     });
   }
   
@@ -1079,7 +1126,10 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
       text: `Passive/Retirement income started, adding ${fmt(diff)}/mo.`,
       icon: "🏦",
       type: "income",
-      changeType: "positive"
+      changeType: "positive",
+      impacts: [
+        `+ ${fmt(diff)}/mo passive income`
+      ]
     });
   }
   
@@ -1090,20 +1140,27 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
   const removedDebts = (prior.activeDebts || []).filter(d => !activeDebtIds.includes(d.id));
   
   addedDebts.forEach(debt => {
+    const typeLabel = debt.type === 'studentLoan' ? 'student loan' : debt.name.toLowerCase();
     explanations.push({
-      text: `New debt obligations active: ${debt.name} (+${fmt(debt.monthlyPayment)}/mo).`,
+      text: `This phase begins when ${typeLabel} payments start.`,
       icon: debt.icon || "💸",
       type: "debt",
-      changeType: "negative"
+      changeType: "negative",
+      impacts: [
+        `+ ${fmt(debt.monthlyPayment)}/month debt payment`
+      ]
     });
   });
   
   removedDebts.forEach(debt => {
     explanations.push({
-      text: `Debt payoff complete for ${debt.name} (saving ${fmt(debt.monthlyPayment)}/mo).`,
+      text: `Debt payoff complete for ${debt.name}.`,
       icon: "🎉",
       type: "debt",
-      changeType: "positive"
+      changeType: "positive",
+      impacts: [
+        `- ${fmt(debt.monthlyPayment)}/month debt payment removed`
+      ]
     });
   });
   
@@ -1112,7 +1169,8 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
       text: `Transitioned to a new phase boundary at age ${activePhaseObj.startAge}.`,
       icon: "ℹ️",
       type: "info",
-      changeType: "neutral"
+      changeType: "neutral",
+      impacts: []
     });
   }
   

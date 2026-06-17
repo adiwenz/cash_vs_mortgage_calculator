@@ -24,7 +24,7 @@ try {
   // Verify retirement phase is standard
   const retirementPhase1 = phases1.find(p => p.startAge >= 65);
   expect(retirementPhase1.name).toBe('Retirement');
-  expect(retirementPhase1.icon).toBe('🌴');
+  expect(retirementPhase1.icon).toBe('🏖️');
   console.log('✅ Scenario 1 Passed.');
 
   // Test 2: Social Security Enabled at claim age 67
@@ -41,12 +41,12 @@ try {
   const retirementPreSS = phases2.find(p => p.startAge === 65);
   expect(retirementPreSS.endAge).toBe(67);
   expect(retirementPreSS.name).toBe('Retirement');
-  expect(retirementPreSS.icon).toBe('🌴');
+  expect(retirementPreSS.icon).toBe('🏖️');
 
   const retirementPostSS = phases2.find(p => p.startAge === 67);
   expect(retirementPostSS.endAge).toBe(85);
   expect(retirementPostSS.name).toBe('Receiving SS');
-  expect(retirementPostSS.icon).toBe('🇺🇸');
+  expect(retirementPostSS.icon).toBe('💰');
   console.log('✅ Scenario 2 Passed.');
 
   // Test 3: Early Claiming SS (e.g. claim at 62, retire at 65)
@@ -68,12 +68,12 @@ try {
   const workSSPhase = phases3.find(p => p.startAge === 62);
   expect(workSSPhase.endAge).toBe(65);
   expect(workSSPhase.name).toBe('Working (Receiving SS)');
-  expect(workSSPhase.icon).toBe('🇺🇸');
+  expect(workSSPhase.icon).toBe('💰');
 
   // Phase [65, 85] should be retirement receiving SS.
   const retireSSPhase = phases3.find(p => p.startAge === 65);
   expect(retireSSPhase.name).toBe('Receiving SS');
-  expect(retireSSPhase.icon).toBe('🇺🇸');
+  expect(retireSSPhase.icon).toBe('💰');
   console.log('✅ Scenario 3 Passed.');
 
   // Test 4: Marriage Phase receiving SS
@@ -98,7 +98,7 @@ try {
   // Phase starting at 66 should be marriage phase under SS
   const marriageSSPhase = phases4.find(p => p.startAge === 66);
   expect(marriageSSPhase.name).toBe('Marriage Phase (Receiving SS)');
-  expect(marriageSSPhase.icon).toBe('🇺🇸');
+  expect(marriageSSPhase.icon).toBe('💰');
   console.log('✅ Scenario 4 Passed.');
 
   console.log('🎉 ALL SOCIAL SECURITY BUDGET PHASES TESTS PASSED SUCCESSFULLY.');

@@ -87,7 +87,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(budgetBtn);
     
     // Assert Modal is Open and renders correct title
-    expect(screen.getByText(/Work Phase Budget/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
     // Expand the Savings section by clicking the card
     const savingsCard = screen.getAllByText(/Save & Invest/i)[0];
@@ -120,7 +120,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Assert modal is closed
     await waitFor(() => {
-      expect(screen.queryByText(/Work Phase Budget/i)).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
     });
   });
 
@@ -285,7 +285,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(updateBudgetBtn);
     
     // Verify Budget modal opens in married mode
-    expect(screen.getByText(/Work Phase Budget/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
     expect(screen.queryAllByText(/\$11,667/).length > 0 || screen.queryAllByText(/\$10,937/).length > 0 || screen.queryAllByText(/\$10,895/).length > 0 || screen.queryAllByText(/\$10,322/).length > 0 || screen.queryAllByText(/\$10,398/).length > 0).toBe(true); // Combined take-home income
     
     // Expand the Needs section to inspect Housing (Rent/Mortgage)
@@ -381,15 +381,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(segments[3].textContent).toContain('Working');
     expect(segments[3].textContent).toContain('58–65');
 
-    // Click on 1 Child phase (0)
+    // Click on 1 Child phase (0) which opens the budget modal directly
     fireEvent.click(segments[0]);
-    
-    // Open edit modal via Inspector drawer button
-    const editBtn = screen.getByRole('button', { name: /Edit Phase Budget/i });
-    fireEvent.click(editBtn);
 
     // Verify budget builder is open
-    expect(screen.getByText(/Childcare Phase Budget/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
     // Expand advanced settings to expose input
     const advancedToggle1 = screen.getByText(/Show Advanced Details/i);
@@ -401,10 +397,8 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const saveBtn1 = document.querySelector('.budget-modal-card .btn-primary');
     fireEvent.click(saveBtn1);
 
-    // Click on 2 Kids phase (1)
+    // Click on 2 Kids phase (1) which opens the budget modal directly
     fireEvent.click(segments[1]);
-    const editBtn2 = screen.getByRole('button', { name: /Edit Phase Budget/i });
-    fireEvent.click(editBtn2);
 
     // Expand advanced settings to expose input
     const advancedToggle2 = screen.getByText(/Show Advanced Details/i);
@@ -497,7 +491,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(setBudgetBtn);
 
     // Verify budget builder is open
-    expect(screen.getByRole('heading', { name: /Phase Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
     // Expand the Savings section
     const savingsHeader = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
@@ -644,79 +638,105 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
   });
 
-  test('9. Budget Phases UI Refinement - Segmented Timeline and Selected Phase Inspector', async () => {
+  test('9. Budget Phases UI Refinement - Segmented Timeline and Modal Interaction', async () => {
     navigateToStep2();
 
-    // 1. Roadmap remains visible above budget phases
-    const timelineGrid = document.querySelector('.timeline-grid');
-    expect(timelineGrid).not.toBeNull();
-    
-    // Milestone nodes should be visible
-    const milestoneCircles = document.querySelectorAll('.milestone-circle-wrapper');
-    expect(milestoneCircles.length).toBeGreaterThan(0);
+    // 1. Budget Phases row rendering inside the roadmap grid under Layer 3
+    const budgetRow = document.querySelector('.budget-phases-timeline-row');
+    expect(budgetRow).not.toBeNull();
 
-    // 2. Budget phases appear as a dedicated segmented row
-    const timelineContainer = document.querySelector('.budget-timeline-segmented-container');
-    expect(timelineContainer).not.toBeNull();
-    const segments = document.querySelectorAll('.budget-segment');
+    const segments = budgetRow.querySelectorAll('.budget-segment');
     expect(segments.length).toBeGreaterThan(0);
 
-    // 3. Default current-age phase selection
-    const selectedSegment = document.querySelector('.budget-segment.selected');
-    expect(selectedSegment).not.toBeNull();
-    expect(selectedSegment.textContent).toContain('35'); // Default current age is 35
+    // 2. Default current-age phase segment should be highlighted
+    const activeSegment = budgetRow.querySelector('.budget-segment.current-age-phase');
+    expect(activeSegment).not.toBeNull();
 
-    // 4. Clicking a segment changes selection and updates inline inspector (not in side drawer)
-    const otherSegment = Array.from(segments).find(s => !s.classList.contains('selected'));
-    expect(otherSegment).toBeDefined();
-    fireEvent.click(otherSegment);
-    expect(otherSegment.classList.contains('selected')).toBe(true);
+    // 3. Clicking a budget segment opens the Budget Modal
+    fireEvent.click(segments[0]);
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
-    // 5. Selected Phase Inspector rendering inline details
-    const inspector = document.querySelector('.selected-phase-inspector');
-    expect(inspector).not.toBeNull();
-    
-    // Header
-    const inspectorHeader = document.querySelector('.inspector-header');
-    expect(inspectorHeader).not.toBeNull();
-    
-    // Why this budget exists
-    expect(screen.getByText(/Why this budget exists/i)).toBeDefined();
-    
-    // Budget equation / summary
-    const budgetEquation = document.querySelector('.budget-equation');
-    expect(budgetEquation).not.toBeNull();
-    expect(budgetEquation.textContent).toContain('Income');
-    expect(budgetEquation.textContent).toContain('Needs');
-    expect(budgetEquation.textContent).toContain('Wants');
-    expect(budgetEquation.textContent).toContain('Save & Invest');
+    // 4. Modal switches active phase budgets when clicking tabs
+    const modalTabs = document.querySelectorAll('.budget-modal-tab');
+    expect(modalTabs.length).toBeGreaterThan(0);
 
-    // Savings Allocation
-    expect(screen.getByText(/Savings Allocation/i)).toBeDefined();
-
-    // Impact
-    expect(screen.getByText(/Impact This Phase/i)).toBeDefined();
-
-    // Recommendations
-    expect(screen.getByText(/Recommendations/i)).toBeDefined();
-
-    // What happens next
-    expect(screen.getByText(/What happens next\?/i)).toBeDefined();
-
-    // 6. Edit budget action opening modal
-    const editBtn = screen.getByRole('button', { name: /Edit Phase Budget/i });
-    expect(editBtn).toBeDefined();
-    fireEvent.click(editBtn);
-
-    // Verify budget modal opens
-    expect(screen.getByRole('heading', { name: /Phase Budget/i })).toBeDefined();
+    // Click the last tab in the modal
+    const lastTab = modalTabs[modalTabs.length - 1];
+    fireEvent.click(lastTab);
+    expect(lastTab.classList.contains('active')).toBe(true);
 
     // Close the modal
     const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
     if (cancelBtn) fireEvent.click(cancelBtn);
 
-    // 7. Mobile layout features: Timeline horizontal scroll
-    const segmentedTimeline = document.querySelector('.budget-timeline-segmented');
-    expect(segmentedTimeline).not.toBeNull();
+    // 5. Set Budget button opens current-age budget phase by default
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+
+    // Close the modal again
+    const cancelBtn2 = document.querySelector('.budget-modal-card .btn-secondary');
+    if (cancelBtn2) fireEvent.click(cancelBtn2);
+
+    // 6. Event node clicks open event editors, not the budget modal
+    const milestone = document.querySelector('.milestone-circle-wrapper');
+    if (milestone) {
+      fireEvent.click(milestone);
+      // It should open an event editor modal or not open the budget modal
+      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
+    }
+  });
+
+  test('10. Budget Phases Responsive Rendering and Tooltips', () => {
+    navigateToStep2();
+
+    const budgetRow = document.querySelector('.budget-phases-timeline-row');
+    expect(budgetRow).not.toBeNull();
+
+    const segments = budgetRow.querySelectorAll('.budget-timeline-lane-segment');
+    expect(segments.length).toBeGreaterThan(0);
+
+    segments.forEach((segment) => {
+      // 1. Accessibility properties check
+      expect(segment.getAttribute('tabIndex')).toBe('0');
+      expect(segment.getAttribute('aria-label')).toMatch(/Age \d+–\d+/);
+
+      // 2. Custom tooltip structure check
+      const tooltip = segment.querySelector('.timeline-tooltip');
+      expect(tooltip).not.toBeNull();
+      expect(tooltip.querySelector('div').textContent).toBeTruthy();
+      expect(tooltip.textContent).toContain('Monthly Income:');
+      expect(tooltip.textContent).toContain('Needs:');
+      expect(tooltip.textContent).toContain('Wants:');
+      expect(tooltip.textContent).toContain('Save & Invest:');
+
+      // 3. Width-based rendering validation
+      const widthStyle = segment.style.width;
+      const widthPct = parseFloat(widthStyle);
+      const trackWidth = 800; // Mocked default
+      const widthPx = (widthPct / 100) * trackWidth;
+
+      if (widthPx > 180) {
+        // Large segment: icon, full label, and age range should be displayed
+        const text = segment.textContent;
+        expect(text).toContain('Age');
+      } else if (widthPx >= 100) {
+        // Medium segment: icon, short phase name, no age range
+        const labelContainer = segment.querySelector('.segment-label');
+        if (labelContainer) {
+          expect(labelContainer.textContent).not.toContain('Age');
+        }
+      } else if (widthPx >= 50) {
+        // Small segment: icon only, hide label, hide age range
+        const labelContainer = segment.querySelector('.segment-label');
+        if (labelContainer) {
+          expect(labelContainer.textContent).not.toMatch(/[a-zA-Z0-9]/);
+        }
+      } else {
+        // Tiny segment: never render text inside the segment
+        const labelContainer = segment.querySelector('.segment-label');
+        expect(labelContainer).toBeNull();
+      }
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -257,6 +257,19 @@ export default function LifePlanScreen({
   dragOccurredRef
 }) {
   const [selectedPhaseId, setSelectedPhaseId] = useState(null);
+  const trackRef = useRef(null);
+  const [trackWidth, setTrackWidth] = useState(800);
+
+  useEffect(() => {
+    if (!trackRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setTrackWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(trackRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const normalizedPhases = useMemo(() => {
     return getNormalizedPhases(inputs);
@@ -778,7 +791,7 @@ export default function LifePlanScreen({
                             fontSize: '0.78rem',
                             whiteSpace: 'nowrap'
                           }}
-                          onClick={handleSetBudgetClick}
+                          onClick={() => handleSetBudgetClick()}
                         >
                           Set Budget
                         </button>
@@ -1276,7 +1289,199 @@ export default function LifePlanScreen({
                           });
                         })()}
       
-                        {/* Budget Timeline lane removed from the main roadmap grid */}
+                        {/* Layer 3: LIFE PHASES */}
+                        {(() => {
+                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                          if (totalYears <= 0) return null;
+                          const retAge = inputs.targetRetirementAge || inputs.lifeExpectancy;
+                          const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
+      
+                          return (
+                            <div className="timeline-row">
+                              <div className="timeline-row-label">Life Phases</div>
+                              <div className="timeline-row-content life-phase-track">
+                                <div className="timeline-track-inner">
+                                  {workPct > 0 && (
+                                    <div
+                                      className="life-phase-span work-save"
+                                      style={{
+                                        left: '0%',
+                                        width: `${workPct}%`
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+                                        <span style={{ fontWeight: 700 }}>💼 Work & Save</span>
+                                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {inputs.currentAge}–{retAge}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {workPct < 100 && (
+                                    <div
+                                      className="life-phase-span retirement"
+                                      style={{
+                                        left: `${workPct}%`,
+                                        width: `${100 - workPct}%`
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+                                        <span style={{ fontWeight: 700 }}>🏖️ Retirement</span>
+                                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {retAge}–{inputs.lifeExpectancy}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+      
+                        {/* Layer 4: BUDGET PHASES */}
+                        {(() => {
+                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                          if (totalYears <= 0) return null;
+
+                          const getBudgetPhaseThemeClass = (p) => {
+                            const label = p.label || '';
+                            const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
+                            const hasSS = p.activeEvents?.includes('socialSecurity') || label.includes('Social Security') || p.icon === '🏖️💰' || p.icon === '💰';
+                            
+                            if (isRetired) {
+                              if (hasSS) return 'theme-retired-ss'; // Emerald / Teal
+                              return 'theme-retired'; // Amber / Gold
+                            }
+                            
+                            // Working phases
+                            const lowerLabel = label.toLowerCase();
+                            const hasChildcare = lowerLabel.includes('childcare');
+                            const hasStudentLoan = lowerLabel.includes('student loan') || p.activeDebts?.some(d => d.type === 'studentLoan');
+                            const hasHouse = lowerLabel.includes('house') || lowerLabel.includes('mortgage') || p.activeDebts?.some(d => d.type === 'mortgage');
+                            const hasOtherDebt = p.activeDebts && p.activeDebts.length > 0;
+                            
+                            if (hasChildcare) {
+                              if (hasOtherDebt) return 'theme-working-childcare-debt'; // Coral / Rose
+                              return 'theme-working-childcare'; // Magenta / Pink-Purple
+                            }
+                            if (hasStudentLoan) return 'theme-working-student-loan'; // Purple
+                            if (hasHouse) return 'theme-working-house'; // Cyan / Blue
+                            
+                            return 'theme-working-standard'; // Indigo / Blue
+                          };
+      
+                          return (
+                            <div className="timeline-row budget-phases-timeline-row">
+                              <div className="timeline-row-label">📊 Budget Phases</div>
+                              <div className="timeline-row-content budget-phases-track">
+                                <div ref={trackRef} className="timeline-track-inner" style={{ display: 'flex', height: '100%', position: 'relative' }}>
+                                  {normalizedPhases.map((p) => {
+                                    const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
+                                    const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
+                                    const widthPct = endPct - startPct;
+                                    if (widthPct <= 0) return null;
+ 
+                                    const isCurrentAge = inputs.currentAge >= p.startAge && inputs.currentAge < p.endAge;
+                                    const widthPx = (widthPct / 100) * trackWidth;
+ 
+                                    const phaseNeedsTotal = (Number(p.expenses?.housing) || 0) +
+                                                           (Number(p.expenses?.utilities) || 0) +
+                                                           (Number(p.expenses?.food) || 0) +
+                                                           (Number(p.expenses?.transportation) || 0) +
+                                                           (Number(p.expenses?.healthcare) || 0) +
+                                                           (p.isMarried ? (Number(p.expenses?.debt) || 0) : 0) +
+                                                           (Number(p.expenses?.childcare) || 0) +
+                                                           (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.[`debt_${d.id}`]) || d.monthlyPayment || 0), 0);
+ 
+                                    const phaseWantsTotal = (Number(p.expenses?.leisure) || 0) +
+                                                           (Number(p.expenses?.diningOut) || 0) +
+                                                           (Number(p.expenses?.misc) || 0);
+ 
+                                    const phaseSavingsTotal = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
+                                                             (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+ 
+                                    const shortLabel = p.label ? p.label.split(' + ')[0] : '';
+                                    
+                                    let content = null;
+                                    if (widthPx > 180) {
+                                      content = (
+                                        <div className="segment-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                          <span style={{ fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', width: '100%', fontSize: '0.68rem', textAlign: 'center' }}>
+                                            {p.icon} {p.label}
+                                          </span>
+                                          <span style={{ fontSize: '0.58rem', opacity: 0.85 }}>
+                                            Age {p.startAge}–{p.endAge}
+                                          </span>
+                                        </div>
+                                      );
+                                    } else if (widthPx >= 100) {
+                                      content = (
+                                        <div className="segment-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '0.68rem', fontWeight: 700 }}>
+                                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', width: '100%', textAlign: 'center' }}>
+                                            {p.icon} {p.label}
+                                          </span>
+                                        </div>
+                                      );
+                                    } else if (widthPx >= 50) {
+                                      content = (
+                                        <div className="segment-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.95rem' }}>
+                                          {p.icon}
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    const themeClass = getBudgetPhaseThemeClass(p);
+ 
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        className={`budget-segment budget-timeline-lane-segment ${themeClass} ${isCurrentAge ? 'current-age-phase' : ''} ${activeSelectedPhaseId === p.id ? 'selected' : ''}`}
+                                        style={{
+                                          position: 'absolute',
+                                          left: `${startPct}%`,
+                                          width: `${widthPct}%`
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSetBudgetClick(p.id);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleSetBudgetClick(p.id);
+                                          }
+                                        }}
+                                        tabIndex={0}
+                                        aria-label={`${p.label} (Age ${p.startAge}–${p.endAge})`}
+                                      >
+                                        {content}
+                                        <div className={`timeline-tooltip ${startPct < 20 ? 'align-left' : startPct > 80 ? 'align-right' : ''}`}>
+                                          <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <span>{p.icon}</span> <span>{p.label}</span>
+                                          </div>
+                                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '200px', lineHeight: '1.4', textAlign: 'left' }}>
+                                            <div><strong>Age:</strong> {p.startAge}–{p.endAge}</div>
+                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '0.25rem', paddingTop: '0.25rem' }}>
+                                              <strong>Active Events:</strong> {p.activeEvents && p.activeEvents.length > 0 ? p.activeEvents.map(evId => getEventDetails(evId)?.name || evId).join(', ') : 'None'}
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.15rem 0.5rem', marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
+                                              <div>Monthly Income:</div>
+                                              <div style={{ textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatCurrency(p.income || 0)}</div>
+                                              <div>Needs:</div>
+                                              <div style={{ textAlign: 'right' }}>{formatCurrency(phaseNeedsTotal)}</div>
+                                              <div>Wants:</div>
+                                              <div style={{ textAlign: 'right' }}>{formatCurrency(phaseWantsTotal)}</div>
+                                              <div>Save & Invest:</div>
+                                              <div style={{ textAlign: 'right', color: 'var(--accent-blue)' }}>{formatCurrency(phaseSavingsTotal)}</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
       
                         {/* CHRONOLOGICAL AGE TICKS */}
                         <div className="timeline-row">
@@ -1308,409 +1513,7 @@ export default function LifePlanScreen({
       
                       </div>
                     </div>
-
-                    {/* Details Drawer sliding from right replaced with inline timeline + inspector */}
-                  </div> {/* close timeline-layout-wrapper early */}
-
-                  {/* Segmented Budget Timeline Row */}
-                  <div className="budget-timeline-segmented-container">
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', margin: '1.25rem 0 0.5rem 0', color: 'var(--primary)', letterSpacing: '0.05em' }}>
-                      Budget Timeline
-                    </h3>
-                    <div className="budget-timeline-segmented">
-                      {normalizedPhases.map((p) => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        const duration = p.endAge - p.startAge;
-                        const isSelected = activeSelectedPhaseId === p.id;
-                        
-                        return (
-                          <div
-                            key={p.id}
-                            className={`budget-segment budget-segment-${p.type} ${isSelected ? 'selected' : ''}`}
-                            style={{
-                              flex: `${duration} 0 auto`,
-                              minWidth: '120px'
-                            }}
-                            onClick={() => {
-                              setSelectedPhaseId(p.id);
-                            }}
-                          >
-                            <span className="budget-segment-age">Age {p.startAge}–{p.endAge}</span>
-                            <div className="budget-segment-label-wrapper">
-                              <span className="budget-segment-icons">
-                                {p.activeEvents && p.activeEvents.slice(0, 3).map((evId, idx) => (
-                                  <span key={idx} role="img" aria-label="event-icon">{getEventDetails(evId).icon}</span>
-                                ))}
-                              </span>
-                              <span className="segment-label-full">{p.label}</span>
-                              <span className="segment-label-short">{p.label ? p.label.split(' + ')[0] : ''}</span>
-                            </div>
-
-                            {/* Tooltip on hover */}
-                            <div className="timeline-tooltip" style={{ bottom: '110%', left: '50%', transform: 'translateX(-50%)' }}>
-                              <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.25rem' }}>
-                                {p.label} (Age {p.startAge}–{p.endAge})
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                                <div>Income: {formatCurrency(p.income)}/mo</div>
-                                <div>Expenses: {formatCurrency(Object.values(p.expenses).reduce((sum, v) => sum + v, 0))}/mo</div>
-                                {p.activeEvents && p.activeEvents.length > 0 && (
-                                  <div style={{ marginTop: '0.25rem', paddingTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                    Active Events: {p.activeEvents.map(evId => getEventDetails(evId).name).join(', ')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
-
-                  {/* Selected Budget Phase Inspector */}
-                  {selectedPhaseObj && (
-                    <div className="selected-phase-inspector">
-                      <div className="inspector-layout">
-                        {/* Left Column */}
-                        <div className="inspector-left-col">
-                          {/* Header */}
-                          <div className="inspector-header">
-                            <div className="inspector-title-wrapper">
-                              <span className="inspector-emoji">{selectedPhaseObj.icon || '🔍'}</span>
-                              <div className="inspector-title-text">
-                                <h2>{selectedPhaseObj.label} (Age {selectedPhaseObj.startAge}–{selectedPhaseObj.endAge})</h2>
-                                <p>This budget is active from age {selectedPhaseObj.startAge} to {selectedPhaseObj.endAge}.</p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn-primary edit-phase-btn"
-                              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 'bold' }}
-                              onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                            >
-                              Edit Phase Budget
-                            </button>
-                          </div>
-
-                          {/* Cards Row 1: Why Exists & Active Events */}
-                          <div className="inspector-cards-row">
-                            <div className="inspector-card">
-                              <h3>Why this budget exists</h3>
-                              <div className="card-content">
-                                {(() => {
-                                  const flows = [];
-                                  const needsCategories = ['housing', 'utilities', 'food', 'transportation', 'healthcare', 'childcare'];
-                                  
-                                  Object.entries(selectedPhaseObj.expenses).forEach(([key, val]) => {
-                                    if (val > 0) {
-                                      if (key === 'childcare') {
-                                        flows.push({ label: 'Childcare & support expenses', value: val * 12, isExpense: true });
-                                      } else if (key.startsWith('debt_')) {
-                                        const debtId = key.replace('debt_', '');
-                                        const debtEv = (inputs.lifeEvents || []).find(e => e.id === debtId);
-                                        if (debtEv) {
-                                          const typeLabel = debtEv.type === 'buyHouse' ? 'Mortgage' : debtEv.borrowingType || debtEv.type;
-                                          flows.push({ label: `${typeLabel} payment: ${debtEv.name || debtEv.title || 'Loan'}`, value: val * 12, isExpense: true });
-                                        } else {
-                                          flows.push({ label: `Debt payment (${debtId})`, value: val * 12, isExpense: true });
-                                        }
-                                      }
-                                    }
-                                  });
-
-                                  const sabbatical = (inputs.lifeEvents || []).find(ev => ev.type === 'sabbatical' && ev.enabled && selectedPhaseObj.startAge >= ev.startAge && selectedPhaseObj.startAge < ev.endAge);
-                                  if (sabbatical) {
-                                    flows.push({ label: `Sabbatical income reduction (${sabbatical.incomeReduction}%)`, value: null, isExpense: true });
-                                  }
-
-                                  const baristaFire = (inputs.lifeEvents || []).find(ev => ev.type === 'baristaFire' && ev.enabled && selectedPhaseObj.startAge >= Number(ev.startAge));
-                                  if (baristaFire) {
-                                    flows.push({ label: `Barista FIRE part-time income`, value: Number(baristaFire.partTimeIncome), isExpense: false });
-                                  }
-
-                                  if (selectedPhaseObj.childBoost > 0) {
-                                    flows.push({ label: 'Childcare income boost', value: selectedPhaseObj.childBoost * 12, isExpense: false });
-                                  }
-
-                                  if (flows.length === 0) {
-                                    return <div className="no-data-text">Standard baseline living expenses apply.</div>;
-                                  }
-
-                                  const netChange = flows.reduce((sum, f) => sum + (f.value ? (f.isExpense ? -f.value : f.value) : 0), 0);
-
-                                  return (
-                                    <div className="why-budget-list">
-                                      {flows.map((f, i) => (
-                                        <div key={i} className="flow-item">
-                                          <span>{f.label}</span>
-                                          {f.value !== null ? (
-                                            <span className={f.isExpense ? 'expense-text' : 'income-text'}>
-                                              {f.isExpense ? '-' : '+'}{formatCurrency(Math.round(f.value / 12))}/mo
-                                            </span>
-                                          ) : (
-                                            <span className="neutral-text">Active</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                      <div className="flow-item net-change">
-                                        <span>Net Change</span>
-                                        <span className={netChange >= 0 ? 'income-text' : 'expense-text'}>
-                                          {netChange >= 0 ? '+' : ''}{formatCurrency(Math.round(netChange / 12))}/mo
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-
-                            <div className="inspector-card">
-                              <h3>Active Events</h3>
-                              <div className="card-content">
-                                <div className="active-events-list">
-                                  {selectedPhaseObj.activeEvents && selectedPhaseObj.activeEvents.length > 0 ? (
-                                    selectedPhaseObj.activeEvents.map(evId => {
-                                      const details = getEventDetails(evId);
-                                      return (
-                                        <div key={evId} className="event-item">
-                                          <span className="event-icon">{details.icon}</span>
-                                          <div className="event-details">
-                                            <span className="event-name">{details.name}</span>
-                                            <span className="event-range">Age {details.startAge}–{details.endAge}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })
-                                  ) : (
-                                    <div className="no-data-text">No active lifestyle events during this phase.</div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Budget summary block */}
-                          <div className="inspector-card budget-summary-card">
-                            <div className="card-header-with-action">
-                              <h3>Budget</h3>
-                              <button className="btn-link" onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}>Edit</button>
-                            </div>
-                            {(() => {
-                              const totalExpenses = Object.values(selectedPhaseObj.expenses).reduce((sum, v) => sum + v, 0);
-                              const totalSavings = selectedPhaseObj.savingsAllocMode === 'percentSurplus'
-                                ? Math.round(Math.max(0, selectedPhaseObj.income - totalExpenses) * (Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0) / 100))
-                                : Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0);
-                              
-                              const needsCategories = ['housing', 'utilities', 'food', 'transportation', 'healthcare', 'childcare'];
-                              let needsAmt = 0;
-                              let wantsAmt = 0;
-                              Object.entries(selectedPhaseObj.expenses).forEach(([key, val]) => {
-                                if (needsCategories.includes(key) || key.startsWith('debt_')) {
-                                  needsAmt += val;
-                                } else {
-                                  wantsAmt += val;
-                                }
-                              });
-
-                              const needsPct = selectedPhaseObj.income > 0 ? Math.round((needsAmt / selectedPhaseObj.income) * 100) : 0;
-                              const wantsPct = selectedPhaseObj.income > 0 ? Math.round((wantsAmt / selectedPhaseObj.income) * 100) : 0;
-                              const savingsPct = selectedPhaseObj.income > 0 ? Math.round((totalSavings / selectedPhaseObj.income) * 100) : 0;
-
-                              return (
-                                <div className="budget-equation">
-                                  <div className="equation-block income">
-                                    <span className="block-label">Income</span>
-                                    <span className="block-value">{formatCurrency(selectedPhaseObj.income)}/mo</span>
-                                    <span className="block-subtext">After Tax</span>
-                                  </div>
-                                  <div className="equation-operator">=</div>
-                                  <div className="equation-block needs">
-                                    <span className="block-label">Needs</span>
-                                    <span className="block-value">{formatCurrency(needsAmt)}/mo</span>
-                                    <span className="block-subtext">{needsPct}%</span>
-                                  </div>
-                                  <div className="equation-operator">+</div>
-                                  <div className="equation-block wants">
-                                    <span className="block-label">Wants</span>
-                                    <span className="block-value">{formatCurrency(wantsAmt)}/mo</span>
-                                    <span className="block-subtext">{wantsPct}%</span>
-                                  </div>
-                                  <div className="equation-operator">+</div>
-                                  <div className="equation-block savings">
-                                    <span className="block-label">Save & Invest</span>
-                                    <span className="block-value">{formatCurrency(totalSavings)}/mo</span>
-                                    <span className="block-subtext">{savingsPct}%</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* Savings Allocation */}
-                          <div className="inspector-card savings-allocation-card">
-                            <div className="card-header-with-action">
-                              <h3>Savings Allocation</h3>
-                              <button className="btn-link" onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}>Edit</button>
-                            </div>
-                            <div className="savings-allocation-grid">
-                              {Object.entries(selectedPhaseObj.savings).filter(([_, val]) => val > 0).map(([key, val]) => {
-                                const label = key === 'trad401k' ? 'Pre-Tax 401(k)' : key === 'rothIra' ? 'Roth IRA' : key === 'tradIra' ? 'Traditional IRA' : key === 'hsa' ? 'HSA' : key === 'brokerage' ? 'Brokerage' : key === 'hysa' ? 'HYSA' : key;
-                                return (
-                                  <div key={key} className="savings-item">
-                                    <div className="savings-item-header">
-                                      <span className="savings-label">{label}</span>
-                                      <span className="savings-value">
-                                        {selectedPhaseObj.savingsAllocMode === 'percentSurplus' ? `${val}%` : `${formatCurrency(val)}/mo`}
-                                      </span>
-                                    </div>
-                                    <div className="savings-progress-bar-container">
-                                      <div className="savings-progress-bar" style={{ width: `${selectedPhaseObj.savingsAllocMode === 'percentSurplus' ? val : Math.min(100, (val / (selectedPhaseObj.income || 5000)) * 100)}%` }} />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0) === 0 && (
-                                <div className="no-data-text">No savings allocated during this phase.</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Debt Obligations */}
-                          {selectedPhaseObj.activeDebts && selectedPhaseObj.activeDebts.length > 0 && (
-                            <div className="inspector-card debt-obligations-card">
-                              <h3>Debt Obligations</h3>
-                              <div className="debt-obligations-list">
-                                {selectedPhaseObj.activeDebts.map(debt => (
-                                  <div key={debt.id} className="debt-item-row">
-                                    <span className="debt-name">💳 {debt.name}</span>
-                                    <div className="debt-kpis">
-                                      <div className="debt-kpi">
-                                        <span>Payment</span>
-                                        <strong>{formatCurrency(debt.monthlyPayment)}/mo</strong>
-                                      </div>
-                                      <div className="debt-kpi">
-                                        <span>Interest Rate</span>
-                                        <strong>{debt.interestRate}%</strong>
-                                      </div>
-                                      <div className="debt-kpi">
-                                        <span>Payoff Age</span>
-                                        <strong>Age {debt.payoffAge || debt.endAge}</strong>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Right Column */}
-                        <div className="inspector-right-col">
-                          {/* Impact card */}
-                          <div className="inspector-card impact-card">
-                            <h3>Impact This Phase</h3>
-                            {(() => {
-                              const totalExpenses = Object.values(selectedPhaseObj.expenses).reduce((sum, v) => sum + v, 0);
-                              const surplus = selectedPhaseObj.income - totalExpenses;
-                              const totalSavings = selectedPhaseObj.savingsAllocMode === 'percentSurplus'
-                                ? Math.round(Math.max(0, surplus) * (Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0) / 100))
-                                : Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0);
-                              const finalSurplus = surplus - totalSavings;
-                              const savingsRate = selectedPhaseObj.income > 0 ? Math.round((totalSavings / selectedPhaseObj.income) * 100) : 0;
-                              return (
-                                <div className="impact-metrics">
-                                  <div className="metric-row">
-                                    <span>Monthly Surplus</span>
-                                    <strong className={finalSurplus >= 0 ? 'income-text' : 'expense-text'}>
-                                      {finalSurplus >= 0 ? '+' : ''}{formatCurrency(finalSurplus)}/mo
-                                    </strong>
-                                  </div>
-                                  <div className="metric-row">
-                                    <span>Savings Rate</span>
-                                    <strong>{savingsRate}%</strong>
-                                  </div>
-                                  <div className="metric-row">
-                                    <span>Retirement Age</span>
-                                    <strong>Age {displayedResults.retirementReadyAge || displayedResults.targetRetirementAge || 'N/A'}</strong>
-                                  </div>
-                                  <div className="metric-row">
-                                    <span>Net Worth at 65</span>
-                                    <strong>
-                                      {(() => {
-                                        const r65 = displayedResults.nominalData?.find(d => d.age === 65);
-                                        return r65 ? formatCurrency(r65.netWorth) : 'N/A';
-                                      })()}
-                                    </strong>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* Recommendations */}
-                          <div className="inspector-card recommendations-card">
-                            <h3>Recommendations</h3>
-                            {(() => {
-                              const totalExpenses = Object.values(selectedPhaseObj.expenses).reduce((sum, v) => sum + v, 0);
-                              const surplus = selectedPhaseObj.income - totalExpenses;
-                              const totalSavings = selectedPhaseObj.savingsAllocMode === 'percentSurplus'
-                                ? Math.round(Math.max(0, surplus) * (Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0) / 100))
-                                : Object.values(selectedPhaseObj.savings).reduce((sum, v) => sum + v, 0);
-                              const finalSurplus = surplus - totalSavings;
-
-                              const recs = [];
-                              if (finalSurplus < 0) {
-                                recs.push({ title: 'Reduce Wants', desc: `Cut discretionary wants spending by ${formatCurrency(-finalSurplus)}/mo to eliminate the deficit.` });
-                                recs.push({ title: 'Increase Income', desc: `Earning more could restore your savings rate and keep retirement on track.` });
-                              } else if (finalSurplus > 100) {
-                                recs.push({ title: 'Adjust Savings Allocation', desc: `Allocate your surplus of ${formatCurrency(finalSurplus)}/mo to Brokerage or tax-advantaged accounts.` });
-                              }
-                              if (selectedPhaseObj.activeDebts && selectedPhaseObj.activeDebts.length > 0) {
-                                recs.push({ title: 'Faster Debt Payoff', desc: `Target extra payments to higher interest rate debts first.` });
-                              }
-                              if (recs.length === 0) {
-                                recs.push({ title: 'Balanced Flow', desc: `Your budget is healthy and balanced. Keep monitoring your progress!` });
-                              }
-
-                              return (
-                                <div className="recommendations-list">
-                                  {recs.map((r, i) => (
-                                    <div key={i} className="rec-item">
-                                      <h4>{r.title}</h4>
-                                      <p>{r.desc}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* What happens next? */}
-                          <div className="inspector-card next-phase-card">
-                            <h3>What happens next?</h3>
-                            {(() => {
-                              const currentIdx = normalizedPhases.findIndex(p => p.id === selectedPhaseObj.id);
-                              if (currentIdx !== -1 && currentIdx < normalizedPhases.length - 1) {
-                                const nextPhase = normalizedPhases[currentIdx + 1];
-                                let transitionText = `At age ${nextPhase.startAge}, you transition to the ${nextPhase.label} phase.`;
-                                if (nextPhase.type === 'retire') {
-                                  transitionText = `At age ${nextPhase.startAge}, retirement begins! Active career income ends, and you transition to retirement spending rules.`;
-                                } else if (nextPhase.childCount < selectedPhaseObj.childCount) {
-                                  transitionText = `At age ${nextPhase.startAge}, childcare ends, freeing up cash flow and increasing your savings rate.`;
-                                } else if (nextPhase.activeDebts.length < selectedPhaseObj.activeDebts.length) {
-                                  transitionText = `At age ${nextPhase.startAge}, debt is paid off, unlocking additional monthly surplus.`;
-                                } else if (nextPhase.label.includes('Social Security') && !selectedPhaseObj.label.includes('Social Security')) {
-                                  transitionText = `At age ${nextPhase.startAge}, Social Security starts, increasing your income.`;
-                                }
-                                return <p>{transitionText}</p>;
-                              }
-                              return <p>This phase continues until the end of your financial timeline (age {selectedPhaseObj.endAge}).</p>;
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
       
       
