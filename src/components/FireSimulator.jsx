@@ -32,6 +32,7 @@ import BudgetModal from './fire-simulator/BudgetModal';
 import EventModalForm from './fire-simulator/EventModalForm';
 import TodayScreen from './fire-simulator/TodayScreen';
 import LifePlanScreen from './fire-simulator/LifePlanScreen';
+import MobileFireSimulator from './fire-simulator/MobileFireSimulator';
 
 import { DEFAULT_FIRE_INPUTS } from '../defaultInputs';
 import {
@@ -5075,6 +5076,128 @@ export default function FireSimulator() {
     if (income <= 0) return 0;
     return Math.round(((income - expenses) / income) * 100);
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileFireSimulator
+          inputs={inputs}
+          updateInput={updateInput}
+          displayMode={displayMode}
+          setDisplayMode={setDisplayMode}
+          activeResults={activeResults}
+          displayedResults={displayedResults}
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+          chartData={chartData}
+          validation={validation}
+          handleCreateEvent={handleCreateEvent}
+          handleEditRoadmapEvent={handleEditRoadmapEvent}
+          handleSetBudgetClick={handleSetBudgetClick}
+          handleOpenSavingsDetails={handleOpenSavingsDetails}
+          isMobile={isMobile}
+          totalNetWorth={totalNetWorth}
+          activeStep={activeStep}
+          setActiveStep={setActiveStep}
+          timelineEvents={timelineEvents}
+          editingEvent={editingEvent}
+          displayedBaselineResults={displayedBaselineResults}
+          baselineResults={baselineResults}
+        />
+        
+        {editingEvent && (
+          <EventModalForm
+            inputs={inputs}
+            editingEvent={editingEvent}
+            setEditingEvent={setEditingEvent}
+            isFullPartnerProfileOpen={isFullPartnerProfileOpen}
+            setIsFullPartnerProfileOpen={setIsFullPartnerProfileOpen}
+            isZeroSpendingConfirmed={isZeroSpendingConfirmed}
+            setIsZeroSpendingConfirmed={setIsZeroSpendingConfirmed}
+            isPartnerZeroSpendingConfirmed={isPartnerZeroSpendingConfirmed}
+            setIsPartnerZeroSpendingConfirmed={setIsPartnerZeroSpendingConfirmed}
+            handleDeleteEvent={handleDeleteEvent}
+            handleSaveEvent={handleSaveEvent}
+            handleSetBudgetClick={handleSetBudgetClick}
+            setIsBudgetOpenFromMarriageWizard={setIsBudgetOpenFromMarriageWizard}
+            tempSocialSecurityDetails={tempSocialSecurityDetails}
+          />
+        )}
+        <ChildImpactModal
+          childImpactSummary={childImpactSummary}
+          inputs={inputs}
+          setChildImpactSummary={setChildImpactSummary}
+          setEditingEvent={setEditingEvent}
+          setShowImprovementModal={setShowImprovementModal}
+        />
+        {isBudgetModalOpen && (
+          <BudgetModal
+            inputs={inputs}
+            isBudgetOpenFromMarriageWizard={isBudgetOpenFromMarriageWizard}
+            editingEvent={editingEvent}
+            budgetMonthlyIncome={budgetMonthlyIncome}
+            setBudgetMonthlyIncome={setBudgetMonthlyIncome}
+            budgetExpenses={budgetExpenses}
+            setBudgetExpenses={setBudgetExpenses}
+            budgetSavings={budgetSavings}
+            setBudgetSavings={setBudgetSavings}
+            budgetPartnerSavings={budgetPartnerSavings}
+            setBudgetPartnerSavings={setBudgetPartnerSavings}
+            activeBudgetPhase={activeBudgetPhase}
+            handleSwitchBudgetPhase={handleSwitchBudgetPhase}
+            savingsAllocMode={savingsAllocMode}
+            handleToggleSavingsAllocMode={handleToggleSavingsAllocMode}
+            budgetHsaCoverage={budgetHsaCoverage}
+            setBudgetHsaCoverage={setBudgetHsaCoverage}
+            budgetFilingStatus={budgetFilingStatus}
+            setBudgetFilingStatus={setBudgetFilingStatus}
+            budgetMonthlySpending={budgetMonthlySpending}
+            setBudgetMonthlySpending={setBudgetMonthlySpending}
+            budgetMonthlySavings={budgetMonthlySavings}
+            setBudgetMonthlySavings={setBudgetMonthlySavings}
+            pendingImprovement={pendingImprovement}
+            handleCloseBudgetModal={handleCloseBudgetModal}
+            handleSaveBudget={handleSaveBudget}
+          />
+        )}
+        {isSavingsDetailsOpen && (
+          <SavingsDetailsModal
+            savingsDetails={savingsDetails}
+            setSavingsDetails={setSavingsDetails}
+            setIsSavingsDetailsOpen={setIsSavingsDetailsOpen}
+            handleSaveSavingsDetails={handleSaveSavingsDetails}
+          />
+        )}
+        <CurrentConditionModal
+          editingCondition={editingCondition}
+          inputs={inputs}
+          setEditingCondition={setEditingCondition}
+          handleSaveCurrentCondition={handleSaveCurrentCondition}
+        />
+        {notification && (
+          <div style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            backgroundColor: 'var(--bg-secondary, #1f2937)',
+            borderLeft: '4px solid var(--accent-rose, #f43f5e)',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+            color: 'var(--text-primary, #f3f4f6)',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '0.375rem',
+            zIndex: 9999,
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            ⚠️ {notification}
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="fire-simulator-container" style={{ gridTemplateColumns: '1fr', gap: '1.5rem' }}>
