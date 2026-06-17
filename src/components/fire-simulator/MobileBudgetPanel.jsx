@@ -29,6 +29,11 @@ export default function MobileBudgetPanel({
   setBudgetSavings,
   budgetPartnerSavings,
   setBudgetPartnerSavings,
+  handleSavingsChange,
+  userAge,
+  spouseAge,
+  filingStatus,
+  hsaCoverageType,
   activeBudgetPhase,
   handleSwitchBudgetPhase,
   savingsAllocMode,
@@ -417,10 +422,11 @@ export default function MobileBudgetPanel({
                               className="input-number-box"
                               style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                               value={budgetSavings[item.key] || 0}
-                              onChange={(e) => setBudgetSavings({
-                                ...budgetSavings,
-                                [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                              })}
+                              onChange={(e) => handleSavingsChange(
+                                item.key,
+                                Math.max(0, parseFloat(e.target.value) || 0),
+                                false
+                              )}
                             />
                           </div>
                         ) : (
@@ -462,10 +468,11 @@ export default function MobileBudgetPanel({
                                   className="input-number-box"
                                   style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                                   value={budgetPartnerSavings[item.key] || 0}
-                                  onChange={(e) => setBudgetPartnerSavings({
-                                    ...budgetPartnerSavings,
-                                    [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                                  })}
+                                  onChange={(e) => handleSavingsChange(
+                                    item.key,
+                                    Math.max(0, parseFloat(e.target.value) || 0),
+                                    true
+                                  )}
                                 />
                               </div>
                             ) : (

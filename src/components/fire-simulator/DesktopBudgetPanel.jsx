@@ -36,6 +36,11 @@ export default function DesktopBudgetPanel({
   setBudgetSavings,
   budgetPartnerSavings,
   setBudgetPartnerSavings,
+  handleSavingsChange,
+  userAge,
+  spouseAge,
+  filingStatus,
+  hsaCoverageType,
   activeBudgetPhase,
   handleSwitchBudgetPhase,
   savingsAllocMode,
@@ -804,10 +809,11 @@ export default function DesktopBudgetPanel({
                                 className="input-number-box"
                                 style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                                 value={budgetSavings[item.key] || 0}
-                                onChange={(e) => setBudgetSavings({
-                                  ...budgetSavings,
-                                  [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                                })}
+                                onChange={(e) => handleSavingsChange(
+                                  item.key,
+                                  Math.max(0, parseFloat(e.target.value) || 0),
+                                  false
+                                )}
                               />
                             </div>
                           </div>
@@ -871,10 +877,11 @@ export default function DesktopBudgetPanel({
                                     className="input-number-box"
                                     style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                                     value={budgetPartnerSavings[item.key] || 0}
-                                    onChange={(e) => setBudgetPartnerSavings({
-                                      ...budgetPartnerSavings,
-                                      [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                                    })}
+                                    onChange={(e) => handleSavingsChange(
+                                      item.key,
+                                      Math.max(0, parseFloat(e.target.value) || 0),
+                                      true
+                                    )}
                                   />
                                 </div>
                               </div>

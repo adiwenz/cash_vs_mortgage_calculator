@@ -392,14 +392,14 @@ export const RETIREMENT_LIMITS = {
 };
 
 /**
- * Returns the contribution limit for a specific account, age, and filing status
+ * Returns the annual contribution limit for a specific retirement account
  */
-export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
-  let limitKey = accountKey;
-  if (accountKey === 'trad401k') limitKey = '401k';
-  if (accountKey === 'tradIra') limitKey = 'traditionalIRA';
-  if (accountKey === 'rothIra') limitKey = 'rothIRA';
-  if (accountKey === 'hsa') limitKey = 'hsa';
+export function getAnnualContributionLimit(accountType, age, filingStatus = 'single', hsaCoverageType = null) {
+  let limitKey = accountType;
+  if (accountType === 'trad401k') limitKey = '401k';
+  if (accountType === 'tradIra') limitKey = 'traditionalIRA';
+  if (accountType === 'rothIra') limitKey = 'rothIRA';
+  if (accountType === 'hsa') limitKey = 'hsa';
 
   const config = RETIREMENT_LIMITS[limitKey];
   if (!config) return Infinity;
@@ -419,8 +419,13 @@ export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
     return limit;
   }
   if (limitKey === 'hsa') {
-    const isMarried = (filingStatus === 'married' || filingStatus === 'jointly' || filingStatus === 'marriedJointly');
-    let limit = isMarried ? config.family : config.individual;
+    let limit;
+    if (hsaCoverageType) {
+      limit = hsaCoverageType === 'family' ? config.family : config.individual;
+    } else {
+      const isMarried = (filingStatus === 'married' || filingStatus === 'jointly' || filingStatus === 'marriedJointly');
+      limit = isMarried ? config.family : config.individual;
+    }
     if (age >= 55) {
       limit += config.catchUp55Plus;
     }
@@ -428,3 +433,62 @@ export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
   }
   return Infinity;
 }
+
+/**
+ * Returns the monthly contribution limit derived from the annual limit
+ */
+export function getMonthlyContributionLimit(accountType, age, filingStatus = 'single', hsaCoverageType = null) {
+  const annualLimit = getAnnualContributionLimit(accountType, age, filingStatus, hsaCoverageType);
+  if (annualLimit === Infinity) return Infinity;
+  return annualLimit / 12;
+}
+
+/**
+ * Caps a monthly contribution amount to the IRS limit and returns metadata
+ */
+export function capMonthlyContribution(accountType, monthlyAmount, context = {}) {
+  const age = context.age ?? 30;
+  const filingStatus = context.filingStatus ?? 'single';
+  const hsaCoverageType = context.hsaCoverageType ?? null;
+
+  const annualLimit = getAnnualContributionLimit(accountType, age, filingStatus, hsaCoverageType);
+  if (annualLimit === Infinity) {
+    return {
+      cappedAmount: monthlyAmount,
+      wasCapped: false,
+      annualLimit: Infinity,
+      monthlyLimit: Infinity,
+      message: ''
+    };
+  }
+
+  const monthlyLimit = Math.round((annualLimit / 12) * 100) / 100;
+  const wasCapped = monthlyAmount > monthlyLimit;
+  const cappedAmount = wasCapped ? monthlyLimit : monthlyAmount;
+
+  const formattedAnnual = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(annualLimit);
+
+  const message = wasCapped
+    ? `Can't contribute more than the IRS limit of ${formattedAnnual}/yr for this account.`
+    : '';
+
+  return {
+    cappedAmount,
+    wasCapped,
+    annualLimit,
+    monthlyLimit,
+    message
+  };
+}
+
+/**
+ * Returns the contribution limit for a specific account, age, and filing status
+ */
+export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
+  return getAnnualContributionLimit(accountKey, age, filingStatus);
+}
+

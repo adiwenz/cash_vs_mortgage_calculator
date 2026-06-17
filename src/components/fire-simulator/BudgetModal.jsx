@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
-import { calculateUSTaxForModal, getRetirementLimit } from '../../simulatorMathUtils';
+import { calculateUSTaxForModal, getRetirementLimit, capMonthlyContribution } from '../../simulatorMathUtils';
 import { formatCurrency } from './helpers';
 import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 import DesktopBudgetPanel from './DesktopBudgetPanel';
@@ -41,6 +41,26 @@ export default function BudgetModal({
   const [isEditingSavings, setIsEditingSavings] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+
+  const [toast, setToast] = useState({ visible: false, message: '' });
+  const lastToastTimeRef = useRef({});
+  const triggerToast = (accountKey, message) => {
+    const now = Date.now();
+    const lastTime = lastToastTimeRef.current[accountKey] || 0;
+    if (now - lastTime > 3000) {
+      lastToastTimeRef.current[accountKey] = now;
+      setToast({ visible: true, message });
+    }
+  };
+
+  useEffect(() => {
+    if (toast.visible) {
+      const timer = setTimeout(() => {
+        setToast({ visible: false, message: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.visible]);
 
   useEffect(() => {
     if (!showPopover) return;
@@ -197,10 +217,55 @@ export default function BudgetModal({
   const childAdjustedSavings = combinedSavingsMonthly;
   const netRemaining = combinedIncome - childAdjustedSavings - activeSpending - monthlyTax;
   
+  const handleSavingsChange = (key, value, isPartner = false) => {
+    const context = {
+      age: isPartner ? spouseAge : userAge,
+      filingStatus: filingStatusForModal,
+      hsaCoverageType: budgetHsaCoverage
+    };
+
+    let finalValue = value;
+    if (savingsAllocMode === 'fixed') {
+      const capRes = capMonthlyContribution(key, value, context);
+      if (capRes.wasCapped) {
+        triggerToast(isPartner ? `partner_${key}` : key, capRes.message);
+        finalValue = capRes.cappedAmount;
+      }
+    }
+
+    if (isPartner) {
+      setBudgetPartnerSavings(prev => ({
+        ...prev,
+        [key]: finalValue
+      }));
+    } else {
+      setBudgetSavings(prev => ({
+        ...prev,
+        [key]: finalValue
+      }));
+    }
+  };
+
   const handleAllocateRemaining = (categoryKey) => {
+    const prevVal = budgetSavings[categoryKey] || 0;
+    const targetVal = prevVal + remainingMonthly;
+    
+    let finalVal = targetVal;
+    if (savingsAllocMode === 'fixed') {
+      const capRes = capMonthlyContribution(categoryKey, targetVal, {
+        age: userAge,
+        filingStatus: filingStatusForModal,
+        hsaCoverageType: budgetHsaCoverage
+      });
+      if (capRes.wasCapped) {
+        triggerToast(categoryKey, capRes.message);
+        finalVal = capRes.cappedAmount;
+      }
+    }
+    
     setBudgetSavings(prev => ({
       ...prev,
-      [categoryKey]: Math.max(0, (prev[categoryKey] || 0) + remainingMonthly)
+      [categoryKey]: Math.max(0, finalVal)
     }));
   };
 
@@ -644,6 +709,11 @@ export default function BudgetModal({
     budgetPartnerSavings,
     setBudgetPartnerSavings,
     activeBudgetPhase,
+    handleSavingsChange,
+    userAge,
+    spouseAge,
+    filingStatus: filingStatusForModal,
+    hsaCoverageType: budgetHsaCoverage,
     handleSwitchBudgetPhase,
     savingsAllocMode,
     budgetHsaCoverage,
@@ -673,6 +743,15 @@ export default function BudgetModal({
 
   return (
     <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
+      <style>{`
+        @keyframes toast-fade-in {
+          from { opacity: 0; transform: translate(-50%, 20px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .custom-toast {
+          animation: toast-fade-in 0.25s ease-out forwards;
+        }
+      `}</style>
       <div 
         className={isMobile ? "budget-modal-card redesigned modal-content mobile-full" : `budget-modal-card redesigned modal-content ${showBreakdown ? 'with-breakdown' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -684,6 +763,33 @@ export default function BudgetModal({
           <DesktopBudgetPanel {...panelProps} />
         )}
       </div>
+
+      {toast.visible && (
+        <div 
+          className="custom-toast"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#ef4444',
+            color: '#ffffff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            zIndex: 1100,
+            fontSize: '0.9rem',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            pointerEvents: 'none'
+          }}
+        >
+          <span>⚠️</span>
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 }

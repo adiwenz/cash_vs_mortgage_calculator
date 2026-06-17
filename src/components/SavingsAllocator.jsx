@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import './SavingsAllocator.css';
-import { getRetirementLimit } from '../simulatorMathUtils';
+import { getAnnualContributionLimit } from '../simulatorMathUtils';
 
 // 10 allocation categories with curated colors and descriptions
 const CATEGORIES = [
@@ -102,9 +102,9 @@ export default function SavingsAllocator() {
 
   // --- CALCULATION ENGINE ---
   const results = useMemo(() => {
-    const cap401k = getRetirementLimit('401k', age, filingStatus);
-    const capIRA = getRetirementLimit('traditionalIRA', age, filingStatus);
-    const capHSA = getRetirementLimit('hsa', age, hsaCoverage === 'family' ? 'married' : 'single');
+    const cap401k = getAnnualContributionLimit('401k', age, filingStatus);
+    const capIRA = getAnnualContributionLimit('traditionalIRA', age, filingStatus);
+    const capHSA = getAnnualContributionLimit('hsa', age, filingStatus, hsaCoverage);
 
     let preTaxDeductionsAnnual = 0;
     let taxes = 0;
@@ -206,9 +206,9 @@ export default function SavingsAllocator() {
   const guardrails = useMemo(() => {
     const warnings = [];
     const caps = {
-      trad401k: getRetirementLimit('401k', age, filingStatus),
-      iraCombined: getRetirementLimit('traditionalIRA', age, filingStatus),
-      hsa: getRetirementLimit('hsa', age, hsaCoverage === 'family' ? 'married' : 'single')
+      trad401k: getAnnualContributionLimit('401k', age, filingStatus),
+      iraCombined: getAnnualContributionLimit('traditionalIRA', age, filingStatus),
+      hsa: getAnnualContributionLimit('hsa', age, filingStatus, hsaCoverage)
     };
 
     const c = results.monthlyContributions;
