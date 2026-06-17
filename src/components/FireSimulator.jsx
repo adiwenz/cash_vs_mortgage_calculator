@@ -84,6 +84,10 @@ export default function FireSimulator() {
     setEditingEvent,
     childImpactSummary,
     setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
     editingCondition,
     setEditingCondition,
     draggingInfo,
@@ -827,6 +831,65 @@ export default function FireSimulator() {
 
     setShowImprovementModal(false);
     setIsBudgetModalOpen(true);
+  };
+
+  const handleApplyRebalanceStrategy = (strategyId) => {
+    if (!houseRebalanceSummary) return;
+
+    const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+    const newInputs = JSON.parse(JSON.stringify(scen.inputs));
+    const purchaseAge = houseRebalanceSummary.purchaseAge;
+
+    const buyHouseEventIndex = (newInputs.lifeEvents || []).findIndex(e => e.type === 'buyHouse' && e.enabled);
+    if (buyHouseEventIndex === -1) return;
+    const buyHouseEv = newInputs.lifeEvents[buyHouseEventIndex];
+
+    if (strategyId === 'incomeBoost') {
+      const yearlyIncomeBoost = houseRebalanceSummary.deficit * 12;
+      const incomeBoostEvent = {
+        id: `careerChange-${Date.now()}`,
+        type: 'careerChange',
+        name: 'Income Increase (Homeownership)',
+        startAge: purchaseAge,
+        endAge: newInputs.targetRetirementAge || 65,
+        growthRate: 3.0,
+        isTaxable: true,
+        amount: yearlyIncomeBoost,
+        salaryIncrease: yearlyIncomeBoost,
+        incomeChangeType: 'increaseByAmount',
+        permanent: true,
+        enabled: true
+      };
+      newInputs.lifeEvents = [...(newInputs.lifeEvents || []), incomeBoostEvent];
+      setNotification("✓ Income boost added to plan.");
+    } else if (strategyId === 'updatePrice') {
+      const affordablePrice = houseRebalanceSummary.affordablePrice;
+      if (affordablePrice !== undefined) {
+        newInputs.lifeEvents[buyHouseEventIndex] = {
+          ...buyHouseEv,
+          homePrice: affordablePrice,
+          downPayment: Math.min(buyHouseEv.downPayment || 0, affordablePrice)
+        };
+        setNotification(`✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`);
+      }
+    } else if (strategyId === 'delayPurchase') {
+      const earliestAffordableAge = houseRebalanceSummary.earliestAffordableAge;
+      if (earliestAffordableAge) {
+        newInputs.lifeEvents[buyHouseEventIndex] = {
+          ...buyHouseEv,
+          purchaseAge: earliestAffordableAge,
+          age: earliestAffordableAge
+        };
+        setNotification(`✓ Purchase delayed to age ${earliestAffordableAge}.`);
+      }
+    }
+
+    setScenarios(prev => prev.map(s => {
+      if (s.id !== currentScenarioId) return s;
+      return { ...s, inputs: newInputs };
+    }));
+
+    setTimeout(() => setNotification(null), 4000);
   };
 
   // Compute Social Security Claim Preview details
@@ -1617,6 +1680,11 @@ export default function FireSimulator() {
     setEditingEvent,
     childImpactSummary,
     setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
+    handleApplyRebalanceStrategy,
     editingCondition,
     setEditingCondition,
     draggingInfo,

@@ -355,14 +355,120 @@ export function useRecommendations(inputs, activeResults) {
       }
     }
 
-    if (houseDeficit > 0 && activeBuyHouseEv) {
+    let baselineReadyAge = null;
+    let housingCostChange = 0;
+    let monthlySurplusChange = 0;
+    let retirementReadyAgeUnchanged = true;
+    let isAffordable = true;
+    let isMonthlyDeficitOnly = false;
+    let isRetirementImpactCreated = false;
+
+    if (activeBuyHouseEv) {
+      const purchaseAge = Number(activeBuyHouseEv.purchaseAge || activeBuyHouseEv.age || 40);
+      
+      // Get phases without the house event
+      const baselineInputs = JSON.parse(JSON.stringify(recInputs));
+      baselineInputs.lifeEvents = (baselineInputs.lifeEvents || []).map(ev => {
+        if (ev.type === 'buyHouse') {
+          return { ...ev, enabled: false };
+        }
+        return ev;
+      });
+      const baselineResultsSim = runFireSimulation(baselineInputs);
+      baselineReadyAge = baselineResultsSim.retirementReadyAge;
+
+      const phasesWithHouse = normPhases;
+      const phasesWithoutHouse = getNormalizedPhases(baselineInputs);
+      
+      const postPhase = phasesWithHouse.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      const prePhase = phasesWithoutHouse.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      
+      if (postPhase && prePhase) {
+        const preHousingCost = prePhase.expenses['housing'] || prePhase.expenses['rent'] || 0;
+        
+        const p = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
+        const dp = Number(activeBuyHouseEv.downPayment) || 0;
+        const isCash = dp >= p || activeBuyHouseEv.purchaseType === 'cash';
+        
+        let monthlyPI = 0;
+        let loanAmount = 0;
+        if (!isCash) {
+          const rate = (activeBuyHouseEv.mortgageRate !== undefined ? Number(activeBuyHouseEv.mortgageRate) : 6.5) / 100;
+          const mortgageTerm = activeBuyHouseEv.loanTerm !== undefined ? Number(activeBuyHouseEv.loanTerm) : 30;
+          loanAmount = Math.max(0, p - dp);
+          if (loanAmount > 0 && mortgageTerm > 0) {
+            const r = rate / 12;
+            const n = mortgageTerm * 12;
+            monthlyPI = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+          }
+        }
+
+        const propTaxRate = (activeBuyHouseEv.propertyTax !== undefined ? Number(activeBuyHouseEv.propertyTax) : 1.1) / 100;
+        const insRate = (activeBuyHouseEv.insurance !== undefined ? Number(activeBuyHouseEv.insurance) : 0.35) / 100;
+        const maintRate = (activeBuyHouseEv.maintenance !== undefined ? Number(activeBuyHouseEv.maintenance) : 1.0) / 100;
+        
+        const monthlyPropTax = (p * propTaxRate) / 12;
+        const monthlyIns = (p * insRate) / 12;
+        const monthlyMaint = (p * maintRate) / 12;
+        const monthlyHoa = Number(activeBuyHouseEv.hoa) || 0;
+        const monthlyUtil = Number(activeBuyHouseEv.utilitiesIncrease) || 0;
+        
+        let monthlyPmi = 0;
+        if (!isCash && dp < p * 0.2) {
+          const pmiRate = activeBuyHouseEv.pmi !== undefined ? Number(activeBuyHouseEv.pmi) : 0.5;
+          monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+        }
+        
+        const totalMonthlyHouseCost = monthlyPI + monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
+        const keepRent = !!activeBuyHouseEv.keepRent;
+        housingCostChange = Math.round(totalMonthlyHouseCost - (keepRent ? 0 : preHousingCost));
+        
+        const getPhaseSurplus = (phase, inputsObj) => {
+          const debts = getActiveDebtsForAge(inputsObj, phase.startAge);
+          const filteredDebts = debts.filter(d => d.id !== 'mortgage' && d.id !== '🏠 Mortgage' && d.type !== 'mortgage');
+          const debtsTotal = filteredDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+          const baseExpenses = Object.keys(phase.expenses || {}).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (phase.expenses[v] || 0), 0);
+          const savings = phase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+          const taxes = inputsObj.includeTaxes ? Math.round(calculateUSTaxForModal(phase.income * 12 || 0, 0, inputsObj.filingStatus || 'single') / 12) : 0;
+          const totalAllocated = baseExpenses + debtsTotal + savings + taxes;
+          return phase.income - totalAllocated;
+        };
+
+        const preSurplus = getPhaseSurplus(prePhase, baselineInputs);
+        const postSurplus = getPhaseSurplus(postPhase, recInputs);
+        monthlySurplusChange = Math.round(postSurplus - preSurplus);
+      }
+
+      const readyAge = recResults.retirementReadyAge;
+      const targetRetAge = Number(inputs.targetRetirementAge) || 65;
+      
+      const retirementFailed = (readyAge && readyAge > targetRetAge) || !recResults.moneyLasts;
+      const readyAgeDelayed = readyAge !== null && baselineReadyAge !== null && readyAge > baselineReadyAge;
+      
+      if (retirementFailed || readyAgeDelayed) {
+        isRetirementImpactCreated = true;
+        isAffordable = false;
+        retirementReadyAgeUnchanged = false;
+      } else {
+        retirementReadyAgeUnchanged = true;
+        if (houseDeficit > 0) {
+          isMonthlyDeficitOnly = true;
+          isAffordable = false;
+        } else {
+          isAffordable = true;
+        }
+      }
+    }
+
+    // Generate house-related recommendations if a deficit or impact was created
+    if (activeBuyHouseEv && (houseDeficit > 0 || isRetirementImpactCreated)) {
       list.push({
         type: 'reduceHomePrice',
         icon: '📉',
-        title: 'Reduce home price or increase down payment',
-        details: 'Lower the purchase price or increase your down payment to decrease your mortgage size and monthly payment.',
+        title: 'Reduce home price',
+        details: 'Lower the purchase price to decrease your mortgage size and monthly payment.',
         bulletPoints: [
-          'Reduce home price or increase down payment to eliminate the monthly deficit.',
+          'Reduce home price to eliminate the monthly deficit.',
           'This lowers the mortgage loan size, reducing your monthly payment and interest expense.',
           'Keeps your retirement timeline on track.'
         ],
@@ -370,41 +476,28 @@ export function useRecommendations(inputs, activeResults) {
         yearsImprovement: null,
         value: houseDeficit,
         savingsFocus: 'Home Purchase',
-        savingsEffortScore: 2
+        savingsEffortScore: 2,
+        priorityGroup: 1,
+        isPrimary: false
       });
 
       list.push({
-        type: 'increaseHomeIncome',
+        type: 'increaseDownPayment',
         icon: '💰',
-        title: `Increase income by $${houseDeficit}/month`,
-        details: `Increase your gross monthly income by $${houseDeficit}/month ($${houseDeficit * 12}/year) to cover the mortgage deficit.`,
+        title: 'Increase down payment',
+        details: 'Put more money down upfront to decrease your mortgage size and monthly payment.',
         bulletPoints: [
-          `Earn an extra $${houseDeficit}/month ($${houseDeficit * 12}/year) gross income.`,
-          `This covers the monthly deficit without changing your savings or wants allocations.`,
-          `Your retirement timeline remains fully on track.`
+          'Increase down payment to eliminate the monthly deficit.',
+          'This lowers the mortgage loan size, reducing your monthly payment and interest expense.',
+          'Keeps your retirement timeline on track.'
         ],
         readyAge: currentReadyAge || targetRetirementAge,
         yearsImprovement: null,
         value: houseDeficit,
-        savingsFocus: 'Earn More',
-        savingsEffortScore: 2
-      });
-
-      list.push({
-        type: 'reduceWantsNeeds',
-        icon: '🛒',
-        title: 'Reduce Wants or other discretionary Needs',
-        details: `Reduce your lifestyle spending in other categories by a combined $${houseDeficit}/month to free up cash flow.`,
-        bulletPoints: [
-          `Reduce dining out, leisure, or other Needs categories by $${houseDeficit}/month.`,
-          `This fits the mortgage into your existing income without overallocating your budget.`,
-          `Maintains your current savings rate and retirement ready age.`
-        ],
-        readyAge: currentReadyAge || targetRetirementAge,
-        yearsImprovement: null,
-        value: houseDeficit,
-        savingsFocus: 'Budget Adjust',
-        savingsEffortScore: 2
+        savingsFocus: 'Home Purchase',
+        savingsEffortScore: 2,
+        priorityGroup: 1,
+        isPrimary: false
       });
 
       list.push({
@@ -421,25 +514,69 @@ export function useRecommendations(inputs, activeResults) {
         yearsImprovement: null,
         value: houseDeficit,
         savingsFocus: 'Delay Event',
-        savingsEffortScore: 2
+        savingsEffortScore: 2,
+        priorityGroup: 1,
+        isPrimary: false
       });
 
-      list.push({
-        type: 'extendRetirementAge',
-        icon: '📅',
-        title: 'Extend your retirement age',
-        details: 'Work and save for longer to support the home purchase and offset the shortfall.',
-        bulletPoints: [
-          'Extending your target retirement age gives you more years of income to cover the mortgage.',
-          'Allows your investment portfolio more time to grow and compound.',
-          'Helps secure your retirement despite higher housing expenses.'
-        ],
-        readyAge: currentReadyAge || targetRetirementAge,
-        yearsImprovement: null,
-        value: houseDeficit,
-        savingsFocus: 'Retire Later',
-        savingsEffortScore: 3
-      });
+      if (isRetirementImpactCreated) {
+        list.push({
+          type: 'increaseHomeIncome',
+          icon: '💰',
+          title: `Increase income by $${houseDeficit}/month`,
+          details: `Increase your gross monthly income by $${houseDeficit}/month ($${houseDeficit * 12}/year) to cover the mortgage deficit.`,
+          bulletPoints: [
+            `Earn an extra $${houseDeficit}/month ($${houseDeficit * 12}/year) gross income.`,
+            `This covers the monthly deficit without changing your savings or wants allocations.`,
+            `Your retirement timeline remains fully on track.`
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: houseDeficit,
+          savingsFocus: 'Earn More',
+          savingsEffortScore: 2,
+          priorityGroup: 2,
+          isPrimary: true
+        });
+
+        list.push({
+          type: 'reduceWantsNeeds',
+          icon: '🛒',
+          title: 'Reduce spending',
+          details: `Reduce your lifestyle spending in other categories by a combined $${houseDeficit}/month to free up cash flow.`,
+          bulletPoints: [
+            `Reduce dining out, leisure, or other Needs categories by $${houseDeficit}/month.`,
+            `This fits the mortgage into your existing income without overallocating your budget.`,
+            `Maintains your current savings rate and retirement ready age.`
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: houseDeficit,
+          savingsFocus: 'Budget Adjust',
+          savingsEffortScore: 2,
+          priorityGroup: 2,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'extendRetirementAge',
+          icon: '📅',
+          title: 'Retire later',
+          details: 'Work and save for longer to support the home purchase and offset the shortfall.',
+          bulletPoints: [
+            'Extending your target retirement age gives you more years of income to cover the mortgage.',
+            'Allows your investment portfolio more time to grow and compound.',
+            'Helps secure your retirement despite higher housing expenses.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: houseDeficit,
+          savingsFocus: 'Retire Later',
+          savingsEffortScore: 3,
+          priorityGroup: 3,
+          isPrimary: false
+        });
+      }
     }
 
     if (debtDeficit > 0 && activeDebts.length > 0) {
@@ -458,6 +595,8 @@ export function useRecommendations(inputs, activeResults) {
         value: debtDeficit,
         savingsFocus: 'Debt Payoff',
         savingsEffortScore: 2,
+        priorityGroup: 2,
+        isPrimary: false,
         activeDebts
       });
 
@@ -475,22 +614,53 @@ export function useRecommendations(inputs, activeResults) {
         yearsImprovement: null,
         value: debtDeficit,
         savingsFocus: 'Earn More',
-        savingsEffortScore: 2
+        savingsEffortScore: 2,
+        priorityGroup: 2,
+        isPrimary: false
+      });
+    }
+
+    // Set priority group 3 for general retirement recommendations
+    list.forEach(item => {
+      if (item.priorityGroup === undefined) {
+        if (['retire65', 'retireReadyAge', 'retireRequestedDate'].includes(item.type) || item.type.startsWith('childPromotion')) {
+          item.priorityGroup = 3;
+          item.isPrimary = false;
+        } else {
+          item.priorityGroup = 3;
+          item.isPrimary = false;
+        }
+      }
+    });
+
+    // If affordable house, return no recommendations
+    let finalRankedPlan = [];
+    if (!(activeBuyHouseEv && isAffordable)) {
+      finalRankedPlan = list.sort((a, b) => {
+        if (a.isInfoOnly && !b.isInfoOnly) return 1;
+        if (!a.isInfoOnly && b.isInfoOnly) return -1;
+        
+        const aGroup = a.priorityGroup !== undefined ? a.priorityGroup : 3;
+        const bGroup = b.priorityGroup !== undefined ? b.priorityGroup : 3;
+        if (aGroup !== bGroup) {
+          return aGroup - bGroup;
+        }
+        
+        return a.savingsEffortScore - b.savingsEffortScore;
       });
     }
 
     return {
-      rankedPlan: list.sort((a, b) => {
-        if (a.isInfoOnly && !b.isInfoOnly) return 1;
-        if (!a.isInfoOnly && b.isInfoOnly) return -1;
-        
-        const aDiff = a.readyAge - targetRetirementAge;
-        const bDiff = b.readyAge - targetRetirementAge;
-        if (Math.abs(aDiff) !== Math.abs(bDiff)) {
-          return Math.abs(aDiff) - Math.abs(bDiff);
-        }
-        return a.savingsEffortScore - b.savingsEffortScore;
-      }),
+      rankedPlan: finalRankedPlan,
+      isAffordable: activeBuyHouseEv ? isAffordable : false,
+      isMonthlyDeficitOnly: activeBuyHouseEv ? isMonthlyDeficitOnly : false,
+      isRetirementImpactCreated: activeBuyHouseEv ? isRetirementImpactCreated : false,
+      houseDeficit: activeBuyHouseEv ? houseDeficit : 0,
+      housingCostChange: activeBuyHouseEv ? housingCostChange : 0,
+      monthlySurplusChange: activeBuyHouseEv ? monthlySurplusChange : 0,
+      retirementReadyAgeUnchanged: activeBuyHouseEv ? retirementReadyAgeUnchanged : true,
+      retirementReadyAge: recResults.retirementReadyAge,
+      baselineReadyAge,
       moneyLasts: recResults.moneyLasts,
       shortfall: shortfall,
       childcarePeakGrossBoost,

@@ -29,7 +29,12 @@ export default function MobileEventWizard({
   getInputsWithEvent, // Refactored function we'll add to FireSimulator
   baselineResults, // Simulation results before this event was added/modified
   handleApplyMobileRecommendation,
-  improvementPlan
+  improvementPlan,
+  houseImpactSummary,
+  setHouseImpactSummary,
+  houseRebalanceSummary,
+  setHouseRebalanceSummary,
+  handleApplyRebalanceStrategy
 }) {
   const isNew = !editingEvent || !!editingEvent.isNew || editingEvent.type === 'selectType';
 
@@ -38,6 +43,9 @@ export default function MobileEventWizard({
     if (isNew) return 2; // Choose Event Type
     return 8; // Event Details / Manage page
   });
+
+  const [selectedStrategyId, setSelectedStrategyId] = useState('maintainRetirementAge');
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [timingMode, setTimingMode] = useState('age'); // 'age' | 'year'
@@ -1621,6 +1629,189 @@ export default function MobileEventWizard({
             const tempResults = runFireSimulation(newInputs);
             const afterAge = tempResults?.retirementReadyAge ? tempResults.retirementReadyAge : "Needs Adjustment";
             const isChildFlow = draftEvent.type === 'haveChild';
+            const isHouseFlow = draftEvent.type === 'buyHouse';
+
+            if (isHouseFlow) {
+              if (houseRebalanceSummary) {
+                const { 
+                  monthlyDifference, 
+                  deficit, 
+                  affordablePrice, 
+                  affordablePayment, 
+                  earliestAffordableAge 
+                } = houseRebalanceSummary;
+
+                return (
+                  <div className="mobile-wizard-step-content animate-slide-up" style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>
+                        🏠 Home Purchase Impact
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.75rem 0', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                          Housing increased by <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(monthlyDifference)}/mo</strong>
+                        </div>
+                        <div style={{ color: 'var(--accent-red, #ef4444)', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                          Monthly deficit: {formatCurrency(deficit)}/mo
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem 0', fontWeight: '500' }}>
+                        Choose a fix:
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <button
+                        type="button"
+                        className="mobile-wizard-btn-primary"
+                        onClick={() => {
+                          handleApplyRebalanceStrategy('incomeBoost');
+                          setHouseRebalanceSummary(null);
+                          onClose();
+                        }}
+                        style={{ padding: '0.65rem 0.75rem', width: '100%', margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', height: 'auto' }}
+                      >
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>💰 Create Income Boost</span>
+                        <span style={{ fontSize: '0.7rem', opacity: 0.85 }}>+{formatCurrency(deficit * 12)}/yr starting at purchase</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="mobile-wizard-btn-primary"
+                        disabled={!affordablePrice}
+                        onClick={() => {
+                          handleApplyRebalanceStrategy('updatePrice');
+                          setHouseRebalanceSummary(null);
+                          onClose();
+                        }}
+                        style={{ 
+                          padding: '0.65rem 0.75rem', 
+                          width: '100%', 
+                          margin: 0,
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          gap: '0.15rem',
+                          height: 'auto',
+                          opacity: affordablePrice ? 1 : 0.5,
+                          cursor: affordablePrice ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🏠 Update House Price</span>
+                        <span style={{ fontSize: '0.7rem', opacity: 0.85 }}>
+                          {affordablePrice 
+                            ? `Set price to ${formatCurrency(affordablePrice)} (payment: ${formatCurrency(affordablePayment)}/mo)`
+                            : 'No affordable price found'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="mobile-wizard-btn-primary"
+                        disabled={!earliestAffordableAge}
+                        onClick={() => {
+                          handleApplyRebalanceStrategy('delayPurchase');
+                          setHouseRebalanceSummary(null);
+                          onClose();
+                        }}
+                        style={{ 
+                          padding: '0.65rem 0.75rem', 
+                          width: '100%', 
+                          margin: 0,
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          gap: '0.15rem',
+                          height: 'auto',
+                          opacity: earliestAffordableAge ? 1 : 0.5,
+                          cursor: earliestAffordableAge ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📅 Delay Purchase</span>
+                        <span style={{ fontSize: '0.7rem', opacity: 0.85 }}>
+                          {earliestAffordableAge 
+                            ? `Delay purchase to age ${earliestAffordableAge}`
+                            : 'No affordable future age found'}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="mobile-wizard-footer" style={{ display: 'flex', marginTop: '0.5rem' }}>
+                      <button 
+                        type="button" 
+                        className="mobile-wizard-btn-secondary"
+                        style={{ flex: 1, margin: 0 }}
+                        onClick={() => {
+                          setHouseRebalanceSummary(null);
+                          onClose();
+                        }}
+                      >
+                        Skip / Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (houseImpactSummary) {
+                const { housingCostChange, monthlySurplusChange, retirementReadyAge } = houseImpactSummary;
+                return (
+                  <div className="mobile-wizard-step-content animate-slide-up" style={{ padding: '1rem 0', textAlign: 'center' }}>
+                    <div className="success-circle animate-pulse" style={{ margin: '0 auto 0.75rem' }}>
+                      <Check size={36} className="success-icon" />
+                    </div>
+                    <h3 className="success-title" style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>
+                      🏠 Home Purchase Added!
+                    </h3>
+                    <p className="success-desc" style={{ fontSize: '0.8rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
+                      Congratulations! Your retirement plan remains fully on track and sustainable with this home purchase.
+                    </p>
+
+                    <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Housing Cost Change:</span>
+                        <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                          {housingCostChange >= 0 ? `+${formatCurrency(housingCostChange)}/mo` : `${formatCurrency(housingCostChange)}/mo`}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Monthly Surplus Change:</span>
+                        <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                          {monthlySurplusChange >= 0 ? `+${formatCurrency(monthlySurplusChange)}/mo` : `${formatCurrency(monthlySurplusChange)}/mo`}
+                        </strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Retirement Age:</span>
+                        <strong style={{ fontSize: '0.85rem', color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span>Unchanged</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>
+                            ({retirementReadyAge ? `Age ${retirementReadyAge}` : 'Ready'})
+                          </span>
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '8px', padding: '0.5rem 0.75rem', marginBottom: '1.25rem', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '0.9rem' }}>✓</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent-emerald)' }}>Your plan still works</span>
+                    </div>
+
+                    <div className="mobile-wizard-footer" style={{ width: '100%' }}>
+                      <button 
+                        type="button" 
+                        className="mobile-wizard-btn-primary"
+                        onClick={() => {
+                          setHouseImpactSummary(null);
+                          onClose();
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            }
             
             const hasLocalShortfall = afterAge === "Needs Adjustment" || (typeof afterAge === 'number' && afterAge > (inputs.targetRetirementAge || 65));
             const hasShortfall = hasLocalShortfall || (improvementPlan && improvementPlan.rankedPlan && improvementPlan.rankedPlan.length > 0);
