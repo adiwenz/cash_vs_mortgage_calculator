@@ -361,3 +361,70 @@ export function getChildCostsForInterval(interval, inputs) {
   
   return Math.round(totalAnnualCost / 12);
 }
+
+// IRS retirement limits configuration (configurable for each tax year)
+export const RETIREMENT_LIMITS = {
+  '401k': {
+    employeeLimit: 23500,
+    catchUp50Plus: 7500
+  },
+  '403b': {
+    employeeLimit: 23500,
+    catchUp50Plus: 7500
+  },
+  '457b': {
+    employeeLimit: 23500,
+    catchUp50Plus: 7500
+  },
+  'traditionalIRA': {
+    limit: 7000,
+    catchUp50Plus: 1000
+  },
+  'rothIRA': {
+    limit: 7000,
+    catchUp50Plus: 1000
+  },
+  'hsa': {
+    individual: 4300,
+    family: 8550,
+    catchUp55Plus: 1000
+  }
+};
+
+/**
+ * Returns the contribution limit for a specific account, age, and filing status
+ */
+export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
+  let limitKey = accountKey;
+  if (accountKey === 'trad401k') limitKey = '401k';
+  if (accountKey === 'tradIra') limitKey = 'traditionalIRA';
+  if (accountKey === 'rothIra') limitKey = 'rothIRA';
+  if (accountKey === 'hsa') limitKey = 'hsa';
+
+  const config = RETIREMENT_LIMITS[limitKey];
+  if (!config) return Infinity;
+
+  if (limitKey === '401k' || limitKey === '403b' || limitKey === '457b') {
+    let limit = config.employeeLimit;
+    if (age >= 50) {
+      limit += config.catchUp50Plus;
+    }
+    return limit;
+  }
+  if (limitKey === 'traditionalIRA' || limitKey === 'rothIRA') {
+    let limit = config.limit;
+    if (age >= 50) {
+      limit += config.catchUp50Plus;
+    }
+    return limit;
+  }
+  if (limitKey === 'hsa') {
+    const isMarried = (filingStatus === 'married' || filingStatus === 'jointly' || filingStatus === 'marriedJointly');
+    let limit = isMarried ? config.family : config.individual;
+    if (age >= 55) {
+      limit += config.catchUp55Plus;
+    }
+    return limit;
+  }
+  return Infinity;
+}

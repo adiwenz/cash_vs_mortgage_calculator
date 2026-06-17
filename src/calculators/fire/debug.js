@@ -308,6 +308,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
       },
       effectsApplied: p.effectsApplied || []
     })),
-    userOverrides: rawInputs.budgetDetails?.phases || []
+    userOverrides: rawInputs.budgetDetails?.phases || [],
+    contributionLimitLogs: res.contributionLimitLogs || []
   };
 }

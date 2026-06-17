@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import './SavingsAllocator.css';
+import { getRetirementLimit } from '../simulatorMathUtils';
 
 // 10 allocation categories with curated colors and descriptions
 const CATEGORIES = [
@@ -69,6 +70,7 @@ export default function SavingsAllocator() {
   const [filingStatus, setFilingStatus] = useState('single');
   const [allocationMode, setAllocationMode] = useState('surplus'); // 'surplus' | 'gross' | 'net'
   const [taxAware, setTaxAware] = useState(true);
+  const [age, setAge] = useState(30);
   
   // Balance parameters for guardrails
   const [currentEmergencyFund, setCurrentEmergencyFund] = useState(5000);
@@ -100,9 +102,9 @@ export default function SavingsAllocator() {
 
   // --- CALCULATION ENGINE ---
   const results = useMemo(() => {
-    const cap401k = 23500;
-    const capIRA = 7000;
-    const capHSA = hsaCoverage === 'family' ? 8300 : 4150;
+    const cap401k = getRetirementLimit('401k', age, filingStatus);
+    const capIRA = getRetirementLimit('traditionalIRA', age, filingStatus);
+    const capHSA = getRetirementLimit('hsa', age, hsaCoverage === 'family' ? 'married' : 'single');
 
     let preTaxDeductionsAnnual = 0;
     let taxes = 0;
@@ -198,15 +200,15 @@ export default function SavingsAllocator() {
       annualEmployerMatch,
       takeHomePayAnnual
     };
-  }, [grossIncome, monthlyExpenses, filingStatus, allocationMode, taxAware, allocations, hsaCoverage, matchRate, matchLimit, enableMatch]);
+  }, [grossIncome, monthlyExpenses, filingStatus, allocationMode, taxAware, allocations, hsaCoverage, matchRate, matchLimit, enableMatch, age]);
 
   // --- GUARDRAILS & WARNINGS ENGINE ---
   const guardrails = useMemo(() => {
     const warnings = [];
     const caps = {
-      trad401k: 23500,
-      iraCombined: 7000,
-      hsa: hsaCoverage === 'family' ? 8300 : 4150
+      trad401k: getRetirementLimit('401k', age, filingStatus),
+      iraCombined: getRetirementLimit('traditionalIRA', age, filingStatus),
+      hsa: getRetirementLimit('hsa', age, hsaCoverage === 'family' ? 'married' : 'single')
     };
 
     const c = results.monthlyContributions;
@@ -312,7 +314,7 @@ export default function SavingsAllocator() {
     }
 
     return warnings;
-  }, [results, hsaCoverage, monthlyExpenses, currentEmergencyFund, currentChecking, allocations]);
+  }, [results, hsaCoverage, monthlyExpenses, currentEmergencyFund, currentChecking, allocations, age, filingStatus]);
 
   // --- HANDLERS ---
   const handleSliderChange = (catId, value) => {
@@ -427,6 +429,16 @@ export default function SavingsAllocator() {
                   onChange={(e) => setMonthlyExpenses(Math.max(0, parseFloat(e.target.value) || 0))}
                 />
               </div>
+            </div>
+
+            <div className="input-field-group">
+              <label className="field-label">Current Age</label>
+              <input
+                type="number"
+                className="allocator-input-box"
+                value={age}
+                onChange={(e) => setAge(Math.max(18, Math.min(100, parseInt(e.target.value) || 30)))}
+              />
             </div>
 
             <div className="input-field-group">
