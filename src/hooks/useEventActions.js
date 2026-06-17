@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { runFireSimulation } from '../fireCalculations';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
 import { derivePhasesFromEvents } from '../calculators/fire/phases';
+import { getRebalanceStrategies } from '../calculators/fire/rebalance';
 
 export function useEventActions(
   scenarios,
@@ -17,6 +18,8 @@ export function useEventActions(
   const [hookEditingEvent, setEditingEvent] = useState(null);
   const editingEvent = hookEditingEvent;
   const [childImpactSummary, setChildImpactSummary] = useState(null);
+  const [houseImpactSummary, setHouseImpactSummary] = useState(null);
+  const [houseRebalanceSummary, setHouseRebalanceSummary] = useState(null);
   const [editingCondition, setEditingCondition] = useState(null);
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [notification, setNotification] = useState(null);
@@ -315,7 +318,7 @@ export function useEventActions(
     let afterReadyAge = null;
     let avgAnnualChildCost = 0;
 
-    if (type === 'haveChild') {
+    if (type === 'haveChild' || type === 'buyHouse') {
       const currentScenObj = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
       const beforeRes = runFireSimulation(currentScenObj.inputs);
       beforeReadyAge = beforeRes.retirementReadyAge;
@@ -847,7 +850,7 @@ export function useEventActions(
         newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
       }
 
-      if (type === 'haveChild') {
+      if (type === 'haveChild' || type === 'buyHouse') {
         const afterRes = runFireSimulation(newInputs);
         afterReadyAge = afterRes.retirementReadyAge;
       }
@@ -860,15 +863,117 @@ export function useEventActions(
 
     setScenarios(nextScenarios);
 
-    if (type === 'buyHouse' && updatedInputs && setShowImprovementModal) {
+    if (type === 'buyHouse' && updatedInputs) {
       const purchaseAge = Number(editingEvent.purchaseAge || editingEvent.age);
       const phases = derivePhasesFromEvents(updatedInputs, updatedInputs.lifeEvents, updatedInputs.budgetDetails?.phases || []);
       const activePhase = phases.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      let localHouseDeficit = 0;
       if (activePhase) {
         const totalExpenses = Object.values(activePhase.expenses || {}).reduce((sum, val) => sum + (Number(val) || 0), 0);
         const totalIncome = Number(activePhase.income) || 0;
         if (totalIncome - totalExpenses < 0) {
-          setShowImprovementModal(true);
+          localHouseDeficit = Math.abs(totalIncome - totalExpenses);
+        }
+      }
+
+      // Calculate old housing cost
+      const baselineInputs = JSON.parse(JSON.stringify(updatedInputs));
+      baselineInputs.lifeEvents = (baselineInputs.lifeEvents || []).map(ev => {
+        if (ev.type === 'buyHouse') {
+          return { ...ev, enabled: false };
+        }
+        return ev;
+      });
+      const phasesWithoutHouse = derivePhasesFromEvents(baselineInputs, baselineInputs.lifeEvents, baselineInputs.budgetDetails?.phases || []);
+      const prePhase = phasesWithoutHouse.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      
+      let oldHousingCost = 0;
+      if (prePhase) {
+        oldHousingCost = prePhase.expenses['housing'] || prePhase.expenses['rent'] || 0;
+      }
+
+      // Calculate new housing cost
+      const p = Number(editingEvent.homePrice !== undefined ? editingEvent.homePrice : (editingEvent.purchasePrice !== undefined ? editingEvent.purchasePrice : 0)) || 0;
+      const dp = Number(editingEvent.downPayment) || 0;
+      const isCash = dp >= p || editingEvent.purchaseType === 'cash';
+      
+      let monthlyPI = 0;
+      let loanAmount = 0;
+      if (!isCash) {
+        const rate = (editingEvent.mortgageRate !== undefined ? Number(editingEvent.mortgageRate) : 6.5) / 100;
+        const mortgageTerm = editingEvent.loanTerm !== undefined ? Number(editingEvent.loanTerm) : 30;
+        loanAmount = Math.max(0, p - dp);
+        if (loanAmount > 0 && mortgageTerm > 0) {
+          const r = rate / 12;
+          const n = mortgageTerm * 12;
+          monthlyPI = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+        }
+      }
+
+      const propTaxRate = (editingEvent.propertyTax !== undefined ? Number(editingEvent.propertyTax) : 1.1) / 100;
+      const insRate = (editingEvent.insurance !== undefined ? Number(editingEvent.insurance) : 0.35) / 100;
+      const maintRate = (editingEvent.maintenance !== undefined ? Number(editingEvent.maintenance) : 1.0) / 100;
+      
+      const monthlyPropTax = (p * propTaxRate) / 12;
+      const monthlyIns = (p * insRate) / 12;
+      const monthlyMaint = (p * maintRate) / 12;
+      const monthlyHoa = Number(editingEvent.hoa) || 0;
+      const monthlyUtil = Number(editingEvent.utilitiesIncrease) || 0;
+      
+      let monthlyPmi = 0;
+      if (!isCash && dp < p * 0.2) {
+        const pmiRate = editingEvent.pmi !== undefined ? Number(editingEvent.pmi) : 0.5;
+        monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+      }
+      
+      const newHousingCost = Math.round(monthlyPI + monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi);
+
+      if (newHousingCost > oldHousingCost && localHouseDeficit > 0) {
+        // Mortgage replaces rent, cost increases, and budget is overallocated -> rebalance
+        const rebalanceData = getRebalanceStrategies(updatedInputs, editingEvent, beforeReadyAge);
+        if (rebalanceData) {
+          setHouseRebalanceSummary(rebalanceData);
+        } else {
+          if (setShowImprovementModal) setShowImprovementModal(true);
+        }
+      } else {
+        // Check if retirement ready age changed or target not met
+        const targetRetAge = Number(updatedInputs.targetRetirementAge) || 65;
+        const afterRes = runFireSimulation(updatedInputs);
+        const retirementFailed = (afterReadyAge && afterReadyAge > targetRetAge) || !afterRes.moneyLasts;
+        const readyAgeDelayed = afterReadyAge !== null && beforeReadyAge !== null && afterReadyAge > beforeReadyAge;
+        
+        const hasRetirementImpact = retirementFailed || readyAgeDelayed;
+        
+        if (localHouseDeficit <= 0 && !hasRetirementImpact) {
+          // AFFORDABLE HOUSE: Show success impact card
+          const keepRent = !!editingEvent.keepRent;
+          let preSurplus = 0;
+          if (prePhase) {
+            const getPhaseSurplusLocal = (phase) => {
+              const baseExpenses = Object.values(phase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+              return phase.income - baseExpenses;
+            };
+            preSurplus = getPhaseSurplusLocal(prePhase);
+          }
+          let postSurplus = 0;
+          if (activePhase) {
+            const baseExpenses = Object.values(activePhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+            postSurplus = activePhase.income - baseExpenses;
+          }
+          const housingCostChange = Math.round(newHousingCost - (keepRent ? 0 : oldHousingCost));
+          const monthlySurplusChange = Math.round(postSurplus - preSurplus);
+          
+          setHouseImpactSummary({
+            housingCostChange,
+            monthlySurplusChange,
+            retirementReadyAge: afterReadyAge || targetRetAge,
+            isAffordable: true
+          });
+        } else {
+          if (setShowImprovementModal) {
+            setShowImprovementModal(true);
+          }
         }
       }
     }
@@ -993,6 +1098,10 @@ export function useEventActions(
     setEditingEvent,
     childImpactSummary,
     setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
     editingCondition,
     setEditingCondition,
     draggingInfo,

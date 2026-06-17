@@ -530,6 +530,18 @@ export function useTimelineEvents(inputs, displayedResults) {
     });
 
     const occupiedSlotsTimeline = [];
+    // Pre-occupy house slots in occupiedSlotsTimeline
+    deduplicatedSorted.forEach(evt => {
+      if (evt.houseId && houseSlots[evt.houseId] !== undefined) {
+        const stackIndex = houseSlots[evt.houseId];
+        const ageKey = Math.floor(evt.age);
+        if (!occupiedSlotsTimeline[stackIndex]) {
+          occupiedSlotsTimeline[stackIndex] = new Set();
+        }
+        occupiedSlotsTimeline[stackIndex].add(ageKey);
+      }
+    });
+
     return deduplicatedSorted.map(evt => {
       let stackIndex;
       if (evt.houseId && houseSlots[evt.houseId] !== undefined) {

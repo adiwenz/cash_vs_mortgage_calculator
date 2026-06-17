@@ -6,6 +6,7 @@ import { useBudgetPhases } from '../hooks/useBudgetPhases';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useBudgetState } from '../hooks/useBudgetState';
 import { useEventActions } from '../hooks/useEventActions';
+import { applyBalancedBudgetAdjustments, splitPhasesAtAge, applyBudgetAdjustmentsForLevel } from '../calculators/fire/rebalance';
 
 import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView';
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
@@ -84,6 +85,10 @@ export default function FireSimulator() {
     setEditingEvent,
     childImpactSummary,
     setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
     editingCondition,
     setEditingCondition,
     draggingInfo,
@@ -827,6 +832,83 @@ export default function FireSimulator() {
 
     setShowImprovementModal(false);
     setIsBudgetModalOpen(true);
+  };
+
+  const handleApplyRebalanceStrategy = (strategyId) => {
+    if (!houseRebalanceSummary) return;
+
+    const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
+    const newInputs = JSON.parse(JSON.stringify(scen.inputs));
+    const purchaseAge = houseRebalanceSummary.purchaseAge;
+
+    const buyHouseEventIndex = (newInputs.lifeEvents || []).findIndex(e => e.type === 'buyHouse' && e.enabled);
+    if (buyHouseEventIndex === -1) return;
+    const buyHouseEv = newInputs.lifeEvents[buyHouseEventIndex];
+
+    if (strategyId === 'incomeBoost') {
+      const remainingDeficit = houseRebalanceSummary.remainingBalancedDeficit !== undefined 
+        ? houseRebalanceSummary.remainingBalancedDeficit 
+        : houseRebalanceSummary.deficit;
+      const yearlyIncomeBoost = remainingDeficit * 12;
+      const incomeBoostEvent = {
+        id: `careerChange-${Date.now()}`,
+        type: 'careerChange',
+        name: 'Income Increase (Homeownership)',
+        startAge: purchaseAge,
+        endAge: newInputs.targetRetirementAge || 65,
+        growthRate: 0.03,
+        isTaxable: true,
+        amount: yearlyIncomeBoost,
+        salaryIncrease: yearlyIncomeBoost,
+        incomeChangeType: 'increaseByAmount',
+        permanent: true,
+        enabled: true
+      };
+      newInputs.incomeList = [...(newInputs.incomeList || []), incomeBoostEvent];
+      applyBalancedBudgetAdjustments(newInputs, buyHouseEv, buyHouseEv.homePrice, scen.inputs);
+      setNotification("✓ Income boost added to plan.");
+    } else if (strategyId === 'updatePrice') {
+      const affordablePrice = houseRebalanceSummary.selectedAffordablePrice;
+      if (affordablePrice !== undefined && affordablePrice !== null) {
+        newInputs.lifeEvents[buyHouseEventIndex] = {
+          ...buyHouseEv,
+          homePrice: affordablePrice,
+          downPayment: Math.min(buyHouseEv.downPayment || 0, affordablePrice)
+        };
+        if (houseRebalanceSummary.selectedOption === 'balanced') {
+          applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
+        } else if (houseRebalanceSummary.selectedOption === 'aggressive' || houseRebalanceSummary.selectedOption === 'stretch') {
+          applyBudgetAdjustmentsForLevel('stretch', newInputs, buyHouseEv, affordablePrice, scen.inputs);
+        } else {
+          // Fall back to Conservative: no budget adjustments, just split phases at age
+          const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
+          if (newInputs.budgetDetails && newInputs.budgetDetails.phases) {
+            newInputs.budgetDetails.phases = splitPhasesAtAge(newInputs.budgetDetails.phases, purchaseAge);
+          }
+        }
+        
+        const baselineAge = houseRebalanceSummary.baselineRetirementAge;
+        const chosenOption = houseRebalanceSummary.selectedOption || 'balanced';
+        const newAge = chosenOption === 'conservative'
+          ? houseRebalanceSummary.conservativeRetirementAge
+          : chosenOption === 'aggressive'
+          ? houseRebalanceSummary.aggressiveRetirementAge
+          : houseRebalanceSummary.balancedRetirementAge;
+
+        let notificationMsg = `✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`;
+        if (baselineAge !== undefined && newAge !== undefined && newAge !== null && newAge !== baselineAge) {
+          notificationMsg += ` Retirement age may change from ${baselineAge} to ${newAge}.`;
+        }
+        setNotification(notificationMsg);
+      }
+    }
+
+    setScenarios(prev => prev.map(s => {
+      if (s.id !== currentScenarioId) return s;
+      return { ...s, inputs: newInputs };
+    }));
+
+    setTimeout(() => setNotification(null), 4000);
   };
 
   // Compute Social Security Claim Preview details
@@ -1621,6 +1703,11 @@ export default function FireSimulator() {
     setEditingEvent,
     childImpactSummary,
     setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
+    handleApplyRebalanceStrategy,
     editingCondition,
     setEditingCondition,
     draggingInfo,

@@ -268,6 +268,11 @@ export default function MobileFireSimulatorView({
   tempSocialSecurityDetails,
   childImpactSummary,
   setChildImpactSummary,
+  houseImpactSummary,
+  setHouseImpactSummary,
+  houseRebalanceSummary,
+  setHouseRebalanceSummary,
+  handleApplyRebalanceStrategy,
   isBudgetModalOpen,
   handleCloseBudgetModal,
   budgetMonthlyIncome,
@@ -1727,6 +1732,11 @@ export default function MobileFireSimulatorView({
           baselineResults={baselineResults}
           handleApplyMobileRecommendation={handleApplyMobileRecommendation}
           improvementPlan={improvementPlan}
+          houseImpactSummary={houseImpactSummary}
+          setHouseImpactSummary={setHouseImpactSummary}
+          houseRebalanceSummary={houseRebalanceSummary}
+          setHouseRebalanceSummary={setHouseRebalanceSummary}
+          handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
         />
       )}
       <ChildImpactModal
