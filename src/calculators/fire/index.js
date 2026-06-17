@@ -521,6 +521,10 @@ export function runFireSimulation(inputs) {
 
   result.incomeList = incomeList;
   result.spendingPhases = spendingPhases;
+  result.yearsWithLimitsReached = plannedProjection.yearsWithLimitsReached;
+  result.totalRedirectedSavings = plannedProjection.totalRedirectedSavings;
+  result.contributionLimitLogs = plannedProjection.contributionLimitLogs;
+  result.redirectedToCash = plannedProjection.redirectedToCash;
 
   return result;
 }

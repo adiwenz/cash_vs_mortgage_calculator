@@ -402,6 +402,25 @@ export default function DesktopResults({
               </div>
             </div>
           )}
+          {displayedResults.yearsWithLimitsReached > 0 && (
+            <div style={{ 
+              background: 'rgba(99, 102, 241, 0.08)', 
+              border: '1px solid rgba(99, 102, 241, 0.2)', 
+              borderRadius: '6px', 
+              padding: '0.35rem 0.75rem',
+              marginTop: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)'
+            }}>
+              <span>ℹ️</span>
+              <span style={{ lineHeight: '1.45' }}>
+                Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+              </span>
+            </div>
+          )}
         </div>
       )}
 

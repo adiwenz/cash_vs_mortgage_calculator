@@ -1,4 +1,5 @@
 import { formatCurrency } from './helpers';
+import { getRetirementLimit } from '../../simulatorMathUtils';
 
 export default function DesktopBudgetPanel({
   inputs,
@@ -470,19 +471,68 @@ export default function DesktopBudgetPanel({
           {(() => {
             const warnings = [];
             if (!isRetirementPhase) {
-              const trad401kVal = (budgetSavings.trad401k || 0) * 12;
-              const spouse401kVal = isMarriedMode ? (budgetPartnerSavings.trad401k || 0) * 12 : 0;
-              if (trad401kVal > 23500 || spouse401kVal > 23500) {
-                warnings.push(`401(k) exceeds employee limit ($23,500/yr). Capping tax deduction.`);
+              const userAge = activePhaseObj?.startAge || inputs.currentAge || 30;
+              const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+              const spouseMember = (inputs.lifeEvents || []).find(e => e.type === 'spouseMember');
+              const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+                ? Number(spouseMember.currentAge)
+                : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : inputs.currentAge || 30);
+              const ageDifference = spouseCurrentAge - (inputs.currentAge || 30);
+              const spouseAge = userAge + ageDifference;
+
+              const hasBrokerage = inputs.assets && inputs.assets.brokerage !== undefined;
+              const redirectTargetName = hasBrokerage ? 'brokerage account' : 'cash account';
+
+              // User 401(k)
+              const user401kVal = (budgetSavings.trad401k || 0) * 12;
+              const user401kLimit = getRetirementLimit('401k', userAge, 'single');
+              if (user401kVal > user401kLimit) {
+                warnings.push(`Your 401(k) contribution of $${user401kVal.toLocaleString()}/year exceeds the IRS limit of $${user401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
               }
-              const userIraTotal = (budgetSavings.rothIra || 0) + (budgetSavings.tradIra || 0);
-              if (userIraTotal * 12 > 7000) {
-                warnings.push(`Combined IRA contributions exceed the $7,000/yr limit.`);
+
+              // Spouse 401(k)
+              if (isMarriedMode) {
+                const spouse401kVal = (budgetPartnerSavings.trad401k || 0) * 12;
+                const spouse401kLimit = getRetirementLimit('401k', spouseAge, 'single');
+                if (spouse401kVal > spouse401kLimit) {
+                  warnings.push(`Your spouse's 401(k) contribution of $${spouse401kVal.toLocaleString()}/year exceeds the IRS limit of $${spouse401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+                }
               }
+
+              // User IRA
+              const userTradIraVal = (budgetSavings.tradIra || 0) * 12;
+              const userRothIraVal = (budgetSavings.rothIra || 0) * 12;
+              const userIraTotal = userTradIraVal + userRothIraVal;
+              const userIraLimit = getRetirementLimit('traditionalIRA', userAge, 'single');
+              if (userIraTotal > userIraLimit) {
+                warnings.push(`Your combined IRA contributions of $${userIraTotal.toLocaleString()}/year exceed the IRS limit of $${userIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+              }
+
+              // Spouse IRA
+              if (isMarriedMode) {
+                const spouseTradIraVal = (budgetPartnerSavings.tradIra || 0) * 12;
+                const spouseRothIraVal = (budgetPartnerSavings.rothIra || 0) * 12;
+                const spouseIraTotal = spouseTradIraVal + spouseRothIraVal;
+                const spouseIraLimit = getRetirementLimit('traditionalIRA', spouseAge, 'single');
+                if (spouseIraTotal > spouseIraLimit) {
+                  warnings.push(`Your spouse's combined IRA contributions of $${spouseIraTotal.toLocaleString()}/year exceed the IRS limit of $${spouseIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+                }
+              }
+
+              // User HSA
               const userHsaVal = (budgetSavings.hsa || 0) * 12;
-              const maxHsa = budgetHsaCoverage === 'family' ? 8300 : 4150;
-              if (userHsaVal > maxHsa) {
-                warnings.push(`HSA exceeds IRS limit ($${budgetHsaCoverage === 'family' ? '8,300' : '4,150'}/yr). Capping tax deduction.`);
+              const userHsaLimit = getRetirementLimit('hsa', userAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+              if (userHsaVal > userHsaLimit) {
+                warnings.push(`Your HSA contribution of $${userHsaVal.toLocaleString()}/year exceeds the IRS limit of $${userHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+              }
+
+              // Spouse HSA
+              if (isMarriedMode) {
+                const spouseHsaVal = (budgetPartnerSavings.hsa || 0) * 12;
+                const spouseHsaLimit = getRetirementLimit('hsa', spouseAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+                if (spouseHsaVal > spouseHsaLimit) {
+                  warnings.push(`Your spouse's HSA contribution of $${spouseHsaVal.toLocaleString()}/year exceeds the IRS limit of $${spouseHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+                }
               }
             }
             if (warnings.length === 0) return null;

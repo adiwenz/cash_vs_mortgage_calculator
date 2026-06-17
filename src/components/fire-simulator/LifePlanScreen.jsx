@@ -789,6 +789,26 @@ export default function LifePlanScreen({
                           {details.desc}
                         </p>
                       </div>
+
+                      {activeResults.yearsWithLimitsReached > 0 && (
+                        <div style={{ 
+                          background: 'rgba(99, 102, 241, 0.08)', 
+                          border: '1px solid rgba(99, 102, 241, 0.2)', 
+                          borderRadius: '6px', 
+                          padding: '0.35rem 0.75rem',
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)'
+                        }}>
+                          <span>ℹ️</span>
+                          <span style={{ lineHeight: '1.45' }}>
+                            Retirement account limits were reached in <strong>{activeResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(activeResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{activeResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+                          </span>
+                        </div>
+                      )}
                       
                       {/* Planning Concepts & Key Values Grid (6-Column Compact) */}
                       <div style={{ 
@@ -1825,6 +1845,25 @@ export default function LifePlanScreen({
                         <div>
                           <strong style={{ color: 'var(--text-primary)' }}>Lifecycle Planning Note:</strong> Temporary deficits or portfolio drawdowns (where your Net Worth line dips or flattens, such as during high-expense childcare/daycare years or early retirement) are a normal and <strong>perfectly acceptable part of a long-term financial roadmap</strong>. As long as your portfolio recovery projections climb back up in the long run, your plan remains sustainable.
                         </div>
+                      </div>
+                    )}
+                    {displayedResults.yearsWithLimitsReached > 0 && (
+                      <div style={{ 
+                        background: 'rgba(99, 102, 241, 0.08)', 
+                        border: '1px solid rgba(99, 102, 241, 0.2)', 
+                        borderRadius: '6px', 
+                        padding: '0.35rem 0.75rem',
+                        marginTop: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        <span>ℹ️</span>
+                        <span style={{ lineHeight: '1.45' }}>
+                          Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+                        </span>
                       </div>
                     )}
                   </div>

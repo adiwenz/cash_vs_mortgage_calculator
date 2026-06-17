@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
-import { calculateUSTaxForModal } from '../../simulatorMathUtils';
+import { calculateUSTaxForModal, getRetirementLimit } from '../../simulatorMathUtils';
 import { formatCurrency } from './helpers';
 import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 import DesktopBudgetPanel from './DesktopBudgetPanel';
@@ -126,6 +126,16 @@ export default function BudgetModal({
     currentChildCostsMonthly = activeC * 1250;
   }
 
+  const userAge = activePhaseObj?.startAge || inputs.currentAge || 30;
+  const spouseMember = (inputs.lifeEvents || []).find(e => e.type === 'spouseMember');
+  const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+    ? Number(spouseMember.currentAge)
+    : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : inputs.currentAge || 30);
+  const ageDifference = spouseCurrentAge - (inputs.currentAge || 30);
+  const spouseAge = userAge + ageDifference;
+
+  const filingStatusForModal = isMarriedMode ? (marriageEvent.filingStatus || 'jointly') : budgetFilingStatus;
+
   const est401kMonthly = savingsAllocMode === 'percentSurplus' 
     ? Math.round(surplusMonthly * ((budgetSavings.trad401k || 0) / 100)) 
     : (budgetSavings.trad401k || 0);
@@ -136,9 +146,13 @@ export default function BudgetModal({
     ? Math.round(surplusMonthly * ((budgetSavings.hsa || 0) / 100)) 
     : (budgetSavings.hsa || 0);
 
-  const capped401k = Math.min(23500, est401kMonthly * 12);
-  const cappedTradIra = Math.min(7000, estTradIraMonthly * 12);
-  const cappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, estHsaMonthly * 12);
+  const limit401k = getRetirementLimit('401k', userAge, filingStatusForModal);
+  const limitTradIra = getRetirementLimit('traditionalIRA', userAge, filingStatusForModal);
+  const limitHsa = getRetirementLimit('hsa', userAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+
+  const capped401k = Math.min(limit401k, est401kMonthly * 12);
+  const cappedTradIra = Math.min(limitTradIra, estTradIraMonthly * 12);
+  const cappedHsa = Math.min(limitHsa, estHsaMonthly * 12);
   let preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
 
   if (isMarriedMode) {
@@ -146,13 +160,16 @@ export default function BudgetModal({
     const estPartnerTradIra = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.tradIra || 0) / 100)) : (budgetPartnerSavings.tradIra || 0);
     const estPartnerHsa = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.hsa || 0) / 100)) : (budgetPartnerSavings.hsa || 0);
 
-    const partnerCapped401k = Math.min(23500, estPartner401k * 12);
-    const partnerCappedTradIra = Math.min(7000, estPartnerTradIra * 12);
-    const partnerCappedHsa = Math.min(budgetHsaCoverage === 'family' ? 8300 : 4150, estPartnerHsa * 12);
+    const partnerLimit401k = getRetirementLimit('401k', spouseAge, filingStatusForModal);
+    const partnerLimitTradIra = getRetirementLimit('traditionalIRA', spouseAge, filingStatusForModal);
+    const partnerLimitHsa = getRetirementLimit('hsa', spouseAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+
+    const partnerCapped401k = Math.min(partnerLimit401k, estPartner401k * 12);
+    const partnerCappedTradIra = Math.min(partnerLimitTradIra, estPartnerTradIra * 12);
+    const partnerCappedHsa = Math.min(partnerLimitHsa, estPartnerHsa * 12);
     preTaxDeductionsAnnual += partnerCapped401k + partnerCappedTradIra + partnerCappedHsa;
   }
 
-  const filingStatusForModal = isMarriedMode ? (marriageEvent.filingStatus || 'jointly') : budgetFilingStatus;
   const annualTax = inputs.includeTaxes
     ? calculateUSTaxForModal(combinedIncome * 12, preTaxDeductionsAnnual, filingStatusForModal)
     : 0;

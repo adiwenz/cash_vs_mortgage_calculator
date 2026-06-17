@@ -1,7 +1,8 @@
 import {
   U_S_TAX_DATA,
   calculateUSTax,
-  getActiveChildrenCountAtAge
+  getActiveChildrenCountAtAge,
+  getRetirementLimit
 } from '../../simulatorMathUtils.js';
 import { derivePhasesFromEvents } from './phases.js';
 import { getSocialSecurityFactor } from './socialSecurity.js';
@@ -197,6 +198,12 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
   let runOutAge = null;
   let endingSurplusShortfall = 0;
   let cumulativeShortfall = 0;
+  
+  const brokerageExists = profile.assets && (profile.assets.brokerage !== undefined);
+  const redirectDest = brokerageExists ? 'brokerage' : 'cash';
+  let yearsWithLimitsReached = 0;
+  let totalRedirectedSavings = 0;
+  let contributionLimitLogs = [];
   let debtBalance = 0;
   let initialSpending;
   
@@ -741,6 +748,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     let employerMatchContribution = 0;
     let taxes = 0;
     let grossSurplus = annualIncome - annualExpenses;
+    let preTaxRedirectedThisYear = 0;
+    let postTaxRedirectedThisYear = 0;
 
     const sortedAllocations = [...allocationRules]
       .filter(rule => {
@@ -778,6 +787,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       const pPreTax = {};
       let totalPreTaxTarget = 0;
 
+
+
       if (grossSurplus > 0) {
         if (mode === 'percentSurplus') {
           preTaxKeys.forEach(k => {
@@ -794,13 +805,102 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         }
 
         const scale = totalPreTaxTarget > grossSurplus ? (grossSurplus / totalPreTaxTarget) : 1;
+
+        // Determine annual desired pre-tax targets after scaling
+        const uPreTaxDesired = {};
+        const pPreTaxDesired = {};
         preTaxKeys.forEach(k => {
-          const uAlloc = (uPreTax[k] || 0) * scale;
-          const pAlloc = (pPreTax[k] || 0) * scale;
-          const totalAlloc = uAlloc + pAlloc;
+          uPreTaxDesired[k] = (uPreTax[k] || 0) * scale;
+          pPreTaxDesired[k] = (pPreTax[k] || 0) * scale;
+        });
+
+        // Track contributions this year
+        const userContributionsThisYear = { trad401k: 0, tradIra: 0, hsa: 0 };
+        const partnerContributionsThisYear = { trad401k: 0, tradIra: 0, hsa: 0 };
+
+        const uLimit = {};
+        const pLimit = {};
+        preTaxKeys.forEach(k => {
+          uLimit[k] = getRetirementLimit(k, age, currentFilingStatus);
+          pLimit[k] = getRetirementLimit(k, spouseAge, currentFilingStatus);
+        });
+
+        const userAttemptedThisYear = { trad401k: 0, tradIra: 0, hsa: 0 };
+        const partnerAttemptedThisYear = { trad401k: 0, tradIra: 0, hsa: 0 };
+
+        // 12-month deposit loop
+        for (let m = 1; m <= 12; m++) {
+          preTaxKeys.forEach(k => {
+            // User
+            const uMonthlyDesired = uPreTaxDesired[k] / 12;
+            if (uMonthlyDesired > 0) {
+              userAttemptedThisYear[k] += uMonthlyDesired;
+              const uLimitRemaining = uLimit[k] - userContributionsThisYear[k];
+              const uAllowed = Math.min(uMonthlyDesired, Math.max(0, uLimitRemaining));
+              userContributionsThisYear[k] += uAllowed;
+              const uExcess = uMonthlyDesired - uAllowed;
+              preTaxRedirectedThisYear += uExcess;
+            }
+
+            // Spouse/Partner
+            if (isSpouseActive) {
+              const pMonthlyDesired = pPreTaxDesired[k] / 12;
+              if (pMonthlyDesired > 0) {
+                partnerAttemptedThisYear[k] += pMonthlyDesired;
+                const pLimitRemaining = pLimit[k] - partnerContributionsThisYear[k];
+                const pAllowed = Math.min(pMonthlyDesired, Math.max(0, pLimitRemaining));
+                partnerContributionsThisYear[k] += pAllowed;
+                const pExcess = pMonthlyDesired - pAllowed;
+                preTaxRedirectedThisYear += pExcess;
+              }
+            }
+          });
+        }
+
+        // Save pre-tax allocations
+        preTaxKeys.forEach(k => {
+          const uAllowedTotal = userContributionsThisYear[k];
+          const pAllowedTotal = partnerContributionsThisYear[k];
+          const totalAlloc = uAllowedTotal + pAllowedTotal;
           if (totalAlloc > 0) {
             totalPreTaxAllocations += totalAlloc;
             actualContributions[k] = totalAlloc;
+          }
+
+          // Debug logging for User limit hits
+          const uAttemptedTotal = userAttemptedThisYear[k];
+          if (uAttemptedTotal > uLimit[k]) {
+            const uExcessTotal = uAttemptedTotal - uAllowedTotal;
+            if (uExcessTotal > 0.01) {
+              let limitAccountName = k === 'trad401k' ? '401k' : (k === 'tradIra' ? 'traditionalIRA' : k);
+              contributionLimitLogs.push({
+                year: new Date().getFullYear() + year,
+                account: limitAccountName,
+                attemptedContribution: Math.round(uAttemptedTotal),
+                allowedContribution: Math.round(uAllowedTotal),
+                excessRedirected: Math.round(uExcessTotal),
+                redirectedTo: redirectDest
+              });
+            }
+          }
+
+          // Debug logging for Partner limit hits
+          if (isSpouseActive) {
+            const pAttemptedTotal = partnerAttemptedThisYear[k];
+            if (pAttemptedTotal > pLimit[k]) {
+              const pExcessTotal = pAttemptedTotal - pAllowedTotal;
+              if (pExcessTotal > 0.01) {
+                let limitAccountName = k === 'trad401k' ? '401k' : (k === 'tradIra' ? 'traditionalIRA' : k);
+                contributionLimitLogs.push({
+                  year: new Date().getFullYear() + year,
+                  account: limitAccountName,
+                  attemptedContribution: Math.round(pAttemptedTotal),
+                  allowedContribution: Math.round(pAllowedTotal),
+                  excessRedirected: Math.round(pExcessTotal),
+                  redirectedTo: redirectDest
+                });
+              }
+            }
           }
         });
       }
@@ -878,13 +978,80 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           actualPostTax[k] = ((uPostTax[k] || 0) + (pPostTax[k] || 0)) * scale;
         });
 
+        // Calculate User and Spouse Roth IRA limits
+        const uRothDesired = (uPostTax['rothIra'] || 0) * scale;
+        const pRothDesired = (pPostTax['rothIra'] || 0) * scale;
+        const uRothLimit = getRetirementLimit('rothIra', age, currentFilingStatus);
+        const pRothLimit = getRetirementLimit('rothIra', spouseAge, currentFilingStatus);
+
+        let userRothAllowed = 0;
+        let partnerRothAllowed = 0;
+        let userRothAttempted = 0;
+        let partnerRothAttempted = 0;
+
+        for (let m = 1; m <= 12; m++) {
+          // User rothIra
+          const uMonthlyDesired = uRothDesired / 12;
+          if (uMonthlyDesired > 0) {
+            userRothAttempted += uMonthlyDesired;
+            const uLimitRemaining = uRothLimit - userRothAllowed;
+            const uAllowed = Math.min(uMonthlyDesired, Math.max(0, uLimitRemaining));
+            userRothAllowed += uAllowed;
+            const uExcess = uMonthlyDesired - uAllowed;
+            postTaxRedirectedThisYear += uExcess;
+          }
+
+          // Partner rothIra
+          if (isSpouseActive) {
+            const pMonthlyDesired = pRothDesired / 12;
+            if (pMonthlyDesired > 0) {
+              partnerRothAttempted += pMonthlyDesired;
+              const pLimitRemaining = pRothLimit - partnerRothAllowed;
+              const pAllowed = Math.min(pMonthlyDesired, Math.max(0, pLimitRemaining));
+              partnerRothAllowed += pAllowed;
+              const pExcess = pMonthlyDesired - pAllowed;
+              postTaxRedirectedThisYear += pExcess;
+            }
+          }
+        }
+
+        const actualRothIra = userRothAllowed + partnerRothAllowed;
+
+        // Debug logging for Roth IRA limit hits
+        if (userRothAttempted > uRothLimit) {
+          const uExcessTotal = userRothAttempted - userRothAllowed;
+          if (uExcessTotal > 0.01) {
+            contributionLimitLogs.push({
+              year: new Date().getFullYear() + year,
+              account: 'rothIRA',
+              attemptedContribution: Math.round(userRothAttempted),
+              allowedContribution: Math.round(userRothAllowed),
+              excessRedirected: Math.round(uExcessTotal),
+              redirectedTo: redirectDest
+            });
+          }
+        }
+        if (isSpouseActive && partnerRothAttempted > pRothLimit) {
+          const pExcessTotal = partnerRothAttempted - partnerRothAllowed;
+          if (pExcessTotal > 0.01) {
+            contributionLimitLogs.push({
+              year: new Date().getFullYear() + year,
+              account: 'rothIRA',
+              attemptedContribution: Math.round(partnerRothAttempted),
+              allowedContribution: Math.round(partnerRothAllowed),
+              excessRedirected: Math.round(pExcessTotal),
+              redirectedTo: redirectDest
+            });
+          }
+        }
+
         postTaxKeys.forEach(k => {
           const amt = actualPostTax[k] || 0;
           if (amt > 0) {
             if (k === 'rothIra') {
-              balances.rothIra += amt;
-              savingsContribution += amt;
-              actualContributions.rothIra = amt;
+              balances.rothIra += actualRothIra;
+              savingsContribution += actualRothIra;
+              actualContributions.rothIra = actualRothIra;
             } else if (k === 'brokerage') {
               balances.brokerage += amt;
               savingsContribution += amt;
@@ -931,6 +1098,25 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           savingsContribution += leftover;
           actualContributions.brokerage = (actualContributions.brokerage || 0) + leftover;
         }
+
+        // Handle redirection of excess contributions (pre-tax + post-tax)
+        const totalRedirect = preTaxRedirectedThisYear + postTaxRedirectedThisYear;
+        if (totalRedirect > 0.01) {
+          totalRedirectedSavings += totalRedirect;
+          if (brokerageExists) {
+            balances.brokerage += totalRedirect;
+            actualContributions.brokerage = (actualContributions.brokerage || 0) + totalRedirect;
+          } else {
+            balances.cash += totalRedirect;
+            actualContributions.checking = (actualContributions.checking || 0) + totalRedirect;
+          }
+          savingsContribution += totalRedirect;
+        }
+
+        if (preTaxRedirectedThisYear > 0.01 || postTaxRedirectedThisYear > 0.01) {
+          yearsWithLimitsReached++;
+        }
+
         netSurplus = 0;
       }
     } else {
@@ -1366,6 +1552,10 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     coastAge,
     lastWorkingYearSpendingNominal,
     debtSummaries,
-    weddingFinancingDetails
+    weddingFinancingDetails,
+    yearsWithLimitsReached,
+    totalRedirectedSavings,
+    contributionLimitLogs,
+    redirectedToCash: !brokerageExists
   };
 }
