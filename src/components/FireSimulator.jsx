@@ -371,15 +371,11 @@ export default function FireSimulator() {
             } else if (e.type === 'debtPayoff') {
               updated.payoffAge = newAge;
             } else if (e.type === 'marriage') {
-              const shift = newAge - oldAge;
               updated.age = newAge;
               if (e.marriageAge !== undefined && e.marriageAge !== null) {
                 updated.marriageAge = newAge;
               }
-              const oldWeddingAge = (e.weddingAge !== undefined && e.weddingAge !== null && !isNaN(Number(e.weddingAge)))
-                ? Number(e.weddingAge)
-                : oldAge;
-              updated.weddingAge = oldWeddingAge + shift;
+              updated.weddingAge = newAge;
 
               if (newInputs.householdMembers) {
                 newInputs.householdMembers = newInputs.householdMembers.map(m => {
@@ -1602,6 +1598,7 @@ export default function FireSimulator() {
     setActiveStep,
     inputs,
     updateInput,
+    handleStep1Change: updateInput,
     updateAsset,
     displayMode,
     setDisplayMode,

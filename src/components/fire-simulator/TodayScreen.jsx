@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { formatCurrency } from './helpers';
 
 export default function TodayScreen({
@@ -13,6 +13,9 @@ export default function TodayScreen({
   setActiveStep,
   displayedResults
 }) {
+  const [savingsRateOverride, setSavingsRateOverride] = useState(null);
+  const [activeSavingsRate, setActiveSavingsRate] = useState(null);
+
   const simpleSavingsRate = useMemo(() => {
     const income = Number(inputs.simpleIncome) || 0;
     const expenses = Number(inputs.simpleExpenses) || 0;
@@ -43,17 +46,19 @@ export default function TodayScreen({
                 type="number"
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
-                value={inputs.currentAge}
+                value={inputs.currentAge === null ? '' : inputs.currentAge}
                 placeholder="e.g. 35"
-                onChange={(e) => handleStep1Change('currentAge', parseInt(e.target.value) || 0)}
+                onClick={() => handleStep1Change('currentAge', null)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                }}
               />
             </div>
             <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
               Your current age today (e.g. 35)
             </span>
           </div>
-
-
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
@@ -62,9 +67,25 @@ export default function TodayScreen({
                 type="number"
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
-                value={inputs.simpleIncome}
+                value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                 placeholder="e.g. 120000"
-                onChange={(e) => handleStep1Change('simpleIncome', parseFloat(e.target.value) || 0)}
+                onClick={() => {
+                  setActiveSavingsRate(simpleSavingsRate);
+                  handleStep1Change('simpleIncome', null);
+                }}
+                onBlur={() => {
+                  setActiveSavingsRate(null);
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const newIncome = val === '' ? null : (parseFloat(val) || 0);
+                  handleStep1Change('simpleIncome', newIncome);
+                  if (newIncome !== null) {
+                    const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
+                    const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                    handleStep1Change('simpleExpenses', newExpenses);
+                  }
+                }}
               />
             </div>
             <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
@@ -91,10 +112,17 @@ export default function TodayScreen({
                 max="100"
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
-                value={simpleSavingsRate}
+                value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                 placeholder="e.g. 20"
+                onClick={() => setSavingsRateOverride('')}
+                onBlur={() => setSavingsRateOverride(null)}
                 onChange={(e) => {
-                  const rate = parseFloat(e.target.value) || 0;
+                  const val = e.target.value;
+                  setSavingsRateOverride(val);
+                  if (val === '') {
+                    return;
+                  }
+                  const rate = parseFloat(val) || 0;
                   const clampedRate = Math.min(100, Math.max(0, rate));
                   if (lastNonZeroSavingsRateRef) {
                     lastNonZeroSavingsRateRef.current = clampedRate;
@@ -127,9 +155,13 @@ export default function TodayScreen({
                 type="number"
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
-                value={inputs.simpleInvestments}
+                value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                 placeholder="e.g. 250000"
-                onChange={(e) => handleStep1Change('simpleInvestments', parseFloat(e.target.value) || 0)}
+                onClick={() => handleStep1Change('simpleInvestments', null)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                }}
               />
             </div>
             <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
