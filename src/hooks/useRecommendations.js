@@ -338,6 +338,110 @@ export function useRecommendations(inputs, activeResults) {
       });
     });
 
+    const activeBuyHouseEv = (inputs.lifeEvents || []).find(e => e.type === 'buyHouse' && e.enabled);
+    let houseDeficit = 0;
+    if (activeBuyHouseEv) {
+      const purchaseAge = Number(activeBuyHouseEv.purchaseAge || activeBuyHouseEv.age || 40);
+      const housePhase = normPhases.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      if (housePhase) {
+        const houseDebts = getActiveDebtsForAge(inputs, purchaseAge);
+        const filteredHouseDebts = houseDebts.filter(d => d.id !== 'mortgage' && d.id !== '🏠 Mortgage' && d.type !== 'mortgage');
+        const houseDebtsTotal = filteredHouseDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+        const houseBaseExpenses = Object.keys(housePhase.expenses || {}).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (housePhase.expenses[v] || 0), 0);
+        const houseSavings = housePhase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(housePhase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const houseTaxes = inputs.includeTaxes ? Math.round(calculateUSTaxForModal(housePhase.income * 12 || 0, 0, inputs.filingStatus || 'single') / 12) : 0;
+        const houseTotalAllocated = houseBaseExpenses + houseDebtsTotal + houseSavings + houseTaxes;
+        houseDeficit = Math.max(0, houseTotalAllocated - (housePhase.income || 0));
+      }
+    }
+
+    if (houseDeficit > 0 && activeBuyHouseEv) {
+      list.push({
+        type: 'reduceHomePrice',
+        icon: '📉',
+        title: 'Reduce home price or increase down payment',
+        details: 'Lower the purchase price or increase your down payment to decrease your mortgage size and monthly payment.',
+        bulletPoints: [
+          'Reduce home price or increase down payment to eliminate the monthly deficit.',
+          'This lowers the mortgage loan size, reducing your monthly payment and interest expense.',
+          'Keeps your retirement timeline on track.'
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: houseDeficit,
+        savingsFocus: 'Home Purchase',
+        savingsEffortScore: 2
+      });
+
+      list.push({
+        type: 'increaseHomeIncome',
+        icon: '💰',
+        title: `Increase income by $${houseDeficit}/month`,
+        details: `Increase your gross monthly income by $${houseDeficit}/month ($${houseDeficit * 12}/year) to cover the mortgage deficit.`,
+        bulletPoints: [
+          `Earn an extra $${houseDeficit}/month ($${houseDeficit * 12}/year) gross income.`,
+          `This covers the monthly deficit without changing your savings or wants allocations.`,
+          `Your retirement timeline remains fully on track.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: houseDeficit,
+        savingsFocus: 'Earn More',
+        savingsEffortScore: 2
+      });
+
+      list.push({
+        type: 'reduceWantsNeeds',
+        icon: '🛒',
+        title: 'Reduce Wants or other discretionary Needs',
+        details: `Reduce your lifestyle spending in other categories by a combined $${houseDeficit}/month to free up cash flow.`,
+        bulletPoints: [
+          `Reduce dining out, leisure, or other Needs categories by $${houseDeficit}/month.`,
+          `This fits the mortgage into your existing income without overallocating your budget.`,
+          `Maintains your current savings rate and retirement ready age.`
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: houseDeficit,
+        savingsFocus: 'Budget Adjust',
+        savingsEffortScore: 2
+      });
+
+      list.push({
+        type: 'delayHomePurchase',
+        icon: '⏳',
+        title: 'Delay home purchase',
+        details: 'Delay buying the house to allow your investments to compound and increase your cash/down payment.',
+        bulletPoints: [
+          'Delay the purchase by 3-5 years.',
+          'This gives you more time to save a larger down payment, which will lower the mortgage loan amount.',
+          'Reduces total interest paid over the life of the loan.'
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: houseDeficit,
+        savingsFocus: 'Delay Event',
+        savingsEffortScore: 2
+      });
+
+      list.push({
+        type: 'extendRetirementAge',
+        icon: '📅',
+        title: 'Extend your retirement age',
+        details: 'Work and save for longer to support the home purchase and offset the shortfall.',
+        bulletPoints: [
+          'Extending your target retirement age gives you more years of income to cover the mortgage.',
+          'Allows your investment portfolio more time to grow and compound.',
+          'Helps secure your retirement despite higher housing expenses.'
+        ],
+        readyAge: currentReadyAge || targetRetirementAge,
+        yearsImprovement: null,
+        value: houseDeficit,
+        savingsFocus: 'Retire Later',
+        savingsEffortScore: 3
+      });
+    }
+
     if (debtDeficit > 0 && activeDebts.length > 0) {
       list.push({
         type: 'startDebtPayoff',

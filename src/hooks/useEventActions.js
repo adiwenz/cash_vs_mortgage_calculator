@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { runFireSimulation } from '../fireCalculations';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
+import { derivePhasesFromEvents } from '../calculators/fire/phases';
 
 export function useEventActions(
   scenarios,
@@ -10,7 +11,8 @@ export function useEventActions(
   updateInput,
   handleSetBudgetClick,
   setIsBudgetOpenFromMarriageWizard,
-  isMobile
+  isMobile,
+  setShowImprovementModal
 ) {
   const [hookEditingEvent, setEditingEvent] = useState(null);
   const editingEvent = hookEditingEvent;
@@ -57,7 +59,8 @@ export function useEventActions(
         rentGrowth: 3,
         renterInsurance: 0,
         investmentReturn: 7,
-        inflation: 3
+        inflation: 3,
+        keepRent: false
       };
     } else if (type === 'haveChild') {
       defaults = {
@@ -327,10 +330,12 @@ export function useEventActions(
     }
 
     let savedEvent = null;
+    let updatedInputs = null;
     const nextScenarios = scenarios.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
       
       let newInputs = { ...scen.inputs };
+      updatedInputs = newInputs;
       
       if (editingEvent.id) {
         const oldEvent = newInputs.lifeEvents.find(e => e.id === editingEvent.id);
@@ -475,7 +480,8 @@ export function useEventActions(
           inflation: editingEvent.inflation !== undefined ? Number(editingEvent.inflation) : 3,
           currentRent: editingEvent.currentRent !== undefined ? Number(editingEvent.currentRent) : 0,
           rentGrowth: editingEvent.rentGrowth !== undefined ? Number(editingEvent.rentGrowth) : 3,
-          renterInsurance: editingEvent.renterInsurance !== undefined ? Number(editingEvent.renterInsurance) : 0
+          renterInsurance: editingEvent.renterInsurance !== undefined ? Number(editingEvent.renterInsurance) : 0,
+          keepRent: editingEvent.keepRent !== undefined ? !!editingEvent.keepRent : false
         };
 
         if (!newInputs.houseAssets) {
@@ -495,7 +501,8 @@ export function useEventActions(
           name: 'Buy House',
           purchaseAge: Number(editingEvent.purchaseAge),
           age: Number(editingEvent.purchaseAge),
-          houseId: houseId
+          houseId: houseId,
+          keepRent: editingEvent.keepRent !== undefined ? !!editingEvent.keepRent : false
         };
 
         const existingSell = newInputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === houseId);
@@ -832,6 +839,19 @@ export function useEventActions(
     });
 
     setScenarios(nextScenarios);
+
+    if (type === 'buyHouse' && updatedInputs && setShowImprovementModal) {
+      const purchaseAge = Number(editingEvent.purchaseAge || editingEvent.age);
+      const phases = derivePhasesFromEvents(updatedInputs, updatedInputs.lifeEvents, updatedInputs.budgetDetails?.phases || []);
+      const activePhase = phases.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
+      if (activePhase) {
+        const totalExpenses = Object.values(activePhase.expenses || {}).reduce((sum, val) => sum + (Number(val) || 0), 0);
+        const totalIncome = Number(activePhase.income) || 0;
+        if (totalIncome - totalExpenses < 0) {
+          setShowImprovementModal(true);
+        }
+      }
+    }
 
     if (type === 'haveChild' && savedEvent) {
       const diff = (afterReadyAge && beforeReadyAge) ? (afterReadyAge - beforeReadyAge) : 0;

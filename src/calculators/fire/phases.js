@@ -126,10 +126,10 @@ function generateIntervalLabel(startAge, endAge, activeEventsList, enabledEvents
       const creditCard = activeDebts.find(d => d.type === 'creditCard');
       const autoLoan = activeDebts.find(d => d.type === 'carLoan');
       const mortgage = activeDebts.find(d => d.type === 'mortgage');
-      if (studentLoan) parts.push("Student Loan");
+      if (mortgage) parts.push("Mortgage");
+      else if (studentLoan) parts.push("Student Loan");
       else if (creditCard) parts.push("Credit Card");
       else if (autoLoan) parts.push("Auto Loan");
-      else if (mortgage) parts.push("Mortgage");
       else parts.push("Debt Payoff");
     }
 
@@ -631,6 +631,11 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           const dp = Number(asset.downPayment) || 0;
           const isCash = dp >= p || asset.purchaseType === 'cash';
           
+          const keepRent = !!asset.keepRent;
+          if (!keepRent) {
+            resolvedExpenses.housing = 0;
+          }
+          
           if (!isCash) {
             const rate = (asset.mortgageRate !== undefined ? Number(asset.mortgageRate) : 6.5) / 100;
             const mortgageTerm = asset.loanTerm !== undefined ? Number(asset.loanTerm) : (asset.loanTermYears !== undefined ? Number(asset.loanTermYears) : 30);
@@ -644,7 +649,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
                 const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
                 annualPI = monthlyPayment * 12;
               }
-              resolvedExpenses[`debt_${ev.id}`] = Math.round(annualPI / 12);
+              resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + Math.round(annualPI / 12);
             }
           }
         }
@@ -667,7 +672,13 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     let childBoost = 0;
 
     activeDebts.forEach(debt => {
-      resolvedExpenses[`debt_${debt.id}`] = debt.monthlyPayment;
+      if (debt.type === 'mortgage') {
+        if (debt.id && debt.id.startsWith('mortgage-existing-')) {
+          resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + debt.monthlyPayment;
+        }
+      } else {
+        resolvedExpenses[`debt_${debt.id}`] = debt.monthlyPayment;
+      }
     });
 
     let ssMonthlyIncome = 0;
@@ -836,7 +847,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     if (isMarried) {
       effectsApplied.push("Marriage/household changes (spouse income & savings)");
     }
-    const mortgagePIAdded = Object.keys(resolvedExpenses).some(k => k.startsWith('debt_') && enabledEvents.find(ev => ev.id === k.replace('debt_', '') && ev.type === 'buyHouse'));
+    const mortgagePIAdded = resolvedExpenses['🏠 Mortgage'] !== undefined && resolvedExpenses['🏠 Mortgage'] > 0;
     if (mortgagePIAdded) {
       effectsApplied.push("Housing mortgage payment (P&I)");
     }
@@ -867,10 +878,10 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       const creditCard = activeDebts.find(d => d.type === 'creditCard');
       const autoLoan = activeDebts.find(d => d.type === 'carLoan');
       const mortgage = activeDebts.find(d => d.type === 'mortgage');
-      if (studentLoan) name = 'Student Loan Years';
+      if (mortgage) name = 'Mortgage Years';
+      else if (studentLoan) name = 'Student Loan Years';
       else if (creditCard) name = 'Credit Card Years';
       else if (autoLoan) name = 'Auto Loan Years';
-      else if (mortgage) name = 'Mortgage Years';
       else name = 'Debt Payoff Years';
     } else if (marriageEvent && Number(marriageEvent.age) === start) {
       name = 'Married Life';
@@ -1006,6 +1017,27 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
   }
   
   const prior = normalizedPhases[activeIndex - 1];
+  
+  const activeMortgage = activePhaseObj.expenses['🏠 Mortgage'] || 0;
+  const priorMortgage = prior.expenses['🏠 Mortgage'] || 0;
+  const activeRent = activePhaseObj.expenses.housing || 0;
+  const priorRent = prior.expenses.housing || 0;
+  
+  if (activeMortgage > 0 && priorMortgage === 0) {
+    const netDiff = activeMortgage - priorRent;
+    const diffSign = netDiff >= 0 ? "+" : "";
+    explanations.push({
+      text: `Housing changed from ${fmt(priorRent)} rent to ${fmt(activeMortgage)} mortgage (${diffSign}${fmt(netDiff)}/mo)`,
+      icon: "🏠",
+      type: "housing",
+      changeType: netDiff > 0 ? "negative" : "positive",
+      impacts: [
+        "Previous rent removed/replaced",
+        "Mortgage added",
+        `Net housing change: ${diffSign}${fmt(netDiff)}/mo`
+      ]
+    });
+  }
   
   if (activePhaseObj.type === 'retire' && prior.type !== 'retire') {
     explanations.push({

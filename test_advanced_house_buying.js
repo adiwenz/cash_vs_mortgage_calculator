@@ -82,7 +82,8 @@ try {
         rentGrowth: 3.0,
         renterInsurance: 20,
         investmentReturn: 7.0,
-        inflation: 3.0
+        inflation: 3.0,
+        keepRent: true
       }
     ]
   };
@@ -224,7 +225,8 @@ try {
         appreciationRate: 4.0,
         sellingCostRate: 6.0,
         investmentReturn: 7.0,
-        inflation: 3.0
+        inflation: 3.0,
+        keepRent: true
       }
     ],
     lifeEvents: [

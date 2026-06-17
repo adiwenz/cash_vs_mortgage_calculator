@@ -559,18 +559,22 @@ export default function DesktopBudgetPanel({
                   if (activeC > 0 || (budgetExpenses.childcare && budgetExpenses.childcare > 0)) {
                     needsItems.push({ key: 'childcare', label: 'Childcare' });
                   }
+                  if (budgetExpenses['🏠 Mortgage'] > 0 || budgetExpenses['mortgage'] > 0) {
+                    needsItems.push({ key: '🏠 Mortgage', label: 'Mortgage' });
+                  }
                   return needsItems;
                 })().map(item => {
-                  const isChildcare = item.key === 'childcare';
+                  const isSpecialLocked = item.key === 'childcare' || item.key === '🏠 Mortgage';
+                  const icon = item.key === 'childcare' ? '👶 ' : (item.key === '🏠 Mortgage' ? '🏠 ' : '');
                   return (
                     <div 
                       key={item.key} 
-                      className={`breakdown-row budget-input-row ${isChildcare ? 'childcare-locked-glow' : ''}`}
+                      className={`breakdown-row budget-input-row ${isSpecialLocked ? 'childcare-locked-glow' : ''}`}
                     >
                       <span className="breakdown-row-label">
-                        {isChildcare ? '👶 ' : ''}{item.label} {isChildcare && <span style={{ fontSize: '0.72rem', opacity: 0.8, marginLeft: '0.2rem' }}>🔒</span>}
+                        {icon}{item.label} {isSpecialLocked && <span style={{ fontSize: '0.72rem', opacity: 0.8, marginLeft: '0.2rem' }}>🔒</span>}
                       </span>
-                      {isEditingNeeds && !isChildcare ? (
+                      {isEditingNeeds && !isSpecialLocked ? (
                         <div className="input-prefix-wrapper" style={{ width: '100px' }}>
                           <span className="currency-symbol">$</span>
                           <input
@@ -587,8 +591,8 @@ export default function DesktopBudgetPanel({
                       ) : (
                         <>
                           <div className="breakdown-row-dots" />
-                          <span className="breakdown-row-value" style={isChildcare ? { color: 'var(--accent-amber)' } : undefined}>
-                            {formatCurrency(budgetExpenses[item.key] || 0)}
+                          <span className="breakdown-row-value" style={isSpecialLocked ? { color: 'var(--accent-amber)' } : undefined}>
+                            {formatCurrency(budgetExpenses[item.key] || (item.key === '🏠 Mortgage' && budgetExpenses['mortgage']) || 0)}
                           </span>
                         </>
                       )}
@@ -596,7 +600,7 @@ export default function DesktopBudgetPanel({
                   );
                 })}
 
-                {activeDebts.map(debt => (
+                {activeDebts.filter(debt => debt.type !== 'mortgage').map(debt => (
                   <div key={debt.id} className="breakdown-row budget-input-row">
                     <span className="breakdown-row-label">{debt.icon} {debt.name}</span>
                     <div className="breakdown-row-dots" />

@@ -1127,6 +1127,23 @@ export default function MobileEventWizard({
                         <option value={10}>10 Years Fixed</option>
                       </select>
                     </div>
+
+                    <div className="form-group-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                      <div style={{ paddingRight: '0.5rem' }}>
+                        <label className="form-group-label" style={{ marginBottom: 0 }}>Keep rent after purchase</label>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'block', marginTop: '0.15rem' }}>Do not replace rent with mortgage</span>
+                      </div>
+                      <div>
+                        <label className="switch">
+                          <input 
+                            type="checkbox" 
+                            checked={!!draftEvent.keepRent}
+                            onChange={(e) => updateDraft('keepRent', e.target.checked)}
+                          />
+                          <span className="slider-round"></span>
+                        </label>
+                      </div>
+                    </div>
                   </>
                 )}
 
