@@ -32,6 +32,8 @@
   --accent-rose-light: rgba(244, 63, 94, 0.1);
   --accent-sky: #0ea5e9;
   --accent-sky-light: rgba(14, 165, 233, 0.1);
+  --accent-violet: #c084fc;
+  --accent-violet-light: rgba(192, 132, 252, 0.1);
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);

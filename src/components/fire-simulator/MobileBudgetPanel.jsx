@@ -42,7 +42,10 @@ export default function MobileBudgetPanel({
   remainingBalance,
   modalTitle,
   isRetirementPhase,
-  monthlyTax
+  monthlyTax,
+  handleClearNeeds,
+  handleClearWants,
+  handleClearSavings
 }) {
   const [expandedSection, setExpandedSection] = useState('needs'); // 'needs', 'wants', or 'savings'
 
@@ -232,14 +235,24 @@ export default function MobileBudgetPanel({
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.78rem', padding: '0.4rem' }}
-                  onClick={() => setIsEditingNeeds(!isEditingNeeds)}
-                >
-                  {isEditingNeeds ? 'Done Editing ✓' : 'Edit Needs Section'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
+                    onClick={() => setIsEditingNeeds(!isEditingNeeds)}
+                  >
+                    {isEditingNeeds ? 'Done ✓' : 'Edit Section'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                    onClick={handleClearNeeds}
+                  >
+                    Clear 🗑️
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -302,14 +315,24 @@ export default function MobileBudgetPanel({
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.78rem', padding: '0.4rem' }}
-                  onClick={() => setIsEditingWants(!isEditingWants)}
-                >
-                  {isEditingWants ? 'Done Editing ✓' : 'Edit Wants Section'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
+                    onClick={() => setIsEditingWants(!isEditingWants)}
+                  >
+                    {isEditingWants ? 'Done ✓' : 'Edit Section'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                    onClick={handleClearWants}
+                  >
+                    Clear 🗑️
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -452,14 +475,24 @@ export default function MobileBudgetPanel({
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.78rem', padding: '0.4rem' }}
-                      onClick={() => setIsEditingSavings(!isEditingSavings)}
-                    >
-                      {isEditingSavings ? 'Done Editing ✓' : 'Edit Savings Section'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
+                        onClick={() => setIsEditingSavings(!isEditingSavings)}
+                      >
+                        {isEditingSavings ? 'Done ✓' : 'Edit Section'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                        onClick={handleClearSavings}
+                      >
+                        Clear 🗑️
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
