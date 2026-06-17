@@ -42,9 +42,9 @@ describe('Buy House Event Regression Tests', () => {
     // In preHousePhase, rent (housing) should be positive (default is 1500)
     expect(preHousePhase.expenses['housing']).toBe(1500);
 
-    // In postHousePhase, rent should be 0 or deleted
+    // In postHousePhase, rent itself is zeroed but replaced by non-mortgage housing expenses (tax: 250, ins: 125, maint: 250 = 625)
     const postRent = postHousePhase.expenses['housing'];
-    expect(postRent === undefined || postRent === 0).toBe(true);
+    expect(postRent).toBe(625);
   });
 
   test('Mortgage is added under 🏠 Mortgage once', () => {
@@ -108,7 +108,8 @@ describe('Buy House Event Regression Tests', () => {
     const phases = getNormalizedPhases(inputs);
     const postHousePhase = phases.find(p => p.startAge === 40);
 
-    expect(postHousePhase.expenses['housing']).toBe(1500);
+    // Rent is kept (1500) and non-mortgage costs (maintenance: 250) are added (1500 + 250 = 1750)
+    expect(postHousePhase.expenses['housing']).toBe(1750);
     expect(postHousePhase.expenses['🏠 Mortgage']).toBeCloseTo(1439, -1);
   });
 

@@ -870,10 +870,16 @@ export default function FireSimulator() {
     } else if (strategyId === 'updatePrice') {
       const affordablePrice = houseRebalanceSummary.selectedAffordablePrice;
       if (affordablePrice !== undefined && affordablePrice !== null) {
+        const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+        let newDownPayment = buyHouseEv.downPayment || 0;
+        if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
+          const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+          newDownPayment = Math.round(affordablePrice * ratio);
+        }
         newInputs.lifeEvents[buyHouseEventIndex] = {
           ...buyHouseEv,
           homePrice: affordablePrice,
-          downPayment: Math.min(buyHouseEv.downPayment || 0, affordablePrice)
+          downPayment: Math.min(newDownPayment, affordablePrice)
         };
         if (houseRebalanceSummary.selectedOption === 'balanced') {
           applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
@@ -901,6 +907,34 @@ export default function FireSimulator() {
         }
         setNotification(notificationMsg);
       }
+    } else if (strategyId === 'saveForDownPayment') {
+      const additionalNeeded = Math.max(0, houseRebalanceSummary.totalCashNeeded - houseRebalanceSummary.liquidFundsAvailable);
+      
+      const simpleIncome = Number(newInputs.simpleIncome) || 50000;
+      const simpleExpenses = Number(newInputs.simpleExpenses) || 42500;
+      const standardMonthlySavings = Math.round(Math.max(0, simpleIncome - simpleExpenses) / 12);
+      
+      const purchaseAge = houseRebalanceSummary.purchaseAge || 40;
+      const normPhases = getNormalizedPhases(newInputs);
+      const activePhase = normPhases.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge) || normPhases[0];
+      const phaseSavingsTotal = activePhase && activePhase.savings 
+        ? Object.values(activePhase.savings).reduce((sum, v) => sum + (Number(v) || 0), 0)
+        : 0;
+        
+      const monthlySavingsVal = phaseSavingsTotal > 0 ? phaseSavingsTotal : (standardMonthlySavings > 0 ? standardMonthlySavings : 500);
+      const timelineYears = (additionalNeeded / (monthlySavingsVal * 12)).toFixed(1);
+
+      const saveEvent = {
+        id: `saveForDP-${Date.now()}`,
+        type: 'custom',
+        name: `Save for Down Payment (Target: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(additionalNeeded)})`,
+        age: purchaseAge,
+        enabled: true,
+        notes: `Save an additional ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(additionalNeeded)} for down payment gap. Estimated timeline: ${timelineYears} years at current savings rate of ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(monthlySavingsVal)}/mo.`
+      };
+      
+      newInputs.lifeEvents = [...(newInputs.lifeEvents || []), saveEvent];
+      setNotification(`✓ Savings strategy added to plan: Save for Down Payment (Target: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(additionalNeeded)}, approx ${timelineYears} years).`);
     }
 
     setScenarios(prev => prev.map(s => {

@@ -4,7 +4,15 @@ import { calculateUSTaxForModal } from '../../simulatorMathUtils';
 
 export function getHousingCostForPrice(price, buyHouseEv) {
   const p = price;
-  const dp = Math.min(buyHouseEv.downPayment || 0, p);
+  const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+  
+  let dp = buyHouseEv.downPayment || 0;
+  if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
+    const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+    dp = p * ratio;
+  }
+  dp = Math.min(dp, p);
+  
   const isCash = dp >= p || buyHouseEv.purchaseType === 'cash';
   
   let monthlyPI = 0;
@@ -71,14 +79,19 @@ export function splitPhasesAtAge(phases, splitAge) {
 }
 
 export function getOldRentBeforePurchase(originalInputs, purchaseAge) {
-  if (originalInputs.budgetDetails && originalInputs.budgetDetails.phases) {
-    const sortedPhases = [...originalInputs.budgetDetails.phases]
+  const phases = getNormalizedPhases(originalInputs);
+  if (phases && phases.length > 0) {
+    const sortedPhases = [...phases]
       .filter(p => p.startAge < purchaseAge)
       .sort((a, b) => b.startAge - a.startAge);
     for (const phase of sortedPhases) {
       const rent = phase.expenses && (phase.expenses.housing || phase.expenses.rent || 0);
       if (rent > 0) return Number(rent) || 0;
     }
+  }
+  if (originalInputs.budgetDetails?.expenses) {
+    const rent = originalInputs.budgetDetails.expenses.housing || originalInputs.budgetDetails.expenses.rent || 0;
+    if (rent > 0) return Number(rent) || 0;
   }
   return 0;
 }
@@ -182,9 +195,80 @@ function getPriceForHousingCost(targetPayment, buyHouseEv) {
   return bestPrice;
 }
 
+export function getMonthlyPIForPrice(price, buyHouseEv) {
+  const p = price;
+  const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+  let dp = buyHouseEv.downPayment || 0;
+  if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
+    const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+    dp = p * ratio;
+  }
+  dp = Math.min(dp, p);
+  
+  const isCash = dp >= p || buyHouseEv.purchaseType === 'cash';
+  if (isCash) return 0;
+  
+  const rate = (buyHouseEv.mortgageRate !== undefined ? Number(buyHouseEv.mortgageRate) : 6.5) / 100;
+  const mortgageTerm = buyHouseEv.loanTerm !== undefined ? Number(buyHouseEv.loanTerm) : 30;
+  const loanAmount = Math.max(0, p - dp);
+  if (loanAmount > 0 && mortgageTerm > 0) {
+    const r = rate / 12;
+    const n = mortgageTerm * 12;
+    return r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  }
+  return 0;
+}
+
+function getBudgetAdjustmentsForPrice(price, level, buyHouseEv, basePhase, netMonthlyIncome, currentSurplus) {
+  const newHousingCost = getHousingCostForPrice(price, buyHouseEv);
+  const currentWants = (Number(basePhase.expenses.leisure) || 0) + (Number(basePhase.expenses.diningOut) || 0) + (Number(basePhase.expenses.misc) || 0);
+  const currentSavings = basePhase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(basePhase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  
+  const otherBaseExpenses = Object.keys(basePhase.expenses || {})
+    .filter(k => k !== 'housing' && k !== 'rent' && k !== 'leisure' && k !== 'diningOut' && k !== 'misc')
+    .reduce((sum, k) => sum + (Number(basePhase.expenses[k]) || 0), 0);
+  
+  const totalAllocated = newHousingCost + currentWants + currentSavings + otherBaseExpenses;
+  const surplus = basePhase.income - totalAllocated;
+  
+  let amountToCover = Math.max(0, -surplus);
+  let wantsReduction = 0;
+  let savingsReduction = 0;
+
+  if (level !== 'conservative' && amountToCover > 0) {
+    // 1. Reduce Wants down to Wants Floor
+    const wantsFloor = Math.max(250, 0.10 * netMonthlyIncome);
+    const reducibleWants = Math.max(0, currentWants - wantsFloor);
+    wantsReduction = Math.min(amountToCover, reducibleWants);
+    amountToCover -= wantsReduction;
+
+    // 2. Reduce Savings down to Savings Floor
+    if (amountToCover > 0) {
+      const savingsFloor = level === 'balanced' ? 0.10 * netMonthlyIncome : 0;
+      const reducibleSavings = Math.max(0, currentSavings - savingsFloor);
+      savingsReduction = Math.min(amountToCover, reducibleSavings);
+    }
+  }
+
+  return {
+    wantsReduction: Math.round(wantsReduction),
+    savingsReduction: Math.round(savingsReduction),
+    newWants: Math.round(currentWants - wantsReduction),
+    newSavings: Math.round(currentSavings - savingsReduction)
+  };
+}
+
 function getRequiredDownPaymentAndCosts(price, buyHouseEv) {
   const p = price;
-  const dp = Math.min(buyHouseEv.downPayment || 0, p);
+  const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+  
+  let dp = buyHouseEv.downPayment || 0;
+  if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
+    const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+    dp = p * ratio;
+  }
+  dp = Math.min(dp, p);
+  
   const isCash = dp >= p || buyHouseEv.purchaseType === 'cash';
   const closingCostsRate = buyHouseEv.closingCosts !== undefined ? Number(buyHouseEv.closingCosts) : 3;
   const closingCosts = p * (closingCostsRate / 100);
@@ -319,21 +403,29 @@ function getSimulationValidationForPrice(price, level, inputs, buyHouseEv, basel
 
   let isValid = false;
   if (level === 'conservative') {
-    isValid = price > 0 && monthlyHousing <= conservativeMaxPayment && totalCashNeeded <= availableHomeFundsComfortable;
+    isValid = price > 0 && monthlyHousing <= conservativeMaxPayment;
   } else if (level === 'balanced') {
-    isValid = price > 0 && monthlyHousing <= balancedMaxPayment && totalCashNeeded <= availableHomeFundsBalanced;
+    isValid = price > 0 && monthlyHousing <= balancedMaxPayment;
   } else if (level === 'stretch' || level === 'aggressive') {
-    isValid = price > 0 && monthlyHousing <= aggressiveMaxPayment && totalCashNeeded <= availableHomeFundsStretch;
+    isValid = price > 0 && monthlyHousing <= aggressiveMaxPayment;
   }
 
   // Run simulation to get outcomes
   const tempInputs = JSON.parse(JSON.stringify(inputs));
   const buyHouseEventIndex = (tempInputs.lifeEvents || []).findIndex(e => e.id === buyHouseEv.id);
   if (buyHouseEventIndex !== -1) {
+    const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+    let dp = buyHouseEv.downPayment || 0;
+    if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
+      const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+      dp = price * ratio;
+    }
+    dp = Math.min(dp, price);
+
     tempInputs.lifeEvents[buyHouseEventIndex] = {
       ...buyHouseEv,
       homePrice: price,
-      downPayment: Math.min(buyHouseEv.downPayment || 0, price)
+      downPayment: dp
     };
     applyBudgetAdjustmentsForLevel(level, tempInputs, tempInputs.lifeEvents[buyHouseEventIndex], price, originalInputs);
   }
@@ -486,34 +578,38 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
   const isCashPurchase = activeBuyHouseEv.purchaseType === 'cash' || (activeBuyHouseEv.downPayment || 0) >= p;
   const targetDownPaymentPercent = isCashPurchase ? 1.0 : (p > 0 ? Math.max(0.01, (activeBuyHouseEv.downPayment || 0) / p) : 0.20);
 
-  const maxHomePriceComfortable = Math.max(0, availableHomeFundsComfortable - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
-  const maxHomePriceBalanced = Math.max(0, availableHomeFundsBalanced - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
-  const maxHomePriceStretch = Math.max(0, availableHomeFundsStretch - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
-
-  // Back-solve prices without simulation, constrained by down payment capacity
-  const priceConservative = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(conservativeMaxPayment, activeBuyHouseEv), maxHomePriceComfortable)));
-  const priceBalanced = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(balancedMaxPayment, activeBuyHouseEv), maxHomePriceBalanced)));
-  const priceStretch = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(aggressiveMaxPayment, activeBuyHouseEv), maxHomePriceStretch)));
+  // Back-solve prices without simulation, using monthly affordability only
+  const priceStretch = Math.round(Math.max(0, getPriceForHousingCost(aggressiveMaxPayment, activeBuyHouseEv)));
+  const priceBalanced = Math.round(priceStretch * 0.85);
+  const priceConservative = Math.round(priceStretch * 0.70);
 
   // Run simulation exactly once for each band price to validate
   const valConservative = getSimulationValidationForPrice(priceConservative, 'conservative', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
   const valBalanced = getSimulationValidationForPrice(priceBalanced, 'balanced', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
   const valStretch = getSimulationValidationForPrice(priceStretch, 'stretch', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
 
+  const adjConservative = getBudgetAdjustmentsForPrice(priceConservative, 'conservative', activeBuyHouseEv, basePhase, netMonthlyIncome, currentSurplus);
+  const adjBalanced = getBudgetAdjustmentsForPrice(priceBalanced, 'balanced', activeBuyHouseEv, basePhase, netMonthlyIncome, currentSurplus);
+  const adjStretch = getBudgetAdjustmentsForPrice(priceStretch, 'stretch', activeBuyHouseEv, basePhase, netMonthlyIncome, currentSurplus);
+
+  const piConservative = Math.round(getMonthlyPIForPrice(priceConservative, activeBuyHouseEv));
+  const piBalanced = Math.round(getMonthlyPIForPrice(priceBalanced, activeBuyHouseEv));
+  const piAggressive = Math.round(getMonthlyPIForPrice(priceStretch, activeBuyHouseEv));
+
   // Selected option logic:
   let selectedAffordablePrice = null;
   let selectedOption = 'balanced';
   let selectedRetirementDelay = 0;
 
-  if (valBalanced.isValid) {
+  if (priceBalanced > 0) {
     selectedAffordablePrice = priceBalanced;
     selectedOption = 'balanced';
     selectedRetirementDelay = valBalanced.retirementAgeImpact;
-  } else if (valConservative.isValid) {
+  } else if (priceConservative > 0) {
     selectedAffordablePrice = priceConservative;
     selectedOption = 'conservative';
     selectedRetirementDelay = valConservative.retirementAgeImpact;
-  } else if (valStretch.isValid) {
+  } else if (priceStretch > 0) {
     selectedAffordablePrice = priceStretch;
     selectedOption = 'aggressive';
     selectedRetirementDelay = valStretch.retirementAgeImpact;
@@ -533,7 +629,23 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     ? resolvedBaselineAge
     : (valBalanced.baselineReadyAge !== undefined ? valBalanced.baselineReadyAge : (inputs.targetRetirementAge || 65));
 
+  const maxHomePriceBalanced = Math.max(0, availableHomeFundsBalanced - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
+
   const totalCashNeeded = getRequiredDownPaymentAndCosts(p, activeBuyHouseEv);
+
+  const getDownPaymentForPrice = (pr) => {
+    const originalPrice = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
+    let dp = activeBuyHouseEv.downPayment || 0;
+    if (originalPrice > 0 && activeBuyHouseEv.purchaseType !== 'cash') {
+      const ratio = (activeBuyHouseEv.downPayment || 0) / originalPrice;
+      dp = pr * ratio;
+    }
+    return Math.min(dp, pr);
+  };
+
+  const dpConservative = Math.round(getDownPaymentForPrice(priceConservative));
+  const dpBalanced = Math.round(getDownPaymentForPrice(priceBalanced));
+  const dpStretch = Math.round(getDownPaymentForPrice(priceStretch));
 
   return {
     purchaseAge,
@@ -572,10 +684,34 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     affordablePaymentConservative: getHousingCostForPrice(priceConservative, activeBuyHouseEv),
     affordablePaymentBalanced: getHousingCostForPrice(priceBalanced, activeBuyHouseEv),
     affordablePaymentAggressive: getHousingCostForPrice(priceStretch, activeBuyHouseEv),
+    totalCashNeededConservative: getRequiredDownPaymentAndCosts(priceConservative, activeBuyHouseEv),
+    totalCashNeededBalanced: getRequiredDownPaymentAndCosts(priceBalanced, activeBuyHouseEv),
+    totalCashNeededAggressive: getRequiredDownPaymentAndCosts(priceStretch, activeBuyHouseEv),
+    downPaymentConservative: dpConservative,
+    downPaymentBalanced: dpBalanced,
+    downPaymentAggressive: dpStretch,
     earliestAffordableAge,
     liquidFundsAvailable: liquidNWBefore,
     estimatedDownPaymentCapacity: Math.round(maxHomePriceBalanced * targetDownPaymentPercent),
-    totalCashNeeded: totalCashNeeded
+    totalCashNeeded: totalCashNeeded,
+    
+    originalWants: Math.round(currentWants),
+    originalSavings: Math.round(currentSavings),
+    wantsReductionConservative: adjConservative.wantsReduction,
+    wantsReductionBalanced: adjBalanced.wantsReduction,
+    wantsReductionAggressive: adjStretch.wantsReduction,
+    savingsReductionConservative: adjConservative.savingsReduction,
+    savingsReductionBalanced: adjBalanced.savingsReduction,
+    savingsReductionAggressive: adjStretch.savingsReduction,
+    newWantsConservative: adjConservative.newWants,
+    newWantsBalanced: adjBalanced.newWants,
+    newWantsAggressive: adjStretch.newWants,
+    newSavingsConservative: adjConservative.newSavings,
+    newSavingsBalanced: adjBalanced.newSavings,
+    newSavingsAggressive: adjStretch.newSavings,
+    piConservative,
+    piBalanced,
+    piAggressive
   };
 }
 
@@ -591,7 +727,26 @@ export function isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineRead
   const baselinePhases = getNormalizedPhases(baselineInputs);
   const baselineResults = runFireSimulation(baselineInputs);
   const price = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
-  
+
+  const rebalanceData = getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAge);
+  if (!rebalanceData) {
+    return {
+      monthlyAffordable: false,
+      retirementValid: false,
+      downPaymentGap: 0
+    };
+  }
+
   const val = getSimulationValidationForPrice(price, 'balanced', recInputs, activeBuyHouseEv, baselineReadyAge, inputs, baselinePhases, baselineResults);
-  return val.isValid;
+
+  const monthlyAffordable = price <= rebalanceData.affordablePriceBalanced;
+  const retirementValid = val.retirementReadyAge !== null && val.retirementAgeImpact <= 3 && val.sustainable;
+  const requiredDownPayment = getRequiredDownPaymentAndCosts(price, activeBuyHouseEv);
+  const downPaymentGap = Math.max(0, requiredDownPayment - rebalanceData.liquidFundsAvailable);
+
+  return {
+    monthlyAffordable,
+    retirementValid,
+    downPaymentGap
+  };
 }

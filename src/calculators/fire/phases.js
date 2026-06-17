@@ -670,8 +670,30 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           const isCash = dp >= p || asset.purchaseType === 'cash';
           
           const keepRent = !!asset.keepRent;
+          
+          const propTaxRate = (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100;
+          const insRate = (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : (asset.insurance !== undefined ? Number(asset.insurance) : 0.35)) / 100;
+          const maintRate = (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100;
+          
+          const monthlyPropTax = (p * propTaxRate) / 12;
+          const monthlyIns = (p * insRate) / 12;
+          const monthlyMaint = (p * maintRate) / 12;
+          const monthlyHoa = Number(asset.hoaCost !== undefined ? asset.hoaCost : asset.hoa) || 0;
+          const monthlyUtil = Number(asset.utilitiesIncrease) || 0;
+          
+          let monthlyPmi = 0;
+          if (asset.purchaseType !== 'cash' && dp < p * 0.2) {
+            const pmiRate = asset.pmi !== undefined ? Number(asset.pmi) : 0.5;
+            const loanAmount = Math.max(0, p - dp);
+            monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+          }
+          
+          const nonMortgageCosts = monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
+          
           if (!keepRent) {
-            resolvedExpenses.housing = 0;
+            resolvedExpenses.housing = Math.round(nonMortgageCosts);
+          } else {
+            resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
           }
           
           if (!isCash) {

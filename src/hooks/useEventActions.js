@@ -948,25 +948,22 @@ export function useEventActions(
         if (localHouseDeficit <= 0 && !hasRetirementImpact) {
           // AFFORDABLE HOUSE: Show success impact card
           const keepRent = !!editingEvent.keepRent;
-          let preSurplus = 0;
-          if (prePhase) {
-            const getPhaseSurplusLocal = (phase) => {
-              const baseExpenses = Object.values(phase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-              return phase.income - baseExpenses;
-            };
-            preSurplus = getPhaseSurplusLocal(prePhase);
-          }
-          let postSurplus = 0;
-          if (activePhase) {
-            const baseExpenses = Object.values(activePhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-            postSurplus = activePhase.income - baseExpenses;
-          }
+          const getPhaseWants = (phase) => (Number(phase.expenses?.leisure) || 0) + (Number(phase.expenses?.diningOut) || 0) + (Number(phase.expenses?.misc) || 0);
+          const getPhaseSavings = (phase) => phase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+          const wantsReduction = prePhase && activePhase ? Math.max(0, getPhaseWants(prePhase) - getPhaseWants(activePhase)) : 0;
+          const savingsReduction = prePhase && activePhase ? Math.max(0, getPhaseSavings(prePhase) - getPhaseSavings(activePhase)) : 0;
+
           const housingCostChange = Math.round(newHousingCost - (keepRent ? 0 : oldHousingCost));
-          const monthlySurplusChange = Math.round(postSurplus - preSurplus);
+          const totalCashFlowImprovement = -housingCostChange + wantsReduction + savingsReduction;
           
           setHouseImpactSummary({
             housingCostChange,
-            monthlySurplusChange,
+            wantsReduction,
+            savingsReduction,
+            totalCashFlowImprovement,
+            baselineRetirementAge: beforeReadyAge,
+            newRetirementAge: afterReadyAge || targetRetAge,
             retirementReadyAge: afterReadyAge || targetRetAge,
             isAffordable: true
           });

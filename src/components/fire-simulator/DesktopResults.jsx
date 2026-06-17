@@ -32,9 +32,15 @@ const generateLifeStory = (inp, results) => {
   inp.lifeEvents.forEach(ev => {
     if (ev.enabled) {
       if (ev.type === 'buyHouse') {
+        const asset = (ev.houseId && inp.houseAssets)
+          ? inp.houseAssets.find(h => h.id === ev.houseId)
+          : ev;
+        const price = asset ? (asset.homePrice !== undefined ? asset.homePrice : asset.purchasePrice) : ev.homePrice;
+        const pType = asset ? asset.purchaseType : ev.purchaseType;
+        const ageVal = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
         list.push({
-          age: Number(ev.purchaseAge),
-          text: `Buy a home for ${formatCurrency(ev.homePrice)} (${ev.purchaseType === 'cash' ? 'in cash' : 'with mortgage'})`
+          age: ageVal,
+          text: `Buy a home for ${formatCurrency(price)} (${pType === 'cash' ? 'in cash' : 'with mortgage'})`
         });
       } else if (ev.type === 'haveChild') {
         const supportEndParentAge = Number(ev.birthAge) + (ev.includeCollege ? 22 : 18);
@@ -123,8 +129,9 @@ const generateLifeStory = (inp, results) => {
 function LedgerRow({ row, formatCurrency }) {
   const [expanded, setExpanded] = useState(false);
   const isPos = row.type === 'positive';
-  const sign = isPos ? '+' : '-';
-  const color = isPos ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+  const isNeg = row.type === 'negative';
+  const sign = isPos ? '+' : isNeg ? '-' : '';
+  const color = isPos ? 'var(--accent-emerald)' : isNeg ? 'var(--accent-rose)' : 'var(--text-secondary)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -134,15 +141,19 @@ function LedgerRow({ row, formatCurrency }) {
           justifyContent: 'space-between', 
           alignItems: 'center', 
           fontSize: '0.8rem', 
-          color: 'var(--text-secondary)',
+          color: row.isSummary ? 'var(--text-primary)' : 'var(--text-secondary)',
           cursor: row.expandable ? 'pointer' : 'default',
-          padding: '0.15rem 0',
+          padding: row.isSummary ? '0.3rem 0 0.15rem 0' : '0.15rem 0',
           borderRadius: '4px',
-          transition: 'background-color 0.2s'
+          transition: 'background-color 0.2s',
+          borderTop: row.isSummary ? '1px dashed var(--border-color)' : 'none',
+          marginTop: row.isSummary ? '0.2rem' : '0',
+          fontWeight: row.isSummary ? '700' : 'normal'
         }}
         onClick={() => row.expandable && setExpanded(!expanded)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          {row.isTransfer && <span>🔄</span>}
           <span>{sign} {row.label}</span>
           {row.expandable && (
             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted, #a1a1aa)' }}>
@@ -150,10 +161,25 @@ function LedgerRow({ row, formatCurrency }) {
             </span>
           )}
         </div>
-        <strong style={{ color }}>
-          {isPos ? '+' : '-'}{formatCurrency(Math.abs(row.value))}
+        <strong style={{ color: row.isSummary ? (row.type === 'neutral' ? 'var(--text-primary)' : 'var(--accent-emerald)') : color }}>
+          {sign}{formatCurrency(Math.abs(row.value))}
         </strong>
       </div>
+
+      {row.helperText && (
+        <div style={{ 
+          fontSize: '0.7rem', 
+          color: 'var(--text-muted)', 
+          opacity: 0.85, 
+          paddingLeft: row.isTransfer ? '1.2rem' : '0.4rem', 
+          marginTop: '-0.15rem', 
+          marginBottom: '0.1rem',
+          fontStyle: 'italic',
+          lineHeight: '1.2'
+        }}>
+          {row.helperText}
+        </div>
+      )}
       
       {row.expandable && expanded && row.details && (
         <div style={{ 
@@ -553,6 +579,7 @@ export default function DesktopResults({
                       {isLedgerExpanded && [
                         { key: 'incomeInvesting', label: 'Income & Investing' },
                         { key: 'lifeEvents', label: 'Life Events' },
+                        { key: 'homeActivity', label: 'Home Purchase Activity' },
                         { key: 'debtActivity', label: 'Debt Activity' }
                       ].map(sec => {
                         const secRows = yearData.netWorthLedger.rows.filter(r => r.section === sec.key);
@@ -563,9 +590,41 @@ export default function DesktopResults({
                               {sec.label}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '0.4rem' }}>
-                              {secRows.map((row, rIdx) => (
-                                <LedgerRow key={rIdx} row={row} formatCurrency={formatCurrency} />
-                              ))}
+                              {sec.key === 'homeActivity' ? (
+                                [
+                                  { key: 'homePurchased', label: '🏠 Home Purchased' },
+                                  { key: 'equityTransfer', label: '🔄 Cash → Home Equity (No Net Worth Impact)' },
+                                  { key: 'purchaseCosts', label: '💸 Purchase Costs' },
+                                  { key: 'homeOwnership', label: '🏡 Home Ownership' }
+                                ].map(sub => {
+                                  const subRows = secRows.filter(r => r.subgroup === sub.key);
+                                  if (subRows.length === 0) return null;
+                                  return (
+                                    <div key={sub.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.2rem' }}>
+                                      <div style={{ fontSize: '0.68rem', fontWeight: '600', color: 'var(--text-secondary)', opacity: 0.8, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.1rem', marginBottom: '0.15rem' }}>
+                                        {sub.label}
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '0.4rem' }}>
+                                        {sub.key === 'equityTransfer' ? (
+                                          subRows.map((row, rIdx) => (
+                                            <div key={rIdx} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.15rem 0' }}>
+                                              {row.helperText}
+                                            </div>
+                                          ))
+                                        ) : (
+                                          subRows.map((row, rIdx) => (
+                                            <LedgerRow key={rIdx} row={row} formatCurrency={formatCurrency} />
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                secRows.map((row, rIdx) => (
+                                  <LedgerRow key={rIdx} row={row} formatCurrency={formatCurrency} />
+                                ))
+                              )}
                             </div>
                           </div>
                         );

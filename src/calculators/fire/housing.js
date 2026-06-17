@@ -26,11 +26,16 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
 
       const houseShortfall = deductFromLiquidAssets(totalCashNeeded, age, state);
       if (houseShortfall > 0.01) {
-        state.hasRunOut = true;
-        if (state.runOutAge === null) {
-          state.runOutAge = age;
-        }
+        state.cumulativeShortfall = (state.cumulativeShortfall || 0) + houseShortfall;
+        state.housePurchaseShortfall = (state.housePurchaseShortfall || 0) + houseShortfall;
       }
+
+      state.purchaseDebugThisYear = {
+        purchasePrice: p,
+        downPaymentUsed: isCash ? p : dp,
+        closingCostsPaid: closingCosts + points + renovationCost,
+        mortgageOriginalBalance: isCash ? 0 : Math.max(0, p - dp)
+      };
 
       if (isCash) {
         purchasedProperties.push({
@@ -165,21 +170,62 @@ export function processYearlyHousingUpdates(age, currentAge, homeEquityBaseline,
   });
   let totalMortgageBalance = 0;
   let annualHousingExpenses = 0;
+  let totalMortgagePrincipalPaid = 0;
+  let totalMortgageInterestPaid = 0;
+
+  // Debug variables sum
+  let homeValueStart = 0;
+  let homeValueEnd = 0;
+  let mortgageBalanceStart = 0;
+  let mortgageBalanceEnd = 0;
+  let principalPaid = 0;
+  let interestPaid = 0;
+  let propertyTaxPaid = 0;
+  let insurancePaid = 0;
+  let maintenancePaid = 0;
 
   purchasedProperties.forEach(prop => {
-    prop.currentValue = prop.currentValue * (1 + prop.appreciationRate);
+    const prevVal = prop.currentValue;
+    const newVal = prop.currentValue * (1 + prop.appreciationRate);
+    prop.currentValue = newVal;
     totalHomeValue += prop.currentValue;
+
+    homeValueStart += prevVal;
+    homeValueEnd += newVal;
 
     if (prop.purchaseType === 'mortgage') {
       if (age >= prop.purchaseAge && age < prop.purchaseAge + prop.loanTerm) {
-        annualHousingExpenses += prop.annualPI;
         const elapsedYears = age - prop.purchaseAge;
         const r = prop.mortgageRate / 12;
         const n = prop.loanTerm * 12;
-        const elapsedMonths = elapsedYears * 12;
-        const remainingMonths = n - elapsedMonths;
         const pmt = prop.annualPI / 12;
-        prop.mortgageBalance = r === 0 ? pmt * remainingMonths : pmt * (1 - Math.pow(1 + r, -remainingMonths)) / r;
+
+        // Calculate starting balance of the year
+        let startBal = 0;
+        if (age === prop.purchaseAge) {
+          startBal = prop.loanAmount || 0;
+        } else {
+          const prevElapsedMonths = elapsedYears * 12;
+          const prevRemainingMonths = n - prevElapsedMonths;
+          startBal = r === 0 ? pmt * prevRemainingMonths : pmt * (1 - Math.pow(1 + r, -prevRemainingMonths)) / r;
+        }
+
+        // Calculate ending balance of the year (elapsedMonths is (elapsedYears + 1) * 12)
+        const elapsedMonths = (elapsedYears + 1) * 12;
+        const remainingMonths = Math.max(0, n - elapsedMonths);
+        prop.mortgageBalance = remainingMonths === 0 ? 0 : (r === 0 ? pmt * remainingMonths : pmt * (1 - Math.pow(1 + r, -remainingMonths)) / r);
+
+        const pPaid = Math.max(0, startBal - prop.mortgageBalance);
+        const iPaid = Math.max(0, prop.annualPI - pPaid);
+
+        totalMortgagePrincipalPaid += pPaid;
+        totalMortgageInterestPaid += iPaid;
+        annualHousingExpenses += iPaid;
+
+        mortgageBalanceStart += startBal;
+        mortgageBalanceEnd += prop.mortgageBalance;
+        principalPaid += pPaid;
+        interestPaid += iPaid;
       } else {
         prop.mortgageBalance = 0;
       }
@@ -190,6 +236,10 @@ export function processYearlyHousingUpdates(age, currentAge, homeEquityBaseline,
     const ins = prop.currentValue * prop.insuranceRate;
     const maint = prop.currentValue * prop.maintenanceRate;
     annualHousingExpenses += propTax + ins + maint;
+
+    propertyTaxPaid += propTax;
+    insurancePaid += ins;
+    maintenancePaid += maint;
 
     const propInflationRate = prop.inflation !== undefined ? (prop.inflation / 100) : inflationRate;
     const hoaCost = (prop.hoa || 0) * 12 * Math.pow(1 + propInflationRate, age - prop.purchaseAge);
@@ -207,6 +257,17 @@ export function processYearlyHousingUpdates(age, currentAge, homeEquityBaseline,
   return {
     totalHomeValue,
     totalMortgageBalance,
-    annualHousingExpenses
+    annualHousingExpenses,
+    totalMortgagePrincipalPaid,
+    annualMortgageInterest: totalMortgageInterestPaid,
+    homeValueStart,
+    homeValueEnd,
+    mortgageBalanceStart,
+    mortgageBalanceEnd,
+    principalPaid,
+    interestPaid,
+    propertyTaxPaid,
+    insurancePaid,
+    maintenancePaid
   };
 }

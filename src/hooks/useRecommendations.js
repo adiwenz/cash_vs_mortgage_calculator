@@ -381,7 +381,8 @@ export function useRecommendations(inputs, activeResults) {
       baselineReadyAge = baselineResultsSim.retirementReadyAge;
 
       rebalanceData = getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAge);
-      isLiquidInsufficient = !!(rebalanceData && rebalanceData.totalCashNeeded > rebalanceData.liquidFundsAvailable);
+      const affordabilityResult = isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineReadyAge);
+      isLiquidInsufficient = affordabilityResult ? (affordabilityResult.downPaymentGap > 0) : false;
 
       const phasesWithHouse = normPhases;
       const phasesWithoutHouse = getNormalizedPhases(baselineInputs);
@@ -445,10 +446,7 @@ export function useRecommendations(inputs, activeResults) {
         monthlySurplusChange = Math.round(postSurplus - preSurplus);
       }
 
-      isAffordable = isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineReadyAge);
-      if (isLiquidInsufficient) {
-        isAffordable = false;
-      }
+      isAffordable = affordabilityResult ? (affordabilityResult.monthlyAffordable && affordabilityResult.retirementValid) : true;
       
       if (!isAffordable) {
         const readyAge = recResults.retirementReadyAge;
@@ -551,20 +549,24 @@ export function useRecommendations(inputs, activeResults) {
           isPrimary: false
         });
 
+        const totalSavings = Object.values(activePhaseObj?.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const monthlySavingsVal = totalSavings > 0 ? totalSavings : (standardMonthlySavings > 0 ? standardMonthlySavings : 500);
+        const timelineYears = (liquidShortfall / (monthlySavingsVal * 12)).toFixed(1);
+
         list.push({
           type: 'delayHomePurchaseDownPayment',
           icon: '⏳',
-          title: 'Delay home purchase for down payment',
-          details: 'Delay your purchase timeline to allow more time for your liquid assets to grow.',
+          title: 'Save for Down Payment',
+          details: `Save an additional ${formatCurrency(liquidShortfall)} before purchasing to cover the down payment gap.`,
           bulletPoints: [
-            'Provides more months to build up the necessary down payment cash.',
-            'Allows compound growth on existing brokerage and cash assets.',
-            'Lowers the required loan amount when you eventually buy.'
+            `Target: Save an additional ${formatCurrency(liquidShortfall)} cash to cover down payment and closing costs.`,
+            `Estimated timeline: ${timelineYears} years at your current savings rate of ${formatCurrency(monthlySavingsVal)}/month.`,
+            `Waiting allows your savings to accumulate, down payment cash to grow, and compound growth to build without reducing the recommended home price.`
           ],
           readyAge: currentReadyAge || targetRetirementAge,
           yearsImprovement: null,
           value: liquidShortfall,
-          savingsFocus: 'Delay Event',
+          savingsFocus: 'Down Payment',
           savingsEffortScore: 2,
           priorityGroup: 1,
           isPrimary: false
@@ -652,17 +654,17 @@ export function useRecommendations(inputs, activeResults) {
       list.push({
         type: 'delayHomePurchase',
         icon: '⏳',
-        title: 'Delay home purchase',
-        details: 'Delay buying the house to allow your investments to compound and increase your cash/down payment.',
+        title: 'Save for Down Payment',
+        details: 'Wait and save to increase your cash reserves and down payment, lowering mortgage strain.',
         bulletPoints: [
-          'Delay the purchase by 3-5 years.',
+          'Waiting allows your savings to accumulate, down payment cash to grow, and compound growth to build.',
           'This gives you more time to save a larger down payment, which will lower the mortgage loan amount.',
           'Reduces total interest paid over the life of the loan.'
         ],
         readyAge: currentReadyAge || targetRetirementAge,
         yearsImprovement: null,
         value: houseDeficit,
-        savingsFocus: 'Delay Event',
+        savingsFocus: 'Down Payment',
         savingsEffortScore: 2,
         priorityGroup: 1,
         isPrimary: false
@@ -784,7 +786,7 @@ export function useRecommendations(inputs, activeResults) {
 
     // If affordable house, return no recommendations
     let finalRankedPlan = [];
-    if (!(activeBuyHouseEv && isAffordable)) {
+    if (!(activeBuyHouseEv && isAffordable && !isLiquidInsufficient)) {
       finalRankedPlan = list.sort((a, b) => {
         if (a.isInfoOnly && !b.isInfoOnly) return 1;
         if (!a.isInfoOnly && b.isInfoOnly) return -1;

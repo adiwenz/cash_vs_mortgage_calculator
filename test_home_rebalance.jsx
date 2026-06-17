@@ -6,12 +6,20 @@ import { runFireSimulation } from './src/fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
 import { getRebalanceStrategies, applyBalancedBudgetAdjustments, isHouseAffordableBalanced } from './src/calculators/fire/rebalance.js';
 import HouseRebalanceModal from './src/components/fire-simulator/HouseRebalanceModal.jsx';
+import HouseImpactModal from './src/components/fire-simulator/HouseImpactModal.jsx';
 import { useRecommendations } from './src/hooks/useRecommendations.js';
 import { useTimelineEvents } from './src/hooks/useTimelineEvents.js';
+import DesktopResults from './src/components/fire-simulator/DesktopResults.jsx';
+import LifePlanScreen from './src/components/fire-simulator/LifePlanScreen.jsx';
 
 describe('Home Purchase Rebalance calculations & strategies tests', () => {
   beforeEach(() => {
     cleanup();
+    global.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
   });
 
   const setupBaseInputs = () => {
@@ -172,9 +180,9 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     expect(rebalanceData.oldHousingCost).toBe(1000);
     expect(rebalanceData.deficit).toBeGreaterThan(0);
 
-    // Conservative target is currentRent + currentSurplus + conservativeAdjustmentCapacity - emergencySurplusFloor (1000 + 0 + 0 - 100 = 900)
-    expect(rebalanceData.affordablePaymentConservative).toBeCloseTo(900, -1);
-    expect(rebalanceData.affordablePriceConservative).toBeCloseTo(150112, -3);
+    // Comfortable price is 70% of Stretch, which corresponds to payment of 2380
+    expect(rebalanceData.affordablePaymentConservative).toBeCloseTo(2380, -1);
+    expect(rebalanceData.affordablePriceConservative).toBeCloseTo(396964, -3);
 
     // Balanced can reduce Wants and Savings, so price is higher than Conservative
     expect(rebalanceData.affordablePriceBalanced).toBeGreaterThan(rebalanceData.affordablePriceConservative);
@@ -210,28 +218,33 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
       />
     );
 
-    // Verify Title and deficit display
-    expect(screen.getByRole('heading', { name: /Home Purchase Impact/i })).toBeDefined();
-    expect(screen.getByText(/Monthly deficit: \$600\/mo/i)).toBeDefined();
+    // Verify Title and primary recommendation
+    expect(screen.getByRole('heading', { name: /Home Purchase Recommendation/i })).toBeDefined();
 
-    // Verify comparisons
+    // Verify primary fields
     expect(screen.getByText(/Current Home:/i)).toBeDefined();
     expect(screen.getByText(/\$500,000/i)).toBeDefined();
+    expect(screen.getByText(/Recommended:/i)).toBeDefined();
+    expect(screen.getAllByText(/\$400,000/i).length).toBeGreaterThanOrEqual(1);
+
+    // Expand option comparisons to check comfortable/stretch details
+    const toggleBtn = screen.getByRole('button', { name: /Show Option Comparisons/i });
+    fireEvent.click(toggleBtn);
+
     expect(screen.getByText(/Comfortable:/i)).toBeDefined();
     expect(screen.getByText(/\$200,000/i)).toBeDefined();
     expect(screen.getByText(/Balanced \(Default\):/i)).toBeDefined();
-    expect(screen.getAllByText(/\$400,000/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Stretch:/i)).toBeDefined();
     expect(screen.getByText(/\$480,000/i)).toBeDefined();
 
-    // Verify exactly two action buttons
+    // Verify three action buttons
     const boostBtn = screen.getByRole('button', { name: /Create Income Boost/i });
     const priceBtn = screen.getByRole('button', { name: /Update House Purchase/i });
-    const delayBtn = screen.queryByRole('button', { name: /Delay Purchase/i });
+    const saveBtn = screen.getByRole('button', { name: /Save for Down Payment/i });
 
     expect(boostBtn).toBeDefined();
     expect(priceBtn).toBeDefined();
-    expect(delayBtn).toBeNull();
+    expect(saveBtn).toBeDefined();
 
     // Verify subtext and callbacks
     expect(screen.getByText(/Set price to Balanced option: \$400,000/i)).toBeDefined();
@@ -352,19 +365,21 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     const fireCalculationsModule = await import('./src/fireCalculations.js');
     const spy = vi.spyOn(fireCalculationsModule, 'runFireSimulation');
     
-    const beforeResults = fireCalculationsModule.runFireSimulation(inputs);
-    spy.mockClear();
+    try {
+      const beforeResults = fireCalculationsModule.runFireSimulation(inputs);
+      spy.mockClear();
 
-    const rebalanceData = getRebalanceStrategies(inputs, buyHouseEvent, beforeResults.retirementReadyAge);
+      const rebalanceData = getRebalanceStrategies(inputs, buyHouseEvent, beforeResults.retirementReadyAge);
 
-    expect(rebalanceData.affordablePaymentBalanced).toBeCloseTo(2900, -1);
-    expect(rebalanceData.affordablePaymentAggressive).toBeCloseTo(3400, -1);
-    expect(rebalanceData.affordablePaymentAggressive).toBeGreaterThanOrEqual(rebalanceData.affordablePaymentBalanced);
+      expect(rebalanceData.affordablePaymentBalanced).toBeCloseTo(2890, -1);
+      expect(rebalanceData.affordablePaymentAggressive).toBeCloseTo(3400, -1);
+      expect(rebalanceData.affordablePaymentAggressive).toBeGreaterThanOrEqual(rebalanceData.affordablePaymentBalanced);
 
-    // 3 validation simulations + up to 5 delay purchase age simulations = 8 calls max
-    expect(spy.mock.calls.length).toBeLessThanOrEqual(8);
-    
-    spy.mockRestore();
+      // 3 validation simulations + up to 5 delay purchase age simulations = 8 calls max
+      expect(spy.mock.calls.length).toBeLessThanOrEqual(8);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test('Down payment reduces liquid assets but increases home equity, home equity appears in net worth, and mortgage balance appears as debt', () => {
@@ -403,8 +418,8 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
 
     // Verify homeValue is >= 500k at age 40 (appreciated)
     expect(logAt40.homeValue).toBeGreaterThanOrEqual(500000);
-    // Mortgage balance is 400k (500k price - 100k down payment)
-    expect(logAt40.mortgageBalance).toBeCloseTo(400000, -3);
+    expect(logAt40.mortgageBalance).toBeLessThan(400000);
+    expect(logAt40.mortgageBalance).toBeGreaterThan(390000);
 
     // Home equity = homeValue - mortgageBalance
     const expectedEquity = logAt40.homeValue - logAt40.mortgageBalance;
@@ -455,31 +470,33 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     const fireCalculationsModule = await import('./src/fireCalculations.js');
     const spy = vi.spyOn(fireCalculationsModule, 'runFireSimulation');
 
-    // Case A: 26 years retirement delay / unsustainable in retirement
-    // Under new rules, it is still marked valid because monthly cash flow is valid and down payment can be made!
-    spy.mockImplementation((tempInputs) => {
-      return { retirementReadyAge: 86, moneyLasts: false, endingSurplusShortfall: 0 };
-    });
+    try {
+      // Case A: 26 years retirement delay / unsustainable in retirement
+      // Under new rules, it is still marked valid because monthly cash flow is valid and down payment can be made!
+      spy.mockImplementation((tempInputs) => {
+        return { retirementReadyAge: 86, moneyLasts: false, endingSurplusShortfall: 0 };
+      });
 
-    const baselineReadyAge = 60;
-    const rebalanceA = getRebalanceStrategies(inputs, buyHouseEvent, baselineReadyAge);
+      const baselineReadyAge = 60;
+      const rebalanceA = getRebalanceStrategies(inputs, buyHouseEvent, baselineReadyAge);
 
-    expect(rebalanceA.isConservativeValid).toBe(true);
-    expect(rebalanceA.isBalancedValid).toBe(true);
-    expect(rebalanceA.isAggressiveValid).toBe(true);
-    expect(rebalanceA.isConservativeMonthlyValid).toBe(true);
-    expect(rebalanceA.isBalancedMonthlyValid).toBe(true);
-    expect(rebalanceA.isAggressiveMonthlyValid).toBe(true);
-    expect(rebalanceA.selectedOption).toBe('balanced');
-    expect(rebalanceA.selectedAffordablePrice).not.toBeNull();
+      expect(rebalanceA.isConservativeValid).toBe(false);
+      expect(rebalanceA.isBalancedValid).toBe(true);
+      expect(rebalanceA.isAggressiveValid).toBe(true);
+      expect(rebalanceA.isConservativeMonthlyValid).toBe(true);
+      expect(rebalanceA.isBalancedMonthlyValid).toBe(true);
+      expect(rebalanceA.isAggressiveMonthlyValid).toBe(true);
+      expect(rebalanceA.selectedOption).toBe('balanced');
+      expect(rebalanceA.selectedAffordablePrice).not.toBeNull();
 
-    // Case B: Monthly cash flow / down payment fails
-    // Let's test isHouseAffordableBalanced with a very high home price that exceeds balanced capacity.
-    const expensiveHouse = { ...buyHouseEvent, homePrice: 10000000 };
-    const isAffordable = isHouseAffordableBalanced(inputs, expensiveHouse, baselineReadyAge);
-    expect(isAffordable).toBe(false);
-
-    spy.mockRestore();
+      // Case B: Monthly cash flow / down payment fails
+      // Let's test isHouseAffordableBalanced with a very high home price that exceeds balanced capacity.
+      const expensiveHouse = { ...buyHouseEvent, homePrice: 10000000 };
+      const affordabilityResult = isHouseAffordableBalanced(inputs, expensiveHouse, baselineReadyAge);
+      expect(affordabilityResult.monthlyAffordable && affordabilityResult.retirementValid).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test('HouseRebalanceModal regression tests: retirement age delay, (invalid) labels, and buttons', () => {
@@ -525,24 +542,19 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     expect(updateBtn.disabled).toBe(false);
     expect(screen.queryByText(/Plan is unsustainable/i)).toBeNull();
 
+    // Expand comparisons
+    const toggleBtn = screen.getByRole('button', { name: /Show Option Comparisons/i });
+    fireEvent.click(toggleBtn);
+
     // Check that retirement age transitions are displayed
-    expect(screen.getByText(/Retirement age: 60 → 65/i)).toBeDefined();
-    expect(screen.getByText(/Retirement age: 60 → 61/i)).toBeDefined();
-    expect(screen.getByText(/Retirement age: 60 → 68/i)).toBeDefined();
+    expect(screen.getAllByText(/60 → 65/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/60 → 61/i)).toBeDefined();
+    expect(screen.getByText(/60 → 68/i)).toBeDefined();
 
-    // Check that "(invalid)" does NOT appear for valid cash flows
-    expect(screen.queryByText(/\(invalid\)/i)).toBeNull();
-
-    // Case 2: Cash flow test fails (isConservativeMonthlyValid = false)
+    // Case 2: Cash flow test fails (selectedAffordablePrice = null)
     const summaryInvalidCashFlow = {
       ...summaryWithDelay,
       affordablePriceConservative: 0,
-      isConservativeValid: false,
-      isConservativeMonthlyValid: false,
-      isBalancedValid: false,
-      isBalancedMonthlyValid: false,
-      isAggressiveValid: false,
-      isAggressiveMonthlyValid: false,
       selectedAffordablePrice: null,
       selectedOption: 'none'
     };
@@ -554,9 +566,6 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
         handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
       />
     );
-
-    // Verify "(invalid)" label appears
-    expect(screen.getAllByText(/\(invalid\)/i).length).toBeGreaterThanOrEqual(1);
 
     // Verify disabled state shows "Plan is unsustainable"
     const disabledUpdateBtn = screen.getByRole('button', { name: /Update House Purchase/i });
@@ -651,7 +660,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     const { improvementPlan } = result.current;
 
     expect(improvementPlan).not.toBeNull();
-    expect(improvementPlan.isAffordable).toBe(false);
+    expect(improvementPlan.isAffordable).toBe(true);
     
     // Find redirect savings recommendation
     const redirectSavingsRec = improvementPlan.rankedPlan.find(r => r.type === 'redirectSavingsDownPayment');
@@ -733,4 +742,792 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     // They should not have the same stackIndex
     expect(houseTimelineEvent.stackIndex).not.toBe(careerTimelineEvent.stackIndex);
   });
+
+  test('Home Purchase Recommendation Engine new philosophy and rules validation', () => {
+    const inputs = setupBaseInputs();
+    setupCustomPhase(inputs, 5000, 1500, 1500, 1000);
+    inputs.assets = {
+      cash: 5000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 200000
+    };
+
+    // A house event that is affordable monthly (600k) but has a huge down payment gap (200k down payment vs 5k assets)
+    const buyHouseEv = {
+      id: 'house-val-new-rules',
+      type: 'buyHouse',
+      enabled: true,
+      purchaseAge: 40,
+      homePrice: 600000,
+      downPayment: 200000,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.0,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEv];
+    runFireSimulation(inputs);
+
+    const rebalanceData = getRebalanceStrategies(inputs, buyHouseEv, 60);
+
+    // 1. Candidate pricing decoupled from retirement/assets
+    // Stretch should be max affordable payment. Balanced is 85% of Stretch, Comfortable is 70% of Stretch.
+    // Down payment capacity (which is low) should NOT cap the candidate pricing.
+    expect(rebalanceData.affordablePriceBalanced).toBeGreaterThan(500000);
+    expect(rebalanceData.affordablePriceConservative).toBeGreaterThan(400000);
+    expect(rebalanceData.affordablePriceAggressive).toBeGreaterThan(rebalanceData.affordablePriceBalanced);
+
+    // 2. Down payment gap does not invalidate Balanced recommendation
+    const affordabilityResult = isHouseAffordableBalanced(inputs, buyHouseEv, 60);
+    expect(affordabilityResult.monthlyAffordable).toBe(true);
+    expect(affordabilityResult.retirementValid).toBe(true);
+    expect(affordabilityResult.downPaymentGap).toBeGreaterThan(90000);
+
+    // 3. Update House Purchase button should be enabled in HouseRebalanceModal when price is > 0
+    const handleApplyRebalanceStrategy = vi.fn();
+    const { rerender } = render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={{
+          ...rebalanceData,
+          selectedAffordablePrice: 400000,
+          selectedOption: 'balanced'
+        }}
+        setHouseRebalanceSummary={vi.fn()}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+    const updateBtn = screen.getByRole('button', { name: /Update House Purchase/i });
+    expect(updateBtn.disabled).toBe(false);
+
+    // 4. Retirement ready age shows as transition or "Not achievable" (never N/A) in comparisons
+    const toggleBtn = screen.getByRole('button', { name: /Show Option Comparisons/i });
+    fireEvent.click(toggleBtn);
+    
+    cleanup();
+    
+    render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={{
+          ...rebalanceData,
+          baselineRetirementAge: 60,
+          balancedRetirementAge: null, // Should show as "Not achievable"
+          conservativeRetirementAge: 61, // Should show as "60 → 61"
+          aggressiveRetirementAge: 68, // Should show as "60 → 68"
+          selectedAffordablePrice: 400000,
+          selectedOption: 'balanced'
+        }}
+        setHouseRebalanceSummary={vi.fn()}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+
+    const toggleBtn2 = screen.getByRole('button', { name: /Show Option Comparisons/i });
+    fireEvent.click(toggleBtn2);
+
+    expect(screen.getAllByText(/Not achievable/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/60 → 61/i)).toBeDefined();
+    expect(screen.getByText(/60 → 68/i)).toBeDefined();
+  });
+
+  test('Update House Purchase click transitions to detailed outcome screen', () => {
+    const handleApplyRebalanceStrategy = vi.fn();
+    const mockSummary = {
+      purchaseAge: 40,
+      currentHomePrice: 500000,
+      selectedAffordablePrice: 293002,
+      selectedOption: 'balanced',
+      affordablePriceConservative: 200000,
+      affordablePriceBalanced: 293002,
+      affordablePriceAggressive: 350000,
+      affordablePaymentBalanced: 1818,
+      totalCashNeededBalanced: 108790,
+      liquidFundsAvailable: 28015,
+      baselineRetirementAge: 60,
+      balancedRetirementAge: null, // "Not achievable"
+      originalWants: 1500,
+      originalSavings: 1500,
+      wantsReductionBalanced: 300,
+      savingsReductionBalanced: 200,
+      newWantsBalanced: 1200,
+      newSavingsBalanced: 1300,
+      piBalanced: 1108
+    };
+
+    render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={mockSummary}
+        setHouseRebalanceSummary={vi.fn()}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+
+    // Click Update House Purchase
+    const updateBtn = screen.getByRole('button', { name: /Update House Purchase/i });
+    fireEvent.click(updateBtn);
+
+    // Verify it called handleApplyRebalanceStrategy
+    expect(handleApplyRebalanceStrategy).toHaveBeenCalledWith('updatePrice');
+
+    // Verify outcome screen details are shown
+    expect(screen.getByText(/🎉 House Purchase Updated/i)).toBeDefined();
+    expect(screen.getByText(/Full Mortgage Price:/i)).toBeDefined();
+    expect(screen.getAllByText(/\$293,002/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Down Payment:/i)).toBeDefined();
+    expect(screen.getAllByText(/\$108,790/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Mortgage P&I:/i)).toBeDefined();
+    expect(screen.getByText(/\$1,108\/mo/i)).toBeDefined();
+    expect(screen.getByText(/Total Housing Cost:/i)).toBeDefined();
+    expect(screen.getAllByText(/\$1,818\/mo/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/New Retirement Age:/i)).toBeDefined();
+    expect(screen.getAllByText(/Not achievable/i).length).toBeGreaterThanOrEqual(1);
+
+    // Verify budget adjustments are shown
+    expect(screen.getByText(/📈 Budget Adjustments/i)).toBeDefined();
+    
+    const wantsDiv = screen.getByText(/Decrease Wants:/i).closest('div');
+    expect(wantsDiv.textContent).toContain('reduced by $300/mo');
+    expect(wantsDiv.textContent).toContain('from $1,500 to $1,200/mo');
+
+    const savingsDiv = screen.getByText(/Decrease Savings:/i).closest('div');
+    expect(savingsDiv.textContent).toContain('reduced by $200/mo');
+    expect(savingsDiv.textContent).toContain('from $1,500 to $1,300/mo');
+  });
+
+  test('proportional down payment scaling in getRebalanceStrategies and outcome screen', () => {
+    const inputs = setupBaseInputs();
+    setupCustomPhase(inputs, 5000, 1500, 1500, 1000);
+    inputs.assets = {
+      cash: 30000,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 200000
+    };
+
+    // Original home price = 500,000, down payment = 100,000 (20%)
+    const buyHouseEv = {
+      id: 'house-proportional-dp',
+      type: 'buyHouse',
+      enabled: true,
+      purchaseAge: 40,
+      homePrice: 500000,
+      downPayment: 100000,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.0,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEv];
+    runFireSimulation(inputs);
+
+    const rebalanceData = getRebalanceStrategies(inputs, buyHouseEv, 60);
+
+    // Verify proportional down payment is calculated:
+    // balanced price = priceBalanced, downPaymentBalanced = priceBalanced * 0.20
+    const expectedBalancedDownPayment = Math.round(rebalanceData.affordablePriceBalanced * 0.20);
+    expect(rebalanceData.downPaymentBalanced).toBe(expectedBalancedDownPayment);
+
+    // Verify outcome screen displays this proportional down payment
+    const handleApplyRebalanceStrategy = vi.fn();
+    render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={{
+          ...rebalanceData,
+          selectedAffordablePrice: rebalanceData.affordablePriceBalanced,
+          selectedOption: 'balanced'
+        }}
+        setHouseRebalanceSummary={vi.fn()}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+
+    // Click Update House Purchase to see outcome screen
+    const updateBtn = screen.getByRole('button', { name: /Update House Purchase/i });
+    fireEvent.click(updateBtn);
+
+    // Expect to see the proportional down payment on the outcome screen
+    const formattedExpectedDp = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(expectedBalancedDownPayment);
+    const escapedDp = formattedExpectedDp.replace(/\$/g, '\\$');
+    expect(screen.getAllByText(new RegExp(escapedDp, 'i')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('Home Purchase Accounting: down payment, principal amortization, expenses, and retirement ready delays', async () => {
+    const inputs = setupBaseInputs();
+    inputs.assets.brokerage = 200000;
+    inputs.assets.cash = 100000;
+
+    const buyHouseEvent = {
+      id: 'house-event-accounting',
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Moderate Home Purchase',
+      purchaseAge: 40,
+      homePrice: 269493,
+      downPayment: 53899,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.5,
+      loanTerm: 30,
+      propertyTax: 1.1,
+      insurance: 0.35,
+      maintenance: 1.0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEvent];
+    const results = runFireSimulation(inputs);
+
+    const logBefore = results.nominalData.find(l => l.age === 39);
+    const logPurchase = results.nominalData.find(l => l.age === 40);
+    const logAfter = results.nominalData.find(l => l.age === 41);
+
+    expect(logBefore).toBeDefined();
+    expect(logPurchase).toBeDefined();
+    expect(logAfter).toBeDefined();
+
+    // 1. Down payment reduces liquid assets but increases home equity.
+    const liquidBefore = logBefore.portfolio + logBefore.cashBalance;
+    const liquidPurchase = logPurchase.portfolio + logPurchase.cashBalance;
+    const expectedDownPayment = 53899;
+    expect(liquidPurchase).toBeLessThan(liquidBefore - expectedDownPayment);
+    expect(logPurchase.homeEquity).toBeGreaterThanOrEqual(expectedDownPayment);
+
+    // 2. Net worth does not drop by the full down payment.
+    const netWorthDrop = logBefore.netWorth - logPurchase.netWorth;
+    expect(netWorthDrop).toBeLessThan(expectedDownPayment);
+
+    // 3. Mortgage principal payments increase equity and decrease mortgage balance
+    const mortgageBalPurchase = logPurchase.mortgageBalance;
+    const mortgageBalAfter = logAfter.mortgageBalance;
+    expect(mortgageBalAfter).toBeLessThan(mortgageBalPurchase);
+
+    const equityPurchase = logPurchase.homeEquity;
+    const equityAfter = logAfter.homeEquity;
+    expect(equityAfter).toBeGreaterThan(equityPurchase);
+
+    // 4. A moderate home purchase delays retirement rather than automatically making retirement impossible.
+    expect(results.retirementReadyAge).not.toBeNull();
+    expect(results.retirementReadyAge).toBeLessThan(85);
+  });
+
+  test('getOldRentBeforePurchase fallback resolves correctly and shows correct increase in UI warning', () => {
+    const handleApplyRebalanceStrategy = vi.fn();
+    
+    // Simulate simple inputs without budgetDetails.phases
+    const mockSummary = {
+      purchaseAge: 40,
+      currentHomePrice: 500000,
+      selectedAffordablePrice: 269493,
+      selectedOption: 'balanced',
+      affordablePriceConservative: 200000,
+      affordablePriceBalanced: 269493,
+      affordablePriceAggressive: 350000,
+      affordablePaymentBalanced: 1913,
+      totalCashNeededBalanced: 53899,
+      liquidFundsAvailable: 30000,
+      baselineRetirementAge: 60,
+      balancedRetirementAge: null, // "Not achievable"
+      originalWants: 642,
+      originalSavings: 625,
+      wantsReductionBalanced: 225,
+      savingsReductionBalanced: 188,
+      newWantsBalanced: 417,
+      newSavingsBalanced: 437,
+      piBalanced: 1363,
+      oldHousingCost: 1500, // resolved from fallback
+      deficit: 1028
+    };
+
+    render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={mockSummary}
+        setHouseRebalanceSummary={vi.fn()}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+
+    // Click Update House Purchase to transition to the outcome screen
+    const updateBtn = screen.getByRole('button', { name: /Update House Purchase/i });
+    fireEvent.click(updateBtn);
+
+    // Verify outcome details
+    expect(screen.getByText(/Total Housing Cost:/i)).toBeDefined();
+    expect(screen.getByText(/\$1,913\/mo/i)).toBeDefined();
+
+    // Verify the warning box displays correct increase: 1913 - 1500 = 413/mo (not 3549/mo or 1913/mo)
+    const warningText = screen.getByText(/Housing cost increased by/i);
+    expect(warningText.textContent).toContain('Housing cost increased by $413/mo');
+    expect(warningText.textContent).toContain('savings dropped by $188/mo');
+  });
+
+  test('HouseImpactModal renders correctly with no budget adjustments', () => {
+    const mockImpact = {
+      housingCostChange: -80,
+      wantsReduction: 0,
+      savingsReduction: 0,
+      totalCashFlowImprovement: 80,
+      baselineRetirementAge: 60,
+      newRetirementAge: 60,
+      retirementReadyAge: 60,
+      isAffordable: true
+    };
+
+    render(
+      <HouseImpactModal
+        houseImpactSummary={mockImpact}
+        setHouseImpactSummary={vi.fn()}
+      />
+    );
+
+    // Verify Title
+    expect(screen.getByText(/🏠 Home Purchase Added!/i)).toBeDefined();
+
+    // Verify Housing Cost Change
+    const hcRow = screen.getByText(/Housing Cost Change:/i).closest('div');
+    expect(hcRow.textContent).toContain('-$80/mo');
+
+    // Verify Budget Adjustments is +$0/mo
+    const baRow = screen.getByText(/Budget Adjustments:/i).closest('div');
+    expect(baRow.textContent).toContain('+$0/mo');
+
+    // Verify Total Cash Flow Improvement
+    const cfRow = screen.getByText(/Total Cash Flow Improvement:/i).closest('div');
+    expect(cfRow.textContent).toContain('+$80/mo');
+
+    // Verify Retirement Impact
+    const riRow = screen.getByText(/Retirement Impact:/i).closest('div');
+    expect(riRow.textContent).toContain('Unchanged (Age 60)');
+  });
+
+  test('HouseImpactModal renders correctly with Wants and Savings adjustments', () => {
+    const mockImpact = {
+      housingCostChange: -80,
+      wantsReduction: 225,
+      savingsReduction: 188,
+      totalCashFlowImprovement: 493,
+      baselineRetirementAge: 60,
+      newRetirementAge: 62,
+      retirementReadyAge: 62,
+      isAffordable: true
+    };
+
+    render(
+      <HouseImpactModal
+        houseImpactSummary={mockImpact}
+        setHouseImpactSummary={vi.fn()}
+      />
+    );
+
+    // Verify Housing Cost Change
+    const hcRow = screen.getByText(/Housing Cost Change:/i).closest('div');
+    expect(hcRow.textContent).toContain('-$80/mo');
+
+    // Verify Wants and Savings Reductions are displayed separately
+    const wantsRow = screen.getByText(/• Wants Reduction:/i).closest('div');
+    expect(wantsRow.textContent).toContain('+$225/mo');
+
+    const savingsRow = screen.getByText(/• Savings Reduction:/i).closest('div');
+    expect(savingsRow.textContent).toContain('+$188/mo');
+
+    // Verify Budget Adjustments list heading/placeholder is NOT displayed
+    expect(screen.queryByText(/^Budget Adjustments:$/i)).toBeNull();
+
+    // Verify Total Cash Flow Improvement
+    const cfRow = screen.getByText(/Total Cash Flow Improvement:/i).closest('div');
+    expect(cfRow.textContent).toContain('+$493/mo');
+
+    // Verify Retirement Impact shows transition
+    const riRow = screen.getByText(/Retirement Impact:/i).closest('div');
+    expect(riRow.textContent).toContain('60 → 62');
+  });
+
+  test('Affordable home purchase does not trigger automatic wants/savings adjustments', () => {
+    const inputs = setupBaseInputs();
+    setupCustomPhase(inputs, 5500, 1500, 1500, 1500); // income 5.5k, wants 1.5k, savings 1.5k, rent 1.5k
+    inputs.assets = { cash: 60000, emergencyFund: 0, brokerage: 0 };
+
+    const buyHouseEv = {
+      id: 'affordable-house',
+      type: 'buyHouse',
+      enabled: true,
+      purchaseAge: 40,
+      homePrice: 200000,
+      downPayment: 40000,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.5,
+      loanTerm: 30,
+      propertyTax: 1.1,
+      insurance: 0.35,
+      maintenance: 1.0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEv];
+
+    // Compute rebalance strategies - it should not trigger wants/savings reductions
+    const results = runFireSimulation(inputs);
+    const rebalanceData = getRebalanceStrategies(inputs, buyHouseEv, results.retirementReadyAge);
+
+    // Since the house is affordable, rebalanceData should be null (meaning no deficit/rebalancing needed)
+    expect(rebalanceData).toBeNull();
+  });
+
+  test('Home Purchase Accounting Verification Scenario: $200k, $40k down, $6k closing costs, $160k mortgage', () => {
+    const inputs = setupBaseInputs();
+    inputs.assets.brokerage = 100000;
+    inputs.assets.cash = 50000;
+    inputs.assets.realEstate = 0;
+    inputs.assets.debts = 0;
+
+    const buyHouseEvent = {
+      id: 'house-event-200k',
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Moderate Home Purchase',
+      purchaseAge: 40,
+      homePrice: 200000,
+      downPayment: 40000,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.5,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      closingCosts: 3, // 3% of 200k = 6k
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEvent];
+    inputs.houseAssets = [
+      {
+        id: 'house-event-200k',
+        homePrice: 200000,
+        downPayment: 40000,
+        purchaseType: 'mortgage',
+        closingCosts: 3,
+        mortgageRate: 6.5,
+        loanTerm: 30,
+        propertyTax: 0,
+        insurance: 0,
+        maintenance: 0,
+        hoa: 0,
+        pmi: 0
+      }
+    ];
+
+    const results = runFireSimulation(inputs);
+
+    const logBefore = results.nominalData.find(l => l.age === 39);
+    const logPurchase = results.nominalData.find(l => l.age === 40);
+
+    expect(logBefore).toBeDefined();
+    expect(logPurchase).toBeDefined();
+
+    // 1. Home purchase accounting verification
+    expect(logPurchase.homeValue).toBe(206000); // appreciated from 200k during the year
+    expect(logPurchase.mortgageBalance).toBeLessThan(160000);
+    expect(logPurchase.homeEquity).toBeGreaterThan(45000);
+
+    const liquidBefore = logBefore.portfolio + logBefore.cashBalance;
+    const liquidPurchase = logPurchase.portfolio + logPurchase.cashBalance;
+    expect(liquidBefore - liquidPurchase).toBeGreaterThanOrEqual(46000); // down payment + closing costs
+
+    const debugInfo = logPurchase.homeAccountingDebug;
+    expect(debugInfo).toBeDefined();
+    expect(debugInfo.purchasePrice).toBe(200000);
+    expect(debugInfo.downPaymentUsed).toBe(40000);
+    expect(debugInfo.closingCostsPaid).toBe(6000);
+    expect(debugInfo.mortgageOriginalBalance).toBe(160000);
+    expect(debugInfo.netWorthImpactFromPurchase).toBe(-6000);
+
+    // 2. Ledger entries matching the required sections
+    const ledgerRows = logPurchase.netWorthLedger.rows;
+    const homeActivityRows = ledgerRows.filter(r => r.section === 'homeActivity');
+
+    const homeAssetAdded = homeActivityRows.find(r => r.label === 'Home Value');
+    expect(homeAssetAdded).toBeDefined();
+    expect(homeAssetAdded.value).toBe(200000);
+    expect(homeAssetAdded.type).toBe('neutral');
+    expect(homeAssetAdded.subgroup).toBe('homePurchased');
+
+    const mortgageAdded = homeActivityRows.find(r => r.label === 'Mortgage');
+    expect(mortgageAdded).toBeDefined();
+    expect(mortgageAdded.value).toBe(-160000);
+    expect(mortgageAdded.type).toBe('negative');
+    expect(mortgageAdded.subgroup).toBe('homePurchased');
+
+    const homeEquityCreated = homeActivityRows.find(r => r.label === 'Initial Equity');
+    expect(homeEquityCreated).toBeDefined();
+    expect(homeEquityCreated.value).toBe(40000);
+    expect(homeEquityCreated.isSummary).toBe(true);
+    expect(homeEquityCreated.type).toBe('neutral');
+    expect(homeEquityCreated.subgroup).toBe('homePurchased');
+
+    const cashToEquity = homeActivityRows.find(r => r.label === 'Cash → Home Equity');
+    expect(cashToEquity).toBeDefined();
+    expect(cashToEquity.value).toBe(40000);
+    expect(cashToEquity.type).toBe('neutral');
+    expect(cashToEquity.isTransfer).toBe(true);
+    expect(cashToEquity.helperText).toContain('transferred from cash into home equity');
+    expect(cashToEquity.subgroup).toBe('equityTransfer');
+
+    const closingCostsPaid = homeActivityRows.find(r => r.label === 'Closing Costs Paid');
+    expect(closingCostsPaid).toBeDefined();
+    expect(closingCostsPaid.value).toBe(-6000);
+    expect(closingCostsPaid.subgroup).toBe('purchaseCosts');
+
+    const principalPaid = homeActivityRows.find(r => r.label === 'Principal Paid');
+    expect(principalPaid).toBeDefined();
+    expect(principalPaid.value).toBeGreaterThan(0);
+    expect(principalPaid.subgroup).toBe('homeOwnership');
+
+    const interestPaidRow = homeActivityRows.find(r => r.label === 'Interest Paid');
+    expect(interestPaidRow).toBeDefined();
+    expect(interestPaidRow.value).toBeLessThan(0);
+    expect(interestPaidRow.subgroup).toBe('homeOwnership');
+
+    // 4 & 5. Assets / Debt details
+    expect(logPurchase.assets).toBeCloseTo(logPurchase.portfolio + logPurchase.homeValue, 0);
+    expect(logPurchase.debt).toBeCloseTo(logPurchase.mortgageBalance, 0);
+
+    // 6. Net worth formula verification
+    expect(logPurchase.netWorth).toBeCloseTo(logPurchase.assets - logPurchase.debt, 0);
+  });
+
+  test('Roadmap does not render $NaN for home price in DesktopResults.jsx and LifePlanScreen.jsx', () => {
+    const inputs = setupBaseInputs();
+    inputs.lifeEvents = [{
+      id: 'house-nan-check',
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Moderate Home Purchase',
+      purchaseAge: 40,
+      houseId: 'house-nan-check'
+    }];
+    inputs.houseAssets = [{
+      id: 'house-nan-check',
+      homePrice: 200000,
+      purchaseType: 'mortgage'
+    }];
+
+    const mockYearData = {
+      age: 35,
+      netWorth: 10000,
+      assets: 10000,
+      debt: 0,
+      income: 50000,
+      expenses: 30000,
+      savings: 20000,
+      withdrawals: 0,
+      netWorthLedger: {
+        startingNetWorth: 10000,
+        endingNetWorth: 20000,
+        rows: []
+      }
+    };
+
+    const desktopProps = {
+      inputs,
+      displayedResults: { data: [mockYearData] },
+      chartData: [mockYearData],
+      validation: { errors: [] },
+      selectedYear: 35,
+      setSelectedYear: vi.fn(),
+      showAssets: true,
+      setShowAssets: vi.fn(),
+      showDebt: true,
+      setShowDebt: vi.fn(),
+      showNetWorth: true,
+      setShowNetWorth: vi.fn(),
+      handleEditRoadmapEvent: vi.fn()
+    };
+
+    const lifePlanProps = {
+      inputs,
+      activeResults: {
+        data: [mockYearData],
+        nominalData: [mockYearData],
+        retirementOutcome: 'success',
+        runOutAge: 85,
+        retirementReadyAge: 60,
+        yearsWithLimitsReached: 0,
+        totalRedirectedSavings: 0,
+        redirectedToCash: false,
+        retirementReadyTargetComfortable: 1000000,
+        retirementReadyTargetSurvival: 1000000,
+        retirementReadyTarget: 1000000,
+        portfolioAtRetirement: 1200000,
+        retireTodayTarget: 800000,
+        targetRetirementAge: 65
+      },
+      displayedResults: {
+        data: [mockYearData],
+        retirementReadyTargetComfortable: 1000000,
+        retirementReadyTargetSurvival: 1000000,
+        retirementReadyTarget: 1000000,
+        portfolioAtRetirement: 1200000,
+        retireTodayTarget: 800000,
+        targetRetirementAge: 65
+      },
+      selectedYear: 35,
+      setSelectedYear: vi.fn(),
+      chartData: [mockYearData],
+      validation: { errors: [] },
+      handleEditRoadmapEvent: vi.fn(),
+      timelineEvents: [],
+      dragOccurredRef: { current: false }
+    };
+
+    const { container: desktopContainer } = render(<DesktopResults {...desktopProps} />);
+    const desktopHtml = desktopContainer.innerHTML;
+    expect(desktopHtml).not.toContain('$NaN');
+    expect(desktopHtml).toContain('$200,000');
+
+    cleanup();
+
+    const { container: lifePlanContainer } = render(<LifePlanScreen {...lifePlanProps} />);
+    const lifePlanHtml = lifePlanContainer.innerHTML;
+    expect(lifePlanHtml).not.toContain('$NaN');
+    expect(lifePlanHtml).toContain('$200,000');
+  });
+
+  test('Targeted Net Worth Reconciliation Audit for Age 40 purchase', () => {
+    // Exact scenario setup
+    const inputs = setupBaseInputs();
+    inputs.simpleIncome = 50000;
+    inputs.simpleInvestments = 7500; // 15% savings rate
+    inputs.assets.brokerage = 5000;
+    inputs.assets.cash = 0;
+    inputs.assets.realEstate = 0;
+    inputs.assets.debts = 0;
+    inputs.inflationRate = 3.0;
+    inputs.expectedReturn = 7.0;
+
+    const buyHouseEvent = {
+      id: 'house-event-200k',
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Moderate Home Purchase',
+      purchaseAge: 40,
+      homePrice: 200000,
+      downPayment: 40000,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.5,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      closingCosts: 3, // 3% of 200k = 6k
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEvent];
+    inputs.houseAssets = [
+      {
+        id: 'house-event-200k',
+        homePrice: 200000,
+        downPayment: 40000,
+        purchaseType: 'mortgage',
+        closingCosts: 3,
+        mortgageRate: 6.5,
+        loanTerm: 30,
+        propertyTax: 0,
+        insurance: 0,
+        maintenance: 0,
+        hoa: 0,
+        pmi: 0
+      }
+    ];
+
+    const results = runFireSimulation(inputs);
+
+    const logBefore = results.nominalData.find(l => l.age === 39);
+    const logPurchase = results.nominalData.find(l => l.age === 40);
+
+    const startingNetWorth = logBefore.netWorth;
+    const displayedEndingNetWorth = logPurchase.netWorth;
+    const ledgerRows = logPurchase.netWorthLedger.rows;
+
+    const savingsContribution = ledgerRows.find(r => r.label === 'Savings')?.value || 0;
+    const investmentGrowthContribution = ledgerRows.find(r => r.label === 'Investment Growth' || r.label === 'Investment Loss')?.value || 0;
+    const homeAssetAdded = ledgerRows.find(r => r.label === 'Home Value')?.value || 0;
+    const mortgageAdded = ledgerRows.find(r => r.label === 'Mortgage')?.value || 0;
+    const downPaymentTransfer = ledgerRows.find(r => r.label === 'Cash → Home Equity')?.value || 0;
+
+    const closingCostsImpact = ledgerRows.find(r => r.label === 'Closing Costs Paid')?.value || 0;
+    const principalPaidImpact = ledgerRows.find(r => r.label === 'Principal Paid')?.value || 0;
+    const homeAppreciationImpact = ledgerRows.find(r => r.label === 'Home Appreciation')?.value || 0;
+    const interestPaidImpact = ledgerRows.find(r => r.label === 'Interest Paid')?.value || 0;
+
+    const anyOtherNetWorthChanges = 0; // No other net worth changes in this scenario
+
+    const reconciledNetWorth =
+      startingNetWorth +
+      savingsContribution +
+      investmentGrowthContribution +
+      closingCostsImpact +
+      principalPaidImpact +
+      homeAppreciationImpact +
+      interestPaidImpact +
+      anyOtherNetWorthChanges;
+
+    const difference = displayedEndingNetWorth - reconciledNetWorth;
+
+    console.log("=== TARGETED RECONCILIATION AUDIT (AGE 40) ===");
+    console.log(JSON.stringify({
+      startingNetWorth,
+      savingsContribution,
+      investmentGrowthContribution,
+      homeAssetAdded,
+      mortgageAdded,
+      downPaymentTransfer,
+      closingCostsImpact,
+      principalPaidImpact,
+      homeAppreciationImpact,
+      interestPaidImpact,
+      anyOtherNetWorthChanges,
+      calculatedEndingNetWorth: reconciledNetWorth,
+      displayedEndingNetWorth,
+      difference
+    }, null, 2));
+
+    const isReconciled = Math.abs(reconciledNetWorth - displayedEndingNetWorth) < 0.01;
+    if (!isReconciled) {
+      throw new Error(
+        `NET WORTH RECONCILIATION FAILED:
+         Expected ${displayedEndingNetWorth}
+         Calculated ${reconciledNetWorth}
+         Difference ${difference}`
+      );
+    }
+
+    expect(isReconciled).toBe(true);
+  });
 });
+
+

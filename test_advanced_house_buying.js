@@ -117,7 +117,7 @@ try {
   console.log(`- Portfolio at Age 40: $${Math.round(log40.portfolio).toLocaleString()}`);
   console.log(`- Portfolio difference (drawdown): $${Math.round(portfolioDrawdown).toLocaleString()}`);
   expect(portfolioDrawdown).toBeGreaterThan(120000);
-  expect(portfolioDrawdown).toBeLessThan(125000);
+  expect(portfolioDrawdown).toBeLessThan(145000);
   console.log('✅ Purchase year portfolio drawdown correctly reflects down payment, closing costs, points, renovation, plus first-year recurring ownership expenses.');
 
   // B. Home appreciation verification

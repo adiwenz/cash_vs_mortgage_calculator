@@ -5,9 +5,33 @@ export default function HouseImpactModal({
   setHouseImpactSummary
 }) {
   if (!houseImpactSummary) return null;
-  const { housingCostChange, monthlySurplusChange, retirementReadyAge, isAffordable } = houseImpactSummary;
+  
+  const { 
+    housingCostChange, 
+    wantsReduction, 
+    savingsReduction, 
+    totalCashFlowImprovement, 
+    baselineRetirementAge, 
+    newRetirementAge, 
+    retirementReadyAge, 
+    isAffordable 
+  } = houseImpactSummary;
 
   if (!isAffordable) return null;
+
+  const hasAdjustments = (wantsReduction > 0 || savingsReduction > 0);
+  const isDelayed = baselineRetirementAge !== undefined && baselineRetirementAge !== null && newRetirementAge !== undefined && newRetirementAge !== null && newRetirementAge > baselineRetirementAge;
+  const retirementColor = isDelayed ? 'var(--accent-orange, #f97316)' : 'var(--accent-emerald)';
+
+  const renderRetirementImpact = () => {
+    if (baselineRetirementAge === undefined || baselineRetirementAge === null || newRetirementAge === undefined || newRetirementAge === null) {
+      return `Age ${retirementReadyAge || 'N/A'}`;
+    }
+    if (baselineRetirementAge === newRetirementAge) {
+      return `Unchanged (Age ${newRetirementAge})`;
+    }
+    return `${baselineRetirementAge} → ${newRetirementAge}`;
+  };
 
   return (
     <div className="modal-backdrop" onClick={() => setHouseImpactSummary(null)}>
@@ -28,20 +52,45 @@ export default function HouseImpactModal({
             </strong>
           </div>
           
+          {!hasAdjustments ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Budget Adjustments:</span>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                +$0/mo
+              </strong>
+            </div>
+          ) : (
+            <>
+              {wantsReduction > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '0.5rem' }}>• Wants Reduction:</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    +{formatCurrency(wantsReduction)}/mo
+                  </strong>
+                </div>
+              )}
+              {savingsReduction > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '0.5rem' }}>• Savings Reduction:</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    +{formatCurrency(savingsReduction)}/mo
+                  </strong>
+                </div>
+              )}
+            </>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Monthly Surplus Change:</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Cash Flow Improvement:</span>
             <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-              {monthlySurplusChange >= 0 ? `+${formatCurrency(monthlySurplusChange)}/mo` : `${formatCurrency(monthlySurplusChange)}/mo`}
+              {totalCashFlowImprovement >= 0 ? `+${formatCurrency(totalCashFlowImprovement)}/mo` : `${formatCurrency(totalCashFlowImprovement)}/mo`}
             </strong>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Retirement Age:</span>
-            <strong style={{ fontSize: '0.9rem', color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <span>Unchanged</span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>
-                ({retirementReadyAge ? `Age ${retirementReadyAge}` : 'Ready'})
-              </span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Retirement Impact:</span>
+            <strong style={{ fontSize: '0.9rem', color: retirementColor }}>
+              {renderRetirementImpact()}
             </strong>
           </div>
         </div>
@@ -65,3 +114,4 @@ export default function HouseImpactModal({
     </div>
   );
 }
+

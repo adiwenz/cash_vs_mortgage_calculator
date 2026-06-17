@@ -320,6 +320,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     state.housePurchaseTransactionCosts = 0;
     state.yearInvestmentGrowth = 0;
     state.mortgagePayoffFromSale = 0;
+    state.housePurchaseShortfall = 0;
+    state.purchaseDebugThisYear = null;
 
     const startAssets = year === 0
       ? (
@@ -341,6 +343,10 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       : logs[year - 1].debt;
 
     const startNetWorth = startAssets - startDebt;
+
+    const startCustomAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
+    const liquidAssetsBeforePurchase = (balances.cash || 0) + (balances.emergencyFund || 0) + (balances.brokerage || 0) + (balances.trad401k || 0) + (balances.tradIra || 0) + (balances.rothIra || 0) + (balances.hsa || 0) + (balances.other || 0) + startCustomAssetsSum;
+    const netWorthBeforePurchase = startNetWorth;
 
     // Activate future borrowing events starting this year
     activeLoans.forEach(loan => {
@@ -916,7 +922,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     }
 
-    let netSurplus = grossSurplus - taxes + windfallReceived - totalPreTaxAllocations;
+    let netSurplus = grossSurplus - taxes + windfallReceived - totalPreTaxAllocations - (housingUpdates.totalMortgagePrincipalPaid || 0);
     let netCashFlow = netSurplus;
 
     if (isSavingPeriod) {
@@ -1200,55 +1206,33 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     });
 
-    const shortfallVal = shortfall || 0;
+    const shortfallVal = (shortfall || 0) + (state.housePurchaseShortfall || 0);
     const newDebtAdded = weddingFinancedAmount + newMortgageDebt + futureBorrowingActivated + shortfallVal;
 
     const activeLoansInterestPaid = state.annualInterestPaid || 0;
 
-    let annualMortgageInterest = 0;
-    let annualMortgagePrincipal = 0;
-    purchasedProperties.forEach(prop => {
-      if (prop.purchaseType === 'mortgage') {
-        if (age >= prop.purchaseAge && age < prop.purchaseAge + prop.loanTerm) {
-          let startBal = 0;
-          if (age === prop.purchaseAge) {
-            startBal = prop.loanAmount || 0;
-          } else {
-            const prevElapsed = age - 1 - prop.purchaseAge;
-            const r = prop.mortgageRate / 12;
-            const n = prop.loanTerm * 12;
-            const prevElapsedMonths = prevElapsed * 12;
-            const remainingMonths = n - prevElapsedMonths;
-            const pmt = prop.annualPI / 12;
-            startBal = r === 0 ? pmt * remainingMonths : pmt * (1 - Math.pow(1 + r, -remainingMonths)) / r;
-          }
-          const endBal = prop.mortgageBalance || 0;
-          const principalPaid = Math.max(0, startBal - endBal);
-          const interestPaidVal = Math.max(0, prop.annualPI - principalPaid);
-          annualMortgageInterest += interestPaidVal;
-          annualMortgagePrincipal += principalPaid;
-        }
-      }
-    });
+    const annualMortgageInterest = housingUpdates.annualMortgageInterest || 0;
+    const annualMortgagePrincipal = housingUpdates.totalMortgagePrincipalPaid || 0;
 
     const interestPaid = activeLoansInterestPaid + annualMortgageInterest;
 
     // Savings represents net cash flow from income/spending (after min interest/principal but before extra payments/payoffs)
     const grossIncome = annualIncome + windfallReceived;
     const grossExpenses = annualExpenses;
-    const savingsAfterInterest = grossIncome - grossExpenses - taxes - annualExtraPayments - (state.lumpSumDebtPayoffs || 0);
+    const savingsAfterInterest = grossIncome - grossExpenses - taxes - annualExtraPayments - (state.lumpSumDebtPayoffs || 0) - annualMortgagePrincipal;
 
     // Savings before interest to reconcile with -interestPaid in formula
     const savings = savingsAfterInterest + interestPaid;
 
     // Investment Growth calculated directly on assets
     let investmentGrowth = 0;
+    let homeAppreciation = 0;
     if (year > 0) {
       investmentGrowth += state.yearInvestmentGrowth || 0;
 
       // Real estate appreciation
       const prevNominalFactor = Math.pow(1 + inflationRate, year - 1);
-      let homeAppreciation = homeEquityBaseline * (nominalFactor - prevNominalFactor);
+      homeAppreciation = homeEquityBaseline * (nominalFactor - prevNominalFactor);
       purchasedProperties.forEach(prop => {
         if (age >= prop.purchaseAge) {
           const prevVal = prop.currentValue / (1 + prop.appreciationRate);
@@ -1256,6 +1240,57 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         }
       });
       investmentGrowth += homeAppreciation;
+    }
+
+    const mortgagePrincipalPaidVal = annualMortgagePrincipal;
+    const mortgageInterestPaidVal = annualMortgageInterest;
+
+    // Home purchase activity variables
+    let homeAssetAddedValue = 0;
+    let downPaymentUsedValue = 0;
+    let closingCostsPaidValue = 0;
+    let mortgageDebtAddedValue = 0;
+    let liquidAssetsAfterPurchase = liquidAssetsBeforePurchase;
+    let netWorthAfterPurchase = netWorthBeforePurchase;
+    let netWorthImpactFromPurchase = 0;
+
+    const purchaseInfo = state.purchaseDebugThisYear;
+    if (purchaseInfo) {
+      homeAssetAddedValue = purchaseInfo.purchasePrice;
+      downPaymentUsedValue = purchaseInfo.downPaymentUsed;
+      closingCostsPaidValue = purchaseInfo.closingCostsPaid;
+      mortgageDebtAddedValue = purchaseInfo.mortgageOriginalBalance;
+
+      const cashNeeded = downPaymentUsedValue + closingCostsPaidValue;
+      liquidAssetsAfterPurchase = liquidAssetsBeforePurchase - cashNeeded;
+      netWorthAfterPurchase = netWorthBeforePurchase - closingCostsPaidValue;
+      netWorthImpactFromPurchase = netWorthAfterPurchase - netWorthBeforePurchase;
+    }
+
+    let homeAccountingDebug = null;
+    if (purchasedProperties.length > 0 || purchaseInfo) {
+      homeAccountingDebug = {
+        homeValueStart: housingUpdates.homeValueStart || 0,
+        homeValueEnd: housingUpdates.homeValueEnd || 0,
+        purchasePrice: homeAssetAddedValue,
+        downPaymentUsed: downPaymentUsedValue,
+        closingCostsPaid: closingCostsPaidValue,
+        mortgageOriginalBalance: mortgageDebtAddedValue,
+        mortgageBalanceStart: housingUpdates.mortgageBalanceStart || 0,
+        mortgageBalanceEnd: housingUpdates.mortgageBalanceEnd || 0,
+        principalPaid: mortgagePrincipalPaidVal,
+        interestPaid: mortgageInterestPaidVal,
+        propertyTaxPaid: housingUpdates.propertyTaxPaid || 0,
+        insurancePaid: housingUpdates.insurancePaid || 0,
+        maintenancePaid: housingUpdates.maintenancePaid || 0,
+        homeEquityStart: Math.max(0, (housingUpdates.homeValueStart || 0) - (housingUpdates.mortgageBalanceStart || 0)),
+        homeEquityEnd: Math.max(0, (housingUpdates.homeValueEnd || 0) - (housingUpdates.mortgageBalanceEnd || 0)),
+        liquidAssetsBeforePurchase,
+        liquidAssetsAfterPurchase,
+        netWorthBeforePurchase,
+        netWorthAfterPurchase,
+        netWorthImpactFromPurchase
+      };
     }
 
     const lifeEventCosts = weddingPaidFromSavings + sellingCosts + (state.housePurchaseTransactionCosts || 0);
@@ -1285,22 +1320,28 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     // Build UI ledger rows
     const rows = [];
-    if (Math.abs(savingsAfterInterest) > 0.01) {
+    if (Math.abs(savings) > 0.01) {
       rows.push({
         label: 'Savings',
-        value: savingsAfterInterest,
-        type: savingsAfterInterest > 0 ? 'positive' : 'negative',
+        value: savings,
+        type: savings > 0 ? 'positive' : 'negative',
         section: 'incomeInvesting'
       });
     }
-    if (Math.abs(investmentGrowth) > 0.01) {
+
+    // Subtract home appreciation from investmentGrowth for the general row
+    const otherInvestmentGrowth = investmentGrowth - homeAppreciation;
+    if (Math.abs(otherInvestmentGrowth) > 0.01) {
       rows.push({
-        label: investmentGrowth > 0 ? 'Investment Growth' : 'Investment Loss',
-        value: investmentGrowth,
-        type: investmentGrowth > 0 ? 'positive' : 'negative',
+        label: otherInvestmentGrowth > 0 ? 'Investment Growth' : 'Investment Loss',
+        value: otherInvestmentGrowth,
+        type: otherInvestmentGrowth > 0 ? 'positive' : 'negative',
         section: 'incomeInvesting'
       });
     }
+
+    // Life events (exclude transaction costs since they will be in homeActivity)
+    const otherLifeEventCosts = lifeEventCosts - closingCostsPaidValue;
     if (weddingCostTotal > 0) {
       rows.push({
         label: 'Wedding Cost',
@@ -1339,26 +1380,110 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         section: 'lifeEvents'
       });
     }
-    if (newDebtAdded > 0 && newDebtAdded !== weddingFinancedAmount) {
+
+    // Home purchase activity rows
+    if (homeAssetAddedValue > 0) {
+      rows.push({
+        label: 'Home Value',
+        value: homeAssetAddedValue,
+        type: 'neutral',
+        section: 'homeActivity',
+        subgroup: 'homePurchased'
+      });
+    }
+    if (mortgageDebtAddedValue > 0) {
+      rows.push({
+        label: 'Mortgage',
+        value: -mortgageDebtAddedValue,
+        type: 'negative',
+        section: 'homeActivity',
+        subgroup: 'homePurchased'
+      });
+
+      const homeEquityCreated = homeAssetAddedValue - mortgageDebtAddedValue;
+      if (homeEquityCreated > 0) {
+        rows.push({
+          label: 'Initial Equity',
+          value: homeEquityCreated,
+          type: 'neutral',
+          section: 'homeActivity',
+          subgroup: 'homePurchased',
+          isSummary: true
+        });
+      }
+    }
+    if (downPaymentUsedValue > 0) {
+      rows.push({
+        label: 'Cash → Home Equity',
+        value: downPaymentUsedValue,
+        type: 'neutral',
+        section: 'homeActivity',
+        subgroup: 'equityTransfer',
+        isTransfer: true,
+        helperText: `$${Math.round(downPaymentUsedValue).toLocaleString()} transferred from cash into home equity.`
+      });
+    }
+    if (closingCostsPaidValue > 0) {
+      rows.push({
+        label: 'Closing Costs Paid',
+        value: -closingCostsPaidValue,
+        type: 'negative',
+        section: 'homeActivity',
+        subgroup: 'purchaseCosts'
+      });
+    }
+    if (mortgagePrincipalPaidVal > 0) {
+      rows.push({
+        label: 'Principal Paid',
+        value: mortgagePrincipalPaidVal,
+        type: 'positive',
+        section: 'homeActivity',
+        subgroup: 'homeOwnership'
+      });
+    }
+    if (homeAppreciation > 0) {
+      rows.push({
+        label: 'Home Appreciation',
+        value: homeAppreciation,
+        type: 'positive',
+        section: 'homeActivity',
+        subgroup: 'homeOwnership'
+      });
+    }
+    if (mortgageInterestPaidVal > 0) {
+      rows.push({
+        label: 'Interest Paid',
+        value: -mortgageInterestPaidVal,
+        type: 'negative',
+        section: 'homeActivity',
+        subgroup: 'homeOwnership'
+      });
+    }
+
+    // General Debt activity (excluding mortgage debt/principal/interest which are in homeActivity)
+    const otherDebtAdded = newDebtAdded - mortgageDebtAddedValue;
+    if (otherDebtAdded > 0 && otherDebtAdded !== weddingFinancedAmount) {
       rows.push({
         label: 'Debt Added',
-        value: -newDebtAdded,
+        value: -otherDebtAdded,
         type: 'negative',
         section: 'debtActivity'
       });
     }
-    if (debtPrincipalPaid > 0) {
+    const otherDebtPrincipalPaid = Math.max(0, debtPrincipalPaid - mortgagePrincipalPaidVal);
+    if (otherDebtPrincipalPaid > 0) {
       rows.push({
         label: 'Principal Repaid',
-        value: debtPrincipalPaid,
+        value: otherDebtPrincipalPaid,
         type: 'positive',
         section: 'debtActivity'
       });
     }
-    if (interestPaid > 0) {
+    const otherInterestPaid = Math.max(0, interestPaid - mortgageInterestPaidVal);
+    if (otherInterestPaid > 0) {
       rows.push({
         label: 'Interest Paid',
-        value: -interestPaid,
+        value: -otherInterestPaid,
         type: 'negative',
         section: 'debtActivity'
       });
@@ -1492,6 +1617,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       debt: endingDebt,
       netWorthLedger,
       netWorthLedgerDebug,
+      homeAccountingDebug,
       isFI: liquidNW >= retirementReadyTargetForYear,
       fiNumber: retirementReadyTargetForYear,
       ssIncome: yearSocialSecurityIncome,
