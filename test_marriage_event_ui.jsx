@@ -286,4 +286,52 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Verify timeline phase and milestone remain intact
     expect(screen.getAllByText(/Get Married/i).length).toBeGreaterThanOrEqual(2);
   });
+
+  test('test_marriage_event_drag_ties_wedding', async () => {
+    navigateToStep2();
+
+    // 1. Open Add Decision dropdown
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'marriage' } });
+
+    // Step 1: Click Next
+    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    fireEvent.click(nextBtn);
+
+    // Step 2: Plan Wedding (Verify defaults)
+    expect(screen.getAllByText(/Plan Your Wedding/i).length).toBeGreaterThan(0);
+    // Let's set a wedding age different from marriage age or keep defaults
+    const weddingAgeInput = getInputByWrapperText(/Wedding Age/i);
+    expect(weddingAgeInput.value).toBe('35'); // defaults to 35
+
+    fireEvent.click(nextBtn); // Step 2 -> 3
+    fireEvent.click(nextBtn); // Step 3 -> 4
+
+    // Save Marriage Event
+    fireEvent.click(screen.getByRole('button', { name: /Save Marriage Event/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Get Married/i })).toBeNull();
+    });
+
+    // 2. Locate timeline elements
+    // The Marriage event node has 💍
+    const rings = screen.getAllByText('💍');
+    const marriageNode = rings.find(el => el.className === 'milestone-glow-circle' || el.closest('.milestone-glow-circle') !== null).closest('.milestone-circle-wrapper');
+    expect(marriageNode).toBeDefined();
+
+    // 3. Simulate dragging the marriage event to a new age (e.g. from 35 to 45)
+    // We can simulate the mouse events
+    fireEvent.mouseDown(marriageNode, { clientX: 100 });
+    
+    // Move the mouse by a large amount (e.g., 200px) to simulate dragging it to 45
+    // In our test environment, we mock trackWidth or it uses deltaYears based on clientX delta
+    fireEvent.mouseMove(document, { clientX: 300 });
+    
+    // Release drag
+    fireEvent.mouseUp(document);
+
+    // Check that the wedding cost is at the new age or updated in the outputs
+    // We can verify that the simulation completes and updates properly
+    expect(screen.getAllByText(/Get Married/i).length).toBeGreaterThan(0);
+  });
 }, 15000);

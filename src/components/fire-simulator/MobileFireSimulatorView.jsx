@@ -6,7 +6,6 @@ import {
   Settings, 
   ChevronRight, 
   ArrowLeft, 
-  Bell, 
   Sparkles,
   Info
 } from 'lucide-react';
@@ -448,9 +447,6 @@ export default function MobileFireSimulatorView({
           <Sparkles size={20} className="mobile-logo-sparkle" fill="#a78bfa" />
           Finley
         </span>
-        <button type="button" className="mobile-icon-btn" aria-label="Notifications">
-          <Bell size={18} />
-        </button>
       </header>
 
       {/* Main Tab Content */}
@@ -975,9 +971,6 @@ export default function MobileFireSimulatorView({
               <Sparkles size={16} className="mobile-logo-sparkle" fill="#a78bfa" />
               Finley
             </span>
-            <button type="button" className="mobile-icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-            </button>
           </nav>
 
           {/* Overlay Body */}

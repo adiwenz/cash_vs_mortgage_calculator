@@ -382,7 +382,7 @@ export function useTimelineEvents(inputs, displayedResults) {
         age: m.age,
         title: m.label,
         label: m.label,
-        icon: m.type === 'debtPayoff' ? '🛑' : '🔔',
+        icon: m.type === 'debtPayoff' ? '🛑' : m.type === 'marriage' ? '💍' : m.type === 'wedding' ? '💸' : m.type === 'assetTransfer' ? '🔄' : '📈',
         type: m.type,
         isMilestone: m.isMilestone,
         description: `Mathematical milestone: "${m.label}" was achieved.`

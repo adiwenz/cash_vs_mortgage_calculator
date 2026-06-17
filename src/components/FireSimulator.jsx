@@ -370,6 +370,28 @@ export default function FireSimulator() {
               updated.transferAge = newAge;
             } else if (e.type === 'debtPayoff') {
               updated.payoffAge = newAge;
+            } else if (e.type === 'marriage') {
+              const shift = newAge - oldAge;
+              updated.age = newAge;
+              if (e.marriageAge !== undefined && e.marriageAge !== null) {
+                updated.marriageAge = newAge;
+              }
+              const oldWeddingAge = (e.weddingAge !== undefined && e.weddingAge !== null && !isNaN(Number(e.weddingAge)))
+                ? Number(e.weddingAge)
+                : oldAge;
+              updated.weddingAge = oldWeddingAge + shift;
+
+              if (newInputs.householdMembers) {
+                newInputs.householdMembers = newInputs.householdMembers.map(m => {
+                  if (m.id === 'spouse') {
+                    return {
+                      ...m,
+                      activeFromDate: newAge
+                    };
+                  }
+                  return m;
+                });
+              }
             } else {
               updated.age = newAge;
             }

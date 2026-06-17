@@ -2,12 +2,6 @@ export function handleMarriageAssetInjection(age, marriageAge, balances, spouseC
   balances.cash += spouseCash * nominalFactor;
   balances.brokerage += spouseInvestments * nominalFactor;
   balances.trad401k += spouseRetirement * nominalFactor;
-  dynamicMilestones.push({
-    age,
-    label: `Married! Spouse assets injected: +${formatCurrency((spouseCash + spouseInvestments + spouseRetirement) * nominalFactor)}`,
-    type: 'marriage',
-    isMilestone: true
-  });
 }
 
 export function handleWeddingCost(age, weddingAge, weddingCost, nominalFactor, deductFromLiquidAssets, state, dynamicMilestones, formatCurrency) {
