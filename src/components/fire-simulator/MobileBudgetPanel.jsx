@@ -192,18 +192,22 @@ export default function MobileBudgetPanel({
                   if (activeC > 0 || (budgetExpenses.childcare && budgetExpenses.childcare > 0)) {
                     needsItems.push({ key: 'childcare', label: 'Childcare' });
                   }
+                  if (budgetExpenses['🏠 Mortgage'] > 0 || budgetExpenses['mortgage'] > 0) {
+                    needsItems.push({ key: '🏠 Mortgage', label: 'Mortgage' });
+                  }
                   return needsItems;
                 })().map(item => {
-                  const isChildcare = item.key === 'childcare';
+                  const isSpecialLocked = item.key === 'childcare' || item.key === '🏠 Mortgage';
+                  const icon = item.key === 'childcare' ? '👶 ' : (item.key === '🏠 Mortgage' ? '🏠 ' : '');
                   return (
                     <div 
                       key={item.key} 
                       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}
                     >
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        {isChildcare ? '👶 ' : ''}{item.label} {isChildcare && '🔒'}
+                        {icon}{item.label} {isSpecialLocked && '🔒'}
                       </span>
-                      {isEditingNeeds && !isChildcare ? (
+                      {isEditingNeeds && !isSpecialLocked ? (
                         <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                           <span className="currency-symbol">$</span>
                           <input
@@ -218,15 +222,15 @@ export default function MobileBudgetPanel({
                           />
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.85rem', fontWeight: '500', color: isChildcare ? 'var(--accent-amber)' : 'var(--text-primary)' }}>
-                          {formatCurrency(budgetExpenses[item.key] || 0)}
+                        <span style={{ fontSize: '0.85rem', fontWeight: '500', color: isSpecialLocked ? 'var(--accent-amber)' : 'var(--text-primary)' }}>
+                          {formatCurrency(budgetExpenses[item.key] || (item.key === '🏠 Mortgage' && budgetExpenses['mortgage']) || 0)}
                         </span>
                       )}
                     </div>
                   );
                 })}
 
-                {activeDebts.map(debt => (
+                {activeDebts.filter(debt => debt.type !== 'mortgage').map(debt => (
                   <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{debt.icon} {debt.name}</span>
                     <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>

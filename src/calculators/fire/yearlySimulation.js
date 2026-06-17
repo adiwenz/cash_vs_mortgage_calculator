@@ -37,7 +37,7 @@ function formatCurrency(val) {
 function sumNonDebtExpenses(expensesMap) {
   if (!expensesMap) return 0;
   return Object.keys(expensesMap)
-    .filter(k => !k.startsWith('debt_'))
+    .filter(k => !k.startsWith('debt_') && k !== '🏠 Mortgage' && k !== 'mortgage')
     .reduce((sum, k) => sum + (Number(expensesMap[k]) || 0), 0);
 }
 

@@ -403,6 +403,23 @@ export default function EventModalForm({
                           onChange={(e) => setEditingEvent({ ...editingEvent, renterInsurance: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
+                      <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="checkbox"
+                            id="keep-rent"
+                            checked={!!editingEvent.keepRent}
+                            onChange={(e) => setEditingEvent({ ...editingEvent, keepRent: e.target.checked })}
+                            style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                          />
+                          <label htmlFor="keep-rent" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                            Keep rent after purchase (advanced)
+                          </label>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', paddingLeft: '1.55rem', display: 'block' }}>
+                          Preserves rent payments alongside the new mortgage payment rather than replacing them.
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -457,16 +474,48 @@ export default function EventModalForm({
                     <div style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--primary)' }}>
                       🏠 Purchase & Cost Summary
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
-                      <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: 'var(--text-secondary)' }}>Monthly Payment (P&I):</span>
-                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(summary.monthlyPI)}</strong>
+                        <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(summary.monthlyPI)}</strong>
                       </div>
-                      <div>
-                        <span style={{ color: 'var(--text-secondary)' }}>Cash Needed:</span>
-                        <strong style={{ marginLeft: '0.25rem', color: 'var(--text-primary)' }}>{formatCurrency(summary.cashNeeded)}</strong>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderTop: '1px dashed rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Cash Needed:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(summary.cashNeeded)}</strong>
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          color: 'var(--text-tertiary)', 
+                          display: 'flex', 
+                          gap: '0.4rem', 
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          padding: '0.35rem 0.5rem',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255, 255, 255, 0.05)'
+                        }}>
+                          <span>Down Payment: <strong>{formatCurrency(parseFloat(editingEvent.downPayment) || 0)}</strong></span>
+                          <span>+</span>
+                          <span>Closing Costs: <strong>{formatCurrency((parseFloat(editingEvent.homePrice) || 0) * ((parseFloat(editingEvent.closingCosts) || 3) / 100))}</strong></span>
+                          {(parseFloat(editingEvent.points) || 0) > 0 && (
+                            <>
+                              <span>+</span>
+                              <span>Points: <strong>{formatCurrency(parseFloat(editingEvent.points) || 0)}</strong></span>
+                            </>
+                          )}
+                          {(parseFloat(editingEvent.renovationCost) || 0) > 0 && (
+                            <>
+                              <span>+</span>
+                              <span>Renovations: <strong>{formatCurrency(parseFloat(editingEvent.renovationCost) || 0)}</strong></span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '0.2,rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Total Monthly Ownership Cost:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(summary.monthlyOwnershipCost)}/mo</strong>

@@ -76,7 +76,8 @@ export default function FireSimulator() {
     updateInput,
     (phaseId) => handleSetBudgetClickRef.current?.(phaseId),
     setIsBudgetOpenFromMarriageWizard,
-    isMobile
+    isMobile,
+    setShowImprovementModal
   );
   const {
     editingEvent,

@@ -85,6 +85,7 @@ export default function BudgetModal({
                      (Number(budgetExpenses.healthcare) || 0) +
                      (isMarriedMode ? (Number(budgetExpenses.debt) || 0) : 0) +
                      (Number(budgetExpenses.childcare) || 0) +
+                     (Number(budgetExpenses['🏠 Mortgage']) || Number(budgetExpenses['mortgage']) || 0) +
                      activeDebtsTotal;
   const wantsTotal = (Number(budgetExpenses.leisure) || 0) +
                      (Number(budgetExpenses.diningOut) || 0) +
@@ -260,6 +261,8 @@ export default function BudgetModal({
       next.healthcare = 0;
       next.debt = 0;
       next.childcare = 0;
+      next['🏠 Mortgage'] = 0;
+      next['mortgage'] = 0;
       Object.keys(next).forEach(key => {
         if (key.startsWith('debt_')) {
           next[key] = 0;
