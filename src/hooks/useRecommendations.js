@@ -12,6 +12,7 @@ import {
   getChildCountIntervals,
   calculateUSTaxForModal
 } from '../simulatorMathUtils';
+import { isHouseAffordableBalanced } from '../calculators/fire/rebalance';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -439,24 +440,25 @@ export function useRecommendations(inputs, activeResults) {
         monthlySurplusChange = Math.round(postSurplus - preSurplus);
       }
 
-      const readyAge = recResults.retirementReadyAge;
-      const targetRetAge = Number(inputs.targetRetirementAge) || 65;
+      isAffordable = isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineReadyAge);
       
-      const retirementFailed = (readyAge && readyAge > targetRetAge) || !recResults.moneyLasts;
-      const readyAgeDelayed = readyAge !== null && baselineReadyAge !== null && readyAge > baselineReadyAge;
-      
-      if (retirementFailed || readyAgeDelayed) {
-        isRetirementImpactCreated = true;
-        isAffordable = false;
-        retirementReadyAgeUnchanged = false;
+      if (!isAffordable) {
+        const readyAge = recResults.retirementReadyAge;
+        const targetRetAge = Number(inputs.targetRetirementAge) || 65;
+        const retirementFailed = (readyAge && readyAge > targetRetAge) || !recResults.moneyLasts;
+        const readyAgeDelayed = readyAge !== null && baselineReadyAge !== null && readyAge > baselineReadyAge + 1;
+        
+        if (retirementFailed || readyAgeDelayed) {
+          isRetirementImpactCreated = true;
+          retirementReadyAgeUnchanged = false;
+        } else {
+          isMonthlyDeficitOnly = true;
+          retirementReadyAgeUnchanged = true;
+        }
       } else {
         retirementReadyAgeUnchanged = true;
-        if (houseDeficit > 0) {
-          isMonthlyDeficitOnly = true;
-          isAffordable = false;
-        } else {
-          isAffordable = true;
-        }
+        isMonthlyDeficitOnly = false;
+        isRetirementImpactCreated = false;
       }
     }
 

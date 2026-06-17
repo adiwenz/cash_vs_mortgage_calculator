@@ -1634,12 +1634,18 @@ export default function MobileEventWizard({
             if (isHouseFlow) {
               if (houseRebalanceSummary) {
                 const { 
-                  monthlyDifference, 
                   deficit, 
-                  affordablePrice, 
-                  affordablePayment, 
-                  earliestAffordableAge 
+                  affordablePriceConservative,
+                  affordablePriceBalanced,
+                  affordablePriceAggressive,
+                  affordablePaymentBalanced,
+                  earliestAffordableAge,
+                  currentHomePrice
                 } = houseRebalanceSummary;
+
+                const isPriceCalculated = affordablePriceBalanced !== null;
+                const isVeryLowPrice = isPriceCalculated && affordablePriceBalanced < 100000;
+                const isDelayAvailable = earliestAffordableAge !== null;
 
                 return (
                   <div className="mobile-wizard-step-content animate-slide-up" style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1647,14 +1653,31 @@ export default function MobileEventWizard({
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>
                         🏠 Home Purchase Impact
                       </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.75rem 0', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                          Housing increased by <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(monthlyDifference)}/mo</strong>
+                      <div style={{ color: 'var(--accent-red, #ef4444)', fontSize: '0.95rem', fontWeight: 'bold', margin: '0.5rem 0' }}>
+                        Monthly deficit: {formatCurrency(deficit)}/mo
+                      </div>
+                      
+                      {/* Affordability Levels Comparison */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left', margin: '0.75rem 0', fontSize: '0.8rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Current Home:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{currentHomePrice ? formatCurrency(currentHomePrice) : 'Calculated'}</strong>
                         </div>
-                        <div style={{ color: 'var(--accent-red, #ef4444)', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                          Monthly deficit: {formatCurrency(deficit)}/mo
+                        <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.15rem 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Conservative:</span>
+                          <strong>{affordablePriceConservative !== null ? formatCurrency(affordablePriceConservative) : 'N/A'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', fontWeight: 'bold' }}>
+                          <span>Balanced (Default):</span>
+                          <span>{affordablePriceBalanced !== null ? formatCurrency(affordablePriceBalanced) : 'N/A'}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Aggressive:</span>
+                          <strong>{affordablePriceAggressive !== null ? formatCurrency(affordablePriceAggressive) : 'N/A'}</strong>
                         </div>
                       </div>
+
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem 0', fontWeight: '500' }}>
                         Choose a fix:
                       </p>
@@ -1678,7 +1701,7 @@ export default function MobileEventWizard({
                       <button
                         type="button"
                         className="mobile-wizard-btn-primary"
-                        disabled={!affordablePrice}
+                        disabled={!isPriceCalculated}
                         onClick={() => {
                           handleApplyRebalanceStrategy('updatePrice');
                           setHouseRebalanceSummary(null);
@@ -1693,22 +1716,29 @@ export default function MobileEventWizard({
                           alignItems: 'center', 
                           gap: '0.15rem',
                           height: 'auto',
-                          opacity: affordablePrice ? 1 : 0.5,
-                          cursor: affordablePrice ? 'pointer' : 'not-allowed'
+                          opacity: isPriceCalculated ? 1 : 0.5,
+                          cursor: isPriceCalculated ? 'pointer' : 'not-allowed',
+                          border: isVeryLowPrice ? '1px solid #f97316' : undefined
                         }}
                       >
-                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🏠 Update House Price</span>
-                        <span style={{ fontSize: '0.7rem', opacity: 0.85 }}>
-                          {affordablePrice 
-                            ? `Set price to ${formatCurrency(affordablePrice)} (payment: ${formatCurrency(affordablePayment)}/mo)`
-                            : 'No affordable price found'}
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>🏠 Update House Purchase</span>
+                        <span style={{ fontSize: '0.7rem', color: isVeryLowPrice ? '#f97316' : 'inherit', opacity: isVeryLowPrice ? 1 : 0.85 }}>
+                          {isPriceCalculated ? (
+                            isVeryLowPrice ? (
+                              `⚠️ Estimated affordable price: ${formatCurrency(affordablePriceBalanced)}`
+                            ) : (
+                              `Set price to Balanced option: ${formatCurrency(affordablePriceBalanced)} (payment: ${formatCurrency(affordablePaymentBalanced)}/mo)`
+                            )
+                          ) : (
+                            'Cannot calculate affordable home price under current loan assumptions.'
+                          )}
                         </span>
                       </button>
 
                       <button
                         type="button"
                         className="mobile-wizard-btn-primary"
-                        disabled={!earliestAffordableAge}
+                        disabled={!isDelayAvailable}
                         onClick={() => {
                           handleApplyRebalanceStrategy('delayPurchase');
                           setHouseRebalanceSummary(null);
@@ -1723,15 +1753,17 @@ export default function MobileEventWizard({
                           alignItems: 'center', 
                           gap: '0.15rem',
                           height: 'auto',
-                          opacity: earliestAffordableAge ? 1 : 0.5,
-                          cursor: earliestAffordableAge ? 'pointer' : 'not-allowed'
+                          opacity: isDelayAvailable ? 1 : 0.5,
+                          cursor: isDelayAvailable ? 'pointer' : 'not-allowed'
                         }}
                       >
                         <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📅 Delay Purchase</span>
                         <span style={{ fontSize: '0.7rem', opacity: 0.85 }}>
-                          {earliestAffordableAge 
-                            ? `Delay purchase to age ${earliestAffordableAge}`
-                            : 'No affordable future age found'}
+                          {isDelayAvailable ? (
+                            `Move purchase to age ${earliestAffordableAge}`
+                          ) : (
+                            'No near-term delay fixes this'
+                          )}
                         </span>
                       </button>
                     </div>

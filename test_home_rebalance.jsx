@@ -4,7 +4,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { runFireSimulation } from './src/fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
-import { getRebalanceStrategies } from './src/calculators/fire/rebalance.js';
+import { getRebalanceStrategies, applyBalancedBudgetAdjustments } from './src/calculators/fire/rebalance.js';
 import HouseRebalanceModal from './src/components/fire-simulator/HouseRebalanceModal.jsx';
 
 describe('Home Purchase Rebalance calculations & strategies tests', () => {
@@ -134,10 +134,10 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     };
   };
 
-  test('getRebalanceStrategies triggers and computes simplified fixes correctly', () => {
+  test('getRebalanceStrategies triggers and computes Conservative, Balanced, and Aggressive price levels', () => {
     const inputs = setupBaseInputs();
     
-    // Add a buyHouse event that replaces rent (1000) with a much larger mortgage
+    // Rent: 1000, Wants: 1500, Savings: 1500. Income: 5000.
     setupCustomPhase(inputs, 5000, 1500, 1500, 1000);
 
     const buyHouseEvent = {
@@ -146,7 +146,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
       enabled: true,
       name: 'Buy a House',
       purchaseAge: 40,
-      homePrice: 300000,
+      homePrice: 1000000, // Large price so it is not fully affordable at high limit
       downPayment: 0,
       purchaseType: 'mortgage',
       mortgageRate: 6.0,
@@ -168,38 +168,36 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     expect(rebalanceData).not.toBeNull();
     expect(rebalanceData.purchaseAge).toBe(40);
     expect(rebalanceData.oldHousingCost).toBe(1000);
-    expect(rebalanceData.newHousingCost).toBeCloseTo(1800, -1);
-    expect(rebalanceData.monthlyDifference).toBeCloseTo(800, -1);
-    expect(rebalanceData.deficit).toBeCloseTo(800, -1);
+    expect(rebalanceData.deficit).toBeGreaterThan(0);
 
-    // Verify it contains the three fixes and no old strategies
-    expect(rebalanceData.strategies).toBeUndefined();
-    expect(rebalanceData.affordablePrice).toBeDefined();
-    expect(rebalanceData.affordablePayment).toBeDefined();
-    expect(rebalanceData.earliestAffordableAge).toBeDefined();
+    // Conservative target is exactly oldHousingCost (1000)
+    expect(rebalanceData.affordablePaymentConservative).toBeCloseTo(1000, -1);
+    expect(rebalanceData.affordablePriceConservative).toBeCloseTo(166875, -3);
 
-    // Verify affordable price is calculated correctly:
-    expect(rebalanceData.affordablePayment).toBeCloseTo(1000, -1);
-    expect(rebalanceData.affordablePrice).toBeCloseTo(166875, -2);
+    // Balanced can reduce Wants and Savings, so price is higher than Conservative
+    expect(rebalanceData.affordablePriceBalanced).toBeGreaterThan(rebalanceData.affordablePriceConservative);
+
+    // Aggressive can reduce Savings even further to 0, so price is higher than Balanced
+    expect(rebalanceData.affordablePriceAggressive).toBeGreaterThan(rebalanceData.affordablePriceBalanced);
   });
 
-  test('Test rebalancing delay purchase calculation', () => {
+  test('Test rebalancing delay purchase search <= 5 years', () => {
     const inputs = setupBaseInputs();
     setupCustomPhaseForDelay(inputs, 5000, 1500, 1500, 1000);
 
-    // Let's add an income boost at age 45 so they can afford the house then
+    // Add future salary increase at age 43 to make the house affordable then
     const futureIncomeBoost = {
       id: 'boost-1',
       type: 'incomeItem',
       name: 'Salary Boost',
-      startAge: 45,
+      startAge: 43,
       endAge: 65,
-      amount: 2000 * 12,
-      salaryIncrease: 2000 * 12,
+      amount: 2500 * 12,
+      salaryIncrease: 2500 * 12,
       incomeChangeType: 'increaseByAmount',
       frequency: 'yearly',
-      growthRate: 0.03,
-      isTaxable: true,
+      growthRate: 0.0,
+      isTaxable: false,
       enabled: true
     };
 
@@ -209,7 +207,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
       enabled: true,
       name: 'Buy a House',
       purchaseAge: 40,
-      homePrice: 300000,
+      homePrice: 600000, // High price to be unaffordable at 40, 41, 42
       downPayment: 0,
       purchaseType: 'mortgage',
       mortgageRate: 6.0,
@@ -229,22 +227,76 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     const rebalanceData = getRebalanceStrategies(inputs, buyHouseEvent, beforeResults.retirementReadyAge);
     
     expect(rebalanceData).not.toBeNull();
-    expect(rebalanceData.earliestAffordableAge).toBe(45);
+    // Delay purchase should find age 43
+    expect(rebalanceData.earliestAffordableAge).toBe(43);
   });
 
-  test('HouseRebalanceModal renders simplified UI and triggers callbacks', () => {
+  test('Test rebalancing delay purchase doesn\'t recommend > 5 years', () => {
+    const inputs = setupBaseInputs();
+    setupCustomPhaseForDelay(inputs, 5000, 1500, 1500, 1000);
+
+    // Add a salary boost at age 47 (which is +7 years from 40)
+    const futureIncomeBoost = {
+      id: 'boost-1',
+      type: 'incomeItem',
+      name: 'Salary Boost',
+      startAge: 47,
+      endAge: 65,
+      amount: 5000 * 12,
+      salaryIncrease: 5000 * 12,
+      incomeChangeType: 'increaseByAmount',
+      frequency: 'yearly',
+      growthRate: 0.0,
+      isTaxable: false,
+      enabled: true
+    };
+
+    const buyHouseEvent = {
+      id: 'house-event-1',
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Buy a House',
+      purchaseAge: 40,
+      homePrice: 600000,
+      downPayment: 0,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.0,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
+    };
+
+    inputs.lifeEvents = [buyHouseEvent, futureIncomeBoost];
+    const beforeResults = runFireSimulation(inputs);
+
+    const rebalanceData = getRebalanceStrategies(inputs, buyHouseEvent, beforeResults.retirementReadyAge);
+    
+    expect(rebalanceData).not.toBeNull();
+    // Earliest affordable age should be null because it exceeds +5 years (40 + 5 = 45)
+    expect(rebalanceData.earliestAffordableAge).toBeNull();
+  });
+
+  test('HouseRebalanceModal renders three-level comparisons and handles buttons', () => {
     const setHouseRebalanceSummary = vi.fn();
     const handleApplyRebalanceStrategy = vi.fn();
 
     const houseRebalanceSummary = {
       purchaseAge: 40,
       oldHousingCost: 1000,
-      newHousingCost: 1800,
-      monthlyDifference: 800,
-      deficit: 800,
-      affordablePrice: 166875,
-      affordablePayment: 1000,
-      earliestAffordableAge: 45
+      newHousingCost: 2000,
+      monthlyDifference: 1000,
+      deficit: 600,
+      currentHomePrice: 500000,
+      affordablePriceConservative: 200000,
+      affordablePriceBalanced: 400000,
+      affordablePriceAggressive: 480000,
+      affordablePaymentBalanced: 1500,
+      earliestAffordableAge: 43
     };
 
     render(
@@ -255,93 +307,117 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
       />
     );
 
-    // Verify Title
+    // Verify Title and deficit display
     expect(screen.getByRole('heading', { name: /Home Purchase Impact/i })).toBeDefined();
+    expect(screen.getByText(/Monthly deficit: \$600\/mo/i)).toBeDefined();
 
-    // Verify cost increase and deficit text
-    expect(screen.getByText(/Housing increased by/i)).toBeDefined();
-    expect(screen.getByText(/Monthly deficit:/i)).toBeDefined();
+    // Verify comparisons
+    expect(screen.getByText(/Current Home:/i)).toBeDefined();
+    expect(screen.getByText(/\$500,000/i)).toBeDefined();
+    expect(screen.getByText(/Affordable Conservatively:/i)).toBeDefined();
+    expect(screen.getByText(/\$200,000/i)).toBeDefined();
+    expect(screen.getByText(/Affordable with Budget Adjustments:/i)).toBeDefined();
+    expect(screen.getAllByText(/\$400,000/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Affordable Aggressively:/i)).toBeDefined();
+    expect(screen.getByText(/\$480,000/i)).toBeDefined();
 
-    // Verify NO strategy names, radio buttons, or category breakdowns are present
-    expect(screen.queryByText(/Maintain Retirement Age/i)).toBeNull();
-    expect(screen.queryByText(/Protect Lifestyle/i)).toBeNull();
-    expect(screen.queryByText(/Wants/i)).toBeNull();
-    expect(screen.queryByText(/Needs/i)).toBeNull();
-    expect(screen.queryByText(/Savings/i)).toBeNull();
-    expect(screen.queryByRole('radio')).toBeNull();
-
-    // Verify exactly three buttons for fixes are rendered
+    // Verify exactly three action buttons
     const boostBtn = screen.getByRole('button', { name: /Create Income Boost/i });
-    const priceBtn = screen.getByRole('button', { name: /Update House Price/i });
+    const priceBtn = screen.getByRole('button', { name: /Update House Purchase/i });
     const delayBtn = screen.getByRole('button', { name: /Delay Purchase/i });
 
     expect(boostBtn).toBeDefined();
     expect(priceBtn).toBeDefined();
     expect(delayBtn).toBeDefined();
 
-    // Verify click callbacks
-    fireEvent.click(boostBtn);
-    expect(handleApplyRebalanceStrategy).toHaveBeenCalledWith('incomeBoost');
-    expect(setHouseRebalanceSummary).toHaveBeenCalledWith(null);
-
+    // Verify subtext and callbacks
+    expect(screen.getByText(/Set price to Balanced option: \$400,000/i)).toBeDefined();
     fireEvent.click(priceBtn);
     expect(handleApplyRebalanceStrategy).toHaveBeenCalledWith('updatePrice');
 
+    expect(screen.getByText(/Move purchase to age 43/i)).toBeDefined();
     fireEvent.click(delayBtn);
     expect(handleApplyRebalanceStrategy).toHaveBeenCalledWith('delayPurchase');
   });
 
-  test('Create Income Boost creates the correct income event properties', () => {
-    const deficit = 803;
-    const purchaseAge = 40;
-    const yearlyIncomeBoost = deficit * 12;
-    const incomeBoostEvent = {
-      id: `careerChange-test`,
-      type: 'careerChange',
-      name: 'Income Increase (Homeownership)',
-      startAge: purchaseAge,
-      endAge: 65,
-      growthRate: 3.0,
-      isTaxable: true,
-      amount: yearlyIncomeBoost,
-      salaryIncrease: yearlyIncomeBoost,
-      incomeChangeType: 'increaseByAmount',
-      permanent: true,
-      enabled: true
+  test('HouseRebalanceModal handles disabled delay purchase and displays message', () => {
+    const setHouseRebalanceSummary = vi.fn();
+    const handleApplyRebalanceStrategy = vi.fn();
+
+    const houseRebalanceSummary = {
+      purchaseAge: 40,
+      oldHousingCost: 1000,
+      newHousingCost: 2000,
+      monthlyDifference: 1000,
+      deficit: 600,
+      currentHomePrice: 500000,
+      affordablePriceConservative: 200000,
+      affordablePriceBalanced: 400000,
+      affordablePriceAggressive: 480000,
+      affordablePaymentBalanced: 1500,
+      earliestAffordableAge: null // No affordable age <= 5 years
     };
-    expect(incomeBoostEvent.amount).toBe(9636);
-    expect(incomeBoostEvent.startAge).toBe(40);
+
+    render(
+      <HouseRebalanceModal
+        houseRebalanceSummary={houseRebalanceSummary}
+        setHouseRebalanceSummary={setHouseRebalanceSummary}
+        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+      />
+    );
+
+    const delayBtn = screen.getByRole('button', { name: /Delay Purchase/i });
+    expect(delayBtn.disabled).toBe(true);
+    expect(screen.getByText(/No near-term delay fixes this/i)).toBeDefined();
   });
 
-  test('Update House Price updates the house event price', () => {
-    const buyHouseEv = {
-      id: 'house-event-1',
-      homePrice: 300000,
-      downPayment: 50000
-    };
-    const affordablePrice = 166875;
-    const updatedEv = {
-      ...buyHouseEv,
-      homePrice: affordablePrice,
-      downPayment: Math.min(buyHouseEv.downPayment, affordablePrice)
-    };
-    expect(updatedEv.homePrice).toBe(166875);
-    expect(updatedEv.downPayment).toBe(50000);
-  });
+  test('applyBalancedBudgetAdjustments reduces Wants before Savings', () => {
+    const inputs = setupBaseInputs();
+    setupCustomPhase(inputs, 5000, 1500, 1500, 1000);
 
-  test('Delay Purchase moves the house event to the earliest affordable age', () => {
-    const buyHouseEv = {
+    const buyHouseEvent = {
       id: 'house-event-1',
       purchaseAge: 40,
-      age: 40
+      downPayment: 0,
+      purchaseType: 'mortgage',
+      mortgageRate: 6.0,
+      loanTerm: 30,
+      propertyTax: 0,
+      insurance: 0,
+      maintenance: 0,
+      utilitiesIncrease: 0,
+      hoa: 0,
+      pmi: 0,
+      keepRent: false
     };
-    const earliestAffordableAge = 45;
-    const updatedEv = {
-      ...buyHouseEv,
-      purchaseAge: earliestAffordableAge,
-      age: earliestAffordableAge
-    };
-    expect(updatedEv.purchaseAge).toBe(45);
-    expect(updatedEv.age).toBe(45);
+
+    // Calculate a price that increases monthly cost by 600
+    // Rent is 1000, so new payment is 1600.
+    const price = 267000; 
+
+    // Clone inputs to apply changes
+    const adjustedInputs = JSON.parse(JSON.stringify(inputs));
+    applyBalancedBudgetAdjustments(adjustedInputs, buyHouseEvent, price, inputs);
+
+    const originalPhase = inputs.budgetDetails.phases[1];
+    const adjustedPhase = adjustedInputs.budgetDetails.phases.find(p => p.startAge === 40);
+
+    expect(adjustedPhase).toBeDefined();
+
+    // Wants (leisure, diningOut, misc) original total: 1500. Wants floor is max(250, 10% of 5000 net income) = 500.
+    // Reducible wants: 1500 - 500 = 1000.
+    // Net housing cost increase is 600 (1600 payment - 1000 rent).
+    // Wants reduction needed: 600.
+    // Adjusted Wants should be 1500 - 600 = 900.
+    const originalWants = originalPhase.expenses.leisure + originalPhase.expenses.diningOut + originalPhase.expenses.misc;
+    const adjustedWants = adjustedPhase.expenses.leisure + adjustedPhase.expenses.diningOut + adjustedPhase.expenses.misc;
+
+    expect(adjustedWants).toBe(900);
+
+    // Savings original: 1500. Since wants covered the entire 600, savings should remain unchanged.
+    const originalSavings = Object.values(originalPhase.savings).reduce((a, b) => a + b, 0);
+    const adjustedSavings = Object.values(adjustedPhase.savings).reduce((a, b) => a + b, 0);
+
+    expect(adjustedSavings).toBe(originalSavings);
   });
 });

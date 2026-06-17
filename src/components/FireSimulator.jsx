@@ -6,6 +6,7 @@ import { useBudgetPhases } from '../hooks/useBudgetPhases';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useBudgetState } from '../hooks/useBudgetState';
 import { useEventActions } from '../hooks/useEventActions';
+import { applyBalancedBudgetAdjustments } from '../calculators/fire/rebalance';
 
 import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView';
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
@@ -863,13 +864,14 @@ export default function FireSimulator() {
       newInputs.lifeEvents = [...(newInputs.lifeEvents || []), incomeBoostEvent];
       setNotification("✓ Income boost added to plan.");
     } else if (strategyId === 'updatePrice') {
-      const affordablePrice = houseRebalanceSummary.affordablePrice;
-      if (affordablePrice !== undefined) {
+      const affordablePrice = houseRebalanceSummary.affordablePriceBalanced;
+      if (affordablePrice !== undefined && affordablePrice !== null) {
         newInputs.lifeEvents[buyHouseEventIndex] = {
           ...buyHouseEv,
           homePrice: affordablePrice,
           downPayment: Math.min(buyHouseEv.downPayment || 0, affordablePrice)
         };
+        applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
         setNotification(`✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`);
       }
     } else if (strategyId === 'delayPurchase') {
