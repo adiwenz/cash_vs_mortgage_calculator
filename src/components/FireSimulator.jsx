@@ -6,7 +6,7 @@ import { useBudgetPhases } from '../hooks/useBudgetPhases';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useBudgetState } from '../hooks/useBudgetState';
 import { useEventActions } from '../hooks/useEventActions';
-import { applyBalancedBudgetAdjustments } from '../calculators/fire/rebalance';
+import { applyBalancedBudgetAdjustments, splitPhasesAtAge, applyBudgetAdjustmentsForLevel } from '../calculators/fire/rebalance';
 
 import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView';
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
@@ -846,14 +846,17 @@ export default function FireSimulator() {
     const buyHouseEv = newInputs.lifeEvents[buyHouseEventIndex];
 
     if (strategyId === 'incomeBoost') {
-      const yearlyIncomeBoost = houseRebalanceSummary.deficit * 12;
+      const remainingDeficit = houseRebalanceSummary.remainingBalancedDeficit !== undefined 
+        ? houseRebalanceSummary.remainingBalancedDeficit 
+        : houseRebalanceSummary.deficit;
+      const yearlyIncomeBoost = remainingDeficit * 12;
       const incomeBoostEvent = {
         id: `careerChange-${Date.now()}`,
         type: 'careerChange',
         name: 'Income Increase (Homeownership)',
         startAge: purchaseAge,
         endAge: newInputs.targetRetirementAge || 65,
-        growthRate: 3.0,
+        growthRate: 0.03,
         isTaxable: true,
         amount: yearlyIncomeBoost,
         salaryIncrease: yearlyIncomeBoost,
@@ -861,28 +864,42 @@ export default function FireSimulator() {
         permanent: true,
         enabled: true
       };
-      newInputs.lifeEvents = [...(newInputs.lifeEvents || []), incomeBoostEvent];
+      newInputs.incomeList = [...(newInputs.incomeList || []), incomeBoostEvent];
+      applyBalancedBudgetAdjustments(newInputs, buyHouseEv, buyHouseEv.homePrice, scen.inputs);
       setNotification("✓ Income boost added to plan.");
     } else if (strategyId === 'updatePrice') {
-      const affordablePrice = houseRebalanceSummary.affordablePriceBalanced;
+      const affordablePrice = houseRebalanceSummary.selectedAffordablePrice;
       if (affordablePrice !== undefined && affordablePrice !== null) {
         newInputs.lifeEvents[buyHouseEventIndex] = {
           ...buyHouseEv,
           homePrice: affordablePrice,
           downPayment: Math.min(buyHouseEv.downPayment || 0, affordablePrice)
         };
-        applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
-        setNotification(`✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`);
-      }
-    } else if (strategyId === 'delayPurchase') {
-      const earliestAffordableAge = houseRebalanceSummary.earliestAffordableAge;
-      if (earliestAffordableAge) {
-        newInputs.lifeEvents[buyHouseEventIndex] = {
-          ...buyHouseEv,
-          purchaseAge: earliestAffordableAge,
-          age: earliestAffordableAge
-        };
-        setNotification(`✓ Purchase delayed to age ${earliestAffordableAge}.`);
+        if (houseRebalanceSummary.selectedOption === 'balanced') {
+          applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
+        } else if (houseRebalanceSummary.selectedOption === 'aggressive' || houseRebalanceSummary.selectedOption === 'stretch') {
+          applyBudgetAdjustmentsForLevel('stretch', newInputs, buyHouseEv, affordablePrice, scen.inputs);
+        } else {
+          // Fall back to Conservative: no budget adjustments, just split phases at age
+          const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
+          if (newInputs.budgetDetails && newInputs.budgetDetails.phases) {
+            newInputs.budgetDetails.phases = splitPhasesAtAge(newInputs.budgetDetails.phases, purchaseAge);
+          }
+        }
+        
+        const baselineAge = houseRebalanceSummary.baselineRetirementAge;
+        const chosenOption = houseRebalanceSummary.selectedOption || 'balanced';
+        const newAge = chosenOption === 'conservative'
+          ? houseRebalanceSummary.conservativeRetirementAge
+          : chosenOption === 'aggressive'
+          ? houseRebalanceSummary.aggressiveRetirementAge
+          : houseRebalanceSummary.balancedRetirementAge;
+
+        let notificationMsg = `✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`;
+        if (baselineAge !== undefined && newAge !== undefined && newAge !== null && newAge !== baselineAge) {
+          notificationMsg += ` Retirement age may change from ${baselineAge} to ${newAge}.`;
+        }
+        setNotification(notificationMsg);
       }
     }
 

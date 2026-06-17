@@ -12,7 +12,7 @@ import {
   getChildCountIntervals,
   calculateUSTaxForModal
 } from '../simulatorMathUtils';
-import { isHouseAffordableBalanced } from '../calculators/fire/rebalance';
+import { isHouseAffordableBalanced, getRebalanceStrategies } from '../calculators/fire/rebalance';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -363,6 +363,8 @@ export function useRecommendations(inputs, activeResults) {
     let isAffordable = true;
     let isMonthlyDeficitOnly = false;
     let isRetirementImpactCreated = false;
+    let rebalanceData = null;
+    let isLiquidInsufficient = false;
 
     if (activeBuyHouseEv) {
       const purchaseAge = Number(activeBuyHouseEv.purchaseAge || activeBuyHouseEv.age || 40);
@@ -377,6 +379,9 @@ export function useRecommendations(inputs, activeResults) {
       });
       const baselineResultsSim = runFireSimulation(baselineInputs);
       baselineReadyAge = baselineResultsSim.retirementReadyAge;
+
+      rebalanceData = getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAge);
+      isLiquidInsufficient = !!(rebalanceData && rebalanceData.totalCashNeeded > rebalanceData.liquidFundsAvailable);
 
       const phasesWithHouse = normPhases;
       const phasesWithoutHouse = getNormalizedPhases(baselineInputs);
@@ -441,6 +446,9 @@ export function useRecommendations(inputs, activeResults) {
       }
 
       isAffordable = isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineReadyAge);
+      if (isLiquidInsufficient) {
+        isAffordable = false;
+      }
       
       if (!isAffordable) {
         const readyAge = recResults.retirementReadyAge;
@@ -462,8 +470,145 @@ export function useRecommendations(inputs, activeResults) {
       }
     }
 
-    // Generate house-related recommendations if a deficit or impact was created
-    if (activeBuyHouseEv && (houseDeficit > 0 || isRetirementImpactCreated)) {
+    // Generate house-related recommendations if a deficit, impact, or liquid insufficiency was created
+    if (activeBuyHouseEv && (houseDeficit > 0 || isRetirementImpactCreated || isLiquidInsufficient)) {
+      if (isLiquidInsufficient && rebalanceData) {
+        const liquidShortfall = rebalanceData.totalCashNeeded - rebalanceData.liquidFundsAvailable;
+
+        list.push({
+          type: 'redirectSavingsDownPayment',
+          icon: '💰',
+          title: 'Redirect savings to down payment',
+          details: 'Redirect your ongoing monthly savings to your down payment fund instead of long-term investments.',
+          bulletPoints: [
+            'Build your cash reserves specifically for the home purchase down payment.',
+            'Focusing cash flow on the down payment helps you reach the required liquid balance faster.',
+            'Avoids having to pull funds from retirement accounts.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Down Payment',
+          savingsEffortScore: 1,
+          priorityGroup: 1,
+          isPrimary: true
+        });
+
+        list.push({
+          type: 'pauseNonRetirementSavings',
+          icon: '🛑',
+          title: 'Pause non-retirement savings',
+          details: 'Temporarily pause other non-essential savings buckets (like travel or auto funds) to prioritize your home purchase.',
+          bulletPoints: [
+            'Directs all available discretionary savings toward your down payment.',
+            'Shortens the time needed to save up for the purchase.',
+            'Can be resumed once the home purchase is complete.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Savings',
+          savingsEffortScore: 1,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'redirectBrokerageHouseFund',
+          icon: '📈',
+          title: 'Redirect brokerage contributions',
+          details: 'Redirect monthly contributions from your taxable brokerage account to your down payment cash fund.',
+          bulletPoints: [
+            'Taxable brokerage investments can be volatile; cash is safer for short-term down payment needs.',
+            'Reduces investment risk for funds needed in the near term.',
+            'Ensures you have liquid cash available when closing.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Brokerage',
+          savingsEffortScore: 1,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'increaseDownPaymentIncome',
+          icon: '💵',
+          title: 'Increase income for down payment',
+          details: 'Earn additional income to accelerate saving for your down payment shortfall.',
+          bulletPoints: [
+            'Additional income directly increases your liquid cash capacity.',
+            'Consider side projects, bonuses, or career changes to bridge the down payment gap.',
+            'Keeps your current lifestyle budget intact.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Earn More',
+          savingsEffortScore: 2,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'delayHomePurchaseDownPayment',
+          icon: '⏳',
+          title: 'Delay home purchase for down payment',
+          details: 'Delay your purchase timeline to allow more time for your liquid assets to grow.',
+          bulletPoints: [
+            'Provides more months to build up the necessary down payment cash.',
+            'Allows compound growth on existing brokerage and cash assets.',
+            'Lowers the required loan amount when you eventually buy.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Delay Event',
+          savingsEffortScore: 2,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'purchaseWithPartner',
+          icon: '👥',
+          title: 'Purchase with a partner',
+          details: 'Combine liquid assets and incomes with a spouse or co-buyer to purchase the home.',
+          bulletPoints: [
+            'Doubles your liquid down payment capacity.',
+            'Shares transaction costs and ongoing mortgage expenses.',
+            'Improves mortgage approval odds and affordability.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Co-buying',
+          savingsEffortScore: 2,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+
+        list.push({
+          type: 'purchaseWithRoommate',
+          icon: '🤝',
+          title: 'Purchase with a roommate',
+          details: 'Co-sign or rent out a room to a roommate to share down payment and monthly costs.',
+          bulletPoints: [
+            'Reduces your individual down payment requirement by co-owning.',
+            'Rental income from a roommate offsets monthly housing costs.',
+            'Makes homeownership accessible sooner.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: liquidShortfall,
+          savingsFocus: 'Co-buying',
+          savingsEffortScore: 2,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+      }
+
       list.push({
         type: 'reduceHomePrice',
         icon: '📉',
@@ -479,28 +624,30 @@ export function useRecommendations(inputs, activeResults) {
         value: houseDeficit,
         savingsFocus: 'Home Purchase',
         savingsEffortScore: 2,
-        priorityGroup: 1,
+        priorityGroup: isLiquidInsufficient ? 2 : 1,
         isPrimary: false
       });
 
-      list.push({
-        type: 'increaseDownPayment',
-        icon: '💰',
-        title: 'Increase down payment',
-        details: 'Put more money down upfront to decrease your mortgage size and monthly payment.',
-        bulletPoints: [
-          'Increase down payment to eliminate the monthly deficit.',
-          'This lowers the mortgage loan size, reducing your monthly payment and interest expense.',
-          'Keeps your retirement timeline on track.'
-        ],
-        readyAge: currentReadyAge || targetRetirementAge,
-        yearsImprovement: null,
-        value: houseDeficit,
-        savingsFocus: 'Home Purchase',
-        savingsEffortScore: 2,
-        priorityGroup: 1,
-        isPrimary: false
-      });
+      if (!isLiquidInsufficient) {
+        list.push({
+          type: 'increaseDownPayment',
+          icon: '💰',
+          title: 'Increase down payment',
+          details: 'Put more money down upfront to decrease your mortgage size and monthly payment.',
+          bulletPoints: [
+            'Increase down payment to eliminate the monthly deficit.',
+            'This lowers the mortgage loan size, reducing your monthly payment and interest expense.',
+            'Keeps your retirement timeline on track.'
+          ],
+          readyAge: currentReadyAge || targetRetirementAge,
+          yearsImprovement: null,
+          value: houseDeficit,
+          savingsFocus: 'Home Purchase',
+          savingsEffortScore: 2,
+          priorityGroup: 1,
+          isPrimary: false
+        });
+      }
 
       list.push({
         type: 'delayHomePurchase',

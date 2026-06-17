@@ -83,10 +83,17 @@ export function getOldRentBeforePurchase(originalInputs, purchaseAge) {
   return 0;
 }
 
-export function applyBalancedBudgetAdjustments(inputs, buyHouseEv, price, originalInputs) {
+export function applyBudgetAdjustmentsForLevel(level, inputs, buyHouseEv, price, originalInputs) {
   const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
   
-  const baselineInputs = JSON.parse(JSON.stringify(originalInputs));
+  if (level === 'conservative') {
+    if (inputs.budgetDetails && inputs.budgetDetails.phases) {
+      inputs.budgetDetails.phases = splitPhasesAtAge(inputs.budgetDetails.phases, purchaseAge);
+    }
+    return;
+  }
+  
+  const baselineInputs = JSON.parse(JSON.stringify(originalInputs || inputs));
   baselineInputs.lifeEvents = (baselineInputs.lifeEvents || []).map(ev => {
     if (ev.type === 'buyHouse') {
       return { ...ev, enabled: false };
@@ -101,6 +108,11 @@ export function applyBalancedBudgetAdjustments(inputs, buyHouseEv, price, origin
       if (phase.startAge >= purchaseAge && phase.type === 'workSave') {
         const baseP = baselinePhases.find(p => phase.startAge >= p.startAge && phase.startAge < p.endAge);
         const phaseIncome = baseP ? baseP.income : 0;
+        
+        const taxes = (originalInputs || inputs).includeTaxes 
+          ? Math.round(calculateUSTaxForModal(phaseIncome * 12 || 0, 0, (originalInputs || inputs).filingStatus || 'single') / 12) 
+          : 0;
+        const netMonthlyIncome = phaseIncome - taxes;
 
         const newHousingCost = getHousingCostForPrice(price, buyHouseEv);
         
@@ -116,82 +128,7 @@ export function applyBalancedBudgetAdjustments(inputs, buyHouseEv, price, origin
         let amountToCover = Math.max(0, -surplus);
         if (amountToCover > 0) {
           // 1. Reduce Wants down to Wants Floor
-          const wantsFloor = Math.max(250, 0.10 * phaseIncome);
-          const reducibleWants = Math.max(0, currentWants - wantsFloor);
-          const wantsReduction = Math.min(amountToCover, reducibleWants);
-          
-          if (wantsReduction > 0) {
-            const ratio = currentWants > 0 ? (currentWants - wantsReduction) / currentWants : 0;
-            if (phase.expenses.leisure !== undefined) phase.expenses.leisure = Math.round(phase.expenses.leisure * ratio);
-            if (phase.expenses.diningOut !== undefined) phase.expenses.diningOut = Math.round(phase.expenses.diningOut * ratio);
-            if (phase.expenses.misc !== undefined) phase.expenses.misc = Math.round(phase.expenses.misc * ratio);
-            amountToCover -= wantsReduction;
-          }
-          
-          // 2. Reduce Savings down to Savings Floor (10% of net income)
-          if (amountToCover > 0) {
-            const currentSavings = Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-            const savingsFloor = 0.10 * phaseIncome;
-            const reducibleSavings = Math.max(0, currentSavings - savingsFloor);
-            const savingsReduction = Math.min(amountToCover, reducibleSavings);
-            
-            if (savingsReduction > 0) {
-              const ratio = currentSavings > 0 ? (currentSavings - savingsReduction) / currentSavings : 0;
-              Object.keys(phase.savings || {}).forEach(k => {
-                phase.savings[k] = Math.round(phase.savings[k] * ratio);
-              });
-              amountToCover -= savingsReduction;
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-function isAffordableAtPrice(price, level, inputs, activeBuyHouseEv, baselineReadyAge, baselinePhases) {
-  const purchaseAge = Number(activeBuyHouseEv.purchaseAge || activeBuyHouseEv.age || 40);
-
-  // Clone inputs
-  const tempInputs = JSON.parse(JSON.stringify(inputs));
-  
-  // Update event price and down payment
-  const buyHouseEventIndex = (tempInputs.lifeEvents || []).findIndex(e => e.id === activeBuyHouseEv.id);
-  if (buyHouseEventIndex === -1) return false;
-  tempInputs.lifeEvents[buyHouseEventIndex] = {
-    ...activeBuyHouseEv,
-    homePrice: price,
-    downPayment: Math.min(activeBuyHouseEv.downPayment || 0, price)
-  };
-  
-  // Apply budget modifications
-  if (tempInputs.budgetDetails && tempInputs.budgetDetails.phases) {
-    tempInputs.budgetDetails.phases = splitPhasesAtAge(tempInputs.budgetDetails.phases, purchaseAge);
-    
-    for (const phase of tempInputs.budgetDetails.phases) {
-      if (phase.startAge >= purchaseAge && phase.type === 'workSave') {
-        const baseP = baselinePhases.find(p => phase.startAge >= p.startAge && phase.startAge < p.endAge);
-        const phaseIncome = baseP ? baseP.income : 0;
-
-        const newHousingCost = getHousingCostForPrice(price, tempInputs.lifeEvents[buyHouseEventIndex]);
-        
-        const currentWants = (Number(phase.expenses.leisure) || 0) + (Number(phase.expenses.diningOut) || 0) + (Number(phase.expenses.misc) || 0);
-        const otherBaseExpenses = Object.keys(phase.expenses)
-          .filter(k => k !== 'housing' && k !== 'rent' && k !== 'leisure' && k !== 'diningOut' && k !== 'misc')
-          .reduce((sum, k) => sum + (Number(phase.expenses[k]) || 0), 0);
-        const totalSavings = Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-        
-        const totalAllocated = newHousingCost + currentWants + totalSavings + otherBaseExpenses;
-        const surplus = phaseIncome - totalAllocated;
-        
-        let amountToCover = Math.max(0, -surplus);
-        if (amountToCover > 0) {
-          if (level === 'conservative') {
-            return false; // No budget changes allowed for Conservative
-          }
-          
-          // 1. Reduce Wants down to Wants Floor
-          const wantsFloor = Math.max(250, 0.10 * phaseIncome);
+          const wantsFloor = Math.max(250, 0.10 * netMonthlyIncome);
           const reducibleWants = Math.max(0, currentWants - wantsFloor);
           const wantsReduction = Math.min(amountToCover, reducibleWants);
           
@@ -206,7 +143,7 @@ function isAffordableAtPrice(price, level, inputs, activeBuyHouseEv, baselineRea
           // 2. Reduce Savings down to Savings Floor
           if (amountToCover > 0) {
             const currentSavings = Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-            const savingsFloor = level === 'balanced' ? 0.10 * phaseIncome : 0;
+            const savingsFloor = level === 'balanced' ? 0.10 * netMonthlyIncome : 0;
             const reducibleSavings = Math.max(0, currentSavings - savingsFloor);
             const savingsReduction = Math.min(amountToCover, reducibleSavings);
             
@@ -215,45 +152,232 @@ function isAffordableAtPrice(price, level, inputs, activeBuyHouseEv, baselineRea
               Object.keys(phase.savings || {}).forEach(k => {
                 phase.savings[k] = Math.round(phase.savings[k] * ratio);
               });
-              amountToCover -= savingsReduction;
             }
-          }
-          
-          if (amountToCover > 0) {
-            return false; // Deficit not fully covered
           }
         }
       }
     }
   }
-  
-  // Evaluate simulation results
-  const res = runFireSimulation(tempInputs);
-  const targetBaselineAge = baselineReadyAge !== null ? baselineReadyAge : (inputs.targetRetirementAge || 65);
-  
-  if (level === 'balanced') {
-    if (res.retirementReadyAge === null) return false;
-    if (res.retirementReadyAge > targetBaselineAge + 1) return false;
-  } else if (level === 'aggressive') {
-    if (res.retirementReadyAge === null || res.retirementReadyAge > (inputs.lifeExpectancy || 85) || !res.moneyLasts) return false;
-  }
-  
-  return true;
 }
 
-function isAffordableAtAge(age, level, inputs, activeBuyHouseEv, baselineReadyAge, baselinePhases) {
+export function applyBalancedBudgetAdjustments(inputs, buyHouseEv, price, originalInputs) {
+  applyBudgetAdjustmentsForLevel('balanced', inputs, buyHouseEv, price, originalInputs);
+}
+
+function getPriceForHousingCost(targetPayment, buyHouseEv) {
+  if (targetPayment <= 0) return 0;
+  let low = 0;
+  let high = Math.max(100000, targetPayment * 12 * 100);
+  let bestPrice = 0;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const cost = getHousingCostForPrice(mid, buyHouseEv);
+    if (cost <= targetPayment) {
+      bestPrice = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return bestPrice;
+}
+
+function getRequiredDownPaymentAndCosts(price, buyHouseEv) {
+  const p = price;
+  const dp = Math.min(buyHouseEv.downPayment || 0, p);
+  const isCash = dp >= p || buyHouseEv.purchaseType === 'cash';
+  const closingCostsRate = buyHouseEv.closingCosts !== undefined ? Number(buyHouseEv.closingCosts) : 3;
+  const closingCosts = p * (closingCostsRate / 100);
+  const points = buyHouseEv.points !== undefined ? Number(buyHouseEv.points) : 0;
+  const renovationCost = buyHouseEv.renovationCost !== undefined ? Number(buyHouseEv.renovationCost) : 0;
+  let totalCashNeeded = closingCosts + points + renovationCost;
+  if (isCash) {
+    totalCashNeeded += p;
+  } else {
+    totalCashNeeded += dp;
+  }
+  return totalCashNeeded;
+}
+
+function getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, inputs) {
+  const logBefore = baselineResults && baselineResults.nominalData ? baselineResults.nominalData.find(l => l.age === purchaseAge - 1) : null;
+  if (logBefore) {
+    const cash = Number(logBefore.cashBalance) || 0;
+    const brokerage = Number(logBefore.brokerageBalance) || 0;
+    const emergencyFund = Number(logBefore.emergencyFundBalance) || 0;
+    return cash + brokerage + emergencyFund;
+  }
+  const assets = inputs.assets || {};
+  const conditionItems = (inputs.lifeEvents || []).filter(e => e.type === 'conditionItem');
+  
+  const customCheckingSavings = conditionItems
+    .filter(c => c.type === 'checkingSavings')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+    
+  const customBrokerage = conditionItems
+    .filter(c => c.type === 'brokerage')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  
+  return (Number(assets.cash) || 0) +
+         (Number(assets.emergencyFund) || 0) +
+         (Number(assets.brokerage) || 0) +
+         customCheckingSavings +
+         customBrokerage;
+}
+
+function getSimulationValidationForPrice(price, level, inputs, buyHouseEv, baselineReadyAge, originalInputs, baselinePhases, baselineResults) {
+  if (price <= 0) {
+    return {
+      isValid: false,
+      monthlySurplus: 0,
+      savingsRate: 0,
+      retirementAgeImpact: 0,
+      sustainable: false
+    };
+  }
+
+  const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
+  const normPhases = getNormalizedPhases(originalInputs);
+  const basePhase = baselinePhases.find(ph => purchaseAge >= ph.startAge && purchaseAge < ph.endAge);
+  if (!basePhase) {
+    return {
+      isValid: false,
+      monthlySurplus: 0,
+      savingsRate: 0,
+      retirementAgeImpact: 0,
+      sustainable: false
+    };
+  }
+
+  const phaseIncome = basePhase.income;
+  const baseExpensesExcludingWantsAndHousing = Object.keys(basePhase.expenses || {})
+    .filter(k => !k.startsWith('debt_') && k !== 'housing' && k !== 'rent' && k !== 'leisure' && k !== 'diningOut' && k !== 'misc')
+    .reduce((sum, v) => sum + (basePhase.expenses[v] || 0), 0);
+    
+  const debts = getActiveDebtsForAge(originalInputs, basePhase.startAge);
+  const filteredDebts = debts.filter(d => d.id !== 'mortgage' && d.id !== '🏠 Mortgage' && d.type !== 'mortgage');
+  const debtsTotal = filteredDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
+  
+  const taxes = originalInputs.includeTaxes ? Math.round(calculateUSTaxForModal(phaseIncome * 12 || 0, 0, originalInputs.filingStatus || 'single') / 12) : 0;
+  
+  const oldHousingCost = getOldRentBeforePurchase(originalInputs, purchaseAge);
+  const existingNonHousingNeeds = baseExpensesExcludingWantsAndHousing + debtsTotal;
+  const currentNeeds = existingNonHousingNeeds + oldHousingCost;
+
+  const netMonthlyIncome = phaseIncome - taxes;
+  const currentWants = (Number(basePhase.expenses.leisure) || 0) + (Number(basePhase.expenses.diningOut) || 0) + (Number(basePhase.expenses.misc) || 0);
+  const currentSavings = basePhase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(basePhase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  
+  const currentRent = oldHousingCost;
+  const currentSurplus = netMonthlyIncome - currentNeeds - currentWants - currentSavings;
+
+  const wantsFloor = Math.max(250, 0.10 * netMonthlyIncome);
+  const savingsFloor = 0.10 * netMonthlyIncome;
+  const emergencySurplusFloor = 100;
+
+  const conservativeAdjustmentCapacity = 0;
+  const balancedAdjustmentCapacity = Math.max(0, currentWants - wantsFloor) + Math.max(0, currentSavings - savingsFloor);
+  const aggressiveAdjustmentCapacity = Math.max(0, currentWants - wantsFloor) + currentSavings;
+
+  const conservativeMaxPayment = Math.max(0, currentRent + currentSurplus + conservativeAdjustmentCapacity - emergencySurplusFloor);
+  const balancedMaxPayment = Math.max(0, currentRent + currentSurplus + balancedAdjustmentCapacity - emergencySurplusFloor);
+  const aggressiveMaxPayment = Math.max(0, currentRent + currentSurplus + aggressiveAdjustmentCapacity - emergencySurplusFloor);
+
+  const monthlyHousing = getHousingCostForPrice(price, buyHouseEv);
+  const totalCashNeeded = getRequiredDownPaymentAndCosts(price, buyHouseEv);
+  const liquidNWBefore = getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, originalInputs);
+
+  const emergencyFundBefore = baselineResults && baselineResults.nominalData 
+    ? (baselineResults.nominalData.find(l => l.age === purchaseAge - 1)?.emergencyFundBalance || 0)
+    : (Number(originalInputs.assets?.emergencyFund) || 0);
+
+  const emergencyFundMinimumComfortable = emergencyFundBefore;
+  const emergencyFundMinimumBalanced = Math.min(5000, emergencyFundBefore);
+
+  const currentAgeVal = Math.max(0, Number(originalInputs.currentAge) || 30);
+  const yearsDiff = Math.max(0, purchaseAge - currentAgeVal);
+
+  const brokerageSavings = Number(basePhase.savings?.brokerage) || 0;
+  const checkingSavings = Number(basePhase.savings?.checking) || 0;
+  const hysaSavings = Number(basePhase.savings?.hysa) || 0;
+  const emergencySavings = Number(basePhase.savings?.emergency) || 0;
+  const otherSavings = Number(basePhase.savings?.other) || 0;
+  const monthlyNonRetirementSavings = brokerageSavings + checkingSavings + hysaSavings + emergencySavings + otherSavings;
+
+  const trad401kSavings = Number(basePhase.savings?.trad401k) || 0;
+  const tradIraSavings = Number(basePhase.savings?.tradIra) || 0;
+  const rothIraSavings = Number(basePhase.savings?.rothIra) || 0;
+  const hsaSavings = Number(basePhase.savings?.hsa) || 0;
+  const monthlyRetirementSavings = trad401kSavings + tradIraSavings + rothIraSavings + hsaSavings;
+
+  const redirectedSavingsBalanced = yearsDiff * 12 * monthlyNonRetirementSavings;
+  const redirectedSavingsStretch = yearsDiff * 12 * (monthlyNonRetirementSavings + 0.5 * monthlyRetirementSavings);
+
+  const availableHomeFundsComfortable = liquidNWBefore - emergencyFundMinimumComfortable;
+  const availableHomeFundsBalanced = liquidNWBefore - emergencyFundMinimumBalanced + redirectedSavingsBalanced;
+  const availableHomeFundsStretch = liquidNWBefore + redirectedSavingsStretch;
+
+  let isValid = false;
+  if (level === 'conservative') {
+    isValid = price > 0 && monthlyHousing <= conservativeMaxPayment && totalCashNeeded <= availableHomeFundsComfortable;
+  } else if (level === 'balanced') {
+    isValid = price > 0 && monthlyHousing <= balancedMaxPayment && totalCashNeeded <= availableHomeFundsBalanced;
+  } else if (level === 'stretch' || level === 'aggressive') {
+    isValid = price > 0 && monthlyHousing <= aggressiveMaxPayment && totalCashNeeded <= availableHomeFundsStretch;
+  }
+
+  // Run simulation to get outcomes
   const tempInputs = JSON.parse(JSON.stringify(inputs));
-  const buyHouseEventIndex = (tempInputs.lifeEvents || []).findIndex(e => e.id === activeBuyHouseEv.id);
-  if (buyHouseEventIndex === -1) return false;
-  
-  tempInputs.lifeEvents[buyHouseEventIndex] = {
-    ...activeBuyHouseEv,
-    purchaseAge: age,
-    age: age
+  const buyHouseEventIndex = (tempInputs.lifeEvents || []).findIndex(e => e.id === buyHouseEv.id);
+  if (buyHouseEventIndex !== -1) {
+    tempInputs.lifeEvents[buyHouseEventIndex] = {
+      ...buyHouseEv,
+      homePrice: price,
+      downPayment: Math.min(buyHouseEv.downPayment || 0, price)
+    };
+    applyBudgetAdjustmentsForLevel(level, tempInputs, tempInputs.lifeEvents[buyHouseEventIndex], price, originalInputs);
+  }
+
+  const res = runFireSimulation(tempInputs);
+
+  let monthlySurplus = 0;
+  let savingsRate = 0;
+
+  if (tempInputs.budgetDetails && tempInputs.budgetDetails.phases) {
+    for (const phase of tempInputs.budgetDetails.phases) {
+      if (phase.startAge >= purchaseAge && phase.type === 'workSave') {
+        const baseP = baselinePhases.find(p => phase.startAge >= p.startAge && phase.startAge < p.endAge);
+        const phaseIncome = baseP ? baseP.income : 0;
+
+        const monthlyHousingCost = getHousingCostForPrice(price, tempInputs.lifeEvents[buyHouseEventIndex]);
+        const currentWants = (Number(phase.expenses.leisure) || 0) + (Number(phase.expenses.diningOut) || 0) + (Number(phase.expenses.misc) || 0);
+        const otherBaseExpenses = Object.keys(phase.expenses)
+          .filter(k => k !== 'housing' && k !== 'rent' && k !== 'leisure' && k !== 'diningOut' && k !== 'misc')
+          .reduce((sum, k) => sum + (Number(phase.expenses[k]) || 0), 0);
+        const totalSavings = Object.values(phase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+        const totalAllocated = monthlyHousingCost + currentWants + totalSavings + otherBaseExpenses;
+        const surplus = phaseIncome - totalAllocated;
+        monthlySurplus = surplus;
+        savingsRate = phaseIncome > 0 ? (totalSavings / phaseIncome) : 0;
+      }
+    }
+  }
+
+  const targetBaselineAge = baselineReadyAge !== null && baselineReadyAge !== undefined ? baselineReadyAge : (inputs.targetRetirementAge || 65);
+  const retirementReadyAge = res.retirementReadyAge;
+  const retirementAgeImpact = retirementReadyAge !== null ? (retirementReadyAge - targetBaselineAge) : 0;
+  const sustainable = retirementReadyAge !== null && retirementReadyAge <= (inputs.lifeExpectancy || 85) && res.moneyLasts;
+
+  return {
+    isValid,
+    monthlySurplus,
+    savingsRate,
+    retirementAgeImpact,
+    sustainable,
+    retirementReadyAge,
+    baselineReadyAge: targetBaselineAge
   };
-  
-  const price = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
-  return isAffordableAtPrice(price, level, tempInputs, tempInputs.lifeEvents[buyHouseEventIndex], baselineReadyAge, baselinePhases);
 }
 
 export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAge) {
@@ -266,23 +390,18 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
   const activePhase = normPhases.find(p => purchaseAge >= p.startAge && purchaseAge < p.endAge);
   if (!activePhase) return null;
 
-  // Calculate old housing cost using the getOldRentBeforePurchase helper
   const oldHousingCost = getOldRentBeforePurchase(recInputs, purchaseAge);
 
-  // Calculate original new housing cost
   const p = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
   const newHousingCost = getHousingCostForPrice(p, activeBuyHouseEv);
   const monthlyDifference = Math.max(0, newHousingCost - oldHousingCost);
 
-  // Compute surplus in purchase phase to determine deficit
-  const currentSurplus = getPhaseSurplus(activePhase, recInputs);
-  const houseDeficit = Math.max(0, -currentSurplus);
+  const currentSurplusRaw = getPhaseSurplus(activePhase, recInputs);
+  const houseDeficit = Math.max(0, -currentSurplusRaw);
   if (houseDeficit <= 0) return null;
 
-  // Resolve target baseline ready age
   const resolvedBaselineAge = baselineReadyAge !== undefined ? baselineReadyAge : null;
 
-  // Calculate baseline phases to look up baseline rents and incomes correctly
   const baselineInputs = JSON.parse(JSON.stringify(recInputs));
   baselineInputs.lifeEvents = (baselineInputs.lifeEvents || []).map(ev => {
     if (ev.type === 'buyHouse') {
@@ -291,24 +410,130 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     return ev;
   });
   const baselinePhases = getNormalizedPhases(baselineInputs);
+  const baselineResults = runFireSimulation(baselineInputs);
+  const basePhase = baselinePhases.find(ph => purchaseAge >= ph.startAge && purchaseAge < ph.endAge);
+  if (!basePhase) return null;
 
-  // 1. Calculate affordable price for Conservative
-  const affordablePriceConservative = getAffordablePriceForLevel('conservative', recInputs, activeBuyHouseEv, resolvedBaselineAge, baselinePhases);
+  const phaseIncome = basePhase.income;
   
-  // 2. Calculate affordable price for Balanced
-  const affordablePriceBalanced = getAffordablePriceForLevel('balanced', recInputs, activeBuyHouseEv, resolvedBaselineAge, baselinePhases);
+  const baseExpensesExcludingWantsAndHousing = Object.keys(basePhase.expenses || {})
+    .filter(k => !k.startsWith('debt_') && k !== 'housing' && k !== 'rent' && k !== 'leisure' && k !== 'diningOut' && k !== 'misc')
+    .reduce((sum, v) => sum + (basePhase.expenses[v] || 0), 0);
+    
+  const debts = getActiveDebtsForAge(baselineInputs, basePhase.startAge);
+  const filteredDebts = debts.filter(d => d.id !== 'mortgage' && d.id !== '🏠 Mortgage' && d.type !== 'mortgage');
+  const debtsTotal = filteredDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
   
-  // 3. Calculate affordable price for Aggressive
-  const affordablePriceAggressive = getAffordablePriceForLevel('aggressive', recInputs, activeBuyHouseEv, resolvedBaselineAge, baselinePhases);
+  const taxes = recInputs.includeTaxes ? Math.round(calculateUSTaxForModal(phaseIncome * 12 || 0, 0, recInputs.filingStatus || 'single') / 12) : 0;
+  
+  const existingNonHousingNeeds = baseExpensesExcludingWantsAndHousing + debtsTotal;
+  const currentNeeds = existingNonHousingNeeds + oldHousingCost;
 
-  // 4. Calculate earliest purchase age (up to +5 years) under Balanced model
-  let earliestAffordableAge = null;
-  for (let age = purchaseAge + 1; age <= purchaseAge + 5; age++) {
-    if (isAffordableAtAge(age, 'balanced', recInputs, activeBuyHouseEv, resolvedBaselineAge, baselinePhases)) {
-      earliestAffordableAge = age;
-      break;
-    }
+  const netMonthlyIncome = phaseIncome - taxes;
+  const currentWants = (Number(basePhase.expenses.leisure) || 0) + (Number(basePhase.expenses.diningOut) || 0) + (Number(basePhase.expenses.misc) || 0);
+  const currentSavings = basePhase.savingsAllocMode === 'percentSurplus' ? 0 : Object.values(basePhase.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  
+  const currentRent = oldHousingCost;
+  const currentSurplus = netMonthlyIncome - currentNeeds - currentWants - currentSavings;
+
+  const wantsFloor = Math.max(250, 0.10 * netMonthlyIncome);
+  const savingsFloor = 0.10 * netMonthlyIncome;
+  const emergencySurplusFloor = 100;
+
+  const conservativeAdjustmentCapacity = 0;
+  const balancedAdjustmentCapacity = Math.max(0, currentWants - wantsFloor) + Math.max(0, currentSavings - savingsFloor);
+  const aggressiveAdjustmentCapacity = Math.max(0, currentWants - wantsFloor) + currentSavings;
+
+  const conservativeMaxPayment = Math.max(0, currentRent + currentSurplus + conservativeAdjustmentCapacity - emergencySurplusFloor);
+  const balancedMaxPayment = Math.max(0, currentRent + currentSurplus + balancedAdjustmentCapacity - emergencySurplusFloor);
+  const aggressiveMaxPayment = Math.max(0, currentRent + currentSurplus + aggressiveAdjustmentCapacity - emergencySurplusFloor);
+
+  const liquidNWBefore = getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, recInputs);
+
+  const emergencyFundBefore = baselineResults && baselineResults.nominalData 
+    ? (baselineResults.nominalData.find(l => l.age === purchaseAge - 1)?.emergencyFundBalance || 0)
+    : (Number(recInputs.assets?.emergencyFund) || 0);
+
+  const emergencyFundMinimumComfortable = emergencyFundBefore;
+  const emergencyFundMinimumBalanced = Math.min(5000, emergencyFundBefore);
+
+  const currentAgeVal = Math.max(0, Number(recInputs.currentAge) || 30);
+  const yearsDiff = Math.max(0, purchaseAge - currentAgeVal);
+
+  const brokerageSavings = Number(basePhase.savings?.brokerage) || 0;
+  const checkingSavings = Number(basePhase.savings?.checking) || 0;
+  const hysaSavings = Number(basePhase.savings?.hysa) || 0;
+  const emergencySavings = Number(basePhase.savings?.emergency) || 0;
+  const otherSavings = Number(basePhase.savings?.other) || 0;
+  const monthlyNonRetirementSavings = brokerageSavings + checkingSavings + hysaSavings + emergencySavings + otherSavings;
+
+  const trad401kSavings = Number(basePhase.savings?.trad401k) || 0;
+  const tradIraSavings = Number(basePhase.savings?.tradIra) || 0;
+  const rothIraSavings = Number(basePhase.savings?.rothIra) || 0;
+  const hsaSavings = Number(basePhase.savings?.hsa) || 0;
+  const monthlyRetirementSavings = trad401kSavings + tradIraSavings + rothIraSavings + hsaSavings;
+
+  const redirectedSavingsBalanced = yearsDiff * 12 * monthlyNonRetirementSavings;
+  const redirectedSavingsStretch = yearsDiff * 12 * (monthlyNonRetirementSavings + 0.5 * monthlyRetirementSavings);
+
+  const availableHomeFundsComfortable = liquidNWBefore - emergencyFundMinimumComfortable;
+  const availableHomeFundsBalanced = liquidNWBefore - emergencyFundMinimumBalanced + redirectedSavingsBalanced;
+  const availableHomeFundsStretch = liquidNWBefore + redirectedSavingsStretch;
+
+  const closingCostsRate = activeBuyHouseEv.closingCosts !== undefined ? Number(activeBuyHouseEv.closingCosts) : 3;
+  const movingCosts = activeBuyHouseEv.movingCosts !== undefined ? Number(activeBuyHouseEv.movingCosts) : 3000;
+  
+  const isCashPurchase = activeBuyHouseEv.purchaseType === 'cash' || (activeBuyHouseEv.downPayment || 0) >= p;
+  const targetDownPaymentPercent = isCashPurchase ? 1.0 : (p > 0 ? Math.max(0.01, (activeBuyHouseEv.downPayment || 0) / p) : 0.20);
+
+  const maxHomePriceComfortable = Math.max(0, availableHomeFundsComfortable - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
+  const maxHomePriceBalanced = Math.max(0, availableHomeFundsBalanced - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
+  const maxHomePriceStretch = Math.max(0, availableHomeFundsStretch - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
+
+  // Back-solve prices without simulation, constrained by down payment capacity
+  const priceConservative = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(conservativeMaxPayment, activeBuyHouseEv), maxHomePriceComfortable)));
+  const priceBalanced = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(balancedMaxPayment, activeBuyHouseEv), maxHomePriceBalanced)));
+  const priceStretch = Math.round(Math.max(0, Math.min(p, getPriceForHousingCost(aggressiveMaxPayment, activeBuyHouseEv), maxHomePriceStretch)));
+
+  // Run simulation exactly once for each band price to validate
+  const valConservative = getSimulationValidationForPrice(priceConservative, 'conservative', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
+  const valBalanced = getSimulationValidationForPrice(priceBalanced, 'balanced', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
+  const valStretch = getSimulationValidationForPrice(priceStretch, 'stretch', recInputs, activeBuyHouseEv, resolvedBaselineAge, recInputs, baselinePhases, baselineResults);
+
+  // Selected option logic:
+  let selectedAffordablePrice = null;
+  let selectedOption = 'balanced';
+  let selectedRetirementDelay = 0;
+
+  if (valBalanced.isValid) {
+    selectedAffordablePrice = priceBalanced;
+    selectedOption = 'balanced';
+    selectedRetirementDelay = valBalanced.retirementAgeImpact;
+  } else if (valConservative.isValid) {
+    selectedAffordablePrice = priceConservative;
+    selectedOption = 'conservative';
+    selectedRetirementDelay = valConservative.retirementAgeImpact;
+  } else if (valStretch.isValid) {
+    selectedAffordablePrice = priceStretch;
+    selectedOption = 'aggressive';
+    selectedRetirementDelay = valStretch.retirementAgeImpact;
+  } else {
+    // If all are invalid
+    selectedAffordablePrice = null;
+    selectedOption = 'none';
+    selectedRetirementDelay = 0;
   }
+
+  // Calculate remaining Balanced deficit
+  const remainingBalancedDeficit = Math.max(0, newHousingCost - balancedMaxPayment);
+
+  const earliestAffordableAge = null;
+
+  const baselineRetirementAge = resolvedBaselineAge !== null && resolvedBaselineAge !== undefined
+    ? resolvedBaselineAge
+    : (valBalanced.baselineReadyAge !== undefined ? valBalanced.baselineReadyAge : (inputs.targetRetirementAge || 65));
+
+  const totalCashNeeded = getRequiredDownPaymentAndCosts(p, activeBuyHouseEv);
 
   return {
     purchaseAge,
@@ -316,35 +541,42 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     newHousingCost,
     monthlyDifference,
     deficit: houseDeficit,
+    remainingBalancedDeficit,
     currentHomePrice: p,
-    affordablePriceConservative,
-    affordablePriceBalanced,
-    affordablePriceAggressive,
-    affordablePaymentConservative: getHousingCostForPrice(affordablePriceConservative, activeBuyHouseEv),
-    affordablePaymentBalanced: getHousingCostForPrice(affordablePriceBalanced, activeBuyHouseEv),
-    affordablePaymentAggressive: getHousingCostForPrice(affordablePriceAggressive, activeBuyHouseEv),
-    earliestAffordableAge
-  };
-}
+    
+    affordablePriceConservative: priceConservative,
+    affordablePriceBalanced: priceBalanced,
+    affordablePriceAggressive: priceStretch,
+    
+    isConservativeValid: valConservative.isValid,
+    isBalancedValid: valBalanced.isValid,
+    isAggressiveValid: valStretch.isValid,
 
-function getAffordablePriceForLevel(level, inputs, activeBuyHouseEv, baselineReadyAge, baselinePhases) {
-  const p = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
-  
-  let low = 0;
-  let high = p;
-  let affordablePrice = null;
-  
-  while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
-    if (isAffordableAtPrice(mid, level, inputs, activeBuyHouseEv, baselineReadyAge, baselinePhases)) {
-      affordablePrice = mid;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  
-  return affordablePrice;
+    isConservativeMonthlyValid: priceConservative !== null && priceConservative > 0,
+    isBalancedMonthlyValid: priceBalanced !== null && priceBalanced > 0,
+    isAggressiveMonthlyValid: priceStretch !== null && priceStretch > 0,
+
+    isConservativeSustainable: valConservative.sustainable,
+    isBalancedSustainable: valBalanced.sustainable,
+    isAggressiveSustainable: valStretch.sustainable,
+
+    conservativeRetirementAge: valConservative.retirementReadyAge,
+    balancedRetirementAge: valBalanced.retirementReadyAge,
+    aggressiveRetirementAge: valStretch.retirementReadyAge,
+    baselineRetirementAge,
+    
+    selectedAffordablePrice,
+    selectedOption,
+    selectedRetirementDelay,
+    
+    affordablePaymentConservative: getHousingCostForPrice(priceConservative, activeBuyHouseEv),
+    affordablePaymentBalanced: getHousingCostForPrice(priceBalanced, activeBuyHouseEv),
+    affordablePaymentAggressive: getHousingCostForPrice(priceStretch, activeBuyHouseEv),
+    earliestAffordableAge,
+    liquidFundsAvailable: liquidNWBefore,
+    estimatedDownPaymentCapacity: Math.round(maxHomePriceBalanced * targetDownPaymentPercent),
+    totalCashNeeded: totalCashNeeded
+  };
 }
 
 export function isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineReadyAge) {
@@ -357,6 +589,9 @@ export function isHouseAffordableBalanced(inputs, activeBuyHouseEv, baselineRead
     return ev;
   });
   const baselinePhases = getNormalizedPhases(baselineInputs);
+  const baselineResults = runFireSimulation(baselineInputs);
   const price = Number(activeBuyHouseEv.homePrice !== undefined ? activeBuyHouseEv.homePrice : (activeBuyHouseEv.purchasePrice !== undefined ? activeBuyHouseEv.purchasePrice : 0)) || 0;
-  return isAffordableAtPrice(price, 'balanced', recInputs, activeBuyHouseEv, baselineReadyAge, baselinePhases);
+  
+  const val = getSimulationValidationForPrice(price, 'balanced', recInputs, activeBuyHouseEv, baselineReadyAge, inputs, baselinePhases, baselineResults);
+  return val.isValid;
 }
