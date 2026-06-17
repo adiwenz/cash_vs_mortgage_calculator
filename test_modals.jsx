@@ -387,12 +387,6 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Verify budget builder is open
     expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
-    // Expand advanced settings to expose input
-    const advancedToggle1 = screen.getByText(/Show Advanced Details/i);
-    fireEvent.click(advancedToggle1);
-    const userIncomeInput = getInputByWrapperText(/Monthly Take-home Income/i);
-    fireEvent.change(userIncomeInput, { target: { value: '5417' } });
-    expect(screen.getAllByText(/child boost/i).length).toBeGreaterThan(0);
     // Save/Close first modal
     const saveBtn1 = document.querySelector('.budget-modal-card .btn-primary');
     fireEvent.click(saveBtn1);
@@ -400,12 +394,6 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Click on 2 Kids phase (1) which opens the budget modal directly
     fireEvent.click(segments[1]);
 
-    // Expand advanced settings to expose input
-    const advancedToggle2 = screen.getByText(/Show Advanced Details/i);
-    fireEvent.click(advancedToggle2);
-    const userIncomeInput2 = getInputByWrapperText(/Monthly Take-home Income/i);
-    fireEvent.change(userIncomeInput2, { target: { value: '6667' } });
-    expect(screen.getAllByText(/child boost/i).length).toBeGreaterThan(0);
     // Close modal
     const cancelBtnBudget = document.querySelector('.budget-modal-card .btn-secondary');
     fireEvent.click(cancelBtnBudget);
@@ -738,5 +726,90 @@ describe('FireSimulator Modals and Decision Wizards', () => {
         expect(labelContainer).toBeNull();
       }
     });
+  });
+
+  test('11. Budget Modal - Compact Info Interaction & Popover', async () => {
+    navigateToStep2();
+
+    // Open the Budget Modal by clicking the first budget segment
+    const budgetRow = document.querySelector('.budget-phases-timeline-row');
+    expect(budgetRow).not.toBeNull();
+    const segments = budgetRow.querySelectorAll('.budget-segment');
+    fireEvent.click(segments[0]);
+
+    // Verify modal is open
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+
+    // Verify the old large explanation box and active event chips are NOT rendered in the main column
+    expect(document.querySelector('.phase-explanation-box')).toBeNull();
+    expect(document.querySelector('.active-events-container')).toBeNull();
+
+    // Find the compact info icon button next to the budget phase title
+    const infoBtn = document.querySelector('.phase-info-icon-btn');
+    expect(infoBtn).not.toBeNull();
+
+    // Popover should not be visible initially
+    expect(document.querySelector('.phase-info-popover')).toBeNull();
+
+    // Click the info button to toggle popover
+    fireEvent.click(infoBtn);
+    
+    // Popover should now be visible
+    const popover = document.querySelector('.phase-info-popover');
+    expect(popover).not.toBeNull();
+    expect(popover.textContent).toContain('Why this phase exists');
+    expect(popover.textContent).toContain('Active Events:');
+    expect(popover.textContent).toContain('Salary / Main Income');
+
+    // Click document body to verify it closes
+    fireEvent.click(document.body);
+    expect(document.querySelector('.phase-info-popover')).toBeNull();
+  });
+
+  test('12. Budget Modal - Childcare locked & orange glow', async () => {
+    navigateToStep2();
+    
+    // Add child Liam, born at 35 (default)
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'haveChild' } });
+    const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
+    fireEvent.change(childNameInput, { target: { value: 'Liam' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+    
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+    });
+    clickDoneOnWelcomeModal('Liam');
+
+    // Open Budget Modal
+    const budgetRow = document.querySelector('.budget-phases-timeline-row');
+    expect(budgetRow).not.toBeNull();
+    const segments = budgetRow.querySelectorAll('.budget-segment');
+    // The first segment should now be Working + Childcare
+    fireEvent.click(segments[0]);
+
+    // Verify modal is open
+    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+
+    // Verify the "Childcare Adjustment" box is NOT rendered in the modal
+    expect(document.querySelector('.childcare-adjustment-card')).toBeNull();
+
+    // Find Childcare row in Needs breakdown
+    const childcareRow = document.querySelector('.childcare-locked-glow');
+    expect(childcareRow).not.toBeNull();
+    expect(childcareRow.textContent).toContain('Childcare');
+    expect(childcareRow.textContent).toContain('🔒');
+    expect(childcareRow.textContent).toContain('$1,250');
+
+    // Verify that even if we click "Edit Needs", the childcare row remains locked (does not contain an input box)
+    const editNeedsBtn = screen.getByRole('button', { name: /Edit Needs/i });
+    fireEvent.click(editNeedsBtn);
+
+    // Verify input fields are shown for other needs like Housing, but Childcare does not have an input
+    const housingRow = Array.from(document.querySelectorAll('.budget-input-row')).find(r => r.textContent.includes('Housing'));
+    expect(housingRow.querySelector('input')).not.toBeNull();
+
+    const updatedChildcareRow = document.querySelector('.childcare-locked-glow');
+    expect(updatedChildcareRow.querySelector('input')).toBeNull();
   });
 });

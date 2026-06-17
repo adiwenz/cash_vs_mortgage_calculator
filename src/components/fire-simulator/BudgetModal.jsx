@@ -36,7 +36,19 @@ export default function BudgetModal({
   const [isEditingNeeds, setIsEditingNeeds] = useState(false);
   const [isEditingWants, setIsEditingWants] = useState(false);
   const [isEditingSavings, setIsEditingSavings] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [showPopover, setShowPopover] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+
+  useEffect(() => {
+    if (!showPopover) return;
+    const handleDocumentClick = () => {
+      setShowPopover(false);
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [showPopover]);
 
   useEffect(() => {
     const activeTab = document.querySelector('.budget-modal-tab.active');
@@ -333,88 +345,201 @@ export default function BudgetModal({
 
   const modalTitle = activePhaseObj ? `${activePhaseObj.label} Budget` : 'Work Phase Budget';
 
+  const getPopoverDetails = () => {
+    if (!activePhaseObj) return { activeEvents: [], phaseChanges: [] };
+
+    const activeIndex = normalizedPhases.findIndex(p => p.id === activePhaseObj.id);
+    const prior = activeIndex > 0 ? normalizedPhases[activeIndex - 1] : null;
+
+    // 1. Compile Active Events list
+    const activeEventsList = [];
+
+    // Main Income / Retirement Withdrawals
+    if (activePhaseObj.type !== 'retire') {
+      activeEventsList.push("Salary / Main Income");
+    } else {
+      activeEventsList.push("Retirement Withdrawals");
+    }
+
+    // Base spending
+    activeEventsList.push("Base Lifestyle Spending");
+
+    // Marriage
+    if (activePhaseObj.isMarried) {
+      activeEventsList.push("Combined Household Finances");
+    }
+
+    // Childcare
+    if (activePhaseObj.childCount > 0) {
+      activeEventsList.push(`Childcare (${activePhaseObj.childCount} ${activePhaseObj.childCount === 1 ? 'child' : 'children'})`);
+    }
+
+    // Active Debts
+    if (activePhaseObj.activeDebts && activePhaseObj.activeDebts.length > 0) {
+      activePhaseObj.activeDebts.forEach(d => {
+        const typeLabel = d.type === 'studentLoan' ? 'Student loan' : d.name;
+        activeEventsList.push(`${typeLabel} payments`);
+      });
+    }
+
+    // Social Security
+    if (activePhaseObj.ssMonthlyIncome > 0) {
+      activeEventsList.push("Social Security");
+    }
+    if (activePhaseObj.partnerSSMonthlyIncome > 0) {
+      activeEventsList.push("Spouse Social Security");
+    }
+
+    // Custom Incomes (from inputs.incomeList) active at this age
+    const currentAge = activePhaseObj.startAge;
+    const customIncomes = (inputs.incomeList || []).filter(inc => {
+      return inc.enabled && currentAge >= Number(inc.startAge) && currentAge < Number(inc.endAge);
+    });
+    customIncomes.forEach(inc => {
+      activeEventsList.push(inc.name || "Custom Income");
+    });
+
+    // Custom Spendings (from inputs.spendingPhases) active at this age
+    const customSpendings = (inputs.spendingPhases || []).filter(sp => {
+      return sp.enabled && currentAge >= Number(sp.startAge) && currentAge < Number(sp.endAge);
+    });
+    customSpendings.forEach(sp => {
+      activeEventsList.push(sp.name || "Custom Spending");
+    });
+
+    // 2. Compile Phase Changes list
+    const phaseChangesList = [];
+    const explanations = getPhaseChangeExplanations(activePhaseObj, normalizedPhases);
+
+    explanations.forEach(exp => {
+      // Skip filler texts
+      if (exp.text.includes("Starting phase for your financial timeline.") ||
+          exp.text.includes("Transitioned to a new phase boundary")) {
+        return;
+      }
+
+      // Extract amount if present in impacts
+      let amount = "";
+      if (exp.impacts && exp.impacts.length > 0) {
+        const firstImpact = exp.impacts[0];
+        const match = firstImpact.match(/([+-]\s*\$?[\d,]+(?:\/(?:month|year|mo))?)/i);
+        if (match) {
+          amount = match[1].replace(/\s+/g, ""); // e.g. "+$318/month" or "+$15,000/year"
+        }
+      }
+
+      const textLower = exp.text.toLowerCase();
+      
+      // Childcare
+      if (exp.type === 'childcare') {
+        if (textLower.includes("start")) {
+          phaseChangesList.push(`Childcare begins (${amount || '+$15,000/year'})`);
+        } else {
+          phaseChangesList.push(`Childcare ends (${amount || '-$15,000/year'})`);
+        }
+        return;
+      }
+
+      // Debt
+      if (exp.type === 'debt') {
+        let debtName = "Debt";
+        if (textLower.includes("student loan")) {
+          debtName = "Student loan";
+        } else {
+          const nameMatch = exp.text.match(/when\s+(.*?)\s+payments/i) || exp.text.match(/for\s+(.*?)\./i);
+          if (nameMatch) {
+            debtName = nameMatch[1];
+            debtName = debtName.charAt(0).toUpperCase() + debtName.slice(1);
+          }
+        }
+
+        if (textLower.includes("start")) {
+          phaseChangesList.push(`${debtName} begins (${amount})`);
+        } else {
+          phaseChangesList.push(`${debtName} payoff complete (${amount})`);
+        }
+        return;
+      }
+
+      // Retirement
+      if (exp.type === 'retirement' || textLower.includes("retirement")) {
+        phaseChangesList.push("Retirement starts");
+        return;
+      }
+
+      // Marriage
+      if (exp.type === 'marriage' || textLower.includes("marriage") || textLower.includes("married")) {
+        if (textLower.includes("marriage ends") || textLower.includes("no longer married")) {
+          phaseChangesList.push("Marriage ends");
+        } else {
+          phaseChangesList.push("Marriage (Combined finances)");
+        }
+        return;
+      }
+
+      // Social Security
+      if (textLower.includes("social security")) {
+        if (textLower.includes("partner")) {
+          phaseChangesList.push("Spouse Social Security begins");
+        } else {
+          phaseChangesList.push("Social Security begins");
+        }
+        return;
+      }
+
+      // Salary / income changes
+      if (exp.type === 'income' || textLower.includes("income")) {
+        if (textLower.includes("increase")) {
+          phaseChangesList.push(`Salary increase (${amount})`);
+        } else if (textLower.includes("decrease")) {
+          phaseChangesList.push(`Salary decrease (${amount})`);
+        } else if (textLower.includes("passive")) {
+          phaseChangesList.push(`Passive income begins (${amount})`);
+        } else {
+          phaseChangesList.push(exp.text);
+        }
+        return;
+      }
+
+      // Fallback if not matched
+      phaseChangesList.push(exp.text);
+    });
+
+    return { activeEvents: activeEventsList, phaseChanges: phaseChangesList };
+  };
+
+  const getBudgetPhaseThemeClass = (p) => {
+    const label = p.label || '';
+    const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
+    const hasSS = p.activeEvents?.includes('socialSecurity') || label.includes('Social Security') || p.icon === '🏖️💰' || p.icon === '💰';
+    
+    if (isRetired) {
+      if (hasSS) return 'theme-retired-ss'; // Emerald / Teal
+      return 'theme-retired'; // Amber / Gold
+    }
+    
+    // Working phases
+    const lowerLabel = label.toLowerCase();
+    const hasChildcare = lowerLabel.includes('childcare');
+    const hasStudentLoan = lowerLabel.includes('student loan') || p.activeDebts?.some(d => d.type === 'studentLoan');
+    const hasHouse = lowerLabel.includes('house') || lowerLabel.includes('mortgage') || p.activeDebts?.some(d => d.type === 'mortgage');
+    const hasOtherDebt = p.activeDebts && p.activeDebts.length > 0;
+    
+    if (hasChildcare) {
+      if (hasOtherDebt) return 'theme-working-childcare-debt'; // Coral / Rose
+      return 'theme-working-childcare'; // Magenta / Pink-Purple
+    }
+    if (hasStudentLoan) return 'theme-working-student-loan'; // Purple
+    if (hasHouse) return 'theme-working-house'; // Cyan / Blue
+    
+    return 'theme-working-standard'; // Indigo / Blue
+  };
+
   const takeHomeIncome = inputs.includeTaxes ? (combinedIncome - monthlyTax) : combinedIncome;
   const totalAllocated = needsTotal + wantsTotal + activeSavings;
   const remainingBalance = takeHomeIncome - totalAllocated;
 
-  const getHeaderImpacts = () => {
-    const impacts = [];
-    if (!activePhaseObj) return impacts;
 
-    // 1. Childcare
-    if (activePhaseObj.childCount > 0) {
-      const ccCost = budgetExpenses.childcare !== undefined ? budgetExpenses.childcare : (activePhaseObj.expenses.childcare || (activePhaseObj.childCount * 1250));
-      impacts.push({
-        icon: '👶',
-        title: 'Childcare',
-        desc: `+$${(ccCost * 12).toLocaleString()}/year expenses`
-      });
-    }
-
-    // 2. Debts / Student Loans
-    if (activePhaseObj.activeDebts && activePhaseObj.activeDebts.length > 0) {
-      activePhaseObj.activeDebts.forEach(debt => {
-        let icon = '🎓';
-        if (debt.type === 'creditCard' || debt.borrowingType === 'creditCard') icon = '💳';
-        else if (debt.type === 'carLoan' || debt.borrowingType === 'carLoan') icon = '🚗';
-        else if (debt.type === 'mortgage' || debt.borrowingType === 'mortgage') icon = '🏡';
-        else if (debt.type === 'studentLoan' || debt.borrowingType === 'studentLoan') icon = '🎓';
-        else icon = '💸';
-
-        let name = debt.name || 'Debt';
-        if (debt.type === 'studentLoan' || debt.borrowingType === 'studentLoan') name = 'Student Loan';
-
-        const payment = budgetExpenses[`debt_${debt.id}`] !== undefined ? budgetExpenses[`debt_${debt.id}`] : debt.monthlyPayment;
-        impacts.push({
-          icon,
-          title: name,
-          desc: `+$${Math.round(payment)}/month payments`
-        });
-      });
-    }
-
-    // 3. Home Purchase (if buyHouse is active in this phase and has a mortgage payment, and not already listed as mortgage debt)
-    const buyHouseEvents = (inputs.lifeEvents || []).filter(ev => ev.type === 'buyHouse' && ev.enabled !== false);
-    buyHouseEvents.forEach(ev => {
-      const purchaseAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-      let saleAge = inputs.lifeExpectancy;
-      const sellEv = (inputs.lifeEvents || []).find(e => e.type === 'sellHouse' && e.houseId === ev.id && e.enabled !== false);
-      if (sellEv) {
-        saleAge = Number(sellEv.age);
-      } else if (ev.yearsUntilSale !== undefined && ev.yearsUntilSale !== null && ev.yearsUntilSale !== '') {
-        const val = Number(ev.yearsUntilSale);
-        if (!isNaN(val) && val > 0) {
-          saleAge = val < inputs.currentAge ? purchaseAge + val : val;
-        }
-      }
-      
-      if (activePhaseObj.startAge >= purchaseAge && activePhaseObj.startAge < saleAge) {
-        const debtKey = `debt_${ev.id}`;
-        const mortgagePI = budgetExpenses[debtKey] !== undefined ? budgetExpenses[debtKey] : activePhaseObj.expenses[debtKey];
-        if (mortgagePI > 0) {
-          // Check if already added via activeDebts to prevent double listing
-          if (!impacts.some(imp => imp.title === (ev.name || 'Home Purchase'))) {
-            impacts.push({
-              icon: '🏡',
-              title: ev.name || 'Home Purchase',
-              desc: `+$${Math.round(mortgagePI)}/month housing cost`
-            });
-          }
-        }
-      }
-    });
-
-    // 4. Retirement
-    if (activePhaseObj.type === 'retire') {
-      impacts.push({
-        icon: '🏖️',
-        title: 'Retirement',
-        desc: 'Income source changes'
-      });
-    }
-
-    return impacts;
-  };
 
   return (
     <div className="modal-backdrop" onClick={handleCloseBudgetModal}>
@@ -433,8 +558,100 @@ export default function BudgetModal({
             <div className="budget-modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, color: 'var(--text-primary)' }}>
-                    🎯 {modalTitle} {activePhaseObj && `(Age ${activePhaseObj.startAge}–${activePhaseObj.endAge})`}
+                  <h3 style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: 'bold', 
+                    margin: 0, 
+                    color: 'var(--text-primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    verticalAlign: 'middle'
+                  }}>
+                    <span>🎯 {modalTitle} {activePhaseObj && `(Age ${activePhaseObj.startAge}–${activePhaseObj.endAge})`}</span>
+                    {activePhaseObj && (
+                      <div 
+                        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                        onMouseEnter={() => setIsHovering(true)}
+                        onMouseLeave={() => setIsHovering(false)}
+                      >
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPopover(!showPopover);
+                          }}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '1.2rem',
+                            height: '1.2rem',
+                            borderRadius: '50%',
+                            transition: 'all 0.2s',
+                          }}
+                          className="phase-info-icon-btn"
+                          aria-label="Phase Info"
+                        >
+                          ⓘ
+                        </button>
+                        
+                        {(showPopover || isHovering) && (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '0',
+                              marginTop: '0.5rem',
+                              zIndex: 100,
+                              width: '280px',
+                              background: '#1e293b',
+                              border: '1px solid #334155',
+                              borderRadius: '8px',
+                              padding: '0.85rem 1rem',
+                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.82rem',
+                              textAlign: 'left',
+                              lineHeight: '1.4',
+                              fontWeight: 'normal'
+                            }}
+                            className="phase-info-popover"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.6rem', color: '#60a5fa' }}>
+                              Why this phase exists
+                            </div>
+                            
+                            <div style={{ marginBottom: '0.6rem' }}>
+                              <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Active Events:</div>
+                              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
+                                {getPopoverDetails().activeEvents.map((evt, idx) => (
+                                  <li key={idx} style={{ marginBottom: '0.15rem' }}>{evt}</li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            {getPopoverDetails().phaseChanges.length > 0 && (
+                              <div>
+                                <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Phase Changes:</div>
+                                <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
+                                  {getPopoverDetails().phaseChanges.map((chg, idx) => (
+                                    <li key={idx} style={{ marginBottom: '0.15rem' }}>{chg}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </h3>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                     Set your monthly plan for this phase.
@@ -449,33 +666,7 @@ export default function BudgetModal({
                 </button>
               </div>
 
-              {/* Financial Impact of This Phase */}
-              {(() => {
-                const headerImpacts = getHeaderImpacts();
-                if (headerImpacts.length === 0) return null;
-                return (
-                  <div className="phase-impact-summary-box" style={{
-                    marginTop: '0.25rem',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    padding: '0.6rem 0.85rem'
-                  }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.4rem' }}>
-                      Financial Impact of This Phase
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                      {headerImpacts.map((imp, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-                          <span style={{ fontSize: '0.95rem' }}>{imp.icon}</span>
-                          <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{imp.title}</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>({imp.desc})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+
             </div>
 
             {/* Tabs for Budget Phases */}
@@ -483,11 +674,12 @@ export default function BudgetModal({
               {normalizedPhases.map((p) => {
                 const isActive = p.id === activeBudgetPhase;
                 const icons = p.activeEvents && p.activeEvents.slice(0, 3).map(evId => getEventDetails(evId).icon) || [];
+                const themeClass = getBudgetPhaseThemeClass(p);
                 return (
                   <button
                     key={p.id}
                     type="button"
-                    className={`budget-modal-tab ${isActive ? 'active' : ''}`}
+                    className={`budget-modal-tab ${themeClass} ${isActive ? 'active' : ''}`}
                     onClick={() => handleSwitchBudgetPhase(p.id)}
                   >
                     <span className="budget-modal-tab-age">Age {p.startAge}–{p.endAge}</span>
@@ -497,21 +689,7 @@ export default function BudgetModal({
               })}
             </div>
 
-            {/* Active Events in this Phase */}
-            {activePhaseObj && activePhaseObj.activeEvents && activePhaseObj.activeEvents.length > 0 && (
-              <div className="active-events-container">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', alignSelf: 'center', marginRight: '0.25rem' }}>Active Events:</span>
-                {activePhaseObj.activeEvents.map((evId) => {
-                  const details = getEventDetails(evId);
-                  return (
-                    <div key={evId} className="active-event-chip">
-                      <span>{details.icon}</span>
-                      <span>{details.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+
 
             <div className="budget-main-scroll-body">
               {pendingImprovement && (
@@ -535,47 +713,7 @@ export default function BudgetModal({
               </div>
             )}
 
-            {/* Why did this phase change? explanation breakdown */}
-            {(() => {
-              const explanations = getPhaseChangeExplanations(activePhaseObj, normalizedPhases);
-              if (explanations.length === 0) return null;
-              return (
-                <div className="phase-explanation-box" style={{
-                  background: 'rgba(59, 130, 246, 0.08)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  borderRadius: '6px',
-                  padding: '0.75rem 1rem',
-                  marginBottom: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.6rem'
-                }}>
-                  <div style={{ color: '#60a5fa', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    ❓ Why did this phase change?
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                    {explanations.map((exp, idx) => (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          <span style={{ fontSize: '1rem' }}>{exp.icon}</span>
-                          <span style={{ fontWeight: '600' }}>{exp.text}</span>
-                        </div>
-                        {exp.impacts && exp.impacts.length > 0 && (
-                          <div style={{ paddingLeft: '1.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.1rem' }}>Impact:</div>
-                            {exp.impacts.map((imp, i) => (
-                              <div key={i} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span>•</span> <span>{imp}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+
 
             {/* Primary Section: Three Budget Cards */}
             <div className="budget-cards-grid">
@@ -658,32 +796,7 @@ export default function BudgetModal({
 
             </div>
 
-            {/* Childcare Adjustment Card (if applicable) */}
-            {activeC > 0 && currentChildCostsMonthly > 0 && (
-              <div className="childcare-adjustment-card">
-                <div>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--accent-amber)', display: 'block', marginBottom: '0.2rem' }}>
-                    👶 Childcare Adjustment
-                  </strong>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Child expenses increase spending by <strong>{formatCurrency(currentChildCostsMonthly)}/mo</strong>.
-                  </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginTop: '0.15rem' }}>
-                    Recommendation: Increase income by {formatCurrency(currentChildCostsMonthly)}/mo during this phase.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="list-builder-edit-btn"
-                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-                  onClick={() => {
-                    setBudgetMonthlyIncome(prev => prev + currentChildCostsMonthly);
-                  }}
-                >
-                  Apply Recommendation
-                </button>
-              </div>
-            )}
+
 
             {/* Simplified Summary Section */}
             <div 
@@ -818,125 +931,7 @@ export default function BudgetModal({
               )}
             </div>
 
-            {/* Show Advanced Details Collapsible Trigger */}
-            <div style={{ marginBottom: '1rem' }}>
-              <button
-                type="button"
-                onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  fontWeight: 'bold',
-                  padding: '0.25rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                {isAdvancedOpen ? 'Hide Advanced Details ▲' : 'Show Advanced Details ▼'}
-              </button>
 
-              {/* Collapsible Content */}
-              <div className={`advanced-details-container ${isAdvancedOpen ? 'open' : ''}`}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.015)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                  
-                  {/* Income Settings */}
-                  <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>Income Settings</h4>
-                    <div className="input-wrapper" style={{ marginBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.2rem' }}>
-                        <span className="input-name" style={{ fontSize: '0.72rem', margin: 0 }}>Monthly Take-home Income ($)</span>
-                        {activeC > 0 && activeChildBoost > 0 && (
-                          <span style={{ 
-                            fontSize: '0.65rem', 
-                            padding: '0.1rem 0.35rem', 
-                            background: 'rgba(245, 158, 11, 0.15)', 
-                            border: '1px solid rgba(245, 158, 11, 0.35)', 
-                            borderRadius: '4px', 
-                            color: '#f59e0b',
-                            fontWeight: '700'
-                          }}>
-                            +{formatCurrency(activeChildBoost)}/mo child boost
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        type="number"
-                        className="input-number-box"
-                        style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem' }}
-                        value={budgetMonthlyIncome}
-                        onChange={(e) => handleMonthlyIncomeChange(parseFloat(e.target.value) || 0)}
-                        disabled={isRetirementPhase}
-                      />
-                    </div>
-                    {activePhaseObj && activePhaseObj.incomeGrowthRate > 0 && !isRetirementPhase && (
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', display: 'block' }}>
-                        📈 Income grows {(activePhaseObj.incomeGrowthRate * 100).toFixed(1)}%/yr
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Savings Settings */}
-                  <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>Savings Settings</h4>
-                    <div className="input-wrapper" style={{ marginBottom: '0.5rem' }}>
-                      <span className="input-name" style={{ fontSize: '0.72rem' }}>Savings mode:</span>
-                      <select
-                        className="input-number-box"
-                        style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                        value={savingsAllocMode}
-                        onChange={(e) => handleToggleSavingsAllocMode(e.target.value)}
-                        disabled={isMarriedMode || isRetirementPhase}
-                      >
-                        <option value="fixed">Fixed Amount ($)</option>
-                        <option value="percentSurplus">Percent of Surplus (%)</option>
-                      </select>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', display: 'block' }}>
-                      Target savings rate: {activeSavingsRate}%
-                    </span>
-                  </div>
-
-                  {/* Tax & Simulation Settings */}
-                  <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>Tax & Simulation</h4>
-                    <div className="input-wrapper" style={{ marginBottom: '0.5rem' }}>
-                      <span className="input-name" style={{ fontSize: '0.72rem' }}>Filing Status:</span>
-                      <select
-                        className="input-number-box"
-                        style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                        value={isMarriedMode ? (marriageEvent.filingStatus || 'jointly') : budgetFilingStatus}
-                        onChange={(e) => {
-                          if (!isMarriedMode) setBudgetFilingStatus(e.target.value);
-                        }}
-                        disabled={isMarriedMode}
-                      >
-                        <option value="single">Single</option>
-                        <option value="jointly">Married Jointly</option>
-                        <option value="separate">Married Separate</option>
-                        <option value="hoh">Head of Household</option>
-                      </select>
-                    </div>
-                    <div className="input-wrapper">
-                      <span className="input-name" style={{ fontSize: '0.72rem' }}>HSA Coverage:</span>
-                      <select
-                        className="input-number-box"
-                        style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                        value={budgetHsaCoverage}
-                        onChange={(e) => setBudgetHsaCoverage(e.target.value)}
-                      >
-                        <option value="single">Single ($4,150 limit)</option>
-                        <option value="family">Family ($8,300 limit)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
 
             {/* Warnings & Guardrails */}
             {(() => {
@@ -1028,31 +1023,41 @@ export default function BudgetModal({
                         needsItems.push({ key: 'childcare', label: 'Childcare' });
                       }
                       return needsItems;
-                    })().map(item => (
-                      <div key={item.key} className="breakdown-row budget-input-row">
-                        <span className="breakdown-row-label">{item.label}</span>
-                        {isEditingNeeds ? (
-                          <div className="input-prefix-wrapper" style={{ width: '100px' }}>
-                            <span className="currency-symbol">$</span>
-                            <input
-                              type="number"
-                              className="input-number-box"
-                              style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
-                              value={budgetExpenses[item.key] || 0}
-                              onChange={(e) => setBudgetExpenses({
-                                ...budgetExpenses,
-                                [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                              })}
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="breakdown-row-dots" />
-                            <span className="breakdown-row-value">{formatCurrency(budgetExpenses[item.key] || 0)}</span>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                    })().map(item => {
+                      const isChildcare = item.key === 'childcare';
+                      return (
+                        <div 
+                          key={item.key} 
+                          className={`breakdown-row budget-input-row ${isChildcare ? 'childcare-locked-glow' : ''}`}
+                        >
+                          <span className="breakdown-row-label">
+                            {isChildcare ? '👶 ' : ''}{item.label} {isChildcare && <span style={{ fontSize: '0.72rem', opacity: 0.8, marginLeft: '0.2rem' }}>🔒</span>}
+                          </span>
+                          {isEditingNeeds && !isChildcare ? (
+                            <div className="input-prefix-wrapper" style={{ width: '100px' }}>
+                              <span className="currency-symbol">$</span>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
+                                value={budgetExpenses[item.key] || 0}
+                                onChange={(e) => setBudgetExpenses({
+                                  ...budgetExpenses,
+                                  [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                                })}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="breakdown-row-dots" />
+                              <span className="breakdown-row-value" style={isChildcare ? { color: 'var(--accent-amber)' } : undefined}>
+                                {formatCurrency(budgetExpenses[item.key] || 0)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {activeDebts.map(debt => (
                       <div key={debt.id} className="breakdown-row budget-input-row">
