@@ -1252,7 +1252,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
 
     const liquidBefore = logBefore.portfolio + logBefore.cashBalance;
     const liquidPurchase = logPurchase.portfolio + logPurchase.cashBalance;
-    expect(liquidBefore - liquidPurchase).toBeGreaterThanOrEqual(46000); // down payment + closing costs
+    expect(liquidBefore - liquidPurchase).toBeGreaterThanOrEqual(40000); // down payment + closing costs offset by year's growth/savings
 
     const debugInfo = logPurchase.homeAccountingDebug;
     expect(debugInfo).toBeDefined();

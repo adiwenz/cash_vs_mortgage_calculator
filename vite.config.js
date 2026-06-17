@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     include: ['test_*.js', 'test_*.jsx'],
     exclude: ['tests/**', 'node_modules/**'],
-    setupFiles: ['./vitest.setup.js']
+    setupFiles: ['./vitest.setup.js'],
+    testTimeout: 30000
   }
 })

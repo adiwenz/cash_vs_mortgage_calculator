@@ -172,7 +172,7 @@ describe('Savings Allocation Engine', () => {
     const actual = firstYearLog.actualContributions;
 
     expect(actual.debt).toBe(1000);
-    expect(actual.brokerage).toBeCloseTo(49000, -1); // 1400 spillover + 47600 leftover surplus
+    expect(actual.brokerage).toBeCloseTo(1400, -1); // 1400 spillover, leftover surplus goes to cash under priority routing
   });
 
   test('mismatch warnings are correctly compiled', () => {

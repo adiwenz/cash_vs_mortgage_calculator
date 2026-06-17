@@ -36,6 +36,10 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
   const navigateToStep2 = () => {
     render(<FireSimulator />);
     
+    // Set starting savings/investments to 100k so retirement is sustainable for the single user
+    const currentSavingsInput = getInputByWrapperText(/Current Savings \(\$\)/i);
+    fireEvent.change(currentSavingsInput, { target: { value: '100000' } });
+
     // Click "Build My Life Plan" to go to Step 2
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
@@ -88,7 +92,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(savingsRateInput.value).toBe('15'); // same savings
 
     const spouseAssetsInput = getInputByWrapperText(/Partner Assets/i);
-    expect(spouseAssetsInput.value).toBe('5000'); // same assets (user simpleInvestments=5000)
+    expect(spouseAssetsInput.value).toBe('100000'); // same assets (user simpleInvestments=100000)
 
     const spouseDebtInput = getInputByWrapperText(/Partner Debt/i);
     expect(spouseDebtInput.value).toBe('0'); // same debt (user has 0 debt by default)

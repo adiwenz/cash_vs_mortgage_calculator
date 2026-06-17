@@ -188,7 +188,7 @@ export function useFireSimulation() {
           ...scen.inputs.assets,
           [assetKey]: value
         };
-        const total = Object.values(nextAssets).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const total = value === null ? null : Object.values(nextAssets).reduce((sum, v) => sum + (Number(v) || 0), 0);
         return {
           ...scen,
           inputs: {

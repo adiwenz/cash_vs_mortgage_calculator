@@ -21,13 +21,16 @@ try {
   });
   console.log('✅ Tax fields are indeed 0 for all years of the simulation.');
 
-  // 2. Verify savings remains $7,500/year in today's dollars (deflated) in working years
+  // 2. Verify savings scales with income (balanced budget scaling), meaning deflated savings remains constant and nominal grows
   // Pre-retirement (ages 35 to 64)
   for (let age = 35; age < 65; age++) {
+    const rowNominal = dataNominal.find(d => d.age === age);
+    expect(rowNominal.savings).toBeCloseTo(7500 * Math.pow(1.03, age - 35), 0);
+
     const row = dataDeflated.find(d => d.age === age);
     expect(row.savings).toBeCloseTo(7500, 0);
   }
-  console.log('✅ Deflated savings remains exactly $7,500/year during all working years.');
+  console.log('✅ Savings scales with inflation in nominal terms, remaining constant in deflated terms during working years.');
 
   // 3. Verify lifestyle spending remains $42,500/year pre-retirement in today's dollars (deflated)
   // Pre-retirement (ages 35 to 64)

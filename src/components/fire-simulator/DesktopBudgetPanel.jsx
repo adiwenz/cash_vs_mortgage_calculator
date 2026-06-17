@@ -66,7 +66,9 @@ export default function DesktopBudgetPanel({
   setDecideLater,
   handleClearNeeds,
   handleClearWants,
-  handleClearSavings
+  handleClearSavings,
+  budgetScalingMode,
+  handleToggleBudgetScalingMode
 }) {
   return (
     <div className="budget-modal-layout">
@@ -346,31 +348,60 @@ export default function DesktopBudgetPanel({
 
           {/* Allocation Mode Options */}
           {!isRetirementPhase && (
-            <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'block' }}>Savings Allocation Strategy</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                  {savingsAllocMode === 'percentSurplus' 
-                    ? 'Savings targets are percentage allocations of remaining monthly surplus.'
-                    : 'Savings targets are set to exact monthly dollar amounts.'}
-                </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'block' }}>Savings Allocation Strategy</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    {savingsAllocMode === 'percentSurplus' 
+                      ? 'Savings targets are percentage allocations of remaining monthly surplus.'
+                      : 'Savings targets are set to exact monthly dollar amounts.'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-strategy-switch"
+                  style={{ 
+                    fontSize: '0.75rem', 
+                    padding: '0.35rem 0.85rem',
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  onClick={handleToggleSavingsAllocMode}
+                >
+                  Switch to {savingsAllocMode === 'percentSurplus' ? 'Fixed Dollar Amounts' : 'Percentage of Surplus'}
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn-strategy-switch"
-                style={{ 
-                  fontSize: '0.75rem', 
-                  padding: '0.35rem 0.85rem',
-                  border: '1px solid var(--border-color)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  borderRadius: '4px'
-                }}
-                onClick={handleToggleSavingsAllocMode}
-              >
-                Switch to {savingsAllocMode === 'percentSurplus' ? 'Fixed Dollar Amounts' : 'Percentage of Surplus'}
-              </button>
+
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'block' }}>Budget Scaling Mode</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    {budgetScalingMode === 'lifestyle' 
+                      ? 'Lifestyle-Based (Recommended): Expenses & savings scale proportionally as income changes to preserve ratios.'
+                      : 'Fixed Dollar: Expenses & savings remain fixed in nominal dollars (plus inflation) regardless of income.'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-strategy-switch"
+                  style={{ 
+                    fontSize: '0.75rem', 
+                    padding: '0.35rem 0.85rem',
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  onClick={handleToggleBudgetScalingMode}
+                >
+                  Switch to {budgetScalingMode === 'lifestyle' ? 'Fixed Dollar Mode' : 'Lifestyle-Based'}
+                </button>
+              </div>
             </div>
           )}
 

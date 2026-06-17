@@ -28,6 +28,11 @@ export function useBudgetState(
   const [budgetFilingStatus, setBudgetFilingStatus] = useState('single');
   const [budgetHsaCoverage, setBudgetHsaCoverage] = useState('single');
   const [savingsAllocMode, setSavingsAllocMode] = useState('fixed');
+  const [budgetScalingMode, setBudgetScalingMode] = useState('lifestyle');
+
+  const handleToggleBudgetScalingMode = () => {
+    setBudgetScalingMode(prev => prev === 'lifestyle' ? 'fixed' : 'lifestyle');
+  };
   
   const [budgetSavings, setBudgetSavings] = useState({
     trad401k: 100, rothIra: 50, tradIra: 0, hsa: 50, brokerage: 0,
@@ -151,6 +156,7 @@ export function useBudgetState(
       setBudgetPartnerSavings(startPhase.partnerSavings || {});
       setBudgetExpenses(startPhase.expenses);
       setSavingsAllocMode(startPhase.savingsAllocMode);
+      setBudgetScalingMode(startPhase.budgetScalingMode || 'lifestyle');
       
       setBudgetMonthlySpending(Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0));
       const totalSavings = startPhase.savingsAllocMode === 'percentSurplus'
@@ -184,7 +190,8 @@ export function useBudgetState(
         savings: budgetSavings,
         partnerSavings: budgetPartnerSavings,
         expenses: budgetExpenses,
-        savingsAllocMode: savingsAllocMode
+        savingsAllocMode: savingsAllocMode,
+        budgetScalingMode: budgetScalingMode
       }
     }));
 
@@ -195,6 +202,7 @@ export function useBudgetState(
       setBudgetPartnerSavings(nextPhase.partnerSavings || {});
       setBudgetExpenses(nextPhase.expenses);
       setSavingsAllocMode(nextPhase.savingsAllocMode);
+      setBudgetScalingMode(nextPhase.budgetScalingMode || 'lifestyle');
       setBudgetMonthlySpending(Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0));
       
       const totalSavings = nextPhase.savingsAllocMode === 'percentSurplus'
@@ -271,7 +279,8 @@ export function useBudgetState(
         savings: budgetSavings,
         partnerSavings: budgetPartnerSavings,
         expenses: budgetExpenses,
-        savingsAllocMode: savingsAllocMode
+        savingsAllocMode: savingsAllocMode,
+        budgetScalingMode: budgetScalingMode
       }
     };
 
@@ -287,18 +296,71 @@ export function useBudgetState(
         newInputs.budgetDetails.defaultTemplate = updatedDefaultTemplate;
       }
       
-      newInputs.budgetDetails.phases = Object.values(finalEdited).map(p => ({
-        id: p.id,
-        type: p.type,
-        name: p.name,
-        startAge: p.startAge,
-        endAge: p.endAge,
-        income: p.income,
-        savingsAllocMode: p.savingsAllocMode,
-        savings: p.savings,
-        partnerSavings: p.partnerSavings,
-        expenses: p.expenses
-      }));
+      newInputs.budgetDetails.phases = Object.values(finalEdited).map(p => {
+        const resolvedIncome = Number(p.income) || 0;
+        const totalExpensesMonthly = Object.keys(p.expenses)
+          .filter(k => !k.startsWith('debt_'))
+          .reduce((sum, k) => sum + (Number(p.expenses[k]) || 0), 0);
+
+        const userSavingsSum = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const partnerSavingsSum = Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+        let totalSavingsMonthly = 0;
+        if (p.savingsAllocMode === 'percentSurplus') {
+          const initialSurplus = Math.max(0, resolvedIncome - totalExpensesMonthly);
+          totalSavingsMonthly = initialSurplus * ((userSavingsSum + partnerSavingsSum) / 100);
+        } else {
+          totalSavingsMonthly = userSavingsSum + partnerSavingsSum;
+        }
+
+        const expenseRatio = resolvedIncome > 0 ? (totalExpensesMonthly / resolvedIncome) : 0;
+        const savingsRatio = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) : 0;
+
+        const categoryRatios = {};
+        if (resolvedIncome > 0) {
+          Object.keys(p.expenses).forEach(k => {
+            categoryRatios[k] = (Number(p.expenses[k]) || 0) / resolvedIncome;
+          });
+          if (p.savingsAllocMode === 'fixed') {
+            Object.keys(p.savings || {}).forEach(k => {
+              categoryRatios[`savings_${k}`] = (Number(p.savings[k]) || 0) / resolvedIncome;
+            });
+            Object.keys(p.partnerSavings || {}).forEach(k => {
+              categoryRatios[`partnerSavings_${k}`] = (Number(p.partnerSavings[k]) || 0) / resolvedIncome;
+            });
+          } else {
+            const surplusRatio = Math.max(0, resolvedIncome - totalExpensesMonthly) / resolvedIncome;
+            Object.keys(p.savings || {}).forEach(k => {
+              categoryRatios[`savings_${k}`] = ((Number(p.savings[k]) || 0) / 100) * surplusRatio;
+            });
+            Object.keys(p.partnerSavings || {}).forEach(k => {
+              categoryRatios[`partnerSavings_${k}`] = ((Number(p.partnerSavings[k]) || 0) / 100) * surplusRatio;
+            });
+          }
+        }
+
+        return {
+          id: p.id,
+          type: p.type,
+          name: p.name,
+          startAge: p.startAge,
+          endAge: p.endAge,
+          income: p.income,
+          savingsAllocMode: p.savingsAllocMode,
+           budgetScalingMode: p.budgetScalingMode || (p.type === 'retire' ? 'fixed' : 'lifestyle'),
+           incomeAtCreation: p.incomeAtCreation !== undefined ? p.incomeAtCreation : ((resolvedIncome + (p.spouseIncome || 0)) * 12),
+          originalIncome: resolvedIncome,
+          originalExpenses: p.expenses,
+          originalSavings: p.savings,
+          originalPartnerSavings: p.partnerSavings,
+          expenseRatio,
+          savingsRatio,
+          categoryRatios,
+          savings: p.savings,
+          partnerSavings: p.partnerSavings,
+          expenses: p.expenses
+        };
+      });
 
       const currentAgeVal = Number(newInputs.currentAge) || 30;
       const currentPhase = Object.values(finalEdited).find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || Object.values(finalEdited)[0];
@@ -479,6 +541,8 @@ export function useBudgetState(
     handleCloseBudgetModal,
     handleSwitchBudgetPhase,
     handleToggleSavingsAllocMode,
-    handleSaveBudget
+    handleSaveBudget,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode
   };
 }

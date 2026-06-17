@@ -51,7 +51,10 @@ export default function MobileBudgetPanel({
   monthlyTax,
   handleClearNeeds,
   handleClearWants,
-  handleClearSavings
+  handleClearSavings,
+  handleToggleSavingsAllocMode,
+  budgetScalingMode,
+  handleToggleBudgetScalingMode
 }) {
   const [expandedSection, setExpandedSection] = useState('needs'); // 'needs', 'wants', or 'savings'
 
@@ -155,6 +158,63 @@ export default function MobileBudgetPanel({
             <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-violet)' }} />
           </div>
         </div>
+
+        {/* Strategy Controls (Strategy & Scaling) */}
+        {!isRetirementPhase && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Savings Strategy</span>
+                <button
+                  type="button"
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={handleToggleSavingsAllocMode}
+                >
+                  Use {savingsAllocMode === 'percentSurplus' ? 'Fixed Dollars' : 'Surplus %'}
+                </button>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                {savingsAllocMode === 'percentSurplus' 
+                  ? 'Savings targets are percentage allocations of remaining monthly surplus.'
+                  : 'Savings targets are set to exact monthly dollar amounts.'}
+              </span>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Budget Scaling</span>
+                <button
+                  type="button"
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={handleToggleBudgetScalingMode}
+                >
+                  Use {budgetScalingMode === 'lifestyle' ? 'Fixed Dollar' : 'Lifestyle'}
+                </button>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                {budgetScalingMode === 'lifestyle' 
+                  ? 'Lifestyle-Based: Expenses & savings scale proportionally with income.'
+                  : 'Fixed Dollar: Expenses & savings remain fixed (adjusted for inflation only).'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Accordion 1: Needs */}
         <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' }}>

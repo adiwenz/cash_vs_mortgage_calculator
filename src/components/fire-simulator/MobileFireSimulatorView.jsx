@@ -317,6 +317,8 @@ export default function MobileFireSimulatorView({
   setBudgetMonthlySavings,
   pendingImprovement,
   handleSaveBudget,
+  budgetScalingMode,
+  handleToggleBudgetScalingMode,
   isSavingsDetailsOpen,
   savingsDetails,
   setSavingsDetails,
@@ -1816,6 +1818,8 @@ export default function MobileFireSimulatorView({
           handleSwitchBudgetPhase={handleSwitchBudgetPhase}
           savingsAllocMode={savingsAllocMode}
           handleToggleSavingsAllocMode={handleToggleSavingsAllocMode}
+          budgetScalingMode={budgetScalingMode}
+          handleToggleBudgetScalingMode={handleToggleBudgetScalingMode}
           budgetHsaCoverage={budgetHsaCoverage}
           setBudgetHsaCoverage={setBudgetHsaCoverage}
           budgetFilingStatus={budgetFilingStatus}

@@ -98,28 +98,38 @@ describe('Simulation Debugger UI Tests', () => {
     expect(screen.getByText('⚙️ Simulation Debugger')).toBeDefined();
 
     // Verify Tab buttons are present
-    const inputsTab = screen.getByRole('button', { name: 'Inputs' });
-    const eventsTab = screen.getByRole('button', { name: 'Events' });
-    const accountsTab = screen.getByRole('button', { name: 'Accounts & Allocations' });
+    const assumptionsTab = screen.getByRole('button', { name: 'Assumptions & Growth' });
+    const balancesTab = screen.getByRole('button', { name: 'Account Balances' });
+    const readinessTab = screen.getByRole('button', { name: 'Retirement Readiness' });
+    const drawdownsTab = screen.getByRole('button', { name: 'Drawdowns & Sustainability' });
     const timelineTab = screen.getByRole('button', { name: 'Year-by-Year Timeline' });
-    const summaryTab = screen.getByRole('button', { name: 'Summary' });
+    const exportTab = screen.getByRole('button', { name: 'Warnings & Export' });
 
-    expect(inputsTab).toBeDefined();
-    expect(eventsTab).toBeDefined();
-    expect(accountsTab).toBeDefined();
+    expect(assumptionsTab).toBeDefined();
+    expect(balancesTab).toBeDefined();
+    expect(readinessTab).toBeDefined();
+    expect(drawdownsTab).toBeDefined();
     expect(timelineTab).toBeDefined();
-    expect(summaryTab).toBeDefined();
+    expect(exportTab).toBeDefined();
 
-    // Verify Raw User Inputs title in default Inputs tab
-    expect(screen.getByText('Raw User Inputs')).toBeDefined();
+    // Verify Simulation Assumptions in default Assumptions & Growth tab
+    expect(screen.getByText(/Simulation Assumptions/i)).toBeDefined();
 
-    // Click Events tab and verify
-    fireEvent.click(eventsTab);
-    expect(screen.getByText('Normalized Timeline Events')).toBeDefined();
+    // Click Account Balances tab and verify
+    fireEvent.click(balancesTab);
+    expect(screen.getByText(/Starting vs Retirement Account Balances/i)).toBeDefined();
 
-    // Click Summary tab and verify Copy Summary button is present
-    fireEvent.click(summaryTab);
-    expect(screen.getByRole('button', { name: /Copy Summary/i })).toBeDefined();
+    // Click Retirement Readiness tab and verify
+    fireEvent.click(readinessTab);
+    expect(screen.getByText(/FIRE Number Calculation/i)).toBeDefined();
+
+    // Click Drawdowns & Sustainability tab and verify
+    fireEvent.click(drawdownsTab);
+    expect(screen.getByText(/Withdrawal Drawdown Sequence/i)).toBeDefined();
+
+    // Click Warnings & Export tab and verify
+    fireEvent.click(exportTab);
+    expect(screen.getByText(/Simulation Inspector Warnings/i)).toBeDefined();
 
     // Click Close button and verify drawer closes
     const closeBtn = screen.getByRole('button', { name: '✕' });

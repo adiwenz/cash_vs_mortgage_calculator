@@ -165,7 +165,9 @@ export default function FireSimulator() {
     handleCloseBudgetModal,
     handleSwitchBudgetPhase,
     handleToggleSavingsAllocMode,
-    handleSaveBudget
+    handleSaveBudget,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode
   } = budgetState;
 
   // 4. useTimelineEvents hook
@@ -1719,7 +1721,13 @@ export default function FireSimulator() {
     setActiveStep,
     inputs,
     updateInput,
-    handleStep1Change: updateInput,
+    handleStep1Change: (key, value) => {
+      if (key === 'simpleInvestments') {
+        updateAsset('brokerage', value);
+      } else {
+        updateInput(key, value);
+      }
+    },
     updateAsset,
     displayMode,
     setDisplayMode,
@@ -1767,6 +1775,8 @@ export default function FireSimulator() {
     handleSwitchBudgetPhase,
     savingsAllocMode,
     handleToggleSavingsAllocMode,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode,
     budgetSavings,
     setBudgetSavings,
     budgetPartnerSavings,

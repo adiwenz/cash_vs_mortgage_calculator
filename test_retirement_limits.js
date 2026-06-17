@@ -1,6 +1,11 @@
 import { describe, test, expect } from 'vitest';
 import { runFireSimulation } from './src/fireCalculations.js';
-import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
+import { DEFAULT_FIRE_INPUTS as ORIGINAL_DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
+const DEFAULT_FIRE_INPUTS = {
+  ...ORIGINAL_DEFAULT_FIRE_INPUTS,
+  inflationRate: 0,
+  incomeList: ORIGINAL_DEFAULT_FIRE_INPUTS.incomeList.map(inc => ({ ...inc, growthRate: 0 }))
+};
 
 describe('IRS Retirement Contribution Limits', () => {
 

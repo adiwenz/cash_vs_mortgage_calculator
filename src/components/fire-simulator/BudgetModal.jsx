@@ -22,6 +22,8 @@ export default function BudgetModal({
   handleSwitchBudgetPhase,
   savingsAllocMode,
   handleToggleSavingsAllocMode,
+  budgetScalingMode,
+  handleToggleBudgetScalingMode,
   budgetHsaCoverage,
   setBudgetHsaCoverage,
   budgetFilingStatus,
@@ -738,7 +740,9 @@ export default function BudgetModal({
     setDecideLater,
     handleClearNeeds,
     handleClearWants,
-    handleClearSavings
+    handleClearSavings,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode
   };
 
   return (

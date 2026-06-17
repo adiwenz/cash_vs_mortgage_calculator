@@ -120,8 +120,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     ? phases
     : derivePhasesFromEvents({ ...profile, targetRetirementAge, lifeExpectancy: simLifeExpectancy }, events, profile.budgetDetails?.phases || []);
 
+  let checkingBalance = (assets.checking !== undefined && !isNaN(Number(assets.checking))) ? Number(assets.checking) : (Number(assets.cash) || 0);
+  let hysaBalance = (assets.hysa !== undefined && !isNaN(Number(assets.hysa))) ? Number(assets.hysa) : 0;
+  
   let balances = {
-    cash: Number(assets.cash) || 0,
+    cash: checkingBalance + hysaBalance,
     emergencyFund: Number(assets.emergencyFund) || 0,
     brokerage: Number(assets.brokerage) || 0,
     trad401k: Number(assets.trad401k) || 0,
@@ -136,6 +139,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     if (val <= 0) return;
     if (cond.type === 'checkingSavings') {
       balances.cash += val;
+      checkingBalance += val;
     } else if (cond.type === 'brokerage') {
       balances.brokerage += val;
     } else if (cond.type === 'retirement') {
@@ -306,11 +310,51 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     currentAge
   };
 
+  const syncVirtualCashBalancesFromBalancesCash = () => {
+    const totalVirtual = checkingBalance + hysaBalance;
+    const actualCash = balances.cash;
+    if (Math.abs(totalVirtual - actualCash) < 0.01) return;
+    if (actualCash <= 0) {
+      checkingBalance = 0;
+      hysaBalance = 0;
+    } else if (totalVirtual <= 0) {
+      checkingBalance = actualCash;
+      hysaBalance = 0;
+    } else {
+      const checkingRatio = checkingBalance / totalVirtual;
+      checkingBalance = actualCash * checkingRatio;
+      hysaBalance = actualCash - checkingBalance;
+    }
+  };
+
   for (let year = 0; year <= simYearsToCompute; year++) {
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
     state.annualEarlyWithdrawalPenalties = 0;
     const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge);
+
+    // Save starting balances for telemetry
+    const checkingStart = checkingBalance;
+    const hysaStart = hysaBalance;
+    const emergencyStart = balances.emergencyFund;
+    const brokerageStart = balances.brokerage;
+    const trad401kStart = balances.trad401k;
+    const rothIraStart = balances.rothIra;
+    const hsaStart = balances.hsa;
+
+    // Initialize contribution tracking for telemetry
+    let checkingContrib = 0;
+    let hysaContrib = 0;
+    let emergencyContrib = 0;
+    let brokerageContrib = 0;
+    let trad401kContrib = 0;
+    let rothIraContrib = 0;
+    let hsaContrib = 0;
+
+    let explicitBrokerageContrib = 0;
+    let allocationRuleBrokerageContrib = 0;
+    let surplusFallbackBrokerageContrib = 0;
+    let transferBrokerageContrib = 0;
 
     state.weddingFinancedAmount = 0;
     state.weddingPaidFromSavings = 0;
@@ -318,10 +362,21 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     state.lumpSumDebtPayoffs = 0;
     state.annualInterestPaid = 0;
     state.housePurchaseTransactionCosts = 0;
-    state.yearInvestmentGrowth = 0;
+    state.yearWithdrawals = {
+      cash: 0,
+      emergencyFund: 0,
+      brokerage: 0,
+      trad401k: 0,
+      tradIra: 0,
+      rothIra: 0,
+      hsa: 0,
+      other: 0
+    };
     state.mortgagePayoffFromSale = 0;
     state.housePurchaseShortfall = 0;
     state.purchaseDebugThisYear = null;
+    const brokerageStartingBalance = balances.brokerage + customAssets.filter(ca => ca.type === 'brokerage').reduce((sum, ca) => sum + ca.balance, 0);
+    let brokerageGrowthThisYear = 0;
 
     const startAssets = year === 0
       ? (
@@ -375,6 +430,9 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         spouseCash, spouseInvestments, spouseRetirement,
         nominalFactor, dynamicMilestones, formatCurrency
       );
+      checkingBalance += spouseCash * nominalFactor;
+      balances.cash = checkingBalance + hysaBalance;
+      transferBrokerageContrib += spouseInvestments * nominalFactor;
     }
 
     if (hasMarriage && includeWeddingCost && age === weddingAge) {
@@ -383,6 +441,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         deductFromLiquidAssets, state, dynamicMilestones, formatCurrency,
         marriageEvent, activeLoans
       );
+      syncVirtualCashBalancesFromBalancesCash();
     }
 
     if (hasMarriage && age === marriageAge) {
@@ -393,7 +452,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       );
     }
 
-    let yearChildCosts = ((activePhaseForAge && activePhaseForAge.expenses && activePhaseForAge.expenses.childcare) || 0) * 12 * Math.pow(1 + inflationRate, age - currentAge);
+    let yearChildCosts = 0;
 
     let currentFilingStatus = filingStatus;
     if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
@@ -413,19 +472,43 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     state.standardDeduction = standardDeduction;
     state.nominalBrackets = nominalBrackets;
 
+    let checkingGrowth = 0;
+    let hysaGrowth = 0;
+    let emergencyGrowth = 0;
+    let brokerageGrowth = 0;
+    let trad401kGrowth = 0;
+    let rothIraGrowth = 0;
+    let hsaGrowth = 0;
+
     if (year > 0) {
       const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
       
-      const brokerageGrowth = (balances.brokerage || 0) * activeReturnRate;
-      const trad401kGrowth = (balances.trad401k || 0) * activeReturnRate;
+      checkingGrowth = checkingBalance * activeReturnRate;
+      hysaGrowth = hysaBalance * activeReturnRate;
+      emergencyGrowth = (balances.emergencyFund || 0) * activeReturnRate;
+      brokerageGrowth = (balances.brokerage || 0) * activeReturnRate;
+      trad401kGrowth = (balances.trad401k || 0) * activeReturnRate;
       const tradIraGrowth = (balances.tradIra || 0) * activeReturnRate;
-      const rothIraGrowth = (balances.rothIra || 0) * activeReturnRate;
-      const hsaGrowth = (balances.hsa || 0) * activeReturnRate;
+      rothIraGrowth = (balances.rothIra || 0) * activeReturnRate;
+      hsaGrowth = (balances.hsa || 0) * activeReturnRate;
       const otherGrowth = (balances.other || 0) * activeReturnRate;
       const cashGrowth = (balances.cash || 0) * activeReturnRate;
-      const emergencyFundGrowth = (balances.emergencyFund || 0) * activeReturnRate;
+      const emergencyFundGrowth = emergencyGrowth;
 
       state.yearInvestmentGrowth = brokerageGrowth + trad401kGrowth + tradIraGrowth + rothIraGrowth + hsaGrowth + otherGrowth + cashGrowth + emergencyFundGrowth;
+
+      let customBrokerageGrowthVal = 0;
+      customAssets.forEach(ca => {
+        if (ca.type === 'brokerage' && ca.balance > 0) {
+          if (ca.endAge !== null && age > ca.endAge) return;
+          let rateToApply = ca.growthRate !== null ? ca.growthRate : activeReturnRate;
+          customBrokerageGrowthVal += ca.balance * rateToApply;
+        }
+      });
+      brokerageGrowthThisYear = brokerageGrowth + customBrokerageGrowthVal;
+
+      checkingBalance += checkingGrowth;
+      hysaBalance += hysaGrowth;
 
       balances.brokerage *= (1 + activeReturnRate);
       balances.trad401k *= (1 + activeReturnRate);
@@ -433,7 +516,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       balances.rothIra *= (1 + activeReturnRate);
       balances.hsa *= (1 + activeReturnRate);
       balances.other *= (1 + activeReturnRate);
-      balances.cash *= (1 + activeReturnRate);
+      balances.cash = checkingBalance + hysaBalance;
       balances.emergencyFund *= (1 + activeReturnRate);
 
       if (state.cumulativeShortfall > 0) {
@@ -475,6 +558,35 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           const actualTransfer = Math.max(0, Math.min(balances[fromAsset], amount));
           balances[fromAsset] -= actualTransfer;
           balances[toAsset] += actualTransfer;
+
+          // Sync virtual checking/hysa balances
+          if (fromAsset === 'cash' || fromAsset === 'checking') {
+            const fromChecking = Math.min(checkingBalance, actualTransfer);
+            checkingBalance -= fromChecking;
+            const fromHysa = actualTransfer - fromChecking;
+            hysaBalance -= fromHysa;
+          } else if (fromAsset === 'hysa') {
+            const fromHysa = Math.min(hysaBalance, actualTransfer);
+            hysaBalance -= fromHysa;
+            const fromChecking = actualTransfer - fromHysa;
+            checkingBalance -= fromChecking;
+          }
+
+          if (toAsset === 'cash' || toAsset === 'checking') {
+            checkingBalance += actualTransfer;
+          } else if (toAsset === 'hysa') {
+            hysaBalance += actualTransfer;
+          }
+
+          balances.cash = checkingBalance + hysaBalance;
+
+          // Track brokerage transfer contribution
+          if (toAsset === 'brokerage') {
+            transferBrokerageContrib += actualTransfer;
+          } else if (fromAsset === 'brokerage') {
+            transferBrokerageContrib -= actualTransfer;
+          }
+
           if (actualTransfer > 0) {
             dynamicMilestones.push({
               age,
@@ -569,6 +681,34 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
     }
 
+    let budgetScalingMode = 'lifestyle';
+    let phaseIncomeAtCreation = 50000;
+    let incomeMultiplier = 1.0;
+    let savingsMultiplier = 1.0;
+    let scalingMultiplier = 1.0;
+
+    if (activePhaseForAge) {
+      budgetScalingMode = activePhaseForAge.budgetScalingMode || 'lifestyle';
+      phaseIncomeAtCreation = activePhaseForAge.incomeAtCreation !== undefined ? activePhaseForAge.incomeAtCreation : (activePhaseForAge.income * 12);
+      if (budgetScalingMode === 'lifestyle') {
+        incomeMultiplier = phaseIncomeAtCreation > 0 ? (annualIncome / phaseIncomeAtCreation) : 1.0;
+        scalingMultiplier = incomeMultiplier;
+        savingsMultiplier = incomeMultiplier;
+      } else { // 'fixed'
+        incomeMultiplier = 1.0;
+        scalingMultiplier = 1.0;
+        savingsMultiplier = Math.pow(1 + inflationRate, age - currentAge);
+      }
+    }
+
+    if (activePhaseForAge) {
+      if (budgetScalingMode === 'lifestyle') {
+        yearChildCosts = (activePhaseForAge.expenses?.childcare || 0) * 12 * incomeMultiplier;
+      } else {
+        yearChildCosts = (activePhaseForAge.expenses?.childcare || 0) * 12 * Math.pow(1 + inflationRate, age - currentAge);
+      }
+    }
+
     let windfallReceived = 0;
     enabledEvents.forEach(ev => {
       if ((ev.type === 'windfall' || ev.type === 'inheritance' || ev.type === 'sellBusiness') && age === Number(ev.ageReceived || ev.age)) {
@@ -583,7 +723,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     if (activePhaseForAge) {
       const monthlyNonDebt = sumNonDebtExpenses(activePhaseForAge.expenses);
-      spendingForYear = (monthlyNonDebt * 12) * Math.pow(1 + inflationRate + lifestyleUpgrades, age - currentAge);
+      if (budgetScalingMode === 'lifestyle') {
+        spendingForYear = (monthlyNonDebt * 12) * incomeMultiplier;
+      } else {
+        spendingForYear = (monthlyNonDebt * 12) * Math.pow(1 + inflationRate + lifestyleUpgrades, age - currentAge);
+      }
     } else {
       spendingForYear = (Number(profile.simpleExpenses) || 42500) * Math.pow(1 + inflationRate + lifestyleUpgrades, age - currentAge);
     }
@@ -665,10 +809,25 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     handleHousePurchase(
       age, enabledEvents, profile, purchasedProperties, deductFromLiquidAssets, state
     );
+    syncVirtualCashBalancesFromBalancesCash();
+
+    const preHouseSaleCash = balances.cash;
+    const preHouseSaleBrokerage = balances.brokerage;
 
     purchasedProperties = handleHouseSale(
       age, currentAge, enabledEvents, purchasedProperties, state, dynamicMilestones, formatCurrency
     );
+
+    const houseSaleCashReceived = balances.cash - preHouseSaleCash;
+    if (houseSaleCashReceived > 0) {
+      checkingBalance += houseSaleCashReceived;
+      balances.cash = checkingBalance + hysaBalance;
+    }
+
+    const houseSaleBrokerageReceived = balances.brokerage - preHouseSaleBrokerage;
+    if (houseSaleBrokerageReceived > 0) {
+      transferBrokerageContrib += houseSaleBrokerageReceived;
+    }
 
     const housingUpdates = processYearlyHousingUpdates(
       age, currentAge, homeEquityBaseline, nominalFactor, customHouses, purchasedProperties, inflationRate
@@ -688,6 +847,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     annualExpenses += annualMinPayments;
 
     const extraDebtShortfall = deductFromLiquidAssets(annualExtraPayments, age, state);
+    syncVirtualCashBalancesFromBalancesCash();
     if (extraDebtShortfall > 0.01) {
       state.hasRunOut = true;
       if (state.runOutAge === null) {
@@ -699,6 +859,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       if (ev.type === 'debtPayoff' && age === Number(ev.payoffAge)) {
         const amt = Number(ev.remainingBalance !== undefined ? ev.remainingBalance : ev.amount) || 0;
         const debtShortfall = deductFromLiquidAssets(amt, age, state);
+        syncVirtualCashBalancesFromBalancesCash();
         if (debtShortfall > 0.01) {
           state.hasRunOut = true;
           if (state.runOutAge === null) {
@@ -783,7 +944,25 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     const activeBudgetPhase = simPhases.find(p => age >= p.startAge && age < p.endAge);
 
-    if (isSavingPeriod && activeBudgetPhase) {
+    let contributionRoutingSource = 'default_surplus_fallback';
+    let ignoredRulesThisYear = [];
+
+    const hasExplicitPhaseSavings = !!(activeBudgetPhase && (
+      Object.values(activeBudgetPhase.savings || {}).some(v => Number(v) > 0) ||
+      Object.values(activeBudgetPhase.partnerSavings || {}).some(v => Number(v) > 0)
+    ));
+
+    if (isSavingPeriod) {
+      if (hasExplicitPhaseSavings) {
+        const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
+        contributionRoutingSource = mode === 'percentSurplus' ? 'phase_percent_surplus' : 'phase_fixed_savings';
+        ignoredRulesThisYear = sortedAllocations.map(r => r.id || 'unnamed-rule');
+      } else if (sortedAllocations.length > 0) {
+        contributionRoutingSource = 'allocation_rules';
+      }
+    }
+
+    if (isSavingPeriod && hasExplicitPhaseSavings) {
       const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
       const savings = activeBudgetPhase.savings || {};
       const partnerSavings = activeBudgetPhase.partnerSavings || {};
@@ -804,8 +983,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           });
         } else {
           preTaxKeys.forEach(k => {
-            uPreTax[k] = (Number(savings[k]) || 0) * 12;
-            pPreTax[k] = (Number(partnerSavings[k]) || 0) * 12;
+            uPreTax[k] = (Number(savings[k]) || 0) * 12 * savingsMultiplier;
+            pPreTax[k] = (Number(partnerSavings[k]) || 0) * 12 * savingsMultiplier;
             totalPreTaxTarget += uPreTax[k] + pPreTax[k];
           });
         }
@@ -932,17 +1111,30 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         if (amt > 0) {
           balances[k] += amt;
           savingsContribution += amt;
+          if (k === 'trad401k') trad401kContrib += amt;
+          else if (k === 'hsa') hsaContrib += amt;
         }
       });
 
-      if (allocationRules.length > 0) {
-        allocationRules.forEach(rule => {
+      if (contributionRoutingSource === 'allocation_rules') {
+        sortedAllocations.forEach(rule => {
           if (rule.employerMatch) {
             const dest = rule.destination;
             const matchAmt = rule.frequency === 'monthly' ? Number(rule.employerMatch) * 12 : Number(rule.employerMatch);
             if (balances[dest] !== undefined) {
               balances[dest] += matchAmt;
               employerMatchContribution += matchAmt;
+
+              // Track in virtual sub-balances or transfers
+              if (dest === 'cash' || dest === 'checking') {
+                checkingBalance += matchAmt;
+                balances.cash = checkingBalance + hysaBalance;
+              } else if (dest === 'hysa') {
+                hysaBalance += matchAmt;
+                balances.cash = checkingBalance + hysaBalance;
+              } else if (dest === 'brokerage') {
+                transferBrokerageContrib += matchAmt;
+              }
             }
           }
         });
@@ -954,7 +1146,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         netSurplus -= payDown;
       }
 
-      if (activeBudgetPhase && netSurplus > 0) {
+      if (hasExplicitPhaseSavings && netSurplus > 0) {
         const mode = activeBudgetPhase.savingsAllocMode || 'fixed';
         const savings = activeBudgetPhase.savings || {};
         const partnerSavings = activeBudgetPhase.partnerSavings || {};
@@ -972,8 +1164,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           });
         } else {
           postTaxKeys.forEach(k => {
-            uPostTax[k] = (Number(savings[k]) || 0) * 12;
-            pPostTax[k] = (Number(partnerSavings[k]) || 0) * 12;
+            uPostTax[k] = (Number(savings[k]) || 0) * 12 * savingsMultiplier;
+            pPostTax[k] = (Number(partnerSavings[k]) || 0) * 12 * savingsMultiplier;
             totalPostTaxTarget += uPostTax[k] + pPostTax[k];
           });
         }
@@ -1058,22 +1250,30 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
               balances.rothIra += actualRothIra;
               savingsContribution += actualRothIra;
               actualContributions.rothIra = actualRothIra;
+              rothIraContrib += actualRothIra;
             } else if (k === 'brokerage') {
               balances.brokerage += amt;
               savingsContribution += amt;
               actualContributions.brokerage = amt;
+              brokerageContrib += amt;
+              explicitBrokerageContrib += amt;
             } else if (k === 'checking') {
               balances.cash += amt;
               savingsContribution += amt;
               actualContributions.checking = amt;
+              checkingBalance += amt;
+              checkingContrib += amt;
             } else if (k === 'hysa') {
               balances.cash += amt;
               savingsContribution += amt;
               actualContributions.hysa = amt;
+              hysaBalance += amt;
+              hysaContrib += amt;
             } else if (k === 'emergency') {
               balances.emergencyFund += amt;
               savingsContribution += amt;
               actualContributions.emergency = amt;
+              emergencyContrib += amt;
             } else if (k === 'other') {
               balances.other += amt;
               savingsContribution += amt;
@@ -1092,6 +1292,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
                 balances.brokerage += debtRemaining;
                 savingsContribution += debtRemaining;
                 actualContributions.brokerage = (actualContributions.brokerage || 0) + debtRemaining;
+                brokerageContrib += debtRemaining;
+                transferBrokerageContrib += debtRemaining;
               }
               actualContributions.debt = amt - debtRemaining;
             }
@@ -1100,9 +1302,9 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
         if (mode === 'fixed' && netSurplus > totalPostTaxTarget) {
           const leftover = netSurplus - totalPostTaxTarget;
-          balances.brokerage += leftover;
-          savingsContribution += leftover;
-          actualContributions.brokerage = (actualContributions.brokerage || 0) + leftover;
+          balances.cash += leftover;
+          checkingBalance += leftover;
+          checkingContrib += leftover;
         }
 
         // Handle redirection of excess contributions (pre-tax + post-tax)
@@ -1112,9 +1314,13 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           if (brokerageExists) {
             balances.brokerage += totalRedirect;
             actualContributions.brokerage = (actualContributions.brokerage || 0) + totalRedirect;
+            brokerageContrib += totalRedirect;
+            transferBrokerageContrib += totalRedirect;
           } else {
             balances.cash += totalRedirect;
             actualContributions.checking = (actualContributions.checking || 0) + totalRedirect;
+            checkingBalance += totalRedirect;
+            checkingContrib += totalRedirect;
           }
           savingsContribution += totalRedirect;
         }
@@ -1123,6 +1329,55 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
           yearsWithLimitsReached++;
         }
 
+        netSurplus = 0;
+      } else if (contributionRoutingSource === 'allocation_rules' && netSurplus > 0) {
+        sortedAllocations.forEach(rule => {
+          if (rule.type === 'percentSurplus') {
+            const pct = (Number(rule.value) || 0) / 100;
+            const amt = netSurplus * pct;
+            if (amt > 0) {
+              const dest = rule.destination;
+              if (dest === 'brokerage') {
+                balances.brokerage += amt;
+                savingsContribution += amt;
+                actualContributions.brokerage = (actualContributions.brokerage || 0) + amt;
+                brokerageContrib += amt;
+                allocationRuleBrokerageContrib += amt;
+              } else if (dest === 'cash' || dest === 'checking') {
+                balances.cash += amt;
+                savingsContribution += amt;
+                actualContributions.checking = (actualContributions.checking || 0) + amt;
+                checkingBalance += amt;
+                checkingContrib += amt;
+              } else if (dest === 'hysa') {
+                balances.cash += amt;
+                savingsContribution += amt;
+                actualContributions.hysa = (actualContributions.hysa || 0) + amt;
+                hysaBalance += amt;
+                hysaContrib += amt;
+              } else if (dest === 'emergency') {
+                balances.emergencyFund += amt;
+                savingsContribution += amt;
+                actualContributions.emergency = (actualContributions.emergency || 0) + amt;
+                emergencyContrib += amt;
+              } else if (balances[dest] !== undefined) {
+                balances[dest] += amt;
+                savingsContribution += amt;
+                actualContributions[dest] = (actualContributions[dest] || 0) + amt;
+                if (dest === 'trad401k') trad401kContrib += amt;
+                else if (dest === 'rothIra') rothIraContrib += amt;
+                else if (dest === 'hsa') hsaContrib += amt;
+              }
+            }
+          }
+        });
+        netSurplus = 0;
+      } else if (contributionRoutingSource === 'default_surplus_fallback' && netSurplus > 0) {
+        balances.brokerage += netSurplus;
+        savingsContribution += netSurplus;
+        actualContributions.brokerage = (actualContributions.brokerage || 0) + netSurplus;
+        brokerageContrib += netSurplus;
+        surplusFallbackBrokerageContrib += netSurplus;
         netSurplus = 0;
       }
     } else {
@@ -1133,6 +1388,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       }
       if (netSurplus > 0) {
         balances.brokerage += netSurplus;
+        brokerageContrib += netSurplus;
+        surplusFallbackBrokerageContrib += netSurplus;
         netSurplus = 0;
       }
     }
@@ -1143,6 +1400,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     if (netCashFlow < 0) {
       const deficit = -netCashFlow;
       const leftShortfall = coverShortfall(deficit, age, state);
+      syncVirtualCashBalancesFromBalancesCash();
       withdrawal = deficit - leftShortfall;
 
       if (leftShortfall > 0.01) {
@@ -1581,10 +1839,10 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         }
       } else {
         preTaxKeys.forEach(k => {
-          plannedPreTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12;
+          plannedPreTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12 * savingsMultiplier;
         });
         postTaxKeys.forEach(k => {
-          plannedPostTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12;
+          plannedPostTaxSavings += ((Number(savings[k]) || 0) + (Number(partnerSavings[k]) || 0)) * 12 * savingsMultiplier;
         });
       }
     }
@@ -1592,6 +1850,51 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const incomeAvailable = annualIncome + windfallReceived;
     const gapForYear = incomeAvailable - taxes - annualExpenses - totalPlannedSavings;
     const lifestyleGapValue = (age < targetRetirementAge && gapForYear < 0) ? -gapForYear : 0;
+
+
+    const brokerageWithdrawn = state.yearWithdrawals?.brokerage || 0;
+    transferBrokerageContrib -= brokerageWithdrawn;
+
+    const brokerageEndingBalance = balances.brokerage;
+    const expectedBrokerageEndingBalance = brokerageStart + explicitBrokerageContrib + allocationRuleBrokerageContrib + surplusFallbackBrokerageContrib + transferBrokerageContrib + brokerageGrowth;
+    const brokerageDiscrepancy = brokerageEndingBalance - expectedBrokerageEndingBalance;
+    if (Math.abs(brokerageDiscrepancy) > 1.0) {
+      console.warn(`Warning: Brokerage discrepancy at age ${age}: actual ending balance = ${brokerageEndingBalance}, expected ending balance = ${expectedBrokerageEndingBalance}, discrepancy = ${brokerageDiscrepancy}`);
+    }
+
+    let baseMonthlySavings = 0;
+    let baseMonthlyExpenses = 0;
+    if (activePhaseForAge) {
+      const savingsObj = activePhaseForAge.savings || {};
+      const partnerSavingsObj = activePhaseForAge.partnerSavings || {};
+      const savingsKeys = ['checking', 'hysa', 'emergency', 'brokerage', 'trad401k', 'rothIra', 'hsa', 'tradIra', 'debt', 'other'];
+      savingsKeys.forEach(k => {
+        baseMonthlySavings += (Number(savingsObj[k]) || 0) + (Number(partnerSavingsObj[k]) || 0);
+      });
+      baseMonthlyExpenses = sumNonDebtExpenses(activePhaseForAge.expenses);
+    }
+    const scaledMonthlySavings = baseMonthlySavings * savingsMultiplier;
+    const scaledMonthlyExpenses = baseMonthlyExpenses * scalingMultiplier;
+    const budgetBalanceCheck = {
+      income: annualIncome,
+      expenses: spendingForYear,
+      savings: scaledMonthlySavings * 12,
+      difference: annualIncome - (spendingForYear + (scaledMonthlySavings * 12) + taxes)
+    };
+
+    let routingWarning = null;
+    if (isSavingPeriod && hasExplicitPhaseSavings && allocationRules && allocationRules.length > 0) {
+      routingWarning = "Phase savings are active; allocationRules ignored this year.";
+    }
+
+    const currentDrift = isSavingPeriod
+      ? ((annualIncome + windfallReceived) - (annualExpenses + savingsContribution + taxes + annualExtraPayments))
+      : 0;
+
+    if (budgetScalingMode === 'lifestyle' && isSavingPeriod && Math.abs(currentDrift) > 1.0) {
+      console.warn(`[Budget Drift Guardrail Warning] Age ${age}: income (${annualIncome + windfallReceived}) does not match expenses (${annualExpenses}) + savings (${savingsContribution}) + taxes (${taxes}) + extra debt payments (${annualExtraPayments}). Drift: ${currentDrift}`);
+    }
+
     logs.push({
       intervalId: activePhaseForAge ? activePhaseForAge.id : null,
       year,
@@ -1634,7 +1937,84 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       rothIraBalance: balances.rothIra + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'rothIra').reduce((sum, ca) => sum + ca.balance, 0),
       hsaBalance: balances.hsa + customAssets.filter(ca => ca.type === 'retirement' && ca.subtype === 'hsa').reduce((sum, ca) => sum + ca.balance, 0),
       otherBalance: balances.other + customAssets.filter(ca => ca.type === 'asset').reduce((sum, ca) => sum + ca.balance, 0),
-      actualContributions: { ...actualContributions }
+      actualContributions: { ...actualContributions },
+      contributionRoutingSource,
+      annualContributionsByAccount: {
+        checking: checkingContrib,
+        hysa: hysaContrib,
+        emergency: emergencyContrib,
+        brokerage: brokerageContrib,
+        trad401k: trad401kContrib,
+        rothIra: rothIraContrib,
+        hsa: hsaContrib
+      },
+      growthByAccount: {
+        checking: year === 0 ? 0 : checkingGrowth,
+        hysa: year === 0 ? 0 : hysaGrowth,
+        emergency: year === 0 ? 0 : emergencyGrowth,
+        brokerage: year === 0 ? 0 : brokerageGrowth,
+        trad401k: year === 0 ? 0 : trad401kGrowth,
+        rothIra: year === 0 ? 0 : rothIraGrowth,
+        hsa: year === 0 ? 0 : hsaGrowth
+      },
+      startBalanceByAccount: {
+        checking: checkingStart,
+        hysa: hysaStart,
+        emergency: emergencyStart,
+        brokerage: brokerageStart,
+        trad401k: trad401kStart,
+        rothIra: rothIraStart,
+        hsa: hsaStart
+      },
+      endBalanceByAccount: {
+        checking: checkingBalance,
+        hysa: hysaBalance,
+        emergency: balances.emergencyFund,
+        brokerage: balances.brokerage,
+        trad401k: balances.trad401k,
+        rothIra: balances.rothIra,
+        hsa: balances.hsa
+      },
+      brokerageAudit: {
+        startingBalance: brokerageStart,
+        explicitContribution: explicitBrokerageContrib,
+        allocationRuleContribution: allocationRuleBrokerageContrib,
+        surplusFallbackContribution: surplusFallbackBrokerageContrib,
+        transferContribution: transferBrokerageContrib,
+        growth: brokerageGrowth,
+        endingBalance: brokerageEndingBalance,
+        expectedEndingBalance: expectedBrokerageEndingBalance,
+        discrepancy: brokerageDiscrepancy
+      },
+      budgetScaling: {
+        mode: budgetScalingMode,
+        phaseIncomeAtCreation,
+        currentIncome: annualIncome,
+        scalingMultiplier,
+        baseMonthlySavings,
+        scaledMonthlySavings,
+        baseMonthlyExpenses,
+        scaledMonthlyExpenses,
+        budgetBalanceCheck
+      },
+      routingWarning,
+      ignoredAllocationRules: ignoredRulesThisYear,
+      brokerageStartingBalance,
+      brokerageContribution: actualContributions.brokerage || 0,
+      brokerageGrowth: brokerageGrowthThisYear,
+      brokerageEndingBalance: balances.brokerage + customAssets.filter(ca => ca.type === 'brokerage').reduce((sum, ca) => sum + ca.balance, 0),
+      yearWithdrawals: {
+        cash: (state.yearWithdrawals?.cash || 0) + (state.yearWithdrawals?.emergencyFund || 0),
+        brokerage: (state.yearWithdrawals?.brokerage || 0),
+        trad401k: (state.yearWithdrawals?.trad401k || 0) + (state.yearWithdrawals?.tradIra || 0),
+        rothIra: (state.yearWithdrawals?.rothIra || 0),
+        hsa: (state.yearWithdrawals?.hsa || 0)
+      },
+      budgetScalingMode,
+      phaseIncomeAtCreation,
+      currentIncome: annualIncome,
+      scalingMultiplier,
+      budgetDrift: currentDrift
     });
   }
 

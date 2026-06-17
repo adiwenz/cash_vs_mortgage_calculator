@@ -62,7 +62,11 @@ export function withdrawFromCategory(category, amountNeeded, state) {
     ca.balance = Math.max(0, ca.balance - (totalToWithdraw * caRatio));
   });
 
-  remaining -= totalToWithdraw;
+  if (!state.yearWithdrawals) {
+    state.yearWithdrawals = {};
+  }
+  state.yearWithdrawals[category] = (state.yearWithdrawals[category] || 0) + totalToWithdraw;
+
   return totalToWithdraw;
 }
 

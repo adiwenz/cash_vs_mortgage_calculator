@@ -623,7 +623,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           const sumVal = Object.values(baseExpenses).reduce((a, b) => a + b, 0);
           const diff = combExp - sumVal;
           baseExpenses.misc += diff;
-        } else {
+        } else if (i === 0 || !phases[i - 1].isMarried) {
           const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100));
           const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
           const housing = Number(marriageEvent.housingSavings || 0);
@@ -967,6 +967,50 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       }
     }
 
+    const totalExpensesMonthly = Object.keys(resolvedExpenses)
+      .filter(k => !k.startsWith('debt_'))
+      .reduce((sum, k) => sum + (Number(resolvedExpenses[k]) || 0), 0);
+
+    const userSavingsSum = Object.values(baseSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const partnerSavingsSum = Object.values(basePartnerSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+    let totalSavingsMonthly = 0;
+    if (savingsAllocMode === 'percentSurplus') {
+      const initialSurplus = Math.max(0, resolvedIncome - totalExpensesMonthly);
+      totalSavingsMonthly = initialSurplus * ((userSavingsSum + partnerSavingsSum) / 100);
+    } else {
+      totalSavingsMonthly = userSavingsSum + partnerSavingsSum;
+    }
+
+    const expenseRatio = resolvedIncome > 0 ? (totalExpensesMonthly / resolvedIncome) : 0;
+    const savingsRatio = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) : 0;
+
+    const categoryRatios = {};
+    if (resolvedIncome > 0) {
+      Object.keys(resolvedExpenses).forEach(k => {
+        categoryRatios[k] = (Number(resolvedExpenses[k]) || 0) / resolvedIncome;
+      });
+      if (savingsAllocMode === 'fixed') {
+        Object.keys(baseSavings).forEach(k => {
+          categoryRatios[`savings_${k}`] = (Number(baseSavings[k]) || 0) / resolvedIncome;
+        });
+        Object.keys(basePartnerSavings).forEach(k => {
+          categoryRatios[`partnerSavings_${k}`] = (Number(basePartnerSavings[k]) || 0) / resolvedIncome;
+        });
+      } else {
+        const surplusRatio = Math.max(0, resolvedIncome - totalExpensesMonthly) / resolvedIncome;
+        Object.keys(baseSavings).forEach(k => {
+          categoryRatios[`savings_${k}`] = ((Number(baseSavings[k]) || 0) / 100) * surplusRatio;
+        });
+        Object.keys(basePartnerSavings).forEach(k => {
+          categoryRatios[`partnerSavings_${k}`] = ((Number(basePartnerSavings[k]) || 0) / 100) * surplusRatio;
+        });
+      }
+    }
+
+    const budgetScalingMode = savedPhase?.budgetScalingMode || (type === 'retire' ? 'fixed' : 'lifestyle');
+    const incomeAtCreation = savedPhase?.incomeAtCreation !== undefined ? savedPhase.incomeAtCreation : ((resolvedIncome + spouseIncome) * 12);
+
     phases.push({
       id,
       name,
@@ -983,6 +1027,15 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       passiveMonthlyIncome,
       incomeGrowthRate: growthRate,
       savingsAllocMode,
+      budgetScalingMode,
+      incomeAtCreation,
+      originalIncome: resolvedIncome,
+      originalExpenses: { ...resolvedExpenses },
+      originalSavings: { ...baseSavings },
+      originalPartnerSavings: { ...basePartnerSavings },
+      expenseRatio,
+      savingsRatio,
+      categoryRatios,
       savings: { ...baseSavings },
       partnerSavings: { ...basePartnerSavings },
       expenses: resolvedExpenses,

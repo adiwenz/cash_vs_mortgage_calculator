@@ -109,6 +109,8 @@ export default function DesktopFireSimulatorView({
   setBudgetMonthlySavings,
   pendingImprovement,
   handleSaveBudget,
+  budgetScalingMode,
+  handleToggleBudgetScalingMode,
   isSavingsDetailsOpen,
   savingsDetails,
   setSavingsDetails,
@@ -250,6 +252,8 @@ export default function DesktopFireSimulatorView({
           handleSwitchBudgetPhase={handleSwitchBudgetPhase}
           savingsAllocMode={savingsAllocMode}
           handleToggleSavingsAllocMode={handleToggleSavingsAllocMode}
+          budgetScalingMode={budgetScalingMode}
+          handleToggleBudgetScalingMode={handleToggleBudgetScalingMode}
           budgetHsaCoverage={budgetHsaCoverage}
           setBudgetHsaCoverage={setBudgetHsaCoverage}
           budgetFilingStatus={budgetFilingStatus}

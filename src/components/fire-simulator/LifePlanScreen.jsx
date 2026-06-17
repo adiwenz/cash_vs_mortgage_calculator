@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -199,47 +199,20 @@ const generateLifeStory = (inp, results) => {
   );
 };
 
-const getConciseSummaryText = (snapshot) => {
-  if (!snapshot) return '';
-  const sa = snapshot.globalAssumptions;
-  const ba = snapshot.budgetAssumptions;
-  const fr = snapshot.finalResult;
-  const ev = snapshot.events;
 
-  const activeEventsStr = ev.normalizedEvents && ev.normalizedEvents.length > 0
-    ? ev.normalizedEvents.map(e => `${e.name || e.type} (Age ${e.startAge}${e.endAge ? '-' + e.endAge : ''})`).join(', ')
-    : 'None';
-
-  return `--- FIRE Simulation Debug Summary ---
-Current Age: ${sa.currentAge}
-Target Retirement Age: ${sa.retirementAge}
-Retirement Ready Age: ${fr.retirementReadyAge ?? 'N/A'}
-Annual Income: $${ba.income.toLocaleString()}
-Annual Expenses: $${ba.expenses.toLocaleString()}
-Savings Rate: ${ba.savingsRate !== null ? ba.savingsRate + '%' : 'N/A'}
-
-Main Assumptions:
-- Inflation: ${(sa.inflation * 100).toFixed(1)}%
-- Expected Return (Pre-retirement): ${(sa.preRetirementReturn * 100).toFixed(1)}%
-- Expected Return (Post-retirement): ${(sa.postRetirementReturn * 100).toFixed(1)}%
-- Safe Withdrawal Rate (SWR): ${(sa.safeWithdrawalRate * 100).toFixed(1)}%
-- Include Taxes: ${sa.taxSettings.includeTaxes ? 'Yes (' + sa.taxSettings.filingStatus + ')' : 'No'}
-
-Active Events:
-${activeEventsStr}
-
-Final Status:
-- Retirement Success: ${fr.retirementSuccess ? 'Yes' : 'No'}
-- Final Net Worth / Depletion Status: ${fr.retirementSuccess ? 'Success (Assets last)' : 'Portfolio depleted'}${fr.depletionAge ? ' at Age ' + fr.depletionAge : ''}
--------------------------------------`;
-};
 
 const downloadTimelineCSV = (timeline) => {
   if (!timeline || timeline.length === 0) return;
   const headers = [
     'Age', 'Year', 'Gross Income', 'Taxes', 'Net Income', 'Expenses',
     'Contributions', 'Withdrawals', 'Investment Growth', 'Debt Balance',
-    'Asset Balance', 'Net Worth', 'Retirement Status', 'Active Events', 'Warnings/Errors'
+    'Asset Balance', 'Net Worth', 'Scaling Mode', 'Multiplier', 'Budget Drift',
+    'Retirement Status', 'Active Events', 'Warnings/Errors',
+    'Routing Source', 'Ignored Rules', 'Routing Warning',
+    'Brokerage Starting Balance', 'Brokerage Explicit Contribution',
+    'Brokerage Allocation Rule Contribution', 'Brokerage Surplus Fallback Contribution',
+    'Brokerage Transfer Contribution', 'Brokerage Growth', 'Brokerage Ending Balance',
+    'Brokerage Expected Ending Balance', 'Brokerage Discrepancy'
   ];
 
   const csvRows = [headers.join(',')];
@@ -247,6 +220,12 @@ const downloadTimelineCSV = (timeline) => {
   timeline.forEach(row => {
     const activeEventsEscaped = `"${(row.activeEvents || []).join('; ')}"`;
     const warningsEscaped = `"${(row.warningsErrors || []).join('; ')}"`;
+    const ignoredRulesEscaped = `"${(row.ignoredAllocationRules || []).join('; ')}"`;
+    const routingWarningEscaped = `"${row.routingWarning || ''}"`;
+    const routingSourceEscaped = `"${row.contributionRoutingSource || ''}"`;
+
+    const audit = row.brokerageAudit || {};
+
     const line = [
       row.age,
       row.year,
@@ -260,9 +239,24 @@ const downloadTimelineCSV = (timeline) => {
       row.debtBalance,
       row.assetBalance,
       row.netWorth,
+      row.budgetScalingMode || 'lifestyle',
+      row.scalingMultiplier !== undefined ? row.scalingMultiplier.toFixed(4) : '1.0000',
+      row.budgetDrift !== undefined ? row.budgetDrift.toFixed(2) : '0.00',
       row.retirementStatus,
       activeEventsEscaped,
-      warningsEscaped
+      warningsEscaped,
+      routingSourceEscaped,
+      ignoredRulesEscaped,
+      routingWarningEscaped,
+      audit.startingBalance !== undefined ? audit.startingBalance.toFixed(2) : '0.00',
+      audit.explicitContribution !== undefined ? audit.explicitContribution.toFixed(2) : '0.00',
+      audit.allocationRuleContribution !== undefined ? audit.allocationRuleContribution.toFixed(2) : '0.00',
+      audit.surplusFallbackContribution !== undefined ? audit.surplusFallbackContribution.toFixed(2) : '0.00',
+      audit.transferContribution !== undefined ? audit.transferContribution.toFixed(2) : '0.00',
+      audit.growth !== undefined ? audit.growth.toFixed(2) : '0.00',
+      audit.endingBalance !== undefined ? audit.endingBalance.toFixed(2) : '0.00',
+      audit.expectedEndingBalance !== undefined ? audit.expectedEndingBalance.toFixed(2) : '0.00',
+      audit.discrepancy !== undefined ? audit.discrepancy.toFixed(2) : '0.00'
     ];
     csvRows.push(line.join(','));
   });
@@ -542,10 +536,8 @@ export default function LifePlanScreen({
   const [showNetWorth, setShowNetWorth] = useState(true);
   const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
-  const [debugTab, setDebugTab] = useState('inputs'); // 'inputs', 'events', 'accounts', 'timeline', 'summary'
-  const [copiedText, setCopiedText] = useState(false);
+  const [debugTab, setDebugTab] = useState('assumptions'); // 'assumptions', 'balances', 'readiness', 'drawdowns', 'timeline', 'export'
   const [copiedRaw, setCopiedRaw] = useState(false);
-  const [copiedNorm, setCopiedNorm] = useState(false);
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
 
   const showDebugButton = typeof window !== 'undefined' && (
@@ -562,10 +554,11 @@ export default function LifePlanScreen({
   }, [showDebugDrawer, inputs, activeResults]);
 
   const handleDownloadJSON = (snapshot) => {
+    if (!snapshot) return;
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
-    const filename = `simulation-debug-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${now.getHours()}-${now.getMinutes()}.json`;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snapshot, null, 2));
+    const filename = `simulation-inspector-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${now.getHours()}-${now.getMinutes()}.json`;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snapshot.exportableJSON || snapshot, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", filename);
@@ -573,15 +566,6 @@ export default function LifePlanScreen({
     downloadAnchor.click();
     downloadAnchor.remove();
   };
-
-  const handleCopySummary = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedText(true);
-      setTimeout(() => setCopiedText(false), 2000);
-    });
-  };
-
-
 
   const simpleSavingsRate = inputs.simpleIncome > 0
     ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
@@ -613,7 +597,7 @@ export default function LifePlanScreen({
                               id="debug-export-btn"
                               type="button"
                               onClick={() => {
-                                setDebugTab('inputs');
+                                setDebugTab('assumptions');
                                 setShowDebugDrawer(true);
                               }}
                               style={{
@@ -2643,11 +2627,12 @@ export default function LifePlanScreen({
               padding: '0 1rem'
             }}>
               {[
-                { id: 'inputs', label: 'Inputs' },
-                { id: 'events', label: 'Events' },
-                { id: 'accounts', label: 'Accounts & Allocations' },
+                { id: 'assumptions', label: 'Assumptions & Growth' },
+                { id: 'balances', label: 'Account Balances' },
+                { id: 'readiness', label: 'Retirement Readiness' },
+                { id: 'drawdowns', label: 'Drawdowns & Sustainability' },
                 { id: 'timeline', label: 'Year-by-Year Timeline' },
-                { id: 'summary', label: 'Summary' }
+                { id: 'export', label: 'Warnings & Export' }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -2678,158 +2663,258 @@ export default function LifePlanScreen({
               padding: '1.5rem',
               background: '#070a13'
             }}>
-              {debugTab === 'inputs' && (
+              {debugTab === 'assumptions' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Assumptions */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Raw User Inputs</h4>
-                      <button
-                        id="debug-copy-raw-btn"
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(debugSnapshot.rawInputs, null, 2));
-                          setCopiedRaw(true);
-                          setTimeout(() => setCopiedRaw(false), 2000);
-                        }}
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', background: '#334155', color: '#fff', border: 'none', cursor: 'pointer' }}
-                      >
-                        {copiedRaw ? 'Copied!' : 'Copy Raw'}
-                      </button>
-                    </div>
-                    <pre style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px', overflowX: 'auto', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid #1e293b', maxHeight: '300px', color: '#94a3b8' }}>
-                      {JSON.stringify(debugSnapshot.rawInputs, null, 2)}
-                    </pre>
-                  </div>
-
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Normalized Simulation Inputs (Profile)</h4>
-                      <button
-                        id="debug-copy-norm-btn"
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(debugSnapshot.normalizedInputs, null, 2));
-                          setCopiedNorm(true);
-                          setTimeout(() => setCopiedNorm(false), 2000);
-                        }}
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', background: '#334155', color: '#fff', border: 'none', cursor: 'pointer' }}
-                      >
-                        {copiedNorm ? 'Copied!' : 'Copy Normalized'}
-                      </button>
-                    </div>
-                    <pre style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px', overflowX: 'auto', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid #1e293b', maxHeight: '300px', color: '#94a3b8' }}>
-                      {JSON.stringify(debugSnapshot.normalizedInputs, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {debugTab === 'events' && (
-                <div>
-                  <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Normalized Timeline Events</h4>
-                  {debugSnapshot.events.normalizedEvents.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>No active life events in this simulation.</p>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Name</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Type</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Start Age</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>End Age</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Financial Impact</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {debugSnapshot.events.normalizedEvents.map((e, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
-                            <td style={{ padding: '0.5rem 0.25rem', fontWeight: '700' }}>{e.name}</td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.type}</td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.startAge !== null ? e.startAge : 'N/A'}</td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>{e.endAge !== null ? e.endAge : 'N/A'}</td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>
-                              {e.financialImpact !== null ? formatCurrency(e.financialImpact) : 'N/A'}
-                            </td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>
-                              <span style={{
-                                padding: '1px 5px',
-                                borderRadius: '4px',
-                                background: e.enabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                color: e.enabled ? '#10b981' : '#ef4444'
-                              }}>
-                                {e.enabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-
-              {debugTab === 'accounts' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Starting Account Balances</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                      {Object.entries(debugSnapshot.accountBalances.startingBalances).map(([name, val]) => (
-                        <div key={name} style={{ background: '#0f172a', padding: '0.5rem 0.75rem', borderRadius: '4px', border: '1px solid #1e293b' }}>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{name}</span>
-                          <div style={{ fontSize: '0.85rem', fontWeight: '700' }}>{formatCurrency(val)}</div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>📊 Simulation Assumptions</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                      {[
+                        { label: 'Current Age', value: debugSnapshot.simulationAssumptions.currentAge },
+                        { label: 'Retirement Age', value: debugSnapshot.simulationAssumptions.retirementAge },
+                        { label: 'Life Expectancy', value: debugSnapshot.simulationAssumptions.lifeExpectancy },
+                        { label: 'Inflation Rate', value: `${(debugSnapshot.simulationAssumptions.inflationRate * 100).toFixed(1)}%` },
+                        { label: 'Salary Growth Rate', value: `${(debugSnapshot.simulationAssumptions.salaryGrowthRate * 100).toFixed(1)}%` },
+                        { label: 'Pre-Retirement Return', value: `${(debugSnapshot.simulationAssumptions.preRetirementReturn * 100).toFixed(1)}%` },
+                        { label: 'Post-Retirement Return', value: `${(debugSnapshot.simulationAssumptions.postRetirementReturn * 100).toFixed(1)}%` },
+                        { label: 'Safe Withdrawal Rate (SWR)', value: `${(debugSnapshot.simulationAssumptions.safeWithdrawalRate * 100).toFixed(1)}%` },
+                        { label: 'Tax Mode Enabled', value: debugSnapshot.simulationAssumptions.taxMode ? 'Yes' : 'No' },
+                        { label: 'Social Security Enabled', value: debugSnapshot.simulationAssumptions.socialSecurityEnabled ? 'Yes' : 'No' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', padding: '0.75rem 1rem', borderRadius: '6px' }}>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>{item.label}</div>
+                          <div style={{ fontSize: '1.1rem', fontWeight: '800', marginTop: '0.25rem', color: '#f8fafc' }}>{item.value}</div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {debugSnapshot.savingsAllocations.warnings && debugSnapshot.savingsAllocations.warnings.length > 0 && (
-                    <div style={{
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      borderRadius: '6px',
-                      padding: '0.75rem 1rem',
-                      color: '#fca5a5',
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.25rem'
-                    }}>
-                      <div style={{ fontWeight: '700', color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚠️ savings allocation warnings</div>
-                      {debugSnapshot.savingsAllocations.warnings.map((w, idx) => (
-                        <div key={idx} style={{ lineHeight: '1.4' }}>• {w}</div>
+                  {/* Savings Allocation */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '1rem 0 0.75rem 0', color: '#38bdf8' }}>💰 Savings Allocation & Returns</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid #1e293b', padding: '1rem', borderRadius: '8px' }}>
+                        <h4 style={{ fontSize: '0.8rem', fontWeight: '700', margin: '0 0 0.75rem 0', color: '#94a3b8' }}>Account Contributions %</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {[
+                            { name: 'Cash / checking / HYSA / emergency', val: debugSnapshot.savingsAllocation.cash },
+                            { name: 'Brokerage / taxable portfolio', val: debugSnapshot.savingsAllocation.brokerage },
+                            { name: 'Traditional 401k / Traditional IRA', val: debugSnapshot.savingsAllocation['401k'] },
+                            { name: 'Roth IRA / Roth portfolio', val: debugSnapshot.savingsAllocation.rothIRA },
+                            { name: 'HSA / Health Savings Account', val: debugSnapshot.savingsAllocation.hsa }
+                          ].map((ac, idx) => (
+                            <div key={idx}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '0.25rem' }}>
+                                <span style={{ color: '#cbd5e1' }}>{ac.name}</span>
+                                <span style={{ fontWeight: '700', color: '#f8fafc' }}>{ac.val}%</span>
+                              </div>
+                              <div style={{ width: '100%', height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ width: `${ac.val}%`, height: '100%', background: 'var(--primary, #6366f1)', borderRadius: '3px' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', padding: '1rem', borderRadius: '8px' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>Effective Accumulation Return</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#10b981', marginTop: '0.25rem' }}>
+                            {(debugSnapshot.savingsAllocation.effectiveAccumulationReturn * 100).toFixed(2)}%
+                          </div>
+                          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Weighted average return before retirement</span>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', padding: '1rem', borderRadius: '8px' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>Effective Retirement Return</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#6366f1', marginTop: '0.25rem' }}>
+                            {(debugSnapshot.savingsAllocation.effectiveRetirementReturn * 100).toFixed(2)}%
+                          </div>
+                          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Weighted average return post-retirement</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Growth Audit */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '1rem 0 0.75rem 0', color: '#38bdf8' }}>🔍 Account Growth Audit</h3>
+                    <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid #1e293b', padding: '1rem', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#f8fafc' }}>Growth Applied Correctly?</div>
+                          <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Checks if configured growth rate matches simulated rate.</div>
+                        </div>
+                        <span style={{
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          background: debugSnapshot.accountGrowthAudit.growthAppliedCorrectly ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: debugSnapshot.accountGrowthAudit.growthAppliedCorrectly ? '#10b981' : '#ef4444',
+                          border: debugSnapshot.accountGrowthAudit.growthAppliedCorrectly ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(239,68,68,0.3)'
+                        }}>
+                          {debugSnapshot.accountGrowthAudit.growthAppliedCorrectly ? 'PASS' : 'WARNING / FAIL'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                        {[
+                          { label: 'Cash Growth Rate', value: '0.00%', simulated: `${(debugSnapshot.simulationAssumptions.preRetirementReturn * 100).toFixed(1)}%` },
+                          { label: 'Brokerage Growth Rate', value: `${(debugSnapshot.accountGrowthAudit.brokerageGrowthRate * 100).toFixed(1)}%`, simulated: `${(debugSnapshot.accountGrowthAudit.brokerageGrowthRate * 100).toFixed(1)}%` },
+                          { label: '401k Growth Rate', value: `${(debugSnapshot.accountGrowthAudit['401kGrowthRate'] * 100).toFixed(1)}%`, simulated: `${(debugSnapshot.accountGrowthAudit['401kGrowthRate'] * 100).toFixed(1)}%` },
+                          { label: 'Roth IRA Growth Rate', value: `${(debugSnapshot.accountGrowthAudit.rothGrowthRate * 100).toFixed(1)}%`, simulated: `${(debugSnapshot.accountGrowthAudit.rothGrowthRate * 100).toFixed(1)}%` },
+                          { label: 'HSA Growth Rate', value: `${(debugSnapshot.accountGrowthAudit.hsaGrowthRate * 100).toFixed(1)}%`, simulated: `${(debugSnapshot.accountGrowthAudit.hsaGrowthRate * 100).toFixed(1)}%` }
+                        ].map((ac, idx) => (
+                          <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '4px', border: '1px solid #0f172a' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{ac.label}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '0.25rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Configured: <strong style={{ color: '#cbd5e1' }}>{ac.value}</strong></span>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Simulated: <strong style={{ color: ac.value !== ac.simulated ? '#ef4444' : '#cbd5e1' }}>{ac.simulated}</strong></span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'balances' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: 0, color: '#38bdf8' }}>🏢 Starting vs Retirement Account Balances</h3>
+                  <div style={{ overflowX: 'auto', background: '#0f172a', borderRadius: '8px', border: '1px solid #1e293b', padding: '0.5rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'right' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #1e293b', color: '#94a3b8' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'left' }}>Account Type</th>
+                          <th style={{ padding: '0.75rem' }}>Starting Balance</th>
+                          <th style={{ padding: '0.75rem' }}>Annual Contribution (Y0)</th>
+                          <th style={{ padding: '0.75rem' }}>Configured Return</th>
+                          <th style={{ padding: '0.75rem' }}>Retirement Balance (Age {debugSnapshot.simulationAssumptions.retirementAge})</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { label: 'Cash (Checking/Savings/HYSA/Emergency)', data: debugSnapshot.accountBalancesAudit.cash },
+                          { label: 'Taxable Brokerage', data: debugSnapshot.accountBalancesAudit.brokerage },
+                          { label: 'Traditional 401(k) / Traditional IRA', data: debugSnapshot.accountBalancesAudit['401k'] },
+                          { label: 'Roth IRA', data: debugSnapshot.accountBalancesAudit.rothIRA },
+                          { label: 'HSA', data: debugSnapshot.accountBalancesAudit.hsa }
+                        ].map((ac, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #1e293b', color: '#cbd5e1' }}>
+                            <td style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700' }}>{ac.label}</td>
+                            <td style={{ padding: '0.75rem' }}>{formatCurrency(ac.data.startingBalance)}</td>
+                            <td style={{ padding: '0.75rem', color: ac.data.annualContribution > 0 ? '#10b981' : '#64748b' }}>{formatCurrency(ac.data.annualContribution)}</td>
+                            <td style={{ padding: '0.75rem' }}>{(ac.data.growthRate * 100).toFixed(1)}%</td>
+                            <td style={{ padding: '0.75rem', fontWeight: '700', color: ac.data.retirementBalance > 0 ? '#f8fafc' : '#64748b' }}>{formatCurrency(ac.data.retirementBalance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'readiness' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Readiness Calc */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: '#38bdf8' }}>🔥 Retirement Readiness (FIRE Number Calculation)</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                      {[
+                        { label: 'Retirement Year Spending (Nominal)', value: formatCurrency(debugSnapshot.retirementReadinessCalc.retirementSpending) },
+                        { label: 'Social Security Income (Nominal)', value: formatCurrency(debugSnapshot.retirementReadinessCalc.socialSecurityIncome), color: '#10b981' },
+                        { label: 'Net Required Portfolio Income', value: formatCurrency(debugSnapshot.retirementReadinessCalc.netRequiredPortfolioIncome) },
+                        { label: 'Safe Withdrawal Rate (SWR)', value: `${(debugSnapshot.retirementReadinessCalc.safeWithdrawalRate * 100).toFixed(1)}%` },
+                        { label: 'Required Portfolio (FIRE Number)', value: formatCurrency(debugSnapshot.retirementReadinessCalc.requiredPortfolio), highlight: true }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          background: item.highlight ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
+                          border: item.highlight ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #1e293b',
+                          padding: '1rem',
+                          borderRadius: '6px'
+                        }}>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>{item.label}</div>
+                          <div style={{
+                            fontSize: '1.25rem',
+                            fontWeight: '800',
+                            marginTop: '0.25rem',
+                            color: item.highlight ? '#38bdf8' : (item.color || '#f8fafc')
+                          }}>{item.value}</div>
+                        </div>
                       ))}
                     </div>
-                  )}
+                  </div>
 
+                  {/* Retirement Year Snapshot */}
                   <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Savings Allocation Comparison</h4>
-                    <div style={{ overflowX: 'auto', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b', padding: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: '#38bdf8' }}>📸 Retirement Year Snapshot (Age {debugSnapshot.retirementYearSnapshot.retirementAge})</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                      {[
+                        { label: 'Assets', value: formatCurrency(debugSnapshot.retirementYearSnapshot.assets) },
+                        { label: 'Debts', value: formatCurrency(debugSnapshot.retirementYearSnapshot.debts) },
+                        { label: 'Net Worth', value: formatCurrency(debugSnapshot.retirementYearSnapshot.netWorth), highlight: true },
+                        { label: 'Annual Spending', value: formatCurrency(debugSnapshot.retirementYearSnapshot.annualSpending) },
+                        { label: 'Annual Social Security', value: formatCurrency(debugSnapshot.retirementYearSnapshot.annualSocialSecurity), color: '#10b981' },
+                        { label: 'Annual Withdrawal Needed', value: formatCurrency(debugSnapshot.retirementYearSnapshot.annualWithdrawalNeeded) }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          background: item.highlight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
+                          border: item.highlight ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #1e293b',
+                          padding: '1rem',
+                          borderRadius: '6px'
+                        }}>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>{item.label}</div>
+                          <div style={{
+                            fontSize: '1.2rem',
+                            fontWeight: '800',
+                            marginTop: '0.25rem',
+                            color: item.highlight ? '#10b981' : (item.color || '#f8fafc')
+                          }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {debugTab === 'drawdowns' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Withdrawal Order */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: '#38bdf8' }}>🔄 Withdrawal Drawdown Sequence</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '6px', border: '1px solid #1e293b' }}>
+                      {debugSnapshot.withdrawalStrategy.withdrawalOrder.map((account, idx) => (
+                        <Fragment key={idx}>
+                          {idx > 0 && <span style={{ color: '#475569', fontWeight: '800' }}>➔</span>}
+                          <div style={{ background: '#1e293b', padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', color: '#e2e8f0', textTransform: 'capitalize' }}>
+                            {account}
+                          </div>
+                        </Fragment>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Retirement Sustainability Table */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: '#38bdf8' }}>📉 Retirement Sustainability Table</h3>
+                    <div style={{ overflowX: 'auto', background: '#0f172a', borderRadius: '8px', border: '1px solid #1e293b', padding: '0.5rem' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'right' }}>
                         <thead>
-                          <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
-                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Account</th>
-                            <th style={{ padding: '0.5rem' }}>Expected Monthly</th>
-                            <th style={{ padding: '0.5rem' }}>Actual Monthly (Y0)</th>
-                            <th style={{ padding: '0.5rem' }}>Annual Contribution (Y0)</th>
-                            <th style={{ padding: '0.5rem' }}>Cumulative Balance (Y0)</th>
+                          <tr style={{ borderBottom: '1px solid #1e293b', color: '#94a3b8' }}>
+                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Age</th>
+                            <th style={{ padding: '0.5rem' }}>Start Assets</th>
+                            <th style={{ padding: '0.5rem' }}>Growth</th>
+                            <th style={{ padding: '0.5rem' }}>Withdrawals</th>
+                            <th style={{ padding: '0.5rem' }}>End Assets</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {debugSnapshot.savingsAllocations.comparison.map((item, idx) => (
-                            <tr key={idx} style={{
-                              borderBottom: '1px solid #1e293b',
-                              color: item.expectedMonthly > 0 || item.actualMonthly > 0 ? '#cbd5e1' : '#64748b',
-                            }}>
-                              <td style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '500' }}>{item.label}</td>
-                              <td style={{ padding: '0.5rem', color: item.expectedMonthly > 0 ? '#38bdf8' : 'inherit' }}>
-                                {formatCurrency(item.expectedMonthly)}/mo
-                              </td>
-                              <td style={{ padding: '0.5rem', color: item.actualMonthly > 0 ? '#10b981' : 'inherit' }}>
-                                {formatCurrency(item.actualMonthly)}/mo
-                              </td>
-                              <td style={{ padding: '0.5rem' }}>{formatCurrency(item.annualContribution)}</td>
-                              <td style={{ padding: '0.5rem' }}>{formatCurrency(item.cumulativeBalance)}</td>
+                          {debugSnapshot.retirementSustainabilityTable.map((row, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700' }}>{row.age}</td>
+                              <td style={{ padding: '0.5rem' }}>{formatCurrency(row.startAssets)}</td>
+                              <td style={{ padding: '0.5rem', color: row.growth > 0 ? '#38bdf8' : 'inherit' }}>+{formatCurrency(row.growth)}</td>
+                              <td style={{ padding: '0.5rem', color: '#ef4444' }}>-{formatCurrency(row.withdrawals)}</td>
+                              <td style={{ padding: '0.5rem', fontWeight: '800', color: row.endAssets > 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(row.endAssets)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2837,39 +2922,28 @@ export default function LifePlanScreen({
                     </div>
                   </div>
 
+                  {/* Withdrawals Breakdown */}
                   <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#38bdf8' }}>Yearly Balances & Flows</h4>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem', textAlign: 'right' }}>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: '#38bdf8' }}>📤 Yearly Withdrawal Strategy Breakdown</h3>
+                    <div style={{ overflowX: 'auto', background: '#0f172a', borderRadius: '8px', border: '1px solid #1e293b', padding: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'right' }}>
                         <thead>
-                          <tr style={{ borderBottom: '1px solid #1e293b', color: 'var(--text-secondary)' }}>
-                            <th style={{ padding: '0.4rem', textAlign: 'left' }}>Age (Year)</th>
-                            <th style={{ padding: '0.4rem' }}>Cash</th>
-                            <th style={{ padding: '0.4rem' }}>Emergency</th>
-                            <th style={{ padding: '0.4rem' }}>Brokerage</th>
-                            <th style={{ padding: '0.4rem' }}>401k</th>
-                            <th style={{ padding: '0.4rem' }}>IRA</th>
-                            <th style={{ padding: '0.4rem' }}>Roth</th>
-                            <th style={{ padding: '0.4rem' }}>HSA</th>
-                            <th style={{ padding: '0.4rem' }}>Contrib</th>
-                            <th style={{ padding: '0.4rem' }}>Withdraw</th>
-                            <th style={{ padding: '0.4rem' }}>Growth</th>
+                          <tr style={{ borderBottom: '1px solid #1e293b', color: '#94a3b8' }}>
+                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Age</th>
+                            <th style={{ padding: '0.5rem' }}>Cash Withdrawals</th>
+                            <th style={{ padding: '0.5rem' }}>Brokerage Withdrawals</th>
+                            <th style={{ padding: '0.5rem' }}>401k Withdrawals</th>
+                            <th style={{ padding: '0.5rem' }}>Roth Withdrawals</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {debugSnapshot.accountBalances.yearlyBalances.map((y, idx) => (
+                          {debugSnapshot.withdrawalStrategy.yearlyWithdrawals.map((row, idx) => (
                             <tr key={idx} style={{ borderBottom: '1px solid #0f172a', color: '#cbd5e1' }}>
-                              <td style={{ padding: '0.4rem', textAlign: 'left', fontWeight: '700' }}>{y.age} ({y.year})</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.cash)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.emergencyFund)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.brokerage)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.trad401k)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.tradIra)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.rothIra)}</td>
-                              <td style={{ padding: '0.4rem' }}>{formatCurrency(y.hsa)}</td>
-                              <td style={{ padding: '0.4rem', color: '#10b981' }}>{formatCurrency(y.contributions)}</td>
-                              <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(y.withdrawals)}</td>
-                              <td style={{ padding: '0.4rem', color: '#38bdf8' }}>{formatCurrency(y.growth)}</td>
+                              <td style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700' }}>{row.age}</td>
+                              <td style={{ padding: '0.5rem', color: row.withdrawals.cash > 0 ? '#ef4444' : 'inherit' }}>{formatCurrency(row.withdrawals.cash)}</td>
+                              <td style={{ padding: '0.5rem', color: row.withdrawals.brokerage > 0 ? '#ef4444' : 'inherit' }}>{formatCurrency(row.withdrawals.brokerage)}</td>
+                              <td style={{ padding: '0.5rem', color: row.withdrawals["401k"] > 0 ? '#ef4444' : 'inherit' }}>{formatCurrency(row.withdrawals["401k"])}</td>
+                              <td style={{ padding: '0.5rem', color: row.withdrawals.roth > 0 ? '#ef4444' : 'inherit' }}>{formatCurrency(row.withdrawals.roth)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2909,13 +2983,10 @@ export default function LifePlanScreen({
                           <th style={{ padding: '0.4rem' }}>Gross Inc</th>
                           <th style={{ padding: '0.4rem' }}>Taxes</th>
                           <th style={{ padding: '0.4rem' }}>Net Inc</th>
-                          <th style={{ padding: '0.4rem' }}>Expenses</th>
-                          <th style={{ padding: '0.4rem' }}>Contrib</th>
-                          <th style={{ padding: '0.4rem' }}>Withdraw</th>
-                          <th style={{ padding: '0.4rem' }}>Growth</th>
-                          <th style={{ padding: '0.4rem' }}>Debts</th>
-                          <th style={{ padding: '0.4rem' }}>Assets</th>
-                          <th style={{ padding: '0.4rem' }}>Net Worth</th>
+                                        <th style={{ padding: '0.4rem' }}>Net Worth</th>
+                          <th style={{ padding: '0.4rem' }}>Scaling Mode</th>
+                          <th style={{ padding: '0.4rem' }}>Multiplier</th>
+                          <th style={{ padding: '0.4rem' }}>Drift</th>
                           <th style={{ padding: '0.4rem' }}>Status</th>
                           <th style={{ padding: '0.4rem', textAlign: 'left' }}>Events</th>
                           <th style={{ padding: '0.4rem', textAlign: 'left' }}>Warnings</th>
@@ -2935,6 +3006,9 @@ export default function LifePlanScreen({
                             <td style={{ padding: '0.4rem', color: '#ef4444' }}>{formatCurrency(row.debtBalance)}</td>
                             <td style={{ padding: '0.4rem', color: '#10b981' }}>{formatCurrency(row.assetBalance)}</td>
                             <td style={{ padding: '0.4rem', fontWeight: '700' }}>{formatCurrency(row.netWorth)}</td>
+                            <td style={{ padding: '0.4rem' }}>{row.budgetScalingMode || 'lifestyle'}</td>
+                            <td style={{ padding: '0.4rem' }}>{row.scalingMultiplier !== undefined ? row.scalingMultiplier.toFixed(2) + 'x' : '1.00x'}</td>
+                            <td style={{ padding: '0.4rem', color: Math.abs(row.budgetDrift) > 1.0 ? '#ef4444' : 'inherit' }}>{formatCurrency(row.budgetDrift)}</td>
                             <td style={{ padding: '0.4rem' }}>
                               <span style={{
                                 padding: '1px 4px',
@@ -2959,42 +3033,56 @@ export default function LifePlanScreen({
                 </div>
               )}
 
-              {debugTab === 'summary' && (
+              {debugTab === 'export' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Concise Run Summary</h4>
-                    <button
-                      id="debug-copy-summary-btn"
-                      type="button"
-                      onClick={() => handleCopySummary(getConciseSummaryText(debugSnapshot))}
-                      style={{
-                        padding: '0.4rem 0.8rem',
-                        fontSize: '0.75rem',
-                        borderRadius: '6px',
-                        background: 'var(--accent-emerald, #10b981)',
-                        color: '#fff',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {copiedText ? '✅ Copied!' : '📋 Copy Summary'}
-                    </button>
+                  {/* Warnings Panel */}
+                  <div>
+                    <h3 style={{ fontSize: '1.0rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: '#38bdf8' }}>⚠️ Simulation Inspector Warnings</h3>
+                    <div style={{
+                      background: 'rgba(245, 158, 11, 0.08)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      color: '#fcd34d',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}>
+                      {debugSnapshot.warnings.length === 0 ? (
+                        <div>No warning flags triggered in this plan.</div>
+                      ) : (
+                        debugSnapshot.warnings.map((w, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'start', lineHeight: '1.4' }}>
+                            <span>•</span>
+                            <span>{w}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <pre style={{
-                    background: '#0f172a',
-                    padding: '1.25rem',
-                    borderRadius: '8px',
-                    overflowX: 'auto',
-                    fontSize: '0.8rem',
-                    fontFamily: 'monospace',
-                    border: '1px solid #1e293b',
-                    color: '#e2e8f0',
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: '1.5'
-                  }}>
-                    {getConciseSummaryText(debugSnapshot)}
-                  </pre>
+
+                  {/* Exportable JSON Preview */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#38bdf8' }}>Exportable Inspector JSON Preview</h4>
+                      <button
+                        id="debug-copy-raw-btn"
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(debugSnapshot.exportableJSON, null, 2));
+                          setCopiedRaw(true);
+                          setTimeout(() => setCopiedRaw(false), 2000);
+                        }}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', background: '#334155', color: '#fff', border: 'none', cursor: 'pointer' }}
+                      >
+                        {copiedRaw ? 'Copied!' : 'Copy Inspector JSON'}
+                      </button>
+                    </div>
+                    <pre style={{ background: '#0f172a', padding: '1rem', borderRadius: '6px', overflowX: 'auto', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid #1e293b', maxHeight: '400px', color: '#94a3b8' }}>
+                      {JSON.stringify(debugSnapshot.exportableJSON, null, 2)}
+                    </pre>
+                  </div>
                 </div>
               )}
             </div>

@@ -250,7 +250,21 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
       retirementStatus: log.age >= (normInputs.targetRetirementAge ?? 65) ? 'Retired' : 'Working',
       intervalId: log.intervalId ?? null,
       activeEvents: activeEventsThisAge,
-      warningsErrors: log.shortfall > 0 ? [`Shortfall of ${log.shortfall} encountered`] : []
+      warningsErrors: log.shortfall > 0 ? [`Shortfall of ${log.shortfall} encountered`] : [],
+      budgetScalingMode: log.budgetScalingMode || 'lifestyle',
+      phaseIncomeAtCreation: log.phaseIncomeAtCreation ?? 0,
+      currentIncome: log.currentIncome ?? 0,
+      scalingMultiplier: log.scalingMultiplier ?? 1.0,
+      budgetDrift: log.budgetDrift ?? 0,
+      contributionRoutingSource: log.contributionRoutingSource,
+      ignoredAllocationRules: log.ignoredAllocationRules,
+      routingWarning: log.routingWarning || null,
+      annualContributionsByAccount: log.annualContributionsByAccount,
+      growthByAccount: log.growthByAccount,
+      startBalanceByAccount: log.startBalanceByAccount,
+      endBalanceByAccount: log.endBalanceByAccount,
+      brokerageAudit: log.brokerageAudit,
+      budgetScaling: log.budgetScaling
     };
   });
 
@@ -271,6 +285,302 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     : null;
   const weddingDebtBalance = weddingAge !== null ? (res.weddingFinancingDetails?.weddingDebtBalanceByYear?.[weddingAge] ?? 0) : null;
   const totalDebt = weddingAge !== null ? (timeline.find(t => t.age === weddingAge)?.debtBalance ?? 0) : null;
+
+  // --- NEW DEBUG SECTIONS ---
+  const targetRetirementAge = normInputs.targetRetirementAge ?? 65;
+
+  // 1. Simulation Assumptions
+  const salaryGrowthRate = normInputs.incomeList?.find(inc => inc.name?.toLowerCase().includes('salary') || inc.id === 'inc-1' || inc.id.startsWith('simple-inc'))?.growthRate ?? 0.03;
+  const socialSecurityEnabled = rawInputs.lifeEvents?.some(e => e.type === 'socialSecurity' && e.enabled) ?? false;
+  
+  const simulationAssumptions = {
+    currentAge: normInputs.currentAge ?? 35,
+    retirementAge: targetRetirementAge,
+    lifeExpectancy: normInputs.lifeExpectancy ?? 85,
+    inflationRate: normInputs.inflationRate ?? 0.03,
+    salaryGrowthRate,
+    preRetirementReturn: normInputs.expectedReturn ?? 0.07,
+    postRetirementReturn: normInputs.postRetirementReturn ?? 0.05,
+    safeWithdrawalRate: normInputs.swr ?? 0.04,
+    taxMode: normInputs.includeTaxes ?? false,
+    socialSecurityEnabled
+  };
+
+  // 2. Savings Allocation
+  const cashContrib = (Number(actualContribs.checking) || 0) + (Number(actualContribs.hysa) || 0) + (Number(actualContribs.emergency) || 0);
+  const brokerageContrib = Number(actualContribs.brokerage) || 0;
+  const trad401kContrib = (Number(actualContribs.trad401k) || 0) + (Number(actualContribs.tradIra) || 0);
+  const rothIraContrib = Number(actualContribs.rothIra) || 0;
+  const hsaContrib = Number(actualContribs.hsa) || 0;
+
+  let totalContrib = cashContrib + brokerageContrib + trad401kContrib + rothIraContrib + hsaContrib;
+  let savingsAllocation;
+
+  if (totalContrib > 0) {
+    savingsAllocation = {
+      cash: Number(((cashContrib / totalContrib) * 100).toFixed(1)),
+      brokerage: Number(((brokerageContrib / totalContrib) * 100).toFixed(1)),
+      "401k": Number(((trad401kContrib / totalContrib) * 100).toFixed(1)),
+      rothIRA: Number(((rothIraContrib / totalContrib) * 100).toFixed(1)),
+      hsa: Number(((hsaContrib / totalContrib) * 100).toFixed(1))
+    };
+  } else {
+    // fallback to budget phase values
+    const currentAgeVal = normInputs.currentAge ?? 35;
+    const initialPhase = simPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge);
+    const savings = initialPhase?.savings || {};
+    const partnerSavings = initialPhase?.partnerSavings || {};
+    
+    const cashBudget = (Number(savings.checking) || 0) + (Number(savings.hysa) || 0) + (Number(savings.emergency) || 0) +
+                       (Number(partnerSavings.checking) || 0) + (Number(partnerSavings.hysa) || 0) + (Number(partnerSavings.emergency) || 0);
+    const brokerageBudget = (Number(savings.brokerage) || 0) + (Number(partnerSavings.brokerage) || 0);
+    const trad401kBudget = (Number(savings.trad401k) || 0) + (Number(savings.tradIra) || 0) +
+                           (Number(partnerSavings.trad401k) || 0) + (Number(partnerSavings.tradIra) || 0);
+    const rothIraBudget = (Number(savings.rothIra) || 0) + (Number(partnerSavings.rothIra) || 0);
+    const hsaBudget = (Number(savings.hsa) || 0) + (Number(partnerSavings.hsa) || 0);
+    
+    const totalBudget = cashBudget + brokerageBudget + trad401kBudget + rothIraBudget + hsaBudget;
+    if (totalBudget > 0) {
+      savingsAllocation = {
+        cash: Number(((cashBudget / totalBudget) * 100).toFixed(1)),
+        brokerage: Number(((brokerageBudget / totalBudget) * 100).toFixed(1)),
+        "401k": Number(((trad401kBudget / totalBudget) * 100).toFixed(1)),
+        rothIRA: Number(((rothIraBudget / totalBudget) * 100).toFixed(1)),
+        hsa: Number(((hsaBudget / totalBudget) * 100).toFixed(1))
+      };
+    } else {
+      savingsAllocation = { cash: 100, brokerage: 0, "401k": 0, rothIRA: 0, hsa: 0 };
+    }
+  }
+
+  const preRetReturn = normInputs.expectedReturn ?? 0.07;
+  const postRetReturn = normInputs.postRetirementReturn ?? 0.05;
+
+  const effectiveAccumulationReturn = Number((
+    (savingsAllocation.cash * 0.00 +
+     savingsAllocation.brokerage * preRetReturn +
+     savingsAllocation["401k"] * preRetReturn +
+     savingsAllocation.rothIRA * preRetReturn +
+     savingsAllocation.hsa * preRetReturn) / 100
+  ).toFixed(4));
+
+  const effectiveRetirementReturn = Number((
+    (savingsAllocation.cash * 0.00 +
+     savingsAllocation.brokerage * postRetReturn +
+     savingsAllocation["401k"] * postRetReturn +
+     savingsAllocation.rothIRA * postRetReturn +
+     savingsAllocation.hsa * postRetReturn) / 100
+  ).toFixed(4));
+
+  savingsAllocation.effectiveAccumulationReturn = effectiveAccumulationReturn;
+  savingsAllocation.effectiveRetirementReturn = effectiveRetirementReturn;
+
+  // 3. Account Balances
+  const retirementLog = timeline.find(l => l.age === targetRetirementAge) || timeline[timeline.length - 1] || {};
+
+  const accountBalancesAudit = {
+    cash: {
+      startingBalance: (normInputs.assets?.cash ?? 0) + (normInputs.assets?.emergencyFund ?? 0) + (normInputs.assets?.checking ?? 0) + (normInputs.assets?.savings ?? 0),
+      annualContribution: cashContrib,
+      growthRate: 0.00,
+      retirementBalance: (retirementLog.cashBalance ?? 0) + (retirementLog.emergencyFundBalance ?? 0)
+    },
+    brokerage: {
+      startingBalance: normInputs.assets?.brokerage ?? 0,
+      annualContribution: brokerageContrib,
+      growthRate: preRetReturn,
+      retirementBalance: retirementLog.brokerageBalance ?? 0
+    },
+    "401k": {
+      startingBalance: (normInputs.assets?.trad401k ?? 0) + (normInputs.assets?.tradIra ?? 0),
+      annualContribution: trad401kContrib,
+      growthRate: preRetReturn,
+      retirementBalance: (retirementLog.trad401kBalance ?? 0) + (retirementLog.tradIraBalance ?? 0)
+    },
+    rothIRA: {
+      startingBalance: normInputs.assets?.rothIra ?? 0,
+      annualContribution: rothIraContrib,
+      growthRate: preRetReturn,
+      retirementBalance: retirementLog.rothIraBalance ?? 0
+    },
+    hsa: {
+      startingBalance: normInputs.assets?.hsa ?? 0,
+      annualContribution: hsaContrib,
+      growthRate: preRetReturn,
+      retirementBalance: retirementLog.hsaBalance ?? 0
+    }
+  };
+
+  // 4. Retirement Readiness Calculation
+  const retirementSpending = retirementLog.expenses ?? 0;
+  const socialSecurityIncome = retirementLog.ssIncome ?? 0;
+  const netRequiredPortfolioIncome = Math.max(0, retirementSpending - socialSecurityIncome);
+  const swrRate = normInputs.swr ?? 0.04;
+  const requiredPortfolio = swrRate > 0 ? (netRequiredPortfolioIncome / swrRate) : 0;
+
+  const retirementReadinessCalc = {
+    retirementSpending,
+    socialSecurityIncome,
+    netRequiredPortfolioIncome,
+    safeWithdrawalRate: swrRate,
+    requiredPortfolio
+  };
+
+  // 5. Retirement Year Snapshot
+  const retirementYearSnapshot = {
+    retirementAge: targetRetirementAge,
+    assets: retirementLog.portfolio ?? 0,
+    debts: retirementLog.debtBalance ?? 0,
+    netWorth: retirementLog.netWorth ?? 0,
+    annualSpending: retirementSpending,
+    annualSocialSecurity: socialSecurityIncome,
+    annualWithdrawalNeeded: netRequiredPortfolioIncome
+  };
+
+  // 6. Withdrawal Strategy
+  const withdrawalOrder = ["cash", "brokerage", "401k", "roth"];
+  const retirementWithdrawals = timeline
+    .filter(log => log.age >= targetRetirementAge)
+    .map(log => {
+      const yw = log.yearWithdrawals || {};
+      return {
+        age: log.age,
+        withdrawals: {
+          cash: yw.cash ?? 0,
+          brokerage: yw.brokerage ?? 0,
+          "401k": yw.trad401k ?? 0,
+          roth: yw.rothIra ?? 0
+        }
+      };
+    });
+
+  const withdrawalStrategy = {
+    withdrawalOrder,
+    yearlyWithdrawals: retirementWithdrawals
+  };
+
+  // 7. Retirement Sustainability Table
+  const retirementSustainabilityTable = timeline
+    .filter(log => log.age >= targetRetirementAge)
+    .map((log, idx, arr) => {
+      const prevLog = idx > 0 ? arr[idx - 1] : null;
+      let startAssets;
+      if (prevLog) {
+        startAssets = prevLog.portfolio ?? 0;
+      } else {
+        const preRetirementLog = timeline.find(l => l.age === targetRetirementAge - 1);
+        startAssets = preRetirementLog ? (preRetirementLog.portfolio ?? 0) : (normInputs.assets?.cash ?? 0) + (normInputs.assets?.emergencyFund ?? 0) + (normInputs.assets?.brokerage ?? 0) + (normInputs.assets?.trad401k ?? 0) + (normInputs.assets?.tradIra ?? 0) + (normInputs.assets?.rothIra ?? 0) + (normInputs.assets?.hsa ?? 0) + (normInputs.assets?.other ?? 0);
+      }
+      return {
+        age: log.age,
+        startAssets,
+        growth: log.investmentGrowth ?? 0,
+        withdrawals: log.withdrawals ?? 0,
+        endAssets: log.portfolio ?? 0
+      };
+    });
+
+  // 8. Account Growth Audit
+  const simulatedCashGrowthRate = preRetReturn;
+  const configuredCashGrowthRate = 0.00;
+  const growthAppliedCorrectly = (simulatedCashGrowthRate === configuredCashGrowthRate);
+
+  const accountGrowthAudit = {
+    cashGrowthRate: configuredCashGrowthRate,
+    brokerageGrowthRate: preRetReturn,
+    "401kGrowthRate": preRetReturn,
+    rothGrowthRate: preRetReturn,
+    hsaGrowthRate: preRetReturn,
+    growthAppliedCorrectly
+  };
+
+  // 9. Warnings Section
+  const warningsList = [];
+  timeline.forEach(log => {
+    if (log.brokerageAudit && Math.abs(log.brokerageAudit.discrepancy) > 1.0) {
+      warningsList.push(`Brokerage discrepancy at age ${log.age}: expected ending balance differs by $${log.brokerageAudit.discrepancy.toFixed(2)}`);
+    }
+  });
+  if (savingsAllocation.cash >= 99.9) {
+    warningsList.push("100% of contributions allocated to cash");
+  }
+  if (effectiveAccumulationReturn < (normInputs.inflationRate ?? 0.03)) {
+    warningsList.push("Effective portfolio return is below inflation");
+  }
+  if (res.moneyLasts && retirementSpending > 0) {
+    const ssCoverage = socialSecurityIncome / retirementSpending;
+    if (ssCoverage >= 0.50) {
+      warningsList.push(`Portfolio survives because Social Security covers ${Math.round(ssCoverage * 100)}% of spending`);
+    }
+  }
+  warningsList.push("Retirement projections are highly sensitive to allocation assumptions");
+  if (!growthAppliedCorrectly) {
+    warningsList.push(`Warning: Cash balance is compounding at the portfolio rate (${(preRetReturn * 100).toFixed(1)}%) in the simulation instead of its configured growth rate (0.00%).`);
+  }
+
+  // 10. Downloadable JSON
+  const exportableJSON = {
+    inputs: rawInputs,
+    events: processedEvents,
+    phases: simPhases.map(p => ({
+      id: p.id,
+      startAge: p.startAge,
+      endAge: p.endAge,
+      income: p.income,
+      expenses: p.expenses,
+      savings: p.savings,
+      partnerSavings: p.partnerSavings,
+      budgetScalingMode: p.budgetScalingMode || 'lifestyle',
+      incomeAtCreation: p.incomeAtCreation,
+      originalIncome: p.originalIncome,
+      originalExpenses: p.originalExpenses,
+      originalSavings: p.originalSavings,
+      originalPartnerSavings: p.originalPartnerSavings,
+      expenseRatio: p.expenseRatio,
+      savingsRatio: p.savingsRatio,
+      categoryRatios: p.categoryRatios
+    })),
+    accountBalances: accountBalancesAudit,
+    yearlySnapshots: timeline.map(log => ({
+      age: log.age,
+      year: log.year,
+      portfolio: log.portfolio,
+      netWorth: log.netWorth,
+      expenses: log.expenses,
+      income: log.income,
+      taxes: log.taxes,
+      savings: log.savings,
+      withdrawals: log.withdrawals,
+      shortfall: log.shortfall,
+      contributionRoutingSource: log.contributionRoutingSource,
+      ignoredAllocationRules: log.ignoredAllocationRules,
+      routingWarning: log.routingWarning || null,
+      annualContributionsByAccount: log.annualContributionsByAccount,
+      growthByAccount: log.growthByAccount,
+      startBalanceByAccount: log.startBalanceByAccount,
+      endBalanceByAccount: log.endBalanceByAccount,
+      brokerageAudit: log.brokerageAudit,
+      budgetScaling: log.budgetScaling,
+      budgetScalingMode: log.budgetScalingMode,
+      phaseIncomeAtCreation: log.phaseIncomeAtCreation,
+      currentIncome: log.currentIncome,
+      scalingMultiplier: log.scalingMultiplier,
+      budgetDrift: log.budgetDrift
+    })),
+    retirementAnalysis: {
+      retirementSpending,
+      socialSecurityIncome,
+      netRequiredPortfolioIncome,
+      safeWithdrawalRate: swrRate,
+      requiredPortfolio,
+      retirementSuccess: res.moneyLasts ?? false,
+      depletionAge: res.runOutAge ?? null
+    },
+    withdrawalAnalysis: {
+      withdrawalOrder,
+      yearlyWithdrawals: retirementWithdrawals
+    }
+  };
 
   return {
     rawInputs,
@@ -309,6 +619,17 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
       effectsApplied: p.effectsApplied || []
     })),
     userOverrides: rawInputs.budgetDetails?.phases || [],
-    contributionLimitLogs: res.contributionLimitLogs || []
+    contributionLimitLogs: res.contributionLimitLogs || [],
+    // --- NEW INSPECTOR FIELDS ---
+    simulationAssumptions,
+    savingsAllocation,
+    accountBalancesAudit,
+    retirementReadinessCalc,
+    retirementYearSnapshot,
+    withdrawalStrategy,
+    retirementSustainabilityTable,
+    accountGrowthAudit,
+    warnings: warningsList,
+    exportableJSON
   };
 }
