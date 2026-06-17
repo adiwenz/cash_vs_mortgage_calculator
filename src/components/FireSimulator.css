@@ -3307,7 +3307,22 @@
   color: var(--text-secondary);
 }
 
+.pulse-highlight-event {
+  animation: pulse-highlight-glow 1.5s infinite ease-in-out;
+  z-index: 10;
+}
 
-
-
-
+@keyframes pulse-highlight-glow {
+  0% {
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.9);
+    transform: scale(1.15);
+  }
+  100% {
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.4);
+    transform: scale(1);
+  }
+}

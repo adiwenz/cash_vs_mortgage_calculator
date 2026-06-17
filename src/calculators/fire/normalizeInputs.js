@@ -72,8 +72,8 @@ export function getEventsFromInputs(inputs) {
   if (inputs.incomeList) {
     inputs.incomeList.forEach(inc => {
       events.push({
-        type: 'incomeItem',
-        ...inc
+        ...inc,
+        type: 'incomeItem'
       });
     });
   }

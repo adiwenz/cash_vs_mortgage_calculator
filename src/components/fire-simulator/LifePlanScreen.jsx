@@ -20,9 +20,13 @@ const generateLifeStory = (inp, results) => {
   
   inp.incomeList.forEach(inc => {
     if (inc.startAge > curAge) {
+      const isIncrease = inc.incomeChangeType === 'increaseByAmount';
+      const amountVal = isIncrease 
+        ? (inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) 
+        : (inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount);
       list.push({
         age: inc.startAge,
-        text: `Start new career: "${inc.name}" earning ${formatCurrency(inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount)}/yr`
+        text: `Start new career: "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/yr`
       });
     }
   });
@@ -973,12 +977,13 @@ export default function LifePlanScreen({
                                     })();
                                     const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
                                     const isFinancial = isFinancialEvent(evt);
+                                    const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
       
                                     if (isFinancial) {
                                       return (
                                         <div
                                           key={idx}
-                                          className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                                          className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                                           style={{
                                             left: `${percent}%`,
                                             bottom: `${16 + (evt.stackIndex * 38)}px`
@@ -1048,10 +1053,11 @@ export default function LifePlanScreen({
                                       );
                                     } else {
                                       const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
+                                      const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
                                       return (
                                         <div
                                           key={idx}
-                                          className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                                          className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                                           style={{
                                             left: `${percent}%`,
                                             bottom: `${16 + (evt.stackIndex * 38)}px`

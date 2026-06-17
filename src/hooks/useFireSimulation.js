@@ -146,18 +146,11 @@ export function useFireSimulation() {
       }
       
       return {
-        age: row.age,
-        portfolio: row.portfolio,
+        ...row,
         netWorth,
-        assets: row.assets,
-        debt: row.debt,
-        income: row.income,
-        expenses: row.expenses,
-        taxes: row.taxes,
-        fiTarget: row.fiTarget,
-        fiNumber: displayedResults.fiNumber,
         baselineNetWorth: baselineNetWorth,
-        baselinePortfolio: baselineRow ? baselineRow.portfolio : 0
+        baselinePortfolio: baselineRow ? baselineRow.portfolio : 0,
+        fiNumber: displayedResults.fiNumber
       };
     });
   }, [displayedResults.data, displayedBaselineResults.data, inputs.assets, scenarios]);

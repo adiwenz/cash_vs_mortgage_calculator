@@ -8,9 +8,13 @@ const generateLifeStory = (inp, results) => {
   
   inp.incomeList.forEach(inc => {
     if (inc.startAge > curAge) {
+      const isIncrease = inc.incomeChangeType === 'increaseByAmount';
+      const amountVal = isIncrease 
+        ? (inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) 
+        : (inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount);
       list.push({
         age: inc.startAge,
-        text: `Start new career: "${inc.name}" earning ${formatCurrency(inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount)}/yr`
+        text: `Start new career: "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/yr`
       });
     }
   });

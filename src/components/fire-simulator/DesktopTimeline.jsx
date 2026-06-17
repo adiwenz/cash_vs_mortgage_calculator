@@ -125,12 +125,13 @@ export default function DesktopTimeline({
                 })();
                 const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
                 const isFinancial = isFinancialEvent(evt);
+                const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
 
                 if (isFinancial) {
                   return (
                     <div
                       key={idx}
-                      className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                      className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
                         bottom: `${16 + (evt.stackIndex * 38)}px`
@@ -189,10 +190,11 @@ export default function DesktopTimeline({
                   );
                 } else {
                   const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
+                  const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
                   return (
                     <div
                       key={idx}
-                      className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                      className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
                         bottom: `${16 + (evt.stackIndex * 38)}px`

@@ -312,6 +312,9 @@ export function useBudgetState(
       }
 
       newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+        if (inc.incomeChangeType === 'increaseByAmount') {
+          return inc;
+        }
         const matchingPhase = Object.values(finalEdited).find(p => p.startAge === inc.startAge && (p.type === 'careerChange' || p.type === 'current'));
         if (matchingPhase) {
           inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;

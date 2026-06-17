@@ -48,7 +48,7 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
     const currentPhase = preRetirementPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || preRetirementPhases[0];
     startingIncomeAnnual = currentPhase ? currentPhase.income * 12 : (Number(inputs.simpleIncome) || 50000);
   } else {
-    const rawIncomeItem = (inputs.incomeList || []).find(inc => inc.startAge <= currentAge && inc.endAge > currentAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
+    const rawIncomeItem = (inputs.incomeList || []).find(inc => inc.startAge <= currentAge && inc.endAge > currentAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'));
     startingIncomeAnnual = rawIncomeItem 
       ? (rawIncomeItem.frequency === 'monthly' ? rawIncomeItem.amount * 12 : rawIncomeItem.amount) 
       : (Number(inputs.simpleIncome) || 50000);
@@ -89,7 +89,7 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
         growthRate = 0.03;
       }
     } else {
-      const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('child-income-boost'));
+      const activeIncomeItem = (inputs.incomeList || []).find(inc => age >= inc.startAge && age < inc.endAge && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'));
       if (activeIncomeItem) {
         baseIncomeMonthly = activeIncomeItem.frequency === 'monthly' ? Number(activeIncomeItem.amount) : Number(activeIncomeItem.amount) / 12;
         growthRate = (activeIncomeItem.growthRate !== undefined && activeIncomeItem.growthRate !== null && activeIncomeItem.growthRate !== '') ? Number(activeIncomeItem.growthRate) : 0.03;

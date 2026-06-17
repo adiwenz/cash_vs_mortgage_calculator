@@ -143,7 +143,7 @@ export function useRecommendations(inputs, activeResults) {
     const hasShortfall = recResults.endingSurplusShortfall < 0 || 
                          !recResults.moneyLasts ||
                          (recResults.retirementReadyAge && inputs.targetRetirementAge < recResults.retirementReadyAge) ||
-                         (hasChildcarePhase && unfundedMaxChildCostsMonthly > 0);
+                         hasChildcarePhase;
 
     const hasBuyHouse = (inputs.lifeEvents || []).some(e => e.type === 'buyHouse' && e.enabled);
     if (!hasShortfall && !hasBuyHouse && !(debtDeficit > 0)) return null;
@@ -272,30 +272,45 @@ export function useRecommendations(inputs, activeResults) {
       savingsEffortScore: 3
     });
 
-    // 4. Temporary Childcare Offset Recommendation
+    // 4. Get a Promotion Recommendation
     const childRecommendations = getChildCostOffsetRecommendations(inputs);
     childRecommendations.forEach(rec => {
       const clonedInputs = JSON.parse(JSON.stringify(inputs));
-      clonedInputs.incomeList = [...(clonedInputs.incomeList || []), ...rec.incomeBoosts];
+      
+      const promoEvent = {
+        id: `promo-${rec.childEventId}`,
+        type: 'careerChange',
+        name: rec.childName ? `Promotion (${rec.childName})` : 'Get a Promotion',
+        startAge: rec.parentStartAge,
+        endAge: inputs.targetRetirementAge,
+        growthRate: 0.03, // Saved as decimal for simulation (displayed as 3.0% in edit form)
+        isTaxable: true,
+        amount: rec.peakCost,
+        salaryIncrease: rec.peakCost,
+        incomeChangeType: 'increaseByAmount',
+        permanent: true,
+        parentEventId: rec.childEventId
+      };
+
+      clonedInputs.incomeList = [...(clonedInputs.incomeList || []), promoEvent];
       
       const boostResults = runFireSimulation(clonedInputs);
       const readyAge = boostResults.retirementReadyAge;
       const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
       
       list.push({
-        type: `childOffset-${rec.childEventId}`,
-        icon: '👶',
-        title: 'Offset child costs with temporary income',
-        details: `Your plan includes about ${formatCurrency(rec.peakCost)}/year in child-related costs for ${rec.duration} years. One way to keep your retirement plan on track is to earn an extra ${formatCurrency(rec.peakCost)}/year during those years.`,
+        type: `childPromotion-${rec.childEventId}`,
+        icon: '🟦',
+        title: 'Get a Promotion',
+        details: `Increase your income by ${formatCurrency(rec.peakCost)}/year permanently.`,
         bulletPoints: [
-          `Earn an extra ${formatCurrency(rec.peakCost)}/year from parent age ${rec.parentStartAge} to ${rec.parentEndAge}.`,
-          `This temporary income boost is designed to align precisely with your child-rearing years.`,
-          `This recommendation improves or preserves your retirement readiness without requiring a permanent budget cut.`
+          `This offsets childcare costs today and helps you build additional savings after childcare expenses end.`,
+          `A promotion or career advancement that offsets childcare costs and keeps your retirement plan on track. After childcare ends, the additional income becomes available for savings.`
         ],
         readyAge: readyAge || targetRetirementAge,
         yearsImprovement: yearsImprovement,
         value: rec.peakCost,
-        incomeBoosts: rec.incomeBoosts,
+        promoEvent: promoEvent,
         savingsFocus: 'Earn More',
         savingsEffortScore: 2
       });

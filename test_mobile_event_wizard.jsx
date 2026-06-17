@@ -476,7 +476,7 @@ describe('Mobile Event Wizard & Flow', () => {
     await new Promise(resolve => setTimeout(resolve, 60));
 
     expect(screen.getByText('👶 Child Added to Timeline!')).toBeDefined();
-    expect(screen.getByText('Offset child costs with temporary income', { exact: false })).toBeDefined();
+    expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
     expect(screen.getByText('Earn More')).toBeDefined();
     expect(screen.getByText('Apply Adjustment')).toBeDefined();
 
@@ -502,16 +502,30 @@ describe('Mobile Event Wizard & Flow', () => {
         const childRecs = getChildCostOffsetRecommendations(inputs);
         childRecs.forEach(rec => {
           const clonedInputs = JSON.parse(JSON.stringify(inputs));
-          clonedInputs.incomeList = [...(clonedInputs.incomeList || []), ...rec.incomeBoosts];
+          const promoEvent = {
+            id: `promo-${rec.childEventId}`,
+            type: 'careerChange',
+            name: rec.childName ? `Promotion (${rec.childName})` : 'Get a Promotion',
+            startAge: rec.parentStartAge,
+            endAge: inputs.targetRetirementAge,
+            growthRate: 0.03,
+            isTaxable: true,
+            amount: rec.peakCost,
+            salaryIncrease: rec.peakCost,
+            incomeChangeType: 'increaseByAmount',
+            permanent: true,
+            parentEventId: rec.childEventId
+          };
+          clonedInputs.incomeList = [...(clonedInputs.incomeList || []), promoEvent];
           const boostResults = runFireSimulation(clonedInputs);
           
           list.push({
-            type: `childOffset-${rec.childEventId}`,
-            icon: '👶',
-            title: 'Offset child costs with temporary income',
-            details: `Earn extra income to offset childcare costs.`,
+            type: `childPromotion-${rec.childEventId}`,
+            icon: '🟦',
+            title: 'Get a Promotion',
+            details: `Increase your income by $${rec.peakCost}/year permanently.`,
             readyAge: boostResults.retirementReadyAge || 65,
-            incomeBoosts: rec.incomeBoosts,
+            promoEvent: promoEvent,
             savingsFocus: 'Earn More',
             savingsEffortScore: 2
           });
@@ -522,8 +536,8 @@ describe('Mobile Event Wizard & Flow', () => {
 
       const handleApplyMobileRecommendation = (scenario) => {
         let newInputs = JSON.parse(JSON.stringify(inputs));
-        if (scenario.type.startsWith('childOffset') && scenario.incomeBoosts) {
-          newInputs.incomeList = [...(newInputs.incomeList || []), ...scenario.incomeBoosts];
+        if (scenario.type.startsWith('childPromotion') && scenario.promoEvent) {
+          newInputs.incomeList = [...(newInputs.incomeList || []), scenario.promoEvent];
         }
         setInputs(newInputs);
       };
@@ -591,7 +605,7 @@ describe('Mobile Event Wizard & Flow', () => {
     // Now the plan requires adjustments. Verify status message and recommendations panel
     expect(screen.getByText(/Plan requires adjustments/i)).toBeDefined();
     expect(screen.getByText('💡 Actionable Recommendations')).toBeDefined();
-    expect(screen.getByText('Offset child costs with temporary income', { exact: false })).toBeDefined();
+    expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
 
     // 3. Click "Apply Recommendation" button on the card
     const applyBtn = screen.getByRole('button', { name: 'Apply Recommendation' });

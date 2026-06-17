@@ -112,13 +112,6 @@ export function calculateEarnMoreRecommendation(shortfall, rateOfReturn, yearsUn
   return netSavingsRequired / (1 - marginalTaxRate);
 }
 
-/**
- * Recommendation 4: Temporary Childcare Income Boost
- * Detect active child events and calculate matching temporary income boosts.
- * 
- * @param {Object} inputs - The simulator inputs.
- * @returns {Array} List of child offset recommendations.
- */
 export function getChildCostOffsetRecommendations(inputs) {
   const childEvents = (inputs.lifeEvents || []).filter(
     e => e.type === 'haveChild' && e.enabled
@@ -127,9 +120,15 @@ export function getChildCostOffsetRecommendations(inputs) {
     return [];
   }
   
-  const inflationRateDec = (Number(inputs.inflationRate) || 3) / 100;
-  
   return childEvents.map(ev => {
+    // Avoid duplicate promotion creation
+    const hasPromo = (inputs.incomeList || []).some(
+      inc => inc.id === ev.linkedEventId || inc.parentEventId === ev.id
+    );
+    if (hasPromo) {
+      return null;
+    }
+
     const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
     const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
     const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
@@ -152,40 +151,13 @@ export function getChildCostOffsetRecommendations(inputs) {
     const parentEndAge = birthAge + maxAge;
     const duration = maxAge - childStartAge;
     
-    // Generate the matching income boost list
-    const brackets = [
-      { start: 0, end: 4, cost: ages0to4 },
-      { start: 5, end: 12, cost: ages5to12 },
-      { start: 13, end: 18, cost: ages13to18 },
-      { start: 19, end: 22, cost: ages19to22 }
-    ];
-    
-    const incomeBoosts = [];
-    brackets.forEach((br, idx) => {
-      const start = Math.max(childStartAge, br.start);
-      const end = Math.min(maxAge - 1, br.end);
-      if (start <= end && br.cost > 0) {
-        incomeBoosts.push({
-          id: `child-income-boost-${ev.id}-${idx}`,
-          name: `Temporary Income Boost (${ev.childName || 'Child'} Age ${start}-${end})`,
-          amount: br.cost,
-          frequency: 'yearly',
-          startAge: birthAge + start,
-          endAge: birthAge + end + 1, // exclusive
-          growthRate: inflationRateDec,
-          isTaxable: true
-        });
-      }
-    });
-    
     return {
       childEventId: ev.id,
       childName: ev.childName || '',
       peakCost,
       duration,
       parentStartAge,
-      parentEndAge,
-      incomeBoosts
+      parentEndAge
     };
-  });
+  }).filter(Boolean);
 }

@@ -392,27 +392,32 @@ export default function DesktopFireSimulatorView({
         </div>
       )}
 
-      {notification && (
-        <div style={{
-          position: 'fixed',
-          bottom: '2rem',
-          right: '2rem',
-          backgroundColor: 'var(--bg-secondary, #1f2937)',
-          borderLeft: '4px solid var(--accent-rose, #f43f5e)',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
-          color: 'var(--text-primary, #f3f4f6)',
-          padding: '0.75rem 1.25rem',
-          borderRadius: '0.375rem',
-          zIndex: 9999,
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          ⚠️ {notification}
-        </div>
-      )}
+      {notification && (() => {
+        const isSuccess = notification.startsWith('✓');
+        return (
+          <div style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            backgroundColor: 'var(--bg-secondary, #1f2937)',
+            borderLeft: isSuccess ? '4px solid var(--accent-emerald, #10b981)' : '4px solid var(--accent-rose, #f43f5e)',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+            color: 'var(--text-primary, #f3f4f6)',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '0.375rem',
+            zIndex: 9999,
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            whiteSpace: 'pre-line'
+          }}>
+            {!isSuccess && '⚠️ '}
+            {notification}
+          </div>
+        );
+      })()}
 
     </div>
   );

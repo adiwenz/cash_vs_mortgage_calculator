@@ -11,6 +11,16 @@ const formatCurrency = (val) => {
   }).format(val);
 };
 
+function isGeneratedMainIncome(id) {
+  if (!id || typeof id !== 'string') return false;
+  return id.startsWith('child-income-boost') ||
+         id.startsWith('simple-inc-prechild') ||
+         id.startsWith('simple-inc-worksave') ||
+         id.startsWith('simple-inc-childcare') ||
+         id === 'simple-inc' ||
+         id === 'inc-1';
+}
+
 export function useTimelineEvents(inputs, displayedResults) {
   return useMemo(() => {
     const events = [];
@@ -21,10 +31,19 @@ export function useTimelineEvents(inputs, displayedResults) {
 
     // 1. Income Phases
     inp.incomeList.forEach(inc => {
-      if (inc.id && typeof inc.id === 'string' && (inc.id.startsWith('simple-inc') || inc.id.startsWith('child-income-boost'))) {
+      if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc')) {
         return;
       }
-      if (inc.startAge > inp.currentAge && inc.startAge <= inp.lifeExpectancy) {
+      const isCustomCareer = !isGeneratedMainIncome(inc.id);
+      const isAgeMatch = isCustomCareer
+        ? (inc.startAge >= inp.currentAge && inc.startAge <= inp.lifeExpectancy)
+        : (inc.startAge > inp.currentAge && inc.startAge <= inp.lifeExpectancy);
+
+      if (isAgeMatch) {
+        const isIncrease = inc.incomeChangeType === 'increaseByAmount';
+        const amountVal = isIncrease 
+          ? (inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) 
+          : (inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount);
         events.push({
           originalId: inc.id,
           age: Number(inc.startAge),
@@ -32,7 +51,7 @@ export function useTimelineEvents(inputs, displayedResults) {
           label: inc.name,
           icon: '💼',
           type: 'career',
-          description: `Started career phase "${inc.name}" earning ${formatCurrency(inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount)}/year (raises: ${(inc.growthRate * 100).toFixed(1)}%).`
+          description: `Started career phase "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/year (raises: ${(inc.growthRate * 100).toFixed(1)}%).`
         });
       }
     });

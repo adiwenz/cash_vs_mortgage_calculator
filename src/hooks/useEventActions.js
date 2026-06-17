@@ -266,7 +266,13 @@ export function useEventActions(
           ...baseEvent
         });
       } else {
-        setEditingEvent({ ...baseEvent });
+        const isFromIncomeList = inputs.incomeList?.some(i => i.id === baseEvent.id);
+        const isFromSpendingPhases = inputs.spendingPhases?.some(p => p.id === baseEvent.id);
+        setEditingEvent({
+          ...baseEvent,
+          type: isFromIncomeList ? 'careerChange' : (isFromSpendingPhases ? 'move' : baseEvent.type),
+          growthRate: isFromIncomeList && baseEvent.growthRate !== undefined ? Number(baseEvent.growthRate) * 100 : baseEvent.growthRate
+        });
       }
     } else if (evt.type === 'retire') {
       setIsFullPartnerProfileOpen(false);
@@ -329,21 +335,37 @@ export function useEventActions(
       if (editingEvent.id) {
         const oldEvent = newInputs.lifeEvents.find(e => e.id === editingEvent.id);
         if (oldEvent && oldEvent.type === 'haveChild') {
-          const oldBirthAge = Number(oldEvent.birthAge !== undefined ? oldEvent.birthAge : oldEvent.parentAgeAtBirth) || 30;
-          const newBirthAge = Number(editingEvent.birthAge !== undefined ? editingEvent.birthAge : editingEvent.parentAgeAtBirth) || 30;
-          const ageDiff = newBirthAge - oldBirthAge;
-          if (ageDiff !== 0) {
-            newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-              if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${editingEvent.id}-`)) {
-                return {
-                  ...inc,
-                  startAge: inc.startAge + ageDiff,
-                  endAge: inc.endAge + ageDiff
-                };
-              }
-              return inc;
-            });
-          }
+          const birthAgeVal = Number(editingEvent.birthAge !== undefined ? editingEvent.birthAge : editingEvent.parentAgeAtBirth) || 30;
+          const childStartAgeVal = Number(editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0);
+          const includeCollegeVal = !!editingEvent.includeCollege;
+          const maxAgeVal = includeCollegeVal ? 22 : 18;
+          
+          const childCostsInput = newInputs.childCosts || inputs.childCosts;
+          const ages0to4Val = editingEvent.costMethod === 'custom' ? (editingEvent.customAges0to4 !== undefined ? Number(editingEvent.customAges0to4) : 15000) : (childCostsInput?.ages0to4 !== undefined ? Number(childCostsInput.ages0to4) : 15000);
+          const ages5to12Val = editingEvent.costMethod === 'custom' ? (editingEvent.customAges5to12 !== undefined ? Number(editingEvent.customAges5to12) : 15000) : (childCostsInput?.ages5to12 !== undefined ? Number(childCostsInput.ages5to12) : 15000);
+          const ages13to18Val = editingEvent.costMethod === 'custom' ? (editingEvent.customAges13to18 !== undefined ? Number(editingEvent.customAges13to18) : 15000) : (childCostsInput?.ages13to18 !== undefined ? Number(childCostsInput.ages13to18) : 15000);
+          const ages19to22Val = editingEvent.costMethod === 'custom' ? (editingEvent.customAges19to22 !== undefined ? Number(editingEvent.customAges19to22) : 15000) : (childCostsInput?.ages19to22 !== undefined ? Number(childCostsInput.ages19to22) : 15000);
+          
+          const costsVal = [];
+          if (childStartAgeVal <= 4) costsVal.push(ages0to4Val);
+          if (childStartAgeVal <= 12 && maxAgeVal >= 5) costsVal.push(ages5to12Val);
+          if (childStartAgeVal <= 18 && maxAgeVal >= 13) costsVal.push(ages13to18Val);
+          if (includeCollegeVal && childStartAgeVal <= 22 && maxAgeVal >= 19) costsVal.push(ages19to22Val);
+          
+          const peakCostVal = Math.max(...costsVal, 0);
+          const newPromoStartAgeVal = birthAgeVal + childStartAgeVal;
+
+          newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+            if (inc.id === oldEvent.linkedEventId || inc.parentEventId === oldEvent.id || inc.id === editingEvent.linkedEventId || inc.parentEventId === editingEvent.id) {
+              return {
+                ...inc,
+                startAge: newPromoStartAgeVal,
+                salaryIncrease: peakCostVal,
+                name: editingEvent.childName ? `Promotion (${editingEvent.childName})` : 'Get a Promotion'
+              };
+            }
+            return inc;
+          });
         }
         if (newInputs.lifeEvents.some(e => e.id === editingEvent.id)) {
           newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== editingEvent.id);
@@ -411,8 +433,15 @@ export function useEventActions(
           frequency: 'yearly',
           startAge: editingEvent.startAge,
           endAge: newInputs.targetRetirementAge,
-          growthRate: (editingEvent.growthRate || 3.0) / 100,
-          isTaxable: true
+          growthRate: (editingEvent.growthRate !== undefined ? Number(editingEvent.growthRate) : 3.0) / 100,
+          isTaxable: true,
+          
+          incomeChangeType: editingEvent.incomeChangeType || 'newIncomeLevel',
+          salaryIncrease: editingEvent.incomeChangeType === 'increaseByAmount' 
+            ? (editingEvent.salaryIncrease !== undefined ? Number(editingEvent.salaryIncrease) : Number(editingEvent.amount))
+            : undefined,
+          permanent: editingEvent.permanent !== undefined ? !!editingEvent.permanent : false,
+          parentEventId: editingEvent.parentEventId || null
         };
         const updatedIncome = newInputs.incomeList.map(inc => {
           if (inc.startAge < editingEvent.startAge && inc.endAge > editingEvent.startAge) {
@@ -655,6 +684,7 @@ export function useEventActions(
           newEventObj = {
             ...newEventObj,
             childName: editingEvent.childName || '',
+            linkedEventId: editingEvent.linkedEventId || null,
             childStartAge: editingEvent.childStartAge !== undefined ? editingEvent.childStartAge : 0,
             birthAge: editingEvent.birthAge !== undefined ? editingEvent.birthAge : newInputs.currentAge,
             costMethod: editingEvent.costMethod || 'default',
@@ -831,6 +861,7 @@ export function useEventActions(
         
         let newEvents = scen.inputs.lifeEvents.filter(e => e.id !== matchEvent.id);
         let newAssets = scen.inputs.houseAssets || [];
+        let newIncomes = scen.inputs.incomeList || [];
 
         if (matchEvent.type === 'buyHouse' || matchEvent.type === 'sellHouse') {
           const houseId = matchEvent.houseId;
@@ -850,11 +881,15 @@ export function useEventActions(
             return e;
           });
         }
+        if (matchEvent.type === 'haveChild') {
+          newIncomes = newIncomes.filter(i => i.id !== matchEvent.linkedEventId && i.parentEventId !== matchEvent.id);
+        }
 
         let newInputs = {
           ...scen.inputs,
           lifeEvents: newEvents,
-          houseAssets: newAssets
+          houseAssets: newAssets,
+          incomeList: newIncomes
         };
 
         if (evt.type === 'retire') {

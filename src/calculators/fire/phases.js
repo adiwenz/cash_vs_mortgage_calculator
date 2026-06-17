@@ -487,11 +487,19 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       growthRate = (mainIncomeItem.growthRate !== undefined && mainIncomeItem.growthRate !== null && mainIncomeItem.growthRate !== '') ? Number(mainIncomeItem.growthRate) : 0.03;
     }
 
-    const rawIncomeItem = enabledEvents.find(inc => inc.type === 'incomeItem' && start >= inc.startAge && start < inc.endAge && !isGeneratedMainIncome(inc.id));
-    if (rawIncomeItem) {
-      baseIncome = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
-      growthRate = (rawIncomeItem.growthRate !== undefined && rawIncomeItem.growthRate !== null && rawIncomeItem.growthRate !== '') ? Number(rawIncomeItem.growthRate) : 0.03;
-    }
+    const activeIncomes = enabledEvents
+      .filter(inc => inc.type === 'incomeItem' && start >= inc.startAge && start < inc.endAge && !isGeneratedMainIncome(inc.id))
+      .sort((a, b) => Number(a.startAge) - Number(b.startAge));
+
+    activeIncomes.forEach(inc => {
+      if (inc.incomeChangeType === 'increaseByAmount') {
+        const increaseMonthly = Math.round((Number(inc.salaryIncrease) || 0) / 12);
+        baseIncome += increaseMonthly;
+      } else {
+        baseIncome = Math.round(inc.frequency === 'monthly' ? Number(inc.amount) : Number(inc.amount) / 12);
+      }
+      growthRate = (inc.growthRate !== undefined && inc.growthRate !== null && inc.growthRate !== '') ? Number(inc.growthRate) : 0.03;
+    });
     
     const sabbatical = enabledEvents.find(ev => ev.type === 'sabbatical' && start >= ev.startAge && start < ev.endAge);
     if (sabbatical) {
@@ -657,18 +665,6 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     }
 
     let childBoost = 0;
-    if (childCount > 0) {
-      let activeBoostMonthly = 0;
-      enabledEvents.forEach(inc => {
-        if (inc.type === 'incomeItem' && inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
-          if (inc.startAge <= start && inc.endAge > start) {
-            const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
-            activeBoostMonthly += boostYearly / 12;
-          }
-        }
-      });
-      childBoost = activeBoostMonthly * childCostsScale;
-    }
 
     activeDebts.forEach(debt => {
       resolvedExpenses[`debt_${debt.id}`] = debt.monthlyPayment;
@@ -832,7 +828,9 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     }
 
     const effectsApplied = ["Base/default budget"];
-    if (rawIncomeItem) effectsApplied.push(`Career income change: ${rawIncomeItem.name}`);
+    activeIncomes.forEach(inc => {
+      effectsApplied.push(`Career income change: ${inc.name}`);
+    });
     if (sabbatical) effectsApplied.push(`Sabbatical income reduction: ${sabbatical.incomeReduction}%`);
     if (baristaFire) effectsApplied.push(`Barista FIRE part-time income: ${baristaFire.partTimeIncome}/yr`);
     if (isMarried) {

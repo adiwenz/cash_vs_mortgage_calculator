@@ -238,6 +238,12 @@ export default function FireSimulator() {
           }
           return e;
         });
+        newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+          if (inc.endAge === oldAge) {
+            return { ...inc, endAge: newAge };
+          }
+          return inc;
+        });
       } else if (evt.type === 'borrowing') {
         newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
           if (e.id === evt.originalId && e.type === 'borrowing') {
@@ -307,6 +313,21 @@ export default function FireSimulator() {
           }
           return i;
         });
+        const draggedCareer = newInputs.incomeList.find(i => i.id === evt.originalId);
+        if (draggedCareer && draggedCareer.parentEventId) {
+          newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
+            if (e.id === draggedCareer.parentEventId) {
+              const childStartAge = Number(e.childStartAge !== undefined ? e.childStartAge : 0);
+              const newBirthAge = newAge - childStartAge;
+              return {
+                ...e,
+                birthAge: newBirthAge,
+                age: newBirthAge
+              };
+            }
+            return e;
+          });
+        }
       } else {
         newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
           if (e.id === evt.originalId) {
@@ -318,20 +339,16 @@ export default function FireSimulator() {
               updated.age = newAge;
             } else if (e.type === 'haveChild') {
               updated.birthAge = newAge;
-              const oldBirthAge = Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) || 30;
-              const ageDiff = newAge - oldBirthAge;
-              if (ageDiff !== 0) {
-                newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-                  if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${e.id}-`)) {
-                    return {
-                      ...inc,
-                      startAge: inc.startAge + ageDiff,
-                      endAge: inc.endAge + ageDiff
-                    };
-                  }
-                  return inc;
-                });
-              }
+              updated.age = newAge;
+              newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+                if (inc.id === e.linkedEventId || inc.parentEventId === e.id) {
+                  return {
+                    ...inc,
+                    startAge: newAge + (e.childStartAge || 0)
+                  };
+                }
+                return inc;
+              });
             } else if (e.type === 'college') {
               updated.startAge = newAge;
             } else if (e.type === 'sabbatical') {
@@ -488,9 +505,32 @@ export default function FireSimulator() {
   const handleApplyImprovementScenario = (scenario) => {
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     let inp = scen.inputs;
-    if (scenario.type.startsWith('childOffset')) {
-      inp = JSON.parse(JSON.stringify(scen.inputs));
-      inp.incomeList = [...(inp.incomeList || []), ...(scenario.incomeBoosts || [])];
+    if (scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) {
+      if (scenario.promoEvent) {
+        inp = JSON.parse(JSON.stringify(scen.inputs));
+        const remainingIncomes = (inp.incomeList || []).filter(i => i.id !== scenario.promoEvent.id);
+        inp.incomeList = [...remainingIncomes, scenario.promoEvent];
+        
+        inp.lifeEvents = (inp.lifeEvents || []).map(ev => {
+          if (ev.id === scenario.promoEvent.parentEventId) {
+            return { ...ev, linkedEventId: scenario.promoEvent.id };
+          }
+          return ev;
+        });
+
+        setScenarios(prev => prev.map(s => {
+          if (s.id !== currentScenarioId) return s;
+          return { ...s, inputs: inp };
+        }));
+
+        setNotification(
+          `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent.salaryIncrease.toLocaleString()}/year income\nRetirement plan updated`
+        );
+        setTimeout(() => setNotification(null), 4000);
+
+        setShowImprovementModal(false);
+        return;
+      }
     }
     const currentAgeVal = Number(inp.currentAge) || 30;
     const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
@@ -732,14 +772,6 @@ export default function FireSimulator() {
     const currentPhase = normalizedPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normalizedPhases[0];
     if (currentPhase) {
       let childBoostForCurrent = 0;
-      (inp.incomeList || []).forEach(inc => {
-        if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('child-income-boost')) {
-          if (currentPhase.startAge >= inc.startAge && currentPhase.startAge < inc.endAge) {
-            const boostYearly = inc.frequency === 'monthly' ? Number(inc.amount) * 12 : Number(inc.amount);
-            childBoostForCurrent += boostYearly / 12;
-          }
-        }
-      });
       const baseSalaryMonthly = (currentPhase.startAge >= targetRetAgeVal) ? 0 : Math.round(targetIncome / 12);
       initialEdited[currentPhase.id] = {
         ...currentPhase,
@@ -860,21 +892,37 @@ export default function FireSimulator() {
     if (event.id) {
       const oldEvent = newInputs.lifeEvents.find(e => e.id === event.id);
       if (oldEvent && oldEvent.type === 'haveChild') {
-        const oldBirthAge = Number(oldEvent.birthAge !== undefined ? oldEvent.birthAge : oldEvent.parentAgeAtBirth) || 30;
-        const newBirthAge = Number(event.birthAge !== undefined ? event.birthAge : event.parentAgeAtBirth) || 30;
-        const ageDiff = newBirthAge - oldBirthAge;
-        if (ageDiff !== 0) {
-          newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-            if (inc.id && typeof inc.id === 'string' && inc.id.startsWith(`child-income-boost-${event.id}-`)) {
-              return {
-                ...inc,
-                startAge: inc.startAge + ageDiff,
-                endAge: inc.endAge + ageDiff
-              };
-            }
-            return inc;
-          });
-        }
+        const birthAgeVal = Number(event.birthAge !== undefined ? event.birthAge : event.parentAgeAtBirth) || 30;
+        const childStartAgeVal = Number(event.childStartAge !== undefined ? event.childStartAge : 0);
+        const includeCollegeVal = !!event.includeCollege;
+        const maxAgeVal = includeCollegeVal ? 22 : 18;
+        
+        const childCostsInput = newInputs.childCosts || baseInputs.childCosts;
+        const ages0to4Val = event.costMethod === 'custom' ? (event.customAges0to4 !== undefined ? Number(event.customAges0to4) : 15000) : (childCostsInput?.ages0to4 !== undefined ? Number(childCostsInput.ages0to4) : 15000);
+        const ages5to12Val = event.costMethod === 'custom' ? (event.customAges5to12 !== undefined ? Number(event.customAges5to12) : 15000) : (childCostsInput?.ages5to12 !== undefined ? Number(childCostsInput.ages5to12) : 15000);
+        const ages13to18Val = event.costMethod === 'custom' ? (event.customAges13to18 !== undefined ? Number(event.customAges13to18) : 15000) : (childCostsInput?.ages13to18 !== undefined ? Number(childCostsInput.ages13to18) : 15000);
+        const ages19to22Val = event.costMethod === 'custom' ? (event.customAges19to22 !== undefined ? Number(event.customAges19to22) : 15000) : (childCostsInput?.ages19to22 !== undefined ? Number(childCostsInput.ages19to22) : 15000);
+        
+        const costsVal = [];
+        if (childStartAgeVal <= 4) costsVal.push(ages0to4Val);
+        if (childStartAgeVal <= 12 && maxAgeVal >= 5) costsVal.push(ages5to12Val);
+        if (childStartAgeVal <= 18 && maxAgeVal >= 13) costsVal.push(ages13to18Val);
+        if (includeCollegeVal && childStartAgeVal <= 22 && maxAgeVal >= 19) costsVal.push(ages19to22Val);
+        
+        const peakCostVal = Math.max(...costsVal, 0);
+        const newPromoStartAgeVal = birthAgeVal + childStartAgeVal;
+
+        newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+          if (inc.id === oldEvent.linkedEventId || inc.parentEventId === oldEvent.id || inc.id === event.linkedEventId || inc.parentEventId === event.id) {
+            return {
+              ...inc,
+              startAge: newPromoStartAgeVal,
+              salaryIncrease: peakCostVal,
+              name: event.childName ? `Promotion (${event.childName})` : 'Get a Promotion'
+            };
+          }
+          return inc;
+        });
       }
       if (newInputs.lifeEvents.some(e => e.id === event.id)) {
         newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== event.id);
@@ -945,8 +993,15 @@ export default function FireSimulator() {
         frequency: 'yearly',
         startAge: event.startAge,
         endAge: newInputs.targetRetirementAge,
-        growthRate: (event.growthRate || 3.0) / 100,
-        isTaxable: true
+        growthRate: (event.growthRate !== undefined ? Number(event.growthRate) : 3.0) / 100,
+        isTaxable: true,
+        
+        incomeChangeType: event.incomeChangeType || 'newIncomeLevel',
+        salaryIncrease: event.incomeChangeType === 'increaseByAmount' 
+          ? (event.salaryIncrease !== undefined ? Number(event.salaryIncrease) : Number(event.amount))
+          : undefined,
+        permanent: event.permanent !== undefined ? !!event.permanent : false,
+        parentEventId: event.parentEventId || null
       };
       const updatedIncome = newInputs.incomeList.map(inc => {
         if (inc.startAge < event.startAge && inc.endAge > event.startAge) {
@@ -1047,6 +1102,7 @@ export default function FireSimulator() {
         enabled: true,
         name: event.name || 'Have a Child',
         childName: event.childName || '',
+        linkedEventId: event.linkedEventId || null,
         childStartAge: event.childStartAge !== undefined ? Number(event.childStartAge) : 0,
         birthAge: event.birthAge !== undefined ? Number(event.birthAge) : newInputs.currentAge,
         costMethod: event.costMethod || 'default',
@@ -1057,6 +1113,38 @@ export default function FireSimulator() {
         includeCollege: !!event.includeCollege
       };
       
+      const birthAgeVal = Number(newEventObj.birthAge) || 30;
+      const childStartAgeVal = Number(newEventObj.childStartAge) || 0;
+      const includeCollegeVal = !!newEventObj.includeCollege;
+      const maxAgeVal = includeCollegeVal ? 22 : 18;
+      
+      const childCostsInput = newInputs.childCosts || inputs.childCosts;
+      const ages0to4Val = newEventObj.costMethod === 'custom' ? (newEventObj.customAges0to4 !== undefined ? Number(newEventObj.customAges0to4) : 15000) : (childCostsInput?.ages0to4 !== undefined ? Number(childCostsInput.ages0to4) : 15000);
+      const ages5to12Val = newEventObj.costMethod === 'custom' ? (newEventObj.customAges5to12 !== undefined ? Number(newEventObj.customAges5to12) : 15000) : (childCostsInput?.ages5to12 !== undefined ? Number(childCostsInput.ages5to12) : 15000);
+      const ages13to18Val = newEventObj.costMethod === 'custom' ? (newEventObj.customAges13to18 !== undefined ? Number(newEventObj.customAges13to18) : 15000) : (childCostsInput?.ages13to18 !== undefined ? Number(childCostsInput.ages13to18) : 15000);
+      const ages19to22Val = newEventObj.costMethod === 'custom' ? (newEventObj.customAges19to22 !== undefined ? Number(newEventObj.customAges19to22) : 15000) : (childCostsInput?.ages19to22 !== undefined ? Number(childCostsInput.ages19to22) : 15000);
+      
+      const costsVal = [];
+      if (childStartAgeVal <= 4) costsVal.push(ages0to4Val);
+      if (childStartAgeVal <= 12 && maxAgeVal >= 5) costsVal.push(ages5to12Val);
+      if (childStartAgeVal <= 18 && maxAgeVal >= 13) costsVal.push(ages13to18Val);
+      if (includeCollegeVal && childStartAgeVal <= 22 && maxAgeVal >= 19) costsVal.push(ages19to22Val);
+      
+      const peakCostVal = Math.max(...costsVal, 0);
+      const newPromoStartAgeVal = birthAgeVal + childStartAgeVal;
+
+      newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+        if (inc.id === event.linkedEventId || inc.parentEventId === event.id) {
+          return {
+            ...inc,
+            startAge: newPromoStartAgeVal,
+            salaryIncrease: peakCostVal,
+            name: newEventObj.childName ? `Promotion (${newEventObj.childName})` : 'Get a Promotion'
+          };
+        }
+        return inc;
+      });
+
       newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
       savedEvent = newEventObj;
     } else if (type === 'college') {
@@ -1268,9 +1356,22 @@ export default function FireSimulator() {
     const currentAgeVal = Number(newInputs.currentAge) || 30;
     const targetRetAgeVal = Number(newInputs.targetRetirementAge) || 65;
 
-    // 1. If child offset, add temporary income boosts
-    if (scenario.type.startsWith('childOffset') && scenario.incomeBoosts) {
-      newInputs.incomeList = [...(newInputs.incomeList || []), ...(scenario.incomeBoosts || [])];
+    // 1. If child offset / promotion, add the career change event and link it
+    if ((scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) && scenario.promoEvent) {
+      const remainingIncomes = (newInputs.incomeList || []).filter(i => i.id !== scenario.promoEvent.id);
+      newInputs.incomeList = [...remainingIncomes, scenario.promoEvent];
+      
+      newInputs.lifeEvents = (newInputs.lifeEvents || []).map(ev => {
+        if (ev.id === scenario.promoEvent.parentEventId) {
+          return { ...ev, linkedEventId: scenario.promoEvent.id };
+        }
+        return ev;
+      });
+
+      setNotification(
+        `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent.salaryIncrease.toLocaleString()}/year income\nRetirement plan updated`
+      );
+      setTimeout(() => setNotification(null), 4000);
     }
 
     // 2. Adjust target retirement age if working longer / retiring at 65/ready age
@@ -1418,6 +1519,9 @@ export default function FireSimulator() {
 
     // Sync career incomes in incomeList
     newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+      if (inc.incomeChangeType === 'increaseByAmount') {
+        return inc;
+      }
       const matchingPhase = normPhases.find(p => p.startAge === inc.startAge && (p.type === 'careerChange' || p.type === 'current'));
       if (matchingPhase) {
         inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;
