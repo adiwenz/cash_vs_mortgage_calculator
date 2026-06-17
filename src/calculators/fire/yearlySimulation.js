@@ -55,6 +55,16 @@ function getAssetLabel(key) {
   return labels[key] || key;
 }
 
+function isGeneratedMainIncome(id) {
+  if (!id || typeof id !== 'string') return false;
+  return id.startsWith('child-income-boost') ||
+         id.startsWith('simple-inc-prechild') ||
+         id.startsWith('simple-inc-worksave') ||
+         id.startsWith('simple-inc-childcare') ||
+         id === 'simple-inc' ||
+         id === 'inc-1';
+}
+
 export function projectYearlyBalances(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
   const currentAge = profile.currentAge;
   const lifeExpectancy = profile.lifeExpectancy;
@@ -425,12 +435,58 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     if (activePhaseForAge) {
       const yearsGrown = age - currentAge;
 
-      const userBaseSalary = activePhaseForAge.baseSalaryMonthly || 0;
       const userChildBoost = activePhaseForAge.childBoost || 0;
       const userSSBenefit = activePhaseForAge.ssMonthlyIncome || 0;
       const userPassiveMonthly = activePhaseForAge.passiveMonthlyIncome || 0;
 
-      const userBaseSalaryNominal = (userBaseSalary * 12) * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsGrown);
+      let userBaseSalaryNominal = 0;
+      if (age < targetRetirementAge) {
+        const activeCareerChanges = enabledEvents.filter(inc => 
+          inc.type === 'incomeItem' && 
+          age >= inc.startAge && 
+          age < inc.endAge && 
+          !isGeneratedMainIncome(inc.id)
+        );
+
+        const latestReset = [...activeCareerChanges]
+          .reverse()
+          .find(inc => inc.incomeChangeType !== 'increaseByAmount');
+
+        if (latestReset) {
+          // Career-change salary is interpreted as nominal dollars at the event start age,
+          // not "today's dollars" inflated into the future.
+          let baseVal = Number(latestReset.amount) || 0;
+          let yearsSinceReset = age - latestReset.startAge;
+          userBaseSalaryNominal = baseVal * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceReset);
+
+          activeCareerChanges.forEach(inc => {
+            if (inc.incomeChangeType === 'increaseByAmount' && inc.startAge > latestReset.startAge) {
+              const increaseAmount = Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0;
+              let yearsSinceInc = age - inc.startAge;
+              userBaseSalaryNominal += increaseAmount * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceInc);
+            }
+          });
+        } else {
+          let standardBaseSalary = activePhaseForAge.baseSalaryMonthly || 0;
+          activeCareerChanges.forEach(inc => {
+            if (inc.incomeChangeType === 'increaseByAmount') {
+              const increaseMonthly = Math.round((Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0) / 12);
+              standardBaseSalary = Math.max(0, standardBaseSalary - increaseMonthly);
+            }
+          });
+
+          userBaseSalaryNominal = (standardBaseSalary * 12) * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsGrown);
+
+          activeCareerChanges.forEach(inc => {
+            if (inc.incomeChangeType === 'increaseByAmount') {
+              const increaseAmount = Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0;
+              let yearsSinceInc = age - inc.startAge;
+              userBaseSalaryNominal += increaseAmount * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceInc);
+            }
+          });
+        }
+      }
+
       const userChildBoostNominal = (userChildBoost * 12) * nominalFactor;
       const userSSNominal = (userSSBenefit * 12) * nominalFactor;
       const userPassiveNominal = (userPassiveMonthly * 12) * nominalFactor;

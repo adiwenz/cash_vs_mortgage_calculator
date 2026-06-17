@@ -237,4 +237,54 @@ describe('Budget Phases Financial States', () => {
     // With inflation 3% grown for 5 years: 25200 * 1.03^5 = 29213.
     expect(nominalAt40.expenses).toBeCloseTo(29213, -2);
   });
+
+  test('career-change salary is nominal at starting age and grows subsequently', () => {
+    baseInputs.currentAge = 35;
+    baseInputs.simpleIncome = 50000;
+    baseInputs.simpleExpenses = 40000;
+    baseInputs.inflationRate = 0;
+    baseInputs.includeTaxes = false;
+
+    // Career-change salary is interpreted as nominal dollars at the event start age,
+    // not "today's dollars" inflated into the future.
+    baseInputs.incomeList = [
+      {
+        id: 'inc-1',
+        name: 'Salary / Main Income',
+        amount: 50000,
+        frequency: 'yearly',
+        startAge: 35,
+        endAge: 40,
+        growthRate: 0.03,
+        isTaxable: true
+      },
+      {
+        id: 'inc-career-change',
+        name: 'Career Change Job',
+        amount: 150000,
+        frequency: 'yearly',
+        startAge: 40,
+        endAge: 65,
+        growthRate: 0.03,
+        isTaxable: true,
+        incomeChangeType: 'newIncomeLevel'
+      }
+    ];
+
+    const phases = getNormalizedPhases(baseInputs);
+    const phaseAt40 = phases.find(p => p.startAge === 40);
+    expect(phaseAt40).toBeDefined();
+    expect(phaseAt40.income).toBe(12500); // 150,000 / 12 = 12500 monthly
+
+    const results = runFireSimulation(baseInputs);
+    const age39 = results.nominalData.find(d => d.age === 39);
+    const age40 = results.nominalData.find(d => d.age === 40);
+    const age41 = results.nominalData.find(d => d.age === 41);
+    const age42 = results.nominalData.find(d => d.age === 42);
+
+    expect(Math.round(age39.income)).toBe(56280);
+    expect(Math.round(age40.income)).toBe(150000);
+    expect(Math.round(age41.income)).toBe(154500);
+    expect(Math.round(age42.income)).toBe(159135);
+  });
 });
