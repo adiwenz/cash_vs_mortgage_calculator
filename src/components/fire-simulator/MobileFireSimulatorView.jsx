@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useMemo, useEffect } from 'react';
 import { 
   Home, 
@@ -9,9 +10,10 @@ import {
   Sparkles,
   Info
 } from 'lucide-react';
-import { formatCurrency, getAssetLabel, isEditableEvent } from './helpers';
+import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis } from './helpers';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
-import MobileTimeline from './MobileTimeline';
+import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import EventModalForm from './EventModalForm';
@@ -341,6 +343,7 @@ export default function MobileFireSimulatorView({
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
+  const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
   // Sync scroll positions
   useEffect(() => {
@@ -381,13 +384,12 @@ export default function MobileFireSimulatorView({
 
     events.forEach(e => {
       if (!e.enabled) return;
-      let eventAge = null;
-      if (e.type === 'haveChild') eventAge = Number(e.birthAge);
-      else if (e.type === 'buyHouse') eventAge = Number(e.purchaseAge);
-      else if (e.type === 'marriage') eventAge = Number(e.marriageAge || e.age || e.startAge);
-      else if (e.type === 'socialSecurity') eventAge = Number(e.claimingAge);
-      else if (e.type === 'retire') eventAge = Number(e.age);
-      else eventAge = Number(e.age || e.startAge || e.purchaseAge || e.birthAge || e.claimingAge || e.ageReceived);
+      const eventAge = e.type === 'haveChild' ? Number(e.birthAge)
+        : e.type === 'buyHouse' ? Number(e.purchaseAge)
+        : e.type === 'marriage' ? Number(e.marriageAge || e.age || e.startAge)
+        : e.type === 'socialSecurity' ? Number(e.claimingAge)
+        : e.type === 'retire' ? Number(e.age)
+        : Number(e.age || e.startAge || e.purchaseAge || e.birthAge || e.claimingAge || e.ageReceived);
 
       if (eventAge && eventAge > curAge) {
         const diff = eventAge - curAge;
@@ -684,101 +686,454 @@ export default function MobileFireSimulatorView({
         )}
 
         {/* ROADMAP TAB */}
-        {activeTab === 'Roadmap' && (
-          <div>
-            <h1 className="mobile-tab-title">Interactive Roadmap</h1>
-            <p className="mobile-tab-subtitle">Your life plan at a glance</p>
+        {activeTab === 'Roadmap' && (() => {
+          const finalYearLog = chartData[chartData.length - 1];
+          const finalNetWorth = finalYearLog ? finalYearLog.netWorth : 0;
+          
+          const fiConfidence = activeResults.retirementOutcome === 'comfortable' ? '95%' 
+            : activeResults.retirementOutcome === 'sustainable' ? '85%'
+            : activeResults.runOutAge !== null ? `${Math.max(10, Math.round(100 - ((inputs.lifeExpectancy || 85) - activeResults.runOutAge) * 5))}%`
+            : '75%';
 
-            {/* Top Overview Badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div className="mobile-snapshot-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.75rem' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>🏖️ Retirement Age</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: '800', margin: '0.2rem 0' }}>{activeResults.retirementReadyAge || 'N/A'}</span>
-                <span style={{ fontSize: '0.6rem', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
-                  {isPlanOnTrack ? 'On track' : 'Adjustments needed'}
-                </span>
-              </div>
-              
-              {currentAgePhase && (
-                <div className="mobile-snapshot-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.75rem' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{currentAgePhase.icon} Current Phase</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: '800', margin: '0.35rem 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                    {currentAgePhase.label}
-                  </span>
-                  <span style={{ fontSize: '0.6rem', color: '#a78bfa', fontWeight: '700' }}>
-                    Age {currentAgePhase.startAge}–{currentAgePhase.endAge}
-                  </span>
+          const successRate = activeResults.retirementOutcome === 'comfortable' ? '92%' 
+            : activeResults.retirementOutcome === 'sustainable' ? '85%'
+            : activeResults.runOutAge !== null ? `${Math.max(5, Math.round(100 - ((inputs.lifeExpectancy || 85) - activeResults.runOutAge) * 6))}%`
+            : '70%';
+
+          const burnVal = inputs.currentAge < (activeResults.retirementReadyAge || 65) 
+            ? (currentAgePhase ? Object.values(currentAgePhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 4250)
+            : (activeResults.annualRetirementSpending || 51000) / 12;
+
+          const formatCompact = (val) => {
+            if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
+            if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}k`;
+            return formatCurrency(val);
+          };
+
+          return (
+            <div>
+              <h1 className="mobile-tab-title">Interactive Roadmap</h1>
+              <p className="mobile-tab-subtitle">Your life plan at a glance</p>
+
+              {/* Status Card (Avatar & circular track gauge) */}
+              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1e293b', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', position: 'relative' }}>
+                    👤
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Roadmap: <span style={{ color: 'var(--accent-emerald)', fontWeight: '700' }}>Path to FIRE</span></div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.15rem' }}>
+                      Current Status: <span style={{ color: '#60a5fa' }}>{inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.1rem' }}>
+                      Projected Retirement: <span style={{ color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)' }}>
+                        {activeResults.retirementReadyAge || 'N/A'} {isPlanOnTrack ? '(On track)' : '(Delayed)'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '58px', height: '58px' }}>
+                  <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx="29" cy="29" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                    <circle cx="29" cy="29" r="24" fill="none" stroke={isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)'} strokeWidth="4"
+                      strokeDasharray={`${2 * Math.PI * 24}`}
+                      strokeDashoffset={`${2 * Math.PI * 24 * (1 - (isPlanOnTrack ? 0.78 : 0.45))}`}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                    />
+                  </svg>
+                  <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#ffffff', lineHeight: 1 }}>{isPlanOnTrack ? '78%' : '45%'}</span>
+                    <span style={{ fontSize: '0.45rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginTop: '1px' }}>Track</span>
+                  </div>
+                </div>
+              </div>
+
+
+
+
+              {/* Life Journey Timeline */}
+              <MobileTimeline
+                inputs={inputs}
+                timelineEvents={timelineEvents}
+                selectedEventIndex={selectedEventIndex}
+                setSelectedEventIndex={setSelectedEventIndex}
+                handleEditRoadmapEvent={handleEditRoadmapEvent}
+              />
+
+              {/* Net Worth Graph & Projections KPIs Card */}
+              {(() => {
+                const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
+                const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
+                const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
+                
+                const eventAges = Array.from(new Set([
+                  inputs.currentAge,
+                  ...timelineEvents.map(e => Number(e.age)),
+                  inputs.lifeExpectancy
+                ])).sort((a, b) => a - b);
+
+                return (
+                  <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                      <div>
+                        <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                          📈 Net Worth Curve
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
+                          <span>Net Worth</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', borderTop: '2px dashed #3b82f6', display: 'inline-block' }}></span>
+                          <span>Income</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', borderTop: '2px dashed #10b981', display: 'inline-block' }}></span>
+                          <span>Expenses</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
+                          <XAxis
+                            dataKey="age"
+                            ticks={eventAges}
+                            stroke="var(--text-tertiary)"
+                            fontSize={8}
+                          />
+                          <YAxis
+                            stroke="var(--text-tertiary)"
+                            fontSize={8}
+                            tickFormatter={formatYAxis}
+                          />
+                          <Tooltip
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
+                                    <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
+                                    {payload.map((item) => (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
+                                        <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
+                                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="netWorth"
+                            name="Net Worth"
+                            stroke="#a78bfa"
+                            strokeWidth={3}
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="income"
+                            name="Income"
+                            stroke="#3b82f6"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="expenses"
+                            name="Expenses"
+                            stroke="#10b981"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          {selectedAge !== null && (
+                            <ReferenceLine
+                              x={selectedAge}
+                              stroke="var(--primary)"
+                              strokeDasharray="3 3"
+                              strokeWidth={1.5}
+                            />
+                          )}
+                          {selectedAge !== null && selectedPoint && (
+                            <ReferenceDot
+                              x={selectedAge}
+                              y={selectedNetWorth}
+                              r={6}
+                              fill="#a78bfa"
+                              stroke="#ffffff"
+                              strokeWidth={2}
+                              isFront={true}
+                            />
+                          )}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Projections KPIs stats grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Proj. NW</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
+                          {formatCompact(finalNetWorth)}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>FI Conf.</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
+                          {fiConfidence}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Monthly Burn</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
+                          {formatCurrency(burnVal)}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Success Rate</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
+                          {successRate}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+
+
+              {/* Collapsible Budget Phases */}
+              <section style={{ textAlign: 'left', marginTop: '1.5rem' }}>
+                <div className="mobile-section-header">
+                  <h2 className="mobile-section-title">Budget Phases</h2>
+                  <span className="mobile-section-subtitle">Tap a phase to view budget details</span>
+                </div>
+
+                <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {normalizedPhases.map((p, idx) => {
+                    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+                    const badgeColor = colors[idx % colors.length];
+                    const isExpanded = expandedPhaseId === p.id;
+
+                    const totalExpenses = Object.values(p.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                    const totalSavings = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
+                                         (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+
+                    return (
+                      <div 
+                        key={p.id}
+                        className={`mobile-phase-card ${isExpanded ? 'expanded' : ''}`}
+                        style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', cursor: 'pointer' }}
+                        onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div 
+                              className="mobile-phase-badge-num"
+                              style={{ backgroundColor: badgeColor, width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '800', color: '#ffffff' }}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div style={{ textAlign: 'left' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ fontSize: '0.95rem' }}>{p.icon}</span>
+                                <span className="mobile-phase-card-title" style={{ fontWeight: '700', fontSize: '0.95rem', color: '#ffffff' }}>{p.label}</span>
+                              </div>
+                              <span className="mobile-phase-card-age" style={{ fontSize: '0.8rem', color: '#a78bfa', display: 'block', marginTop: '0.1rem', fontWeight: '600' }}>Age {p.startAge}–{p.endAge}</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={18} style={{ color: 'var(--text-tertiary)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                        </div>
+
+                        {isExpanded && (
+                          <div 
+                            className="mobile-phase-expanded-content" 
+                            style={{ marginTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.85rem' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem 0.5rem', textAlign: 'left' }}>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
+                                <strong style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', display: 'block', marginTop: '0.1rem' }}>
+                                  {formatCurrency(p.income || 0)}/mo
+                                </strong>
+                              </div>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
+                                <strong style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.1rem' }}>
+                                  {formatCurrency(totalExpenses)}/mo
+                                </strong>
+                              </div>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
+                                <strong style={{ fontSize: '0.8rem', color: '#3b82f6', display: 'block', marginTop: '0.1rem' }}>
+                                  {formatCurrency(totalSavings)}/mo
+                                </strong>
+                              </div>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
+                                <strong style={{ fontSize: '0.8rem', color: '#ffffff', display: 'block', marginTop: '0.1rem' }}>
+                                  {formatCurrency(p.expenses?.housing || 0)}/mo
+                                </strong>
+                              </div>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>👶 Children Cost</span>
+                                <strong style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginTop: '0.1rem' }}>
+                                  {formatCurrency(p.expenses?.childcare || 0)}/mo
+                                </strong>
+                              </div>
+                              <div className="phase-metric-item">
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>⚖️ Tax Status</span>
+                                <strong style={{ fontSize: '0.8rem', color: '#ffffff', display: 'block', marginTop: '0.1rem' }}>
+                                  {p.isMarried ? 'Married Joint' : 'Single'}
+                                </strong>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="mobile-phase-edit-btn"
+                              style={{ 
+                                width: '100%', 
+                                padding: '0.45rem', 
+                                background: 'rgba(255,255,255,0.04)', 
+                                border: '1px solid rgba(255,255,255,0.08)', 
+                                borderRadius: '8px', 
+                                fontSize: '0.7rem', 
+                                color: 'var(--primary)', 
+                                fontWeight: '600', 
+                                cursor: 'pointer',
+                                marginTop: '0.85rem'
+                              }}
+                              onClick={() => handleSetBudgetClick(p.id)}
+                            >
+                              ⚙️ Edit Budget Configuration
+                            </button>
+
+                            {/* Phase Recommendations Section */}
+                            <div className="mobile-phase-recs-section" style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+                              <h4 style={{ fontWeight: '700', fontSize: '0.85rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ffffff' }}>
+                                💡 Recommendations
+                              </h4>
+                              
+                              {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
+                                <MobileRecommendationsPanel
+                                  improvementPlan={improvementPlan}
+                                  handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
+                                  targetRetirementAge={inputs.targetRetirementAge}
+                                  showHeader={false}
+                                />
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                  {p.label?.toLowerCase().includes('retirement') || p.icon === '🏖️' || p.icon === '🏖' ? (
+                                    <>
+                                      <div 
+                                        className="mobile-rec-card"
+                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
+                                        onClick={() => {
+                                          const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
+                                          if (ssEv) handleEditRoadmapEvent(ssEv);
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                                          <div style={{ fontSize: '1.25rem' }}>📅</div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Delaying claiming to age 70 increases annual benefits by ~8% per year.</span>
+                                          </div>
+                                        </div>
+                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                                      </div>
+                                      
+                                      <div 
+                                        className="mobile-rec-card"
+                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
+                                        onClick={() => handleSetBudgetClick(p.id)}
+                                      >
+                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                                          <div style={{ fontSize: '1.25rem' }}>💸</div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Cutting spending by $200/mo improves portfolio longevity projection.</span>
+                                          </div>
+                                        </div>
+                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                                      </div>
+                                    </>
+                                  ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
+                                    <div 
+                                      className="mobile-rec-card"
+                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
+                                    >
+                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                                        <div style={{ fontSize: '1.25rem' }}>🍼</div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Optimize Childcare Costs</span>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Look into tax-free Dependent Care FSAs to save up to 30% on childcare.</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className="mobile-rec-card"
+                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
+                                      onClick={() => handleSetBudgetClick(p.id)}
+                                    >
+                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                                        <div style={{ fontSize: '1.25rem' }}>📈</div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Increase Savings Rate</span>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Try allocating 1% more of your monthly income to investments.</span>
+                                        </div>
+                                      </div>
+                                      <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="mobile-roadmap-edit-btn"
+                  style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+                >
+                  + Add Life Event
+                </button>
+              </section>
+
+              {!editingEvent && (
+                <button
+                  type="button"
+                  className="mobile-fab-btn animate-scale-in"
+                  onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+                >
+                  ➕ Add Life Event
+                </button>
               )}
             </div>
-
-            {/* Roadmap Timeline component */}
-            <MobileTimeline
-              timelineEvents={timelineEvents}
-              selectedEventIndex={selectedEventIndex}
-              setSelectedEventIndex={setSelectedEventIndex}
-              handleEditRoadmapEvent={handleEditRoadmapEvent}
-            />
-
-            {/* Budget Phases Stack */}
-            <section style={{ textAlign: 'left', marginTop: '1.5rem' }}>
-              <div className="mobile-section-header">
-                <h2 className="mobile-section-title">Budget Phases</h2>
-                <span className="mobile-section-subtitle">Tap a phase to view budget details</span>
-              </div>
-
-              <div className="mobile-phase-card-list">
-                {normalizedPhases.map((p, idx) => {
-                  const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
-                  const badgeColor = colors[idx % colors.length];
-
-                  return (
-                    <div 
-                      key={p.id}
-                      className="mobile-phase-card"
-                      onClick={() => setSelectedMobilePhaseId(p.id)}
-                    >
-                      <div 
-                        className="mobile-phase-badge-num"
-                        style={{ backgroundColor: badgeColor }}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="mobile-phase-card-info">
-                        <div className="mobile-phase-card-header">
-                          <span style={{ fontSize: '1.05rem' }}>{p.icon}</span>
-                          <span className="mobile-phase-card-title">{p.label}</span>
-                        </div>
-                        <span className="mobile-phase-card-age">Age {p.startAge}–{p.endAge}</span>
-                        <span className="mobile-phase-card-desc">{getPhaseDriverDesc(p, idx)}</span>
-                      </div>
-                      <ChevronRight size={20} className="mobile-phase-card-arrow" />
-                    </div>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className="mobile-roadmap-edit-btn"
-                style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
-              >
-                + Add Life Event
-              </button>
-            </section>
-
-            {!editingEvent && (
-              <button
-                type="button"
-                className="mobile-fab-btn animate-scale-in"
-                onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
-              >
-                ➕ Add Life Event
-              </button>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* RESULTS TAB */}
         {activeTab === 'Results' && (

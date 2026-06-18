@@ -322,6 +322,35 @@
   box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
   border-color: rgba(245, 158, 11, 0.8);
 }
+.mobile-roadmap-circle.active.circle-rose {
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.6);
+  border-color: rgba(244, 63, 94, 0.8);
+}
+
+/* Active circle pulse animation */
+@keyframes circle-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(167, 139, 250, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0);
+  }
+}
+.mobile-roadmap-circle.active.pulse {
+  animation: circle-pulse 2s infinite;
+}
+
+/* Smooth phase card transition and active shadows */
+.mobile-phase-card {
+  transition: all 0.25s ease-in-out !important;
+}
+.mobile-phase-card.expanded {
+  border-color: rgba(167, 139, 250, 0.25) !important;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.08) !important;
+}
 
 .mobile-roadmap-age {
   display: inline-block;
@@ -381,6 +410,11 @@
   background: radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 100%);
   border: 1.5px solid rgba(245, 158, 11, 0.4);
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+.circle-rose {
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.25) 0%, rgba(244, 63, 94, 0.05) 100%);
+  border: 1.5px solid rgba(244, 63, 94, 0.4);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
 }
 
 /* Budget Phases Card List */

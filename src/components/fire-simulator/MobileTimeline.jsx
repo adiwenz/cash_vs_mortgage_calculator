@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { isEditableEvent } from './helpers';
 
@@ -32,7 +33,7 @@ const getShortLabel = (evt) => {
   return cleanLabel;
 };
 
-const getRoadmapDetails = (evt, formatCurrency) => {
+export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
   if (!evt) return null;
 
   let title = getShortLabel(evt);
@@ -74,6 +75,11 @@ const getRoadmapDetails = (evt, formatCurrency) => {
       break;
     case 'haveChild':
       whyItMatters = 'Welcoming a child introduces childcare, support, and education expenses, reducing your monthly savings capacity temporarily.';
+      const childEv = inputs?.lifeEvents?.find(e => e.id === evt.originalId);
+      if (childEv) {
+        benefitLabel = 'Child Details';
+        benefitValue = `${childEv.childName || 'Child'} Support Term: ${childEv.includeCollege ? 22 : 18} years`;
+      }
       break;
     case 'childSupportEnds':
       whyItMatters = 'Child support and childcare expenses end, freeing up significant cash flow to accelerate retirement savings.';
@@ -88,9 +94,19 @@ const getRoadmapDetails = (evt, formatCurrency) => {
       break;
     case 'buyHouse':
       whyItMatters = 'Purchasing a home builds equity but introduces mortgage debt, property taxes, and ongoing maintenance costs.';
+      const houseAsset = inputs?.houseAssets?.find(h => h.id === evt.houseId);
+      if (houseAsset) {
+        benefitLabel = 'Property Details';
+        benefitValue = `${formatCurrency(houseAsset.purchasePrice || houseAsset.homePrice || 200000)} home • ${formatCurrency(houseAsset.downPayment || 40000)} down`;
+      }
       break;
     case 'sellHouse':
       whyItMatters = 'Liquidates home equity, converting real estate value into investable brokerage assets to generate passive income.';
+      const sellAsset = inputs?.houseAssets?.find(h => h.id === evt.houseId);
+      if (sellAsset) {
+        benefitLabel = 'Property Name';
+        benefitValue = sellAsset.name || 'Primary Home';
+      }
       break;
     case 'mortgageOff':
       whyItMatters = 'Eliminates monthly mortgage payments, dramatically reducing core living expenses and decreasing FI requirements.';
@@ -138,121 +154,192 @@ const formatCurrency = (val) => {
   }).format(val);
 };
 
+const getCircleColorClass = (type) => {
+  if (type === 'haveChild') return 'circle-blue';
+  if (type === 'retire' || type.startsWith('retirementReady')) return 'circle-green';
+  if (type === 'socialSecurity' || type === 'career') return 'circle-gold';
+  if (type === 'marriage') return 'circle-rose';
+  if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'circle-purple';
+  return 'circle-purple';
+};
+
 export default function MobileTimeline({
+  inputs,
   timelineEvents,
   selectedEventIndex,
   setSelectedEventIndex,
   handleEditRoadmapEvent
 }) {
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(350);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const totalYears = (inputs?.lifeExpectancy || 85) - (inputs?.currentAge || 35);
+
+  // Dynamic Marker Sizing based on total events count (evenly spaced)
+  const eventCount = timelineEvents.length;
+  const sizes = useMemo(() => {
+    return { baseCircleSize: 48, activeCircleSize: 60 };
+  }, []);
+
+  const showAge = eventCount <= 12;
+  const showTitle = eventCount <= 8;
+
+  // Evenly spaced milestones
+  const resolvedPositions = useMemo(() => {
+    if (timelineEvents.length === 0) return [];
+
+    const W = containerWidth || 350;
+    const paddingLeft = 36;
+    const paddingRight = 36;
+    const usableWidth = W - paddingLeft - paddingRight;
+
+    return timelineEvents.map((evt, idx) => {
+      const isSelected = selectedEventIndex === idx;
+      const size = isSelected ? sizes.activeCircleSize : sizes.baseCircleSize;
+      
+      let x = paddingLeft + usableWidth / 2;
+      if (timelineEvents.length > 1) {
+        x = paddingLeft + (idx / (timelineEvents.length - 1)) * usableWidth;
+      }
+
+      return {
+        index: idx,
+        event: evt,
+        age: Number(evt.age),
+        x,
+        size
+      };
+    });
+  }, [timelineEvents, containerWidth, selectedEventIndex, sizes]);
+
   const selectedEvent = timelineEvents[selectedEventIndex] || timelineEvents[0];
+
+  const lineLeft = resolvedPositions.length > 0 ? resolvedPositions[0].x : 0;
+  const lineRight = resolvedPositions.length > 0 ? resolvedPositions[resolvedPositions.length - 1].x : 0;
+  const lineWidth = lineRight - lineLeft;
 
   return (
     <section className="mobile-milestones-section">
       <div className="mobile-section-header">
-        <h2 className="mobile-section-title">Life Events</h2>
-        <span className="mobile-section-subtitle">Tap a milestone to view details</span>
+        <h2 className="mobile-section-title">Your Life Journey ✨</h2>
+        <span className="mobile-section-subtitle">Tap any event to see details and impact</span>
       </div>
-      
-      <div className="mobile-roadmap-track">
-        <div className="mobile-roadmap-scroll-container">
-          {timelineEvents.length > 0 && (
-            <div 
-              className="mobile-roadmap-line-container"
+
+      <div className="mobile-roadmap-track" ref={containerRef} style={{ width: '100%', height: '140px', position: 'relative', overflow: 'hidden' }}>
+        {timelineEvents.length > 0 && (
+          <div
+            className="mobile-roadmap-line"
+            style={{
+              position: 'absolute',
+              top: '38px',
+              left: `${lineLeft}px`,
+              width: `${lineWidth}px`,
+              height: '3px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              zIndex: 1
+            }}
+          />
+        )}
+
+        {resolvedPositions.map((item) => {
+          const isSelected = selectedEventIndex === item.index;
+          const circleColor = getCircleColorClass(item.event.type);
+          const shortLabel = getShortLabel(item.event);
+          const topPosition = 38 - item.size / 2;
+
+          return (
+            <button
+              key={item.index}
+              type="button"
+              className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
               style={{
-                width: `${timelineEvents.length * 6}rem`,
+                position: 'absolute',
+                left: `${item.x}px`,
+                transform: 'translateX(-50%)',
+                top: `${topPosition}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                width: '80px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                zIndex: isSelected ? 3 : 2
+              }}
+              onClick={() => {
+                if (isSelected && isEditableEvent(item.event)) {
+                  handleEditRoadmapEvent(item.event);
+                } else {
+                  setSelectedEventIndex(item.index);
+                }
               }}
             >
-              <div 
-                className="mobile-roadmap-line" 
+              <div
+                className={`mobile-roadmap-circle ${isSelected ? 'active pulse' : ''} ${circleColor}`}
                 style={{
-                  left: '3rem',
-                  right: '3rem',
+                  width: `${item.size}px`,
+                  height: `${item.size}px`,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: isSelected ? '1.4rem' : '1.1rem',
+                  transition: 'all 0.2s ease-in-out'
                 }}
-              />
-              <div 
-                className="mobile-roadmap-line-active" 
-                style={{
-                  left: '3rem',
-                  width: `${selectedEventIndex * 6}rem`,
-                }}
-              />
-            </div>
-          )}
-
-          {timelineEvents.map((evt, idx) => {
-            let circleColor = 'circle-purple';
-            if (evt.type === 'haveChild') circleColor = 'circle-blue';
-            else if (evt.type === 'retire') circleColor = 'circle-green';
-            else if (evt.type === 'socialSecurity') circleColor = 'circle-gold';
-
-            const isSelected = selectedEventIndex === idx;
-            const shortLabel = getShortLabel(evt);
-
-            return (
-              <button
-                key={idx}
-                type="button"
-                className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
-                onClick={() => setSelectedEventIndex(idx)}
               >
-                <div className={`mobile-roadmap-circle ${isSelected ? 'active' : ''} ${circleColor}`}>
-                  <span>{evt.icon}</span>
-                </div>
-                <span className="mobile-roadmap-age">{evt.age}</span>
-                <span className="mobile-roadmap-label-text">{shortLabel}</span>
-              </button>
-            );
-          })}
-        </div>
+                <span>{item.event.icon}</span>
+              </div>
+              
+              {showAge && (
+                <span
+                  className="mobile-roadmap-age"
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    color: isSelected ? '#0f172a' : '#ffffff',
+                    marginTop: '0.4rem'
+                  }}
+                >
+                  {item.event.age}
+                </span>
+              )}
+
+              {showTitle && (
+                <span
+                  className="mobile-roadmap-label-text"
+                  style={{
+                    fontSize: '0.65rem',
+                    color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                    fontWeight: isSelected ? '700' : '500',
+                    marginTop: '0.1rem',
+                    textAlign: 'center',
+                    width: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {shortLabel}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {selectedEvent && (() => {
-        const details = getRoadmapDetails(selectedEvent, formatCurrency);
-        return (
-          <div className="mobile-roadmap-details-card">
-            <div className="mobile-roadmap-details-header">
-              <span className="mobile-roadmap-details-icon">{selectedEvent.icon}</span>
-              <div className="mobile-roadmap-details-title-col">
-                <h3 className="mobile-roadmap-details-title">{details.title}</h3>
-                <span className="mobile-roadmap-details-age-badge">{details.ageLabel}</span>
-              </div>
-            </div>
-            
-            <div className="mobile-roadmap-details-content">
-              {details.benefitLabel && (
-                <div className="mobile-roadmap-details-section-item">
-                  <span className="mobile-roadmap-details-lbl">{details.benefitLabel}</span>
-                  <span className="mobile-roadmap-details-val highlight-purple">{details.benefitValue}</span>
-                </div>
-              )}
 
-              {details.whyItMatters && (
-                <div className="mobile-roadmap-details-section-item">
-                  <span className="mobile-roadmap-details-lbl">Why it matters</span>
-                  <p className="mobile-roadmap-details-desc">{details.whyItMatters}</p>
-                </div>
-              )}
-
-              {details.description && details.description !== details.whyItMatters && (!details.whyItMatters || !details.whyItMatters.includes(details.description)) && (
-                <div className="mobile-roadmap-details-section-item">
-                  <span className="mobile-roadmap-details-lbl">Details</span>
-                  <p className="mobile-roadmap-details-desc">{details.description}</p>
-                </div>
-              )}
-            </div>
-
-            {isEditableEvent(selectedEvent) && (
-              <button
-                type="button"
-                className="mobile-roadmap-edit-btn"
-                onClick={() => handleEditRoadmapEvent(selectedEvent)}
-              >
-                ⚙️ Edit Event
-              </button>
-            )}
-          </div>
-        );
-      })()}
     </section>
   );
 }
