@@ -219,6 +219,7 @@ export default function DesktopFireSimulatorView({
           tempSocialSecurityDetails={tempSocialSecurityDetails}
           activeResults={activeResults}
           baselineResults={baselineResults}
+          setShowImprovementModal={setShowImprovementModal}
         />
       )}
       <ChildImpactModal
@@ -338,6 +339,7 @@ export default function DesktopFireSimulatorView({
                   return (
                     <div 
                       key={scenario.type} 
+                      id={`rec-card-${scenario.type}`}
                       className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
                     >
                       <div className="improvement-plan-card-main-content">

@@ -19,6 +19,7 @@ export default function HouseRebalanceModal({
   const [outcomeDetails, setOutcomeDetails] = useState(null);
 
   const currentHomePriceValue = houseRebalanceSummary.currentHomePrice || 0;
+  const currentShortfall = Math.max(0, (houseRebalanceSummary.totalCashNeeded || 0) - (liquidFundsAvailable || 0));
 
   const selectedOption = houseRebalanceSummary.selectedOption || 'balanced';
   const selectedAffordablePrice = houseRebalanceSummary.selectedAffordablePrice !== undefined
@@ -180,7 +181,11 @@ export default function HouseRebalanceModal({
         </div>
         
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0', lineHeight: '1.4', padding: '0 0.5rem' }}>
-          Your retirement plan can support homeownership, but your down payment is currently the limiting factor.
+          {houseRebalanceSummary.constraint === 'cash' 
+            ? 'Your retirement plan can support a higher home price, but your available liquid assets at the purchase age are the limiting factor.'
+            : houseRebalanceSummary.constraint === 'both'
+            ? 'This purchase is limited by both upfront cash and monthly affordability.'
+            : 'Your upfront cash is sufficient, but the monthly ownership costs would delay retirement.'}
         </p>
 
         {/* Real-World Affordability Comparisons */}
@@ -196,6 +201,13 @@ export default function HouseRebalanceModal({
             <span style={{ color: 'var(--text-secondary)' }}>Recommended:</span>
             <strong style={{ color: 'var(--text-primary)' }}>
               {selectedAffordablePrice !== null ? formatCurrency(selectedAffordablePrice) : 'N/A'}
+            </strong>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Constraint:</span>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {houseRebalanceSummary.constraint === 'cash' ? 'Upfront Cash' : houseRebalanceSummary.constraint === 'both' ? 'Both' : 'Monthly Budget'}
             </strong>
           </div>
 
@@ -216,11 +228,23 @@ export default function HouseRebalanceModal({
           <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.1rem 0' }} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Down Payment Needed:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Total Cash Required:</span>
             <strong style={{ color: 'var(--text-primary)' }}>
               {formatCurrency(downPaymentNeeded)}
             </strong>
           </div>
+          {downPaymentNeeded - actualDownPayment > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', paddingLeft: '0.5rem', marginTop: '0.15rem', gap: '0.15rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                <span>• Down Payment:</span>
+                <span>{formatCurrency(actualDownPayment)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                <span>• Closing Costs & Upfront:</span>
+                <span>{formatCurrency(downPaymentNeeded - actualDownPayment)}</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Current Liquid Funds:</span>
@@ -228,7 +252,6 @@ export default function HouseRebalanceModal({
               {formatCurrency(liquidFundsAvailable)}
             </strong>
           </div>
-
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Additional Needed:</span>
             <strong style={{ color: additionalNeeded > 0 ? 'var(--accent-orange, #f97316)' : 'var(--text-primary)' }}>

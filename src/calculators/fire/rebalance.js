@@ -1,6 +1,13 @@
 import { runFireSimulation, getNormalizedPhases } from '../../fireCalculations';
 import { getActiveDebtsForAge } from './debts';
 import { calculateUSTaxForModal } from '../../simulatorMathUtils';
+import {
+  calculateCashAffordableHomePrice,
+  calculateLiquidAssetsAtPurchaseAge,
+  calculateTotalCashRequired,
+  isCashAffordable
+} from '../../components/fire-simulator/houseAffordabilityUtils';
+
 
 export function resolveBuyHouseEvent(buyHouseEv, inputs) {
   if (!buyHouseEv) return null;
@@ -281,18 +288,11 @@ function getRequiredDownPaymentAndCosts(price, buyHouseEv) {
   }
   dp = Math.min(dp, p);
   
-  const isCash = dp >= p || buyHouseEv.purchaseType === 'cash';
-  const closingCostsRate = buyHouseEv.closingCosts !== undefined ? Number(buyHouseEv.closingCosts) : 3;
-  const closingCosts = p * (closingCostsRate / 100);
-  const points = buyHouseEv.points !== undefined ? Number(buyHouseEv.points) : 0;
-  const renovationCost = buyHouseEv.renovationCost !== undefined ? Number(buyHouseEv.renovationCost) : 0;
-  let totalCashNeeded = closingCosts + points + renovationCost;
-  if (isCash) {
-    totalCashNeeded += p;
-  } else {
-    totalCashNeeded += dp;
-  }
-  return totalCashNeeded;
+  return calculateTotalCashRequired({
+    ...buyHouseEv,
+    homePrice: p,
+    downPayment: dp
+  });
 }
 
 function getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, inputs) {
@@ -803,7 +803,63 @@ function solveBisectionHomeValue(level, inputs, buyHouseEv, baselineReadyAge, ba
     }
   }
   
-  const bestPrice = Math.max(minHomePriceFloor, low_V);
+  const retirementSustainablePrice = Math.max(minHomePriceFloor, low_V);
+  
+  // Calculate cash affordable price
+  const closingCostsRate = buyHouseEv.closingCosts !== undefined ? Number(buyHouseEv.closingCosts) : 3;
+  const closingCostPercent = closingCostsRate / 100;
+  const points = Number(buyHouseEv.points) || 0;
+  const renovationCosts = Number(buyHouseEv.renovationCost) || Number(buyHouseEv.renovationCosts) || 0;
+  const movingCosts = Number(buyHouseEv.movingCost) || Number(buyHouseEv.movingCosts) || 0;
+  const fixedUpfrontCosts = points + renovationCosts + movingCosts;
+
+  const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchase_age, baselineResults);
+
+  const cashAffordablePrice = calculateCashAffordableHomePrice({
+    liquidAssets,
+    downPaymentPercent: down_payment_percent,
+    closingCostPercent,
+    fixedUpfrontCosts
+  });
+
+  let bestPrice = Math.max(0, Math.min(retirementSustainablePrice, cashAffordablePrice));
+
+  // Rounding safety check / validation loop
+  const getDownPaymentForTempPrice = (pr) => {
+    if (buyHouseEv.purchaseType === 'cash') {
+      return pr;
+    }
+    const oPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
+    let dp = buyHouseEv.downPayment || 0;
+    if (oPrice > 0) {
+      const ratio = (buyHouseEv.downPayment || 0) / oPrice;
+      dp = pr * ratio;
+    }
+    return Math.min(dp, pr);
+  };
+
+  let validationPrice = bestPrice;
+  let tempEvent = {
+    ...buyHouseEv,
+    homePrice: validationPrice,
+    downPayment: getDownPaymentForTempPrice(validationPrice)
+  };
+  while (validationPrice > 0 && !isCashAffordable(tempEvent, liquidAssets)) {
+    validationPrice -= 100;
+    if (validationPrice < 0) validationPrice = 0;
+    tempEvent = {
+      ...buyHouseEv,
+      homePrice: validationPrice,
+      downPayment: getDownPaymentForTempPrice(validationPrice)
+    };
+  }
+  bestPrice = validationPrice;
+
+  // Constraint detection
+  const cashLimited = bestPrice >= cashAffordablePrice - 1;
+  const monthlyLimited = bestPrice >= retirementSustainablePrice - 1;
+  const limitingFactor = (cashLimited && monthlyLimited) ? 'both' : cashLimited ? 'cash' : 'monthly';
+
   const annual_maint_tax_ins = bestPrice * annual_overhead_rate;
   const monthly_overhead = annual_maint_tax_ins / 12 + hoa + utilitiesIncrease;
   const M = total_housing_pool - monthly_overhead;
@@ -830,9 +886,9 @@ function solveBisectionHomeValue(level, inputs, buyHouseEv, baselineReadyAge, ba
   }
   const final_post_purchase_savings = Math.max(0, current_savings - final_savings_reduction);
 
-  
   return {
     bestPrice,
+    limitingFactor,
     bestVal: {
       isValid: bestPrice > minHomePriceFloor,
       monthlySurplus: Math.max(0, Math.round(M - required_PI)),
@@ -1001,6 +1057,15 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     selectedRetirementDelay = 0;
   }
 
+  let constraint = 'monthly';
+  if (selectedOption === 'balanced') {
+    constraint = sweepBal.limitingFactor || 'monthly';
+  } else if (selectedOption === 'conservative') {
+    constraint = sweepCons.limitingFactor || 'monthly';
+  } else if (selectedOption === 'aggressive') {
+    constraint = sweepStretch.limitingFactor || 'monthly';
+  }
+
   // Calculate remaining Balanced deficit
   const remainingBalancedDeficit = Math.max(0, newHousingCost - balancedMaxPayment);
 
@@ -1096,7 +1161,8 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
     newSavingsAggressive: adjStretch.newSavings,
     piConservative,
     piBalanced,
-    piAggressive
+    piAggressive,
+    constraint
   };
 }
 

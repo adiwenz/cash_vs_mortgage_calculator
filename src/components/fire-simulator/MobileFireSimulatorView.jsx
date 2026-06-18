@@ -1808,6 +1808,7 @@ export default function MobileFireSimulatorView({
           houseRebalanceSummary={houseRebalanceSummary}
           setHouseRebalanceSummary={setHouseRebalanceSummary}
           handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+          setShowImprovementModal={setShowImprovementModal}
         />
       )}
       <ChildImpactModal
@@ -1892,6 +1893,7 @@ export default function MobileFireSimulatorView({
                 return (
                   <div 
                     key={scenario.type} 
+                    id={`rec-card-${scenario.type}`}
                     className={`improvement-plan-card ${isBalanced ? 'improvement-plan-card-balanced' : ''} ${isBalanced ? 'improvement-plan-grid-balanced' : ''}`}
                   >
                     <div className="improvement-plan-card-main-content">

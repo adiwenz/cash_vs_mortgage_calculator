@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { formatCurrency } from './helpers';
 import MarriageWizard from './MarriageWizard';
-import { getAvailableLiquidAssetsAtPurchaseAge, calculateAffordableHomePrice } from './houseAffordabilityUtils';
+import { 
+  calculateTotalCashRequired, 
+  calculateLiquidAssetsAtPurchaseAge, 
+  calculateCashShortfall 
+} from './houseAffordabilityUtils';
 
 export default function EventModalForm({
   inputs,
@@ -19,7 +23,8 @@ export default function EventModalForm({
   setIsBudgetOpenFromMarriageWizard,
   tempSocialSecurityDetails,
   activeResults,
-  baselineResults
+  baselineResults,
+  setShowImprovementModal
 }) {
   const [showHouseAdvanced, setShowHouseAdvanced] = useState(false);
 
@@ -194,9 +199,8 @@ export default function EventModalForm({
               {(() => {
                 const simulationResults = activeResults || baselineResults;
                 const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
-                const liquidAssets = getAvailableLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
-                const downPaymentPercent = editingEvent.homePrice > 0 ? (editingEvent.downPayment / editingEvent.homePrice) * 100 : 20;
-                const downPaymentAmount = (editingEvent.homePrice || 0) * (downPaymentPercent / 100);
+                const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                const totalCashRequired = calculateTotalCashRequired(editingEvent);
 
                 let projectionsAvailable = false;
                 if (simulationResults && (simulationResults.nominalData || simulationResults.data)) {
@@ -207,11 +211,8 @@ export default function EventModalForm({
                   }
                 }
 
-                if (downPaymentAmount > liquidAssets) {
-                  const affordablePrice = calculateAffordableHomePrice({
-                    liquidAssets,
-                    downPaymentPercent
-                  });
+                if (totalCashRequired > liquidAssets) {
+                  const shortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
                   return (
                     <div style={{
                       gridColumn: 'span 2',
@@ -221,7 +222,7 @@ export default function EventModalForm({
                       borderRadius: '6px',
                       borderLeft: '4px solid #f59e0b',
                       fontSize: '0.85rem',
-                      lineHeight: '1.4',
+                      lineHeight: '1.45',
                       marginTop: '0.5rem',
                       marginBottom: '0.5rem',
                       display: 'flex',
@@ -229,46 +230,69 @@ export default function EventModalForm({
                       gap: '0.4rem'
                     }}>
                       <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <span>⚠️</span> Down Payment Exceeds Available Liquid Assets
+                        <span>⚠️</span> Not Enough Liquid Assets
                       </div>
                       <div>
-                        Your down payment of <strong>{formatCurrency(downPaymentAmount)}</strong> exceeds your projected liquid assets at age <strong>{purchaseAge}</strong> of <strong>{formatCurrency(liquidAssets)}</strong>.
+                        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0' }}>
+                          <span>Total cash required:</span>
+                          <strong>{formatCurrency(totalCashRequired)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0' }}>
+                          <span>Projected liquid assets at age {purchaseAge}:</span>
+                          <strong>{formatCurrency(liquidAssets)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0', borderTop: '1px dashed rgba(245, 158, 11, 0.2)', paddingTop: '0.25rem' }}>
+                          <span>Additional cash needed:</span>
+                          <strong>{formatCurrency(shortfall)}</strong>
+                        </div>
                       </div>
                       {!projectionsAvailable && (
                         <div style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.85 }}>
                           Using current liquid assets.
                         </div>
                       )}
-                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '0.2rem' }}>
                         Liquid assets include cash and taxable brokerage accounts. Retirement accounts are excluded to avoid taxes and withdrawal penalties.
                       </div>
-                      {downPaymentPercent > 0 && liquidAssets > 0 && (
+                      {setShowImprovementModal && (
                         <button
                           type="button"
                           onClick={() => {
-                            setEditingEvent({
-                              ...editingEvent,
-                              homePrice: affordablePrice,
-                              downPayment: liquidAssets
-                            });
+                            setShowImprovementModal(true);
+                            setTimeout(() => {
+                              const housingTypes = [
+                                'reduceHomePrice', 'increaseDownPayment', 'delayHomePurchase', 'increaseHomeIncome',
+                                'redirectSavingsDownPayment', 'pauseNonRetirementSavings', 'redirectBrokerageHouseFund',
+                                'increaseDownPaymentIncome', 'delayHomePurchaseDownPayment', 'purchaseWithPartner',
+                                'purchaseWithRoommate'
+                              ];
+                              for (const type of housingTypes) {
+                                const el = document.getElementById(`rec-card-${type}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  el.style.outline = '2px solid var(--primary)';
+                                  setTimeout(() => {
+                                    el.style.outline = 'none';
+                                  }, 2000);
+                                  break;
+                                }
+                              }
+                            }, 150);
                           }}
                           style={{
                             alignSelf: 'flex-start',
-                            marginTop: '0.35rem',
-                            background: '#f59e0b',
-                            color: '#1e1b4b',
+                            background: 'none',
                             border: 'none',
-                            padding: '0.4rem 0.85rem',
-                            borderRadius: '4px',
+                            color: 'var(--primary, #6366f1)',
                             fontWeight: '600',
                             cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            transition: 'opacity 0.2s'
+                            padding: 0,
+                            fontSize: '0.85rem',
+                            textDecoration: 'underline',
+                            marginTop: '0.35rem'
                           }}
-                          onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-                          onMouseLeave={(e) => e.target.style.opacity = '1'}
                         >
-                          Update House Price to {formatCurrency(affordablePrice)}
+                          View Affordability Recommendations
                         </button>
                       )}
                     </div>

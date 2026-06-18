@@ -6,17 +6,17 @@ import {
   Plus, 
   Minus, 
   Check, 
-  Calendar, 
-  DollarSign, 
   Info,
-  Clock, 
-  TrendingUp, 
   Trash2, 
   Copy, 
   Edit
 } from 'lucide-react';
 import { formatCurrency } from './helpers';
-import { getAvailableLiquidAssetsAtPurchaseAge, calculateAffordableHomePrice } from './houseAffordabilityUtils';
+import { 
+  calculateTotalCashRequired, 
+  calculateLiquidAssetsAtPurchaseAge, 
+  calculateCashShortfall 
+} from './houseAffordabilityUtils';
 import { runFireSimulation } from '../../fireCalculations';
 import { getChildCostOffsetRecommendations } from '../../recommendations';
 
@@ -35,7 +35,8 @@ export default function MobileEventWizard({
   setHouseImpactSummary,
   houseRebalanceSummary,
   setHouseRebalanceSummary,
-  handleApplyRebalanceStrategy
+  handleApplyRebalanceStrategy,
+  setShowImprovementModal
 }) {
   const isNew = !editingEvent || !!editingEvent.isNew || editingEvent.type === 'selectType';
 
@@ -45,8 +46,6 @@ export default function MobileEventWizard({
     return 8; // Event Details / Manage page
   });
 
-  const [selectedStrategyId, setSelectedStrategyId] = useState('maintainRetirementAge');
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showComparisons, setShowComparisons] = useState(false);
   const [outcomeDetails, setOutcomeDetails] = useState(null);
 
@@ -63,6 +62,7 @@ export default function MobileEventWizard({
   // Sync draftEvent if editingEvent changes
   useEffect(() => {
     if (editingEvent) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraftEvent({ ...editingEvent });
       const startAge = getStartAge(editingEvent);
       const endAge = getEndAge(editingEvent);
@@ -1124,9 +1124,8 @@ export default function MobileEventWizard({
 
                     {(() => {
                       const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
-                      const liquidAssets = getAvailableLiquidAssetsAtPurchaseAge(inputs, purchaseAge, baselineResults);
-                      const downPaymentPercent = draftEvent.homePrice > 0 ? (draftEvent.downPayment / draftEvent.homePrice) * 100 : 20;
-                      const downPaymentAmount = (draftEvent.homePrice || 0) * (downPaymentPercent / 100);
+                      const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, baselineResults);
+                      const totalCashRequired = calculateTotalCashRequired(draftEvent);
 
                       let projectionsAvailable = false;
                       if (baselineResults && (baselineResults.nominalData || baselineResults.data)) {
@@ -1137,11 +1136,8 @@ export default function MobileEventWizard({
                         }
                       }
 
-                      if (downPaymentAmount > liquidAssets) {
-                        const affordablePrice = calculateAffordableHomePrice({
-                          liquidAssets,
-                          downPaymentPercent
-                        });
+                      if (totalCashRequired > liquidAssets) {
+                        const shortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
                         return (
                           <div style={{
                             background: 'rgba(245, 158, 11, 0.08)',
@@ -1150,7 +1146,7 @@ export default function MobileEventWizard({
                             borderRadius: '6px',
                             borderLeft: '4px solid #f59e0b',
                             fontSize: '0.85rem',
-                            lineHeight: '1.4',
+                            lineHeight: '1.45',
                             marginTop: '0.25rem',
                             marginBottom: '0.75rem',
                             display: 'flex',
@@ -1158,44 +1154,71 @@ export default function MobileEventWizard({
                             gap: '0.4rem'
                           }}>
                             <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <span>⚠️</span> Down Payment Exceeds Available Liquid Assets
+                              <span>⚠️</span> Not Enough Liquid Assets
                             </div>
                             <div>
-                              Your down payment of <strong>{formatCurrency(downPaymentAmount)}</strong> exceeds your projected liquid assets at age <strong>{purchaseAge}</strong> of <strong>{formatCurrency(liquidAssets)}</strong>.
+                              <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0' }}>
+                                <span>Total cash required:</span>
+                                <strong>{formatCurrency(totalCashRequired)}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0' }}>
+                                <span>Projected liquid assets at age {purchaseAge}:</span>
+                                <strong>{formatCurrency(liquidAssets)}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.15rem 0', borderTop: '1px dashed rgba(245, 158, 11, 0.2)', paddingTop: '0.25rem' }}>
+                                <span>Additional cash needed:</span>
+                                <strong>{formatCurrency(shortfall)}</strong>
+                              </div>
                             </div>
                             {!projectionsAvailable && (
                               <div style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.85 }}>
                                 Using current liquid assets.
                               </div>
                             )}
-                            <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '0.2rem' }}>
                               Liquid assets include cash and taxable brokerage accounts. Retirement accounts are excluded to avoid taxes and withdrawal penalties.
                             </div>
-                            {downPaymentPercent > 0 && liquidAssets > 0 && (
+                            {setShowImprovementModal && (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setDraftEvent(prev => ({
-                                    ...prev,
-                                    homePrice: affordablePrice,
-                                    downPayment: liquidAssets
-                                  }));
+                                  setShowImprovementModal(true);
+                                  onClose();
+                                  setTimeout(() => {
+                                    const housingTypes = [
+                                      'reduceHomePrice', 'increaseDownPayment', 'delayHomePurchase', 'increaseHomeIncome',
+                                      'redirectSavingsDownPayment', 'pauseNonRetirementSavings', 'redirectBrokerageHouseFund',
+                                      'increaseDownPaymentIncome', 'delayHomePurchaseDownPayment', 'purchaseWithPartner',
+                                      'purchaseWithRoommate'
+                                    ];
+                                    for (const type of housingTypes) {
+                                      const el = document.getElementById(`rec-card-${type}`);
+                                      if (el) {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        el.style.outline = '2px solid var(--primary)';
+                                        setTimeout(() => {
+                                          el.style.outline = 'none';
+                                        }, 2000);
+                                        break;
+                                      }
+                                    }
+                                  }, 150);
                                 }}
                                 style={{
                                   alignSelf: 'stretch',
                                   marginTop: '0.35rem',
-                                  background: '#f59e0b',
-                                  color: '#1e1b4b',
+                                  background: 'none',
                                   border: 'none',
-                                  padding: '0.5rem',
-                                  borderRadius: '6px',
+                                  color: 'var(--primary, #6366f1)',
                                   fontWeight: '600',
                                   cursor: 'pointer',
-                                  fontSize: '0.8rem',
+                                  padding: '0.5rem 0',
+                                  fontSize: '0.85rem',
+                                  textDecoration: 'underline',
                                   textAlign: 'center'
                                 }}
                               >
-                                Update House Price to {formatCurrency(affordablePrice)}
+                                View Affordability Recommendations
                               </button>
                             )}
                           </div>
@@ -1752,6 +1775,7 @@ export default function MobileEventWizard({
                 } = houseRebalanceSummary;
 
                 const currentHomePriceValue = houseRebalanceSummary.currentHomePrice || 0;
+                const currentShortfall = Math.max(0, (houseRebalanceSummary.totalCashNeeded || 0) - (liquidFundsAvailable || 0));
 
                 const selectedOption = houseRebalanceSummary.selectedOption || 'balanced';
                 const selectedAffordablePrice = houseRebalanceSummary.selectedAffordablePrice !== undefined
@@ -1906,6 +1930,14 @@ export default function MobileEventWizard({
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>
                         🏠 Home Purchase Recommendation
                       </h3>
+
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem 0', lineHeight: '1.4', padding: '0 0.5rem' }}>
+                        {houseRebalanceSummary.constraint === 'cash' 
+                          ? 'Your retirement plan can support a higher home price, but your available liquid assets at the purchase age are the limiting factor.'
+                          : houseRebalanceSummary.constraint === 'both'
+                          ? 'This purchase is limited by both upfront cash and monthly affordability.'
+                          : 'Your upfront cash is sufficient, but the monthly ownership costs would delay retirement.'}
+                      </p>
                       
                       {/* Primary Focus Card */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', textAlign: 'left', margin: '0.75rem 0', fontSize: '0.8rem' }}>
@@ -1917,6 +1949,13 @@ export default function MobileEventWizard({
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Recommended:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>{selectedAffordablePrice !== null ? formatCurrency(selectedAffordablePrice) : 'N/A'}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Constraint:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {houseRebalanceSummary.constraint === 'cash' ? 'Upfront Cash' : houseRebalanceSummary.constraint === 'both' ? 'Both' : 'Monthly Budget'}
+                          </strong>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1932,15 +1971,26 @@ export default function MobileEventWizard({
                         <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.1rem 0' }} />
 
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>Down Payment Needed:</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>Total Cash Required:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(downPaymentNeeded)}</strong>
                         </div>
+                        {downPaymentNeeded - actualDownPayment > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', paddingLeft: '0.5rem', marginTop: '0.15rem', gap: '0.15rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                              <span>• Down Payment:</span>
+                              <span>{formatCurrency(actualDownPayment)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                              <span>• Closing Costs & Upfront:</span>
+                              <span>{formatCurrency(downPaymentNeeded - actualDownPayment)}</span>
+                            </div>
+                          </div>
+                        )}
 
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Current Liquid Funds:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(liquidFundsAvailable)}</strong>
                         </div>
-
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Additional Needed:</span>
                           <strong style={{ color: additionalNeeded > 0 ? 'var(--accent-orange, #f97316)' : 'var(--text-primary)' }}>{formatCurrency(additionalNeeded)}</strong>

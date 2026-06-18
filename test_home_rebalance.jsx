@@ -664,7 +664,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     const { improvementPlan } = result.current;
 
     expect(improvementPlan).not.toBeNull();
-    expect(improvementPlan.isAffordable).toBe(true);
+    expect(improvementPlan.isAffordable).toBe(false);
     
     // Find redirect savings recommendation
     const redirectSavingsRec = improvementPlan.rankedPlan.find(r => r.type === 'redirectSavingsDownPayment');
@@ -782,16 +782,15 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
 
     const rebalanceData = getRebalanceStrategies(inputs, buyHouseEv, 60);
 
-    // 1. Candidate pricing decoupled from retirement/assets
-    // Stretch should be max affordable payment. Balanced is 85% of Stretch, Comfortable is 70% of Stretch.
-    // Down payment capacity (which is low) should NOT cap the candidate pricing.
-    expect(rebalanceData.affordablePriceBalanced).toBeGreaterThan(350000);
-    expect(rebalanceData.affordablePriceConservative).toBeGreaterThan(200000);
+    // 1. Recommended price is capped by cash affordability constraint
+    expect(rebalanceData.affordablePriceBalanced).toBeLessThan(350000);
+    expect(rebalanceData.affordablePriceConservative).toBeLessThanOrEqual(260000);
     expect(rebalanceData.affordablePriceAggressive).toBeGreaterThanOrEqual(rebalanceData.affordablePriceBalanced);
+    expect(rebalanceData.constraint).toBe('cash');
 
-    // 2. Down payment gap does not invalidate Balanced recommendation
+    // 2. Down payment gap makes Balanced recommendation monthlyAffordable false for original price
     const affordabilityResult = isHouseAffordableBalanced(inputs, buyHouseEv, 60);
-    expect(affordabilityResult.monthlyAffordable).toBe(true);
+    expect(affordabilityResult.monthlyAffordable).toBe(false);
     expect(affordabilityResult.retirementValid).toBe(true);
     expect(affordabilityResult.downPaymentGap).toBeGreaterThan(40000);
 
