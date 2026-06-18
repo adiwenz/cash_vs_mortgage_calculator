@@ -52,8 +52,9 @@ For every major feature:
 2. **Implement Feature**: Perform all coding and modification within the worktree.
 3. **Commit Changes**: Stage and commit your modifications inside the worktree repository.
 4. **Run Verification**:
+   During active development, run verification only targeting the changed files to stay fast and iterative:
    ```bash
    npm run test:changed
    npm run test:e2e:changed
    ```
-5. **Open PR / Merge**: Open a Pull Request or merge the branch back into `main` after verification passes.
+5. **Commit & Merge**: When implementation is complete, run the `git-commit-and-merge` skill. The script will automatically run the full test suite (`npm run test:unit` and optionally `npm run test:e2e`) to ensure no regressions are merged into `main`.

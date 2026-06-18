@@ -49,6 +49,27 @@ if (
   process.exit(1);
 }
 
+// 2.5. Run full test suite before committing/merging
+console.log('\n🧪 RUNNING THE FULL TEST SUITE');
+console.log('--------------------------------------------------');
+console.log('Running unit and component tests...');
+runCmd('npm run test:unit', { cwd: currentWorktreePath, stdio: 'inherit' });
+
+// Check if E2E tests exist before running
+const testsDir = path.join(currentWorktreePath, 'tests');
+const hasE2eTests = fs.existsSync(testsDir) && 
+                    fs.readdirSync(testsDir).some(f => f.endsWith('.spec.js') || f.endsWith('.spec.ts'));
+
+if (hasE2eTests) {
+  console.log('\nRunning E2E tests...');
+  runCmd('npm run test:e2e', { cwd: currentWorktreePath, stdio: 'inherit' });
+} else {
+  console.log('\nℹ️ No E2E tests found (tests/*.spec.js). Skipping E2E test execution.');
+}
+console.log('--------------------------------------------------');
+console.log('✅ ALL TESTS PASSED SUCCESSFULLY!');
+console.log('==================================================');
+
 // 3. Commit changes in the active feature worktree
 console.log(`🔍 Checking for uncommitted changes in '${currentBranch}'...`);
 const statusOutput = runCmd('git status --porcelain');

@@ -28,4 +28,4 @@ This skill ensures that whenever you implement a new feature, add a new calculat
      ```
    - If git changes are not staged/committed, run a targeted run using `npx vitest run test_<feature_name>.js` or `npx vitest related <changed files>`.
    - For Playwright E2E tests, only run changed tests relative to the main branch when code is changed: `npm run test:e2e:changed`. Do NOT run the whole Playwright test suite (`npm run test:e2e`) during development.
-   - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e`) unless verifying final changes before branch merge or explicitly requested by the user.
+   - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e`) manually during development, as the `git-commit-and-merge` skill will automatically run them before merging to `main`.

@@ -23,5 +23,5 @@ This skill outlines how to run the full test suite in the repository to thorough
 
 3. **When to Execute**:
    - When preparing a final release or build verification.
-   - Immediately before running the `git-commit-and-merge` skill to merge the branch.
    - When explicitly requested by the user.
+   - *Note: The `git-commit-and-merge` skill automatically runs the full test suite before committing/merging, so manual execution of this skill is not required immediately before merging.*

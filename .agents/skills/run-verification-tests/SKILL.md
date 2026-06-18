@@ -30,8 +30,8 @@ This skill ensures that whenever you modify, create, or delete any source code, 
    - Do NOT run the whole Playwright test suite (`npm run test:e2e`) when code is changed during development.
 
 4. **Broader/Full-Suite Validation**:
-   - Only run the full E2E suite (`npm run test:e2e`) or full unit test suite (`npm run test:unit`) when:
+   - The full test suite (`npm run test:unit` and optionally `npm run test:e2e`) is automatically executed by the `git-commit-and-merge` skill during checkout cleanup.
+   - Avoid running the full suite manually during development iterations unless:
      - Explicitly requested by the user.
      - Preparing a final release/build verification.
-     - The branch is about to be merged into `main`.
      - The changed-test command indicates broader validation is required.
