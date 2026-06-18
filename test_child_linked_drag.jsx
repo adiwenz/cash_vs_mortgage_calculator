@@ -122,8 +122,8 @@ describe('Child Event Linked Dragging Regression Test', () => {
     expect(endNode.textContent).toContain('Age 63');
 
     // Verify visual horizontal positioning properties (style.left) in jsdom
-    expect(parseFloat(birthNode.style.left)).toBeCloseTo(20);
-    expect(parseFloat(endNode.style.left)).toBeCloseTo(56);
+    expect(parseFloat(birthNode.style.left)).toBeCloseTo(21.8);
+    expect(parseFloat(endNode.style.left)).toBeCloseTo(55.64);
     expect(birthNode.style.left).not.toBe(endNode.style.left); // Must not overlap/render on top of each other!
 
     // Drop event

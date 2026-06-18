@@ -308,45 +308,6 @@
   align-self: stretch;
 }
 
-/* Layer 1: Life Phase Spans */
-.life-phase-track {
-  height: 36px;
-}
-
-.life-phase-span {
-  position: absolute;
-  height: 30px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0 12px;
-  box-sizing: border-box;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: all 0.2s ease;
-}
-
-.life-phase-span.work-save {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px dashed rgba(99, 102, 241, 0.35);
-  color: var(--primary);
-}
-
-.life-phase-span.retirement {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px dashed rgba(16, 185, 129, 0.35);
-  color: var(--accent-emerald);
-}
-
-.life-phase-span:hover {
-  filter: brightness(1.05);
-  box-shadow: var(--shadow-sm);
-}
 
 
 /* Layer 2: Assets & Commitments (Decision Phases) */
@@ -455,6 +416,16 @@
 .milestone-circle-wrapper.milestone-event .milestone-glow-circle {
   border-color: var(--accent-emerald);
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
+}
+
+.milestone-circle-wrapper.financial-milestone .milestone-glow-circle {
+  border-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
+}
+
+.milestone-circle-wrapper.neutral-milestone .milestone-glow-circle {
+  border-color: var(--text-muted, #94a3b8);
+  box-shadow: none;
 }
 
 .milestone-age-label {
@@ -2404,6 +2375,16 @@
   box-shadow: 0 0 15px rgba(16, 185, 129, 0.6), 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-emerald) !important;
 }
 
+.milestone-circle-wrapper.selected.financial-milestone .milestone-glow-circle {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.6), 0 0 0 2px var(--bg-secondary), 0 0 0 4px #f59e0b !important;
+}
+
+.milestone-circle-wrapper.selected.neutral-milestone .milestone-glow-circle {
+  border-color: var(--text-muted, #94a3b8) !important;
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.4), 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--text-muted, #94a3b8) !important;
+}
+
 .financial-milestone-wrapper.selected {
   transform: translateX(-50%) scale(1.1) !important;
   z-index: 50 !important;
@@ -3058,10 +3039,6 @@
   }
 }
 
-/* Budget timeline lane segment inside the roadmap grid */
-.budget-phases-track {
-  height: 36px;
-}
 
 /* Color system variables for Budget Phases flat design */
 .theme-working-standard {
@@ -3107,90 +3084,18 @@
   --theme-glow: rgba(16, 185, 129, 0.4);
 }
 
-.budget-timeline-lane-segment {
-  height: 30px;
-  top: 3px;
-  border-radius: 12px; /* Rounded segments: 12-16px */
-  border: 1px solid var(--theme-border); /* Thin border */
-  background: var(--theme-bg); /* Subtle gradient background */
-  box-shadow: none; /* Flat design - no drop shadows */
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.budget-phases-heading {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+.mobile-budget-panel .budget-phases-heading {
+  font-size: 0.75rem;
+  margin: 0.5rem 0;
   padding: 0 0.5rem;
-  color: #ffffff;
-  cursor: pointer;
-  box-sizing: border-box;
-  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease, border-color 200ms ease;
-  user-select: none;
-  min-width: 0 !important; /* Disable min-width inheritance to prevent visual overlap on short phases */
-}
-
-.budget-timeline-lane-segment:hover,
-.budget-timeline-lane-segment:focus,
-.budget-timeline-lane-segment:focus-within {
-  filter: brightness(1.15); /* Slight brightness increase */
-  box-shadow: none; /* No drop shadows */
-  z-index: 1200 !important; /* Raise z-index on active segments to draw tooltips above event layer */
-}
-
-.budget-phases-timeline-row:hover,
-.budget-phases-timeline-row:focus-within {
-  z-index: 1100 !important; /* Raise row stacking context when active to overlay timeline siblings */
-}
-
-.budget-timeline-lane-segment.selected {
-  border: 1.5px solid var(--theme-border-selected) !important; /* Thin border */
-  box-shadow: 0 0 10px var(--theme-glow) !important; /* Thin glowing outline, subtle glow only */
-  z-index: 10;
-  filter: brightness(1.25); /* Slightly brighter gradient */
-}
-
-.budget-timeline-lane-segment.selected::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  bottom: auto; /* Override bottom from .budget-segment.selected::after */
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 0 5px 5px 5px; /* point up towards the segment */
-  border-style: solid;
-  border-color: transparent transparent var(--theme-border-selected) transparent;
-  display: block;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 15;
-  margin-top: 2px;
-}
-
-.budget-timeline-lane-segment.current-age-phase {
-  border: 1px dashed rgba(255, 255, 255, 0.4);
-}
-
-.budget-timeline-lane-segment.selected.current-age-phase {
-  border: 1.5px solid var(--theme-border-selected) !important;
-}
-
-/* Custom Tooltip Hover & Focus Rules */
-.budget-timeline-lane-segment:hover .timeline-tooltip,
-.budget-timeline-lane-segment:focus .timeline-tooltip,
-.budget-timeline-lane-segment:focus-within .timeline-tooltip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
-
-.budget-timeline-lane-segment:hover .timeline-tooltip.align-left,
-.budget-timeline-lane-segment:focus .timeline-tooltip.align-left,
-.budget-timeline-lane-segment:focus-within .timeline-tooltip.align-left {
-  transform: translateY(0);
-}
-
-.budget-timeline-lane-segment:hover .timeline-tooltip.align-right,
-.budget-timeline-lane-segment:focus .timeline-tooltip.align-right,
-.budget-timeline-lane-segment:focus-within .timeline-tooltip.align-right {
-  transform: translateY(0);
 }
 
 /* Modal Tabs container and buttons */

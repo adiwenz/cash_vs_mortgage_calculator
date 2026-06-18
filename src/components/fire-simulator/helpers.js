@@ -529,3 +529,23 @@ export const isFinancialEvent = (evt) => {
   }
   return false;
 };
+
+export const getEventIcon = (evt) => {
+  if (!evt) return '';
+  if (evt.type === 'today' || evt.type === 'lifeExpectancy') {
+    return ''; // neutral endpoint circle only
+  }
+  if (evt.type?.startsWith('retirementReady')) {
+    return '🎉';
+  }
+  if (evt.type === 'retire') {
+    return '🏖️';
+  }
+  if (evt.type === 'socialSecurity') {
+    return '💰';
+  }
+  if (evt.type === 'medicareEligibility') {
+    return '🏥';
+  }
+  return evt.icon || '';
+};

@@ -1,3 +1,5 @@
+import { runFireSimulation } from '../../fireCalculations';
+
 /**
  * Calculates the total upfront cash required to complete a home purchase.
  *
@@ -116,4 +118,67 @@ export function isCashAffordable(event, liquidAssets) {
   const totalCashRequired = calculateTotalCashRequired(event);
   return totalCashRequired <= liquidAssets;
 }
+
+/**
+ * Runs a local simulation with the house event applied and returns the resulting retirement ready age.
+ *
+ * @param {Object} inputs - Active scenario inputs
+ * @param {Object} event - Buy House event object
+ * @returns {number} Simulated retirement ready age
+ */
+export function getSimulatedRetirementAge(inputs, event) {
+  if (!inputs || !event) return null;
+  try {
+    const tempInputs = JSON.parse(JSON.stringify(inputs));
+    const houseId = event.houseId || `house-${Date.now()}`;
+    const p = Number(event.homePrice) || 0;
+    const dp = Number(event.downPayment) || 0;
+    const purchaseAge = Number(event.purchaseAge || event.age || 35);
+    
+    const houseAssetObj = {
+      id: houseId,
+      name: event.name || 'Primary Home',
+      purchasePrice: p,
+      downPayment: dp,
+      purchaseType: event.purchaseType || 'mortgage',
+      mortgageRate: event.mortgageRate !== undefined ? Number(event.mortgageRate) : 6.5,
+      loanTermYears: event.loanTerm !== undefined ? Number(event.loanTerm) : 30,
+      propertyTaxRate: event.propertyTax !== undefined ? Number(event.propertyTax) : 1.1,
+      insuranceCost: event.insurance !== undefined ? Number(event.insurance) : 0.35,
+      hoaCost: event.hoa !== undefined ? Number(event.hoa) : 0,
+      maintenanceRate: event.maintenance !== undefined ? Number(event.maintenance) : 1.0,
+      renovationCost: event.renovationCost !== undefined ? Number(event.renovationCost) : 0,
+      utilitiesIncrease: event.utilitiesIncrease !== undefined ? Number(event.utilitiesIncrease) : 0,
+      appreciationRate: event.appreciationRate !== undefined ? Number(event.appreciationRate) : 3.0,
+      sellingCostRate: event.sellingCost !== undefined ? Number(event.sellingCost) : 6,
+      keepRent: event.keepRent !== undefined ? !!event.keepRent : false
+    };
+    
+    if (!tempInputs.houseAssets) tempInputs.houseAssets = [];
+    tempInputs.houseAssets = tempInputs.houseAssets.filter(h => h.id !== houseId);
+    tempInputs.houseAssets.push(houseAssetObj);
+    
+    const buyEvId = event.id || `buy-${Date.now()}`;
+    const buyEvObj = {
+      id: buyEvId,
+      type: 'buyHouse',
+      enabled: true,
+      name: 'Buy House',
+      purchaseAge: purchaseAge,
+      age: purchaseAge,
+      houseId: houseId,
+      keepRent: event.keepRent !== undefined ? !!event.keepRent : false
+    };
+    
+    tempInputs.lifeEvents = (tempInputs.lifeEvents || []).filter(e => e.id !== buyEvId && e.houseId !== houseId);
+    tempInputs.lifeEvents.push(buyEvObj);
+    
+    const res = runFireSimulation(tempInputs);
+    return res?.retirementReadyAge || tempInputs.targetRetirementAge || 65;
+  } catch (e) {
+    console.error("Error in getSimulatedRetirementAge:", e);
+    return inputs.targetRetirementAge || 65;
+  }
+}
+
 

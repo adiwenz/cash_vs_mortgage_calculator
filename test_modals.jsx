@@ -80,7 +80,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(budgetBtn);
     
     // Assert Modal is Open and renders correct title
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Expand the Savings section by clicking the card
     const savingsCard = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
@@ -113,7 +113,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Assert modal is closed
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Budget/i, level: 3 })).toBeNull();
     });
   });
 
@@ -278,7 +278,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(updateBudgetBtn);
     
     // Verify Budget modal opens in married mode
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
     expect(screen.queryAllByText(/\$11,667/).length > 0 || screen.queryAllByText(/\$10,937/).length > 0 || screen.queryAllByText(/\$10,895/).length > 0 || screen.queryAllByText(/\$10,322/).length > 0 || screen.queryAllByText(/\$10,398/).length > 0).toBe(true); // Combined take-home income
     
     // Expand the Needs section to inspect Housing (Rent/Mortgage)
@@ -360,32 +360,30 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
     clickDoneOnWelcomeModal('Emma');
 
-    // Verify there are 5 phases on the Budget Timeline
-    console.log("HTML BODY:", document.body.innerHTML);
-    const segments = document.querySelectorAll('.budget-segment');
-    console.log('SEGMENTS FOUND:', Array.from(segments).map(s => s.textContent));
-    expect(segments.length).toBeGreaterThanOrEqual(5);
-    expect(segments[0].textContent).toContain('Working + Childcare');
-    expect(segments[0].textContent).toContain('35–40');
-    expect(segments[1].textContent).toContain('Working + Childcare');
-    expect(segments[1].textContent).toContain('40–53');
-    expect(segments[2].textContent).toContain('Working + Childcare');
-    expect(segments[2].textContent).toContain('53–58');
-    expect(segments[3].textContent).toContain('Working');
-    expect(segments[3].textContent).toContain('58–65');
+    // Open Budget Modal via Set Budget button
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
-    // Click on 1 Child phase (0) which opens the budget modal directly
-    fireEvent.click(segments[0]);
+    // Verify there are 5 phases as tabs inside the Budget Modal
+    const tabs = document.querySelectorAll('.budget-modal-tab');
+    expect(tabs.length).toBeGreaterThanOrEqual(5);
+    expect(tabs[0].textContent).toContain('Working + Childcare');
+    expect(tabs[0].textContent).toContain('35–40');
+    expect(tabs[1].textContent).toContain('Working + Childcare');
+    expect(tabs[1].textContent).toContain('40–53');
+    expect(tabs[2].textContent).toContain('Working + Childcare');
+    expect(tabs[2].textContent).toContain('53–58');
+    expect(tabs[3].textContent).toContain('Working');
+    expect(tabs[3].textContent).toContain('58–65');
 
-    // Verify budget builder is open
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    // Click on the first tab
+    fireEvent.click(tabs[0]);
+    expect(tabs[0].classList.contains('active')).toBe(true);
 
-    // Save/Close first modal
-    const saveBtn1 = document.querySelector('.budget-modal-card .btn-primary');
-    fireEvent.click(saveBtn1);
-
-    // Click on 2 Kids phase (1) which opens the budget modal directly
-    fireEvent.click(segments[1]);
+    // Click on the second tab
+    fireEvent.click(tabs[1]);
+    expect(tabs[1].classList.contains('active')).toBe(true);
 
     // Close modal
     const cancelBtnBudget = document.querySelector('.budget-modal-card .btn-secondary');
@@ -411,6 +409,10 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const liamTooltipText = screen.getAllByText(/Have Child: Liam/i)[0];
     const liamNode = liamTooltipText.closest('.financial-milestone-wrapper, .milestone-circle-wrapper, .timeline-node, .vertical-timeline-node');
     fireEvent.click(liamNode);
+
+    // Click the Edit Decision button in the detail card to open the modal
+    const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
+    fireEvent.click(editBtn);
     
     // Verify college cost text is visible
     expect(screen.getByText(/Adds an additional/i)).toBeDefined();
@@ -472,7 +474,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(setBudgetBtn);
 
     // Verify budget builder is open
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Expand the Savings section
     const savingsHeader = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
@@ -545,8 +547,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(birthNode).not.toBeNull();
 
-    // Click to edit
+    // Click to select
     fireEvent.click(birthNode);
+    // Click Edit Decision to open the edit modal
+    const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
+    fireEvent.click(editBtn);
 
     // Verify Delete Event button is present in the dialog
     let deleteBtn = screen.getByRole('button', { name: /Delete Event/i });
@@ -599,8 +604,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const marriageNode = marriageTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(marriageNode).not.toBeNull();
 
-    // Click to edit the marriage event (which opens it back at step 1)
+    // Click to select the marriage event
     fireEvent.click(marriageNode);
+    // Click Edit Decision to open the edit modal
+    const editBtnMarriage = screen.getByRole('button', { name: /Edit Decision/i });
+    fireEvent.click(editBtnMarriage);
 
     // Verify Marriage modal is open
     expect(screen.getByRole('heading', { name: /Get Married/i })).toBeDefined();
@@ -622,20 +630,17 @@ describe('FireSimulator Modals and Decision Wizards', () => {
   test('9. Budget Phases UI Refinement - Segmented Timeline and Modal Interaction', async () => {
     navigateToStep2WithTimeline();
 
-    // 1. Budget Phases row rendering inside the roadmap grid under Layer 3
+    // 1. Budget Phases row should not be rendered inside the roadmap grid
     const budgetRow = document.querySelector('.budget-phases-timeline-row');
-    expect(budgetRow).not.toBeNull();
+    expect(budgetRow).toBeNull();
 
-    const segments = budgetRow.querySelectorAll('.budget-segment');
-    expect(segments.length).toBeGreaterThan(0);
+    // 2. Life Phases row should not be rendered
+    expect(screen.queryByText('Life Phases')).toBeNull();
 
-    // 2. Default current-age phase segment should be highlighted
-    const activeSegment = budgetRow.querySelector('.budget-segment.current-age-phase');
-    expect(activeSegment).not.toBeNull();
-
-    // 3. Clicking a budget segment opens the Budget Modal
-    fireEvent.click(segments[0]);
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    // 3. Open Budget Modal via Set Budget button
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // 4. Modal switches active phase budgets when clicking tabs
     const modalTabs = document.querySelectorAll('.budget-modal-tab');
@@ -650,88 +655,47 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
     if (cancelBtn) fireEvent.click(cancelBtn);
 
-    // 5. Set Budget button opens current-age budget phase by default
-    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
-    fireEvent.click(setBudgetBtn);
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
-
-    // Close the modal again
-    const cancelBtn2 = document.querySelector('.budget-modal-card .btn-secondary');
-    if (cancelBtn2) fireEvent.click(cancelBtn2);
-
-    // 6. Event node clicks open event editors, not the budget modal
+    // 5. Event node clicks open event editors, not the budget modal
     const milestone = document.querySelector('.milestone-circle-wrapper');
     if (milestone) {
       fireEvent.click(milestone);
       // It should open an event editor modal or not open the budget modal
-      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Budget/i, level: 3 })).toBeNull();
     }
   });
 
   test('10. Budget Phases Responsive Rendering and Tooltips', () => {
     navigateToStep2WithTimeline();
 
-    const budgetRow = document.querySelector('.budget-phases-timeline-row');
-    expect(budgetRow).not.toBeNull();
+    // Verify roadmap does not render phase rows
+    expect(screen.queryByText('Life Phases')).toBeNull();
+    expect(screen.queryByText('📊 Budget Phases')).toBeNull();
+    expect(document.querySelector('.budget-phases-timeline-row')).toBeNull();
 
-    const segments = budgetRow.querySelectorAll('.budget-timeline-lane-segment');
-    expect(segments.length).toBeGreaterThan(0);
+    // Open Budget Modal via Set Budget button
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
-    segments.forEach((segment) => {
-      // 1. Accessibility properties check
-      expect(segment.getAttribute('tabIndex')).toBe('0');
-      expect(segment.getAttribute('aria-label')).toMatch(/Age \d+–\d+/);
+    // Verify Budget Phases heading with correct class is rendered in the modal
+    const phasesHeading = document.querySelector('.budget-phases-heading');
+    expect(phasesHeading).not.toBeNull();
+    expect(phasesHeading.textContent).toBe('Budget Phases');
 
-      // 2. Custom tooltip structure check
-      const tooltip = segment.querySelector('.timeline-tooltip');
-      expect(tooltip).not.toBeNull();
-      expect(tooltip.querySelector('div').textContent).toBeTruthy();
-      expect(tooltip.textContent).toContain('Monthly Income:');
-      expect(tooltip.textContent).toContain('Needs:');
-      expect(tooltip.textContent).toContain('Wants:');
-      expect(tooltip.textContent).toContain('Save & Invest:');
-
-      // 3. Width-based rendering validation
-      const widthStyle = segment.style.width;
-      const widthPct = parseFloat(widthStyle);
-      const trackWidth = 800; // Mocked default
-      const widthPx = (widthPct / 100) * trackWidth;
-
-      if (widthPx > 180) {
-        // Large segment: icon, full label, and age range should be displayed
-        const text = segment.textContent;
-        expect(text).toContain('Age');
-      } else if (widthPx >= 100) {
-        // Medium segment: icon, short phase name, no age range
-        const labelContainer = segment.querySelector('.segment-label');
-        if (labelContainer) {
-          expect(labelContainer.textContent).not.toContain('Age');
-        }
-      } else if (widthPx >= 50) {
-        // Small segment: icon only, hide label, hide age range
-        const labelContainer = segment.querySelector('.segment-label');
-        if (labelContainer) {
-          expect(labelContainer.textContent).not.toMatch(/[a-zA-Z0-9]/);
-        }
-      } else {
-        // Tiny segment: never render text inside the segment
-        const labelContainer = segment.querySelector('.segment-label');
-        expect(labelContainer).toBeNull();
-      }
-    });
+    // Close modal
+    const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');
+    if (cancelBtn) fireEvent.click(cancelBtn);
   });
 
   test('11. Budget Modal - Compact Info Interaction & Popover', async () => {
     navigateToStep2WithTimeline();
 
-    // Open the Budget Modal by clicking the first budget segment
-    const budgetRow = document.querySelector('.budget-phases-timeline-row');
-    expect(budgetRow).not.toBeNull();
-    const segments = budgetRow.querySelectorAll('.budget-segment');
-    fireEvent.click(segments[0]);
+    // Open the Budget Modal by clicking Set Budget button
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
 
     // Verify modal is open
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Verify the old large explanation box and active event chips are NOT rendered in the main column
     expect(document.querySelector('.phase-explanation-box')).toBeNull();
@@ -774,15 +738,12 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
     clickDoneOnWelcomeModal('Liam');
 
-    // Open Budget Modal
-    const budgetRow = document.querySelector('.budget-phases-timeline-row');
-    expect(budgetRow).not.toBeNull();
-    const segments = budgetRow.querySelectorAll('.budget-segment');
-    // The first segment should now be Working + Childcare
-    fireEvent.click(segments[0]);
+    // Open Budget Modal via Set Budget button
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
 
     // Verify modal is open
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Verify the "Childcare Adjustment" box is NOT rendered in the modal
     expect(document.querySelector('.childcare-adjustment-card')).toBeNull();

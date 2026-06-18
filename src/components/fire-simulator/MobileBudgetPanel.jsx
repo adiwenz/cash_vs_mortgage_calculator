@@ -90,6 +90,7 @@ export default function MobileBudgetPanel({
       </div>
 
       {/* Swipeable Tabs for Budget Phases */}
+      <h4 className="budget-phases-heading">Budget Phases</h4>
       <div 
         className="budget-modal-tabs" 
         style={{ 

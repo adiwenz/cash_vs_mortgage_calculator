@@ -15,7 +15,8 @@ import { formatCurrency } from './helpers';
 import { 
   calculateTotalCashRequired, 
   calculateLiquidAssetsAtPurchaseAge, 
-  calculateCashShortfall 
+  calculateCashShortfall,
+  getSimulatedRetirementAge
 } from './houseAffordabilityUtils';
 import { runFireSimulation } from '../../fireCalculations';
 import { getChildCostOffsetRecommendations } from '../../recommendations';
@@ -76,6 +77,54 @@ export default function MobileEventWizard({
       setHasEndAge(false);
     }
   }, [editingEvent]);
+
+  // Reset recommendationApplied if a new cash shortfall is created on mobile
+  useEffect(() => {
+    if (draftEvent && draftEvent.type === 'buyHouse' && draftEvent.recommendationApplied) {
+      const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
+      const simulationResults = baselineResults;
+      const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+      const totalCashRequired = calculateTotalCashRequired(draftEvent);
+      const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
+      if (cashShortfall > 0) {
+        setDraftEvent(prev => ({
+          ...prev,
+          recommendationApplied: false
+        }));
+      }
+    }
+  }, [
+    draftEvent?.homePrice,
+    draftEvent?.downPayment,
+    draftEvent?.purchaseAge,
+    draftEvent?.age,
+    draftEvent?.recommendationApplied,
+    inputs,
+    baselineResults
+  ]);
+
+  const afterReadyAge = useMemo(() => {
+    if (draftEvent?.type !== 'buyHouse') return null;
+    return getSimulatedRetirementAge(inputs, draftEvent);
+  }, [
+    draftEvent?.type,
+    inputs,
+    draftEvent?.homePrice,
+    draftEvent?.downPayment,
+    draftEvent?.purchaseAge,
+    draftEvent?.age,
+    draftEvent?.mortgageRate,
+    draftEvent?.loanTerm,
+    draftEvent?.propertyTax,
+    draftEvent?.insurance,
+    draftEvent?.hoa,
+    draftEvent?.utilitiesIncrease,
+    draftEvent?.maintenance,
+    draftEvent?.renovationCost,
+    draftEvent?.appreciationRate,
+    draftEvent?.sellingCost,
+    draftEvent?.keepRent
+  ]);
 
   // Helpers to get start and end age
   function getStartAge(evt) {
@@ -1633,13 +1682,49 @@ export default function MobileEventWizard({
 
               {/* Next Button */}
               <div className="mobile-wizard-footer">
-                <button 
-                  type="button" 
-                  className="mobile-wizard-btn-primary"
-                  onClick={onSave}
-                >
-                  Next
-                </button>
+                {(() => {
+                  let primaryCta = 'Next';
+                  let onPrimaryClick = onSave;
+
+                  if (draftEvent.type === 'buyHouse') {
+                    const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
+                    const simulationResults = baselineResults;
+                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                    const totalCashRequired = calculateTotalCashRequired(draftEvent);
+                    const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
+                    const hasCashShortfall = cashShortfall > 0;
+
+                    const beforeReadyAge = baselineResults?.retirementReadyAge || inputs.targetRetirementAge || 65;
+                    const afterReadyAgeVal = afterReadyAge !== null && afterReadyAge !== undefined ? afterReadyAge : (inputs.targetRetirementAge || 65);
+                    const retirementDelayYears = Math.max(0, afterReadyAgeVal - beforeReadyAge);
+                    const hasRetirementDelay = retirementDelayYears > 0;
+
+                    if (hasCashShortfall) {
+                      primaryCta = 'Review Options';
+                    } else if (hasRetirementDelay) {
+                      primaryCta = 'Save & Adjust Retirement';
+                    } else {
+                      primaryCta = 'Save Home Purchase';
+                    }
+
+                    const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !draftEvent.recommendationApplied);
+                    if (needsReviewOptions) {
+                      onPrimaryClick = () => {
+                        onSave();
+                      };
+                    }
+                  }
+
+                  return (
+                    <button 
+                      type="button" 
+                      className="mobile-wizard-btn-primary"
+                      onClick={onPrimaryClick}
+                    >
+                      {primaryCta}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1737,13 +1822,49 @@ export default function MobileEventWizard({
 
               {/* Confirm Buttons */}
               <div className="mobile-wizard-footer">
-                <button 
-                  type="button" 
-                  className="mobile-wizard-btn-primary"
-                  onClick={onSave}
-                >
-                  {isNew ? 'Add to Plan' : 'Save Changes'}
-                </button>
+                {(() => {
+                  let primaryCta = isNew ? 'Add to Plan' : 'Save Changes';
+                  let onPrimaryClick = onSave;
+
+                  if (draftEvent.type === 'buyHouse') {
+                    const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
+                    const simulationResults = baselineResults;
+                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                    const totalCashRequired = calculateTotalCashRequired(draftEvent);
+                    const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
+                    const hasCashShortfall = cashShortfall > 0;
+
+                    const beforeReadyAge = baselineResults?.retirementReadyAge || inputs.targetRetirementAge || 65;
+                    const afterReadyAgeVal = afterReadyAge !== null && afterReadyAge !== undefined ? afterReadyAge : (inputs.targetRetirementAge || 65);
+                    const retirementDelayYears = Math.max(0, afterReadyAgeVal - beforeReadyAge);
+                    const hasRetirementDelay = retirementDelayYears > 0;
+
+                    if (hasCashShortfall) {
+                      primaryCta = 'Review Options';
+                    } else if (hasRetirementDelay) {
+                      primaryCta = 'Save & Adjust Retirement';
+                    } else {
+                      primaryCta = 'Save Home Purchase';
+                    }
+
+                    const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !draftEvent.recommendationApplied);
+                    if (needsReviewOptions) {
+                      onPrimaryClick = () => {
+                        onSave();
+                      };
+                    }
+                  }
+
+                  return (
+                    <button 
+                      type="button" 
+                      className="mobile-wizard-btn-primary"
+                      onClick={onPrimaryClick}
+                    >
+                      {primaryCta}
+                    </button>
+                  );
+                })()}
                 <button 
                   type="button" 
                   className="mobile-wizard-btn-link"
@@ -1912,12 +2033,21 @@ export default function MobileEventWizard({
                           type="button"
                           className="mobile-wizard-btn-primary"
                           onClick={() => {
+                            setDraftEvent(prev => ({
+                              ...prev,
+                              homePrice: outcomeDetails.affordablePrice,
+                              downPayment: outcomeDetails.downPayment,
+                              recommendationApplied: true,
+                              appliedRecommendationType: 'updatePrice',
+                              appliedRecommendationAt: Date.now()
+                            }));
                             setHouseRebalanceSummary(null);
-                            onClose();
+                            setOutcomeDetails(null);
+                            setStep(5);
                           }}
                           style={{ padding: '0.75rem 1rem', width: '100%', fontWeight: 'bold', margin: 0 }}
                         >
-                          Close & View Simulator
+                          Review & Save
                         </button>
                       </div>
                     </div>
@@ -2044,8 +2174,14 @@ export default function MobileEventWizard({
                         className="mobile-wizard-btn-primary"
                         onClick={() => {
                           handleApplyRebalanceStrategy('incomeBoost');
+                          setDraftEvent(prev => ({
+                            ...prev,
+                            recommendationApplied: true,
+                            appliedRecommendationType: 'incomeBoost',
+                            appliedRecommendationAt: Date.now()
+                          }));
                           setHouseRebalanceSummary(null);
-                          onClose();
+                          setStep(5);
                         }}
                         style={{ padding: '0.65rem 0.75rem', width: '100%', margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', height: 'auto' }}
                       >
@@ -2104,8 +2240,14 @@ export default function MobileEventWizard({
                         className="mobile-wizard-btn-primary"
                         onClick={() => {
                           handleApplyRebalanceStrategy('saveForDownPayment');
+                          setDraftEvent(prev => ({
+                            ...prev,
+                            recommendationApplied: true,
+                            appliedRecommendationType: 'saveForDownPayment',
+                            appliedRecommendationAt: Date.now()
+                          }));
                           setHouseRebalanceSummary(null);
-                          onClose();
+                          setStep(5);
                         }}
                         style={{ padding: '0.65rem 0.75rem', width: '100%', margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', height: 'auto' }}
                       >

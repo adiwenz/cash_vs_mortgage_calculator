@@ -36,7 +36,7 @@ describe('Clear Budget Allocations Feature', () => {
     // 1. Open Budget Modal
     const budgetBtn = screen.getByRole('button', { name: /Set Budget|Calculate from budget/i });
     fireEvent.click(budgetBtn);
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // 2. Clear Needs section
     const needsCard = screen.getAllByText(/Needs/i)[0];

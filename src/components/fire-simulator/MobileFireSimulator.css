@@ -426,6 +426,11 @@
   border: 1.5px solid rgba(244, 63, 94, 0.4);
   box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
 }
+.circle-neutral {
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.15) 0%, rgba(148, 163, 184, 0.03) 100%);
+  border: 1.5px solid rgba(148, 163, 184, 0.3);
+  box-shadow: none;
+}
 
 /* Budget Phases Card List */
 .mobile-phase-card-list {

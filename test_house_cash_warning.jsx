@@ -11,10 +11,46 @@ globalThis.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
+vi.mock('./src/components/fire-simulator/houseAffordabilityUtils', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    getSimulatedRetirementAge: (inputs, event) => {
+      if (globalThis.__mockRetirementAge !== undefined) {
+        return globalThis.__mockRetirementAge;
+      }
+      return original.getSimulatedRetirementAge(inputs, event);
+    },
+    calculateLiquidAssetsAtPurchaseAge: (inputs, age, results) => {
+      if (globalThis.__mockLiquidAssets !== undefined) {
+        return globalThis.__mockLiquidAssets;
+      }
+      return original.calculateLiquidAssetsAtPurchaseAge(inputs, age, results);
+    },
+    calculateTotalCashRequired: (event) => {
+      if (globalThis.__mockTotalCashRequired !== undefined) {
+        return globalThis.__mockTotalCashRequired;
+      }
+      return original.calculateTotalCashRequired(event);
+    },
+    calculateCashShortfall: (required, assets) => {
+      if (globalThis.__mockCashShortfall !== undefined) {
+        return globalThis.__mockCashShortfall;
+      }
+      return original.calculateCashShortfall(required, assets);
+    }
+  };
+});
+
+
 describe('House Cash Affordability Warning - Desktop and Mobile UI tests', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    delete globalThis.__mockRetirementAge;
+    delete globalThis.__mockLiquidAssets;
+    delete globalThis.__mockTotalCashRequired;
+    delete globalThis.__mockCashShortfall;
   });
 
   const mockInputs = {
@@ -191,5 +227,164 @@ describe('House Cash Affordability Warning - Desktop and Mobile UI tests', () =>
     // Verify wizard onClose is called to dismiss and showImprovementModal is triggered
     expect(onCloseMock).toHaveBeenCalled();
     expect(setShowImprovementModalMock).toHaveBeenCalledWith(true);
+  });
+
+  test('Desktop Modal: CTA button text changes based on shortfall/delay and recommendationApplied', () => {
+    // 1. With cash shortfall -> Review Options
+    globalThis.__mockLiquidAssets = 100000;
+    globalThis.__mockTotalCashRequired = 150000; // shortfall = 50000
+    globalThis.__mockCashShortfall = 50000;
+    globalThis.__mockRetirementAge = 65;
+
+    const editingEvent = {
+      type: 'buyHouse',
+      purchaseAge: 40,
+      homePrice: 500000,
+      downPayment: 100000,
+      recommendationApplied: false
+    };
+
+    const { rerender } = render(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEvent}
+        setEditingEvent={vi.fn()}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Review Options/i })).toBeDefined();
+
+    // 2. No shortfall but has retirement delay, recommendation NOT applied -> Save & Adjust Retirement
+    globalThis.__mockTotalCashRequired = 80000; // no shortfall
+    globalThis.__mockCashShortfall = 0;
+    globalThis.__mockRetirementAge = 70; // delayed (baseline = 65)
+
+    const editingEvent2 = {
+      type: 'buyHouse',
+      purchaseAge: 40,
+      homePrice: 400000,
+      downPayment: 80000,
+      recommendationApplied: false
+    };
+
+    rerender(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEvent2}
+        setEditingEvent={vi.fn()}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Save & Adjust Retirement/i })).toBeDefined();
+
+    // 3. No shortfall, has retirement delay, recommendation applied -> Save & Adjust Retirement (but allows saving)
+    const editingEvent3 = {
+      type: 'buyHouse',
+      purchaseAge: 40,
+      homePrice: 400000,
+      downPayment: 80000,
+      recommendationApplied: true
+    };
+
+    rerender(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEvent3}
+        setEditingEvent={vi.fn()}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    // Button should still say Save & Adjust Retirement
+    expect(screen.getByRole('button', { name: /Save & Adjust Retirement/i })).toBeDefined();
+
+    // 4. No shortfall, no retirement delay -> Save Home Purchase
+    globalThis.__mockRetirementAge = 65; // not delayed
+
+    const editingEvent4 = {
+      type: 'buyHouse',
+      purchaseAge: 40,
+      homePrice: 390000,
+      downPayment: 80000,
+      recommendationApplied: false
+    };
+
+    rerender(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEvent4}
+        setEditingEvent={vi.fn()}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Save Home Purchase/i })).toBeDefined();
+  });
+
+  test('Desktop Modal: Modifying inputs to create a shortfall resets recommendationApplied', async () => {
+    globalThis.__mockLiquidAssets = 100000;
+    globalThis.__mockTotalCashRequired = 80000; // no shortfall initially
+    globalThis.__mockCashShortfall = 0;
+    globalThis.__mockRetirementAge = 65;
+
+    const setEditingEventMock = vi.fn();
+
+    const editingEvent = {
+      type: 'buyHouse',
+      purchaseAge: 40,
+      homePrice: 400000,
+      downPayment: 80000,
+      recommendationApplied: true
+    };
+
+    const { rerender } = render(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEvent}
+        setEditingEvent={setEditingEventMock}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    // Initially recommendationApplied is true, no shortfall -> button is Save Home Purchase
+    expect(screen.getByRole('button', { name: /Save Home Purchase/i })).toBeDefined();
+
+    // Now simulate user changing input to create a shortfall (e.g. increase price)
+    globalThis.__mockTotalCashRequired = 150000; // shortfall created
+    globalThis.__mockCashShortfall = 50000;
+
+    const editingEventModified = {
+      ...editingEvent,
+      homePrice: 600000, // increased price
+    };
+
+    rerender(
+      <EventModalForm
+        inputs={mockInputs}
+        editingEvent={editingEventModified}
+        setEditingEvent={setEditingEventMock}
+        activeResults={mockSimulationResults}
+        baselineResults={{ retirementReadyAge: 65 }}
+        setShowImprovementModal={vi.fn()}
+      />
+    );
+
+    // The useEffect should trigger setEditingEvent to set recommendationApplied to false
+    expect(setEditingEventMock).toHaveBeenCalled();
+    const updater = setEditingEventMock.mock.calls[0][0];
+    const nextState = updater(editingEventModified);
+    expect(nextState.recommendationApplied).toBe(false);
   });
 });

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from './helpers';
 import MarriageWizard from './MarriageWizard';
 import { 
   calculateTotalCashRequired, 
   calculateLiquidAssetsAtPurchaseAge, 
-  calculateCashShortfall 
+  calculateCashShortfall,
+  getSimulatedRetirementAge
 } from './houseAffordabilityUtils';
 
 export default function EventModalForm({
@@ -27,6 +28,54 @@ export default function EventModalForm({
   setShowImprovementModal
 }) {
   const [showHouseAdvanced, setShowHouseAdvanced] = useState(false);
+
+  // Reset recommendationApplied if a new cash shortfall is created
+  useEffect(() => {
+    if (editingEvent && editingEvent.type === 'buyHouse' && editingEvent.recommendationApplied) {
+      const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
+      const simulationResults = activeResults || baselineResults;
+      const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+      const totalCashRequired = calculateTotalCashRequired(editingEvent);
+      const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
+      if (cashShortfall > 0) {
+        setEditingEvent(prev => ({
+          ...prev,
+          recommendationApplied: false
+        }));
+      }
+    }
+  }, [
+    editingEvent?.homePrice,
+    editingEvent?.downPayment,
+    editingEvent?.purchaseAge,
+    editingEvent?.age,
+    editingEvent?.recommendationApplied,
+    inputs,
+    activeResults,
+    baselineResults,
+    setEditingEvent
+  ]);  const afterReadyAge = useMemo(() => {
+    if (editingEvent?.type !== 'buyHouse') return null;
+    return getSimulatedRetirementAge(inputs, editingEvent);
+  }, [
+    editingEvent?.type,
+    inputs,
+    editingEvent?.homePrice,
+    editingEvent?.downPayment,
+    editingEvent?.purchaseAge,
+    editingEvent?.age,
+    editingEvent?.mortgageRate,
+    editingEvent?.loanTerm,
+    editingEvent?.propertyTax,
+    editingEvent?.insurance,
+    editingEvent?.hoa,
+    editingEvent?.utilitiesIncrease,
+    editingEvent?.maintenance,
+    editingEvent?.renovationCost,
+    editingEvent?.appreciationRate,
+    editingEvent?.sellingCost,
+    editingEvent?.keepRent
+  ]);
 
   const type = editingEvent.type;
 
@@ -1704,18 +1753,56 @@ export default function EventModalForm({
             >
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleSaveEvent}
-              disabled={type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge}
-              style={{
-                opacity: (type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge) ? 0.5 : 1,
-                cursor: (type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge) ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Save Event
-            </button>
+            {(() => {
+              let primaryCta = 'Save Event';
+              let onPrimaryClick = handleSaveEvent;
+
+              if (type === 'buyHouse') {
+                const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
+                const simulationResults = activeResults || baselineResults;
+                const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                const totalCashRequired = calculateTotalCashRequired(editingEvent);
+                const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
+                const hasCashShortfall = cashShortfall > 0;
+
+                const beforeReadyAge = baselineResults?.retirementReadyAge || inputs.targetRetirementAge || 65;
+                const afterReadyAgeVal = afterReadyAge !== null && afterReadyAge !== undefined ? afterReadyAge : (inputs.targetRetirementAge || 65);
+                const retirementDelayYears = Math.max(0, afterReadyAgeVal - beforeReadyAge);
+                const hasRetirementDelay = retirementDelayYears > 0;
+
+                if (hasCashShortfall) {
+                  primaryCta = 'Review Options';
+                } else if (hasRetirementDelay) {
+                  primaryCta = 'Save & Adjust Retirement';
+                } else {
+                  primaryCta = 'Save Home Purchase';
+                }
+
+                const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !editingEvent.recommendationApplied);
+                if (needsReviewOptions) {
+                  onPrimaryClick = () => {
+                    if (setShowImprovementModal) {
+                      setShowImprovementModal(true);
+                    }
+                  };
+                }
+              }
+
+              return (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={onPrimaryClick}
+                  disabled={type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge}
+                  style={{
+                    opacity: (type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge) ? 0.5 : 1,
+                    cursor: (type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {primaryCta}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>

@@ -588,11 +588,10 @@ export function useTimelineEvents(inputs, displayedResults) {
     deduplicatedSorted.forEach(evt => {
       if (evt.houseId && houseSlots[evt.houseId] !== undefined) {
         const stackIndex = houseSlots[evt.houseId];
-        const ageKey = Math.floor(evt.age);
         if (!occupiedSlotsTimeline[stackIndex]) {
-          occupiedSlotsTimeline[stackIndex] = new Set();
+          occupiedSlotsTimeline[stackIndex] = [];
         }
-        occupiedSlotsTimeline[stackIndex].add(ageKey);
+        occupiedSlotsTimeline[stackIndex].push(evt.age);
       }
     });
 
@@ -601,14 +600,15 @@ export function useTimelineEvents(inputs, displayedResults) {
       if (evt.houseId && houseSlots[evt.houseId] !== undefined) {
         stackIndex = houseSlots[evt.houseId];
       } else {
-        const ageKey = Math.floor(evt.age);
+        const age = evt.age;
         let slot = 0;
         while (true) {
           if (!occupiedSlotsTimeline[slot]) {
-            occupiedSlotsTimeline[slot] = new Set();
+            occupiedSlotsTimeline[slot] = [];
           }
-          if (!occupiedSlotsTimeline[slot].has(ageKey)) {
-            occupiedSlotsTimeline[slot].add(ageKey);
+          const isConflict = occupiedSlotsTimeline[slot].some(existingAge => Math.abs(existingAge - age) < 3.5);
+          if (!isConflict) {
+            occupiedSlotsTimeline[slot].push(age);
             stackIndex = slot;
             break;
           }
