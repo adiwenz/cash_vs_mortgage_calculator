@@ -316,7 +316,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(handleApplyImprovementScenario).toHaveBeenCalledWith(mockImprovementPlan.rankedPlan[0]);
   });
 
-  test('Roadmap tab renders MobileRecommendationsPanel inside recommendations stack when plan is not on track', () => {
+  test('Roadmap tab does not render MobileRecommendationsPanel inside budget phases', () => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
     const activeRes = runFireSimulation(inputs);
     const displayedRes = {
@@ -372,15 +372,9 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const workSavePhaseBtn = screen.getByText('Working', { selector: '.mobile-phase-card-title' });
     fireEvent.click(workSavePhaseBtn);
 
-    // Verify recommendations header is rendered
-    expect(screen.getByText('💡 Recommendations')).toBeDefined();
-
-    // Since plan is not on track, it should render MobileRecommendationsPanel instead of static mockup recommendations
-    expect(screen.getByText('Save More')).toBeDefined();
-    expect(screen.getByText('Save an additional $500/month.')).toBeDefined();
-
-    // It should NOT render "Delay Social Security" or "Reduce Spending" which are mockup recommendations
-    expect(screen.queryByText('Delay Social Security')).toBeNull();
+    // Verify recommendations header is NOT rendered
+    expect(screen.queryByText('💡 Recommendations')).toBeNull();
+    expect(screen.queryByText('Save More')).toBeNull();
   });
 
   test('Dense cluster even spacing logic', () => {
