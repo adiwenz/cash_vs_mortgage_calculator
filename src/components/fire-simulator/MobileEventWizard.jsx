@@ -16,6 +16,7 @@ import {
   Edit
 } from 'lucide-react';
 import { formatCurrency } from './helpers';
+import { getAvailableLiquidAssetsAtPurchaseAge, calculateAffordableHomePrice } from './houseAffordabilityUtils';
 import { runFireSimulation } from '../../fireCalculations';
 import { getChildCostOffsetRecommendations } from '../../recommendations';
 
@@ -1120,6 +1121,89 @@ export default function MobileEventWizard({
                         </div>
                       </div>
                     </div>
+
+                    {(() => {
+                      const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
+                      const liquidAssets = getAvailableLiquidAssetsAtPurchaseAge(inputs, purchaseAge, baselineResults);
+                      const downPaymentPercent = draftEvent.homePrice > 0 ? (draftEvent.downPayment / draftEvent.homePrice) * 100 : 20;
+                      const downPaymentAmount = (draftEvent.homePrice || 0) * (downPaymentPercent / 100);
+
+                      let projectionsAvailable = false;
+                      if (baselineResults && (baselineResults.nominalData || baselineResults.data)) {
+                        const logs = baselineResults.nominalData || baselineResults.data;
+                        const logBefore = logs.find(l => l.age === purchaseAge - 1);
+                        if (logBefore) {
+                          projectionsAvailable = true;
+                        }
+                      }
+
+                      if (downPaymentAmount > liquidAssets) {
+                        const affordablePrice = calculateAffordableHomePrice({
+                          liquidAssets,
+                          downPaymentPercent
+                        });
+                        return (
+                          <div style={{
+                            background: 'rgba(245, 158, 11, 0.08)',
+                            color: '#f59e0b',
+                            padding: '0.85rem',
+                            borderRadius: '6px',
+                            borderLeft: '4px solid #f59e0b',
+                            fontSize: '0.85rem',
+                            lineHeight: '1.4',
+                            marginTop: '0.25rem',
+                            marginBottom: '0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem'
+                          }}>
+                            <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <span>⚠️</span> Down Payment Exceeds Available Liquid Assets
+                            </div>
+                            <div>
+                              Your down payment of <strong>{formatCurrency(downPaymentAmount)}</strong> exceeds your projected liquid assets at age <strong>{purchaseAge}</strong> of <strong>{formatCurrency(liquidAssets)}</strong>.
+                            </div>
+                            {!projectionsAvailable && (
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.85 }}>
+                                Using current liquid assets.
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>
+                              Liquid assets include cash and taxable brokerage accounts. Retirement accounts are excluded to avoid taxes and withdrawal penalties.
+                            </div>
+                            {downPaymentPercent > 0 && liquidAssets > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDraftEvent(prev => ({
+                                    ...prev,
+                                    homePrice: affordablePrice,
+                                    downPayment: liquidAssets
+                                  }));
+                                }}
+                                style={{
+                                  alignSelf: 'stretch',
+                                  marginTop: '0.35rem',
+                                  background: '#f59e0b',
+                                  color: '#1e1b4b',
+                                  border: 'none',
+                                  padding: '0.5rem',
+                                  borderRadius: '6px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem',
+                                  textAlign: 'center'
+                                }}
+                              >
+                                Update House Price to {formatCurrency(affordablePrice)}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
 
                     <div className="form-group-item">
                       <label className="form-group-label">Mortgage Rate (Interest)</label>

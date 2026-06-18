@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatCurrency } from './helpers';
 import MarriageWizard from './MarriageWizard';
+import { getAvailableLiquidAssetsAtPurchaseAge, calculateAffordableHomePrice } from './houseAffordabilityUtils';
 
 export default function EventModalForm({
   inputs,
@@ -16,7 +17,9 @@ export default function EventModalForm({
   handleSaveEvent,
   handleSetBudgetClick,
   setIsBudgetOpenFromMarriageWizard,
-  tempSocialSecurityDetails
+  tempSocialSecurityDetails,
+  activeResults,
+  baselineResults
 }) {
   const [showHouseAdvanced, setShowHouseAdvanced] = useState(false);
 
@@ -187,6 +190,93 @@ export default function EventModalForm({
                   }}
                 />
               </div>
+
+              {(() => {
+                const simulationResults = activeResults || baselineResults;
+                const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
+                const liquidAssets = getAvailableLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                const downPaymentPercent = editingEvent.homePrice > 0 ? (editingEvent.downPayment / editingEvent.homePrice) * 100 : 20;
+                const downPaymentAmount = (editingEvent.homePrice || 0) * (downPaymentPercent / 100);
+
+                let projectionsAvailable = false;
+                if (simulationResults && (simulationResults.nominalData || simulationResults.data)) {
+                  const logs = simulationResults.nominalData || simulationResults.data;
+                  const logBefore = logs.find(l => l.age === purchaseAge - 1);
+                  if (logBefore) {
+                    projectionsAvailable = true;
+                  }
+                }
+
+                if (downPaymentAmount > liquidAssets) {
+                  const affordablePrice = calculateAffordableHomePrice({
+                    liquidAssets,
+                    downPaymentPercent
+                  });
+                  return (
+                    <div style={{
+                      gridColumn: 'span 2',
+                      background: 'rgba(245, 158, 11, 0.08)',
+                      color: '#f59e0b',
+                      padding: '0.85rem',
+                      borderRadius: '6px',
+                      borderLeft: '4px solid #f59e0b',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.4',
+                      marginTop: '0.5rem',
+                      marginBottom: '0.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>⚠️</span> Down Payment Exceeds Available Liquid Assets
+                      </div>
+                      <div>
+                        Your down payment of <strong>{formatCurrency(downPaymentAmount)}</strong> exceeds your projected liquid assets at age <strong>{purchaseAge}</strong> of <strong>{formatCurrency(liquidAssets)}</strong>.
+                      </div>
+                      {!projectionsAvailable && (
+                        <div style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.85 }}>
+                          Using current liquid assets.
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.75rem', opacity: 0.85 }}>
+                        Liquid assets include cash and taxable brokerage accounts. Retirement accounts are excluded to avoid taxes and withdrawal penalties.
+                      </div>
+                      {downPaymentPercent > 0 && liquidAssets > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEvent({
+                              ...editingEvent,
+                              homePrice: affordablePrice,
+                              downPayment: liquidAssets
+                            });
+                          }}
+                          style={{
+                            alignSelf: 'flex-start',
+                            marginTop: '0.35rem',
+                            background: '#f59e0b',
+                            color: '#1e1b4b',
+                            border: 'none',
+                            padding: '0.4rem 0.85rem',
+                            borderRadius: '4px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            transition: 'opacity 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                          onMouseLeave={(e) => e.target.style.opacity = '1'}
+                        >
+                          Update House Price to {formatCurrency(affordablePrice)}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
 
               {/* COLLAPSIBLE ADVANCED SETTINGS TRIGGER */}
               <div style={{ gridColumn: 'span 2', marginTop: '0.25rem', marginBottom: '0.25rem' }}>

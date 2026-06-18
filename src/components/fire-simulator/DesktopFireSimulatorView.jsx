@@ -217,6 +217,8 @@ export default function DesktopFireSimulatorView({
           handleSetBudgetClick={handleSetBudgetClick}
           setIsBudgetOpenFromMarriageWizard={setIsBudgetOpenFromMarriageWizard}
           tempSocialSecurityDetails={tempSocialSecurityDetails}
+          activeResults={activeResults}
+          baselineResults={baselineResults}
         />
       )}
       <ChildImpactModal
