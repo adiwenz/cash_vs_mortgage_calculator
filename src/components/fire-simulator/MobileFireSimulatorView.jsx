@@ -8,7 +8,10 @@ import {
   ChevronRight, 
   ArrowLeft, 
   Sparkles,
-  Info
+  Info,
+  X,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
@@ -342,6 +345,15 @@ export default function MobileFireSimulatorView({
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [isOptionsSheetOpen, setIsOptionsSheetOpen] = useState(false);
+  const [optionsSheetEvent, setOptionsSheetEvent] = useState(null);
+
+  const handleMobileEventTap = (evt, index) => {
+    setSelectedEventIndex(index);
+    setOptionsSheetEvent(evt);
+    setIsOptionsSheetOpen(true);
+  };
+
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
@@ -760,7 +772,7 @@ export default function MobileFireSimulatorView({
                 timelineEvents={timelineEvents}
                 selectedEventIndex={selectedEventIndex}
                 setSelectedEventIndex={setSelectedEventIndex}
-                handleEditRoadmapEvent={handleEditRoadmapEvent}
+                onEventTap={handleMobileEventTap}
               />
 
               {/* Net Worth Graph & Projections KPIs Card */}
@@ -2166,6 +2178,86 @@ export default function MobileFireSimulatorView({
           setShowImprovementModal={setShowImprovementModal}
         />
       )}
+      {/* Event Options Bottom Sheet */}
+      {isOptionsSheetOpen && optionsSheetEvent && (
+        <div 
+          className="mobile-bottom-sheet-overlay" 
+          onClick={() => {
+            setIsOptionsSheetOpen(false);
+            setOptionsSheetEvent(null);
+          }}
+        >
+          <div className="mobile-bottom-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-bottom-sheet-header">
+              <div className="mobile-bottom-sheet-drag-handle"></div>
+              <h3>Event Options</h3>
+              <button 
+                type="button" 
+                className="mobile-bottom-sheet-close" 
+                onClick={() => {
+                  setIsOptionsSheetOpen(false);
+                  setOptionsSheetEvent(null);
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="mobile-bottom-sheet-body">
+              <div className="mobile-sheet-event-info">
+                <div className="mobile-sheet-event-icon-wrapper">
+                  {optionsSheetEvent.icon}
+                </div>
+                <div className="mobile-sheet-event-details">
+                  <h4>{getRoadmapDetails(optionsSheetEvent, (val) => val, inputs)?.title || optionsSheetEvent.label || 'Life Event'}</h4>
+                  <p>Age {optionsSheetEvent.age}</p>
+                </div>
+              </div>
+              
+              <div className="mobile-sheet-actions">
+                {isEditableEvent(optionsSheetEvent) ? (
+                  <>
+                    <button 
+                      type="button" 
+                      className="mobile-sheet-action-btn edit" 
+                      onClick={() => {
+                        setIsOptionsSheetOpen(false);
+                        setOptionsSheetEvent(null);
+                        handleEditRoadmapEvent(optionsSheetEvent);
+                      }}
+                    >
+                      <Edit2 size={18} className="action-icon" />
+                      <span>Edit Event Details</span>
+                      <ChevronRight size={16} className="action-arrow" />
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      className="mobile-sheet-action-btn delete" 
+                      onClick={() => {
+                        setIsOptionsSheetOpen(false);
+                        setOptionsSheetEvent(null);
+                        if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
+                          handleDeleteEvent(optionsSheetEvent);
+                        }
+                      }}
+                    >
+                      <Trash2 size={18} className="action-icon red" />
+                      <span className="red-text">Delete Event</span>
+                      <ChevronRight size={16} className="action-arrow" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="mobile-sheet-system-message">
+                    <span>System Event — cannot be modified</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ChildImpactModal
         childImpactSummary={childImpactSummary}
         inputs={inputs}

@@ -190,6 +190,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     ];
 
     const handleEditRoadmapEvent = vi.fn();
+    const handleDeleteEvent = vi.fn();
 
     render(
       <MobileFireSimulator
@@ -205,6 +206,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         validation={{}}
         handleCreateEvent={vi.fn()}
         handleEditRoadmapEvent={handleEditRoadmapEvent}
+        handleDeleteEvent={handleDeleteEvent}
         handleSetBudgetClick={vi.fn()}
         handleOpenSavingsDetails={vi.fn()}
         isMobile={true}
@@ -227,24 +229,39 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const scroller = document.querySelector('.mobile-roadmap-track');
     expect(scroller.textContent).not.toContain('Eligible for Medicare. Premium drops from $10,000/yr to $4,000/yr.');
 
-    // 2. The first event (Medicare) is selected by default. Since it's not editable, clicking it again does not edit.
+    // 2. Click the Medicare milestone. Since it's a system event, it shouldn't show edit/delete actions, but should show system message.
     const medicareMilestoneBtn = screen.getByText('Medicare').closest('button');
     fireEvent.click(medicareMilestoneBtn);
-    expect(handleEditRoadmapEvent).not.toHaveBeenCalled();
+    expect(screen.getByText('Event Options')).toBeDefined();
+    expect(screen.getByText('System Event — cannot be modified')).toBeDefined();
+    expect(screen.queryByText('Edit Event Details')).toBeNull();
 
-    // 3. Click the Social Security milestone to select it
+    // 3. Click the Social Security milestone to open the Event Options sheet
     const ssMilestoneBtn = screen.getByText('Social Sec.').closest('button');
     fireEvent.click(ssMilestoneBtn);
+    expect(screen.getByText('Event Options')).toBeDefined();
+    expect(screen.getByText('Social Security')).toBeDefined();
 
-    // 4. Click the Social Security milestone again (since it is selected and editable, it should trigger handleEditRoadmapEvent)
-    fireEvent.click(ssMilestoneBtn);
+    // 4. Click the "Edit Event Details" action button in the bottom sheet
+    const editDetailsBtn = screen.getByText('Edit Event Details');
+    fireEvent.click(editDetailsBtn);
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[2]);
 
-    // 5. Verify Target Retirement edit event callback
+    // 5. Verify Target Retirement edit event callback from bottom sheet
     const retireMilestoneBtn = screen.getByText('Retire').closest('button');
-    fireEvent.click(retireMilestoneBtn); // select it
-    fireEvent.click(retireMilestoneBtn); // edit it
+    fireEvent.click(retireMilestoneBtn); // open bottom sheet
+    const editRetireBtn = screen.getByText('Edit Event Details');
+    fireEvent.click(editRetireBtn);
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
+
+    // 6. Test Delete Event confirmation flow from bottom sheet
+    const deleteConfirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
+    fireEvent.click(retireMilestoneBtn); // open bottom sheet again
+    const deleteBtn = screen.getByText('Delete Event');
+    fireEvent.click(deleteBtn);
+    expect(deleteConfirmSpy).toHaveBeenCalled();
+    expect(handleDeleteEvent).toHaveBeenCalledWith(timelineEvents[1]);
+    deleteConfirmSpy.mockRestore();
   });
 
   test('Overview tab renders MobileRecommendationsPanel when plan is not on track', () => {
@@ -398,7 +415,6 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={0}
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 
@@ -408,17 +424,17 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     // Extract positions
     const positions = Array.from(buttons).map(btn => parseFloat(btn.style.left));
     
-    // Total usable width = W - 72. Positions must increase linearly:
+    // Total usable width = W - (paddingLeft + paddingRight). Positions must increase linearly:
     const diff1 = positions[1] - positions[0];
     const diff2 = positions[2] - positions[1];
     const diff3 = positions[3] - positions[2];
     
     expect(diff1).toBeCloseTo(diff2, 1);
     expect(diff2).toBeCloseTo(diff3, 1);
-    expect(positions[0]).toBe(36); // Pinned left
+    expect(positions[0]).toBe(35); // 54/2 + 8 = 35
   });
 
-  test('Many events (10+) density visibility rules', () => {
+  test('Many events (11+) density visibility rules', () => {
     const inputs = { currentAge: 35, lifeExpectancy: 85 };
     const timelineEvents = Array.from({ length: 11 }, (_, i) => ({
       age: 35 + i * 4,
@@ -434,20 +450,22 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={0}
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 
-    // With 11 events, showAge (<=12) should be true, showTitle (<=8) should be false.
-    // Check that age elements exist but title labels do not.
+    // Keep age pills visible for all events
     const ageElements = container.querySelectorAll('.mobile-roadmap-age');
     expect(ageElements.length).toBe(11);
 
-    const titleElements = container.querySelectorAll('.mobile-roadmap-label-text');
-    expect(titleElements.length).toBe(0);
+    // Non-selected event names should be hidden. Under compact mode, only selected, first and last are visible
+    // Since selected is 0 (which is also first), we only have index 0 and index 10 visible.
+    const titleElements = Array.from(container.querySelectorAll('.mobile-roadmap-label-text'))
+      .filter(el => el.style.visibility !== 'hidden');
+    
+    expect(titleElements.length).toBe(2);
   });
 
-  test('Consistent static marker sizes (48px base, 60px selected)', () => {
+  test('Consistent marker sizes for 1-6 events (44px base, 54px selected)', () => {
     const inputs = { currentAge: 35, lifeExpectancy: 85 };
     const timelineEvents = [
       { age: 35, title: 'Today', label: 'Today', icon: '👤', type: 'career' },
@@ -460,19 +478,18 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={1} // Select the second one
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 
     const circles = container.querySelectorAll('.mobile-roadmap-circle');
     
-    // First circle is base (48px)
-    expect(circles[0].style.width).toBe('48px');
-    expect(circles[0].style.height).toBe('48px');
+    // First circle is base (44px)
+    expect(circles[0].style.width).toBe('44px');
+    expect(circles[0].style.height).toBe('44px');
 
-    // Second circle is selected (60px)
-    expect(circles[1].style.width).toBe('60px');
-    expect(circles[1].style.height).toBe('60px');
+    // Second circle is selected (54px)
+    expect(circles[1].style.width).toBe('54px');
+    expect(circles[1].style.height).toBe('54px');
   });
 
   test('Net Worth graph highlights selected milestone age correctly', () => {
