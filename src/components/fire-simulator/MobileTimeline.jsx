@@ -24,7 +24,7 @@ const getShortLabel = (evt) => {
   if (evt.type === 'borrowing') return 'Borrowing';
   if (evt.type === 'payoffPlanEnd') return 'Loan Off';
   if (evt.type === 'coastFire') return 'Coast FIRE';
-  if (evt.type.startsWith('retirementReady')) return 'Retire Ready';
+  if (evt.type.startsWith('retirementReady')) return 'Work Optional';
   
   let cleanLabel = evt.label || '';
   if (cleanLabel.includes(':')) {
@@ -127,7 +127,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
     case 'retirementReadySurvival':
     case 'retirementReadyComfortable':
     case 'retirementReadySWR':
-      title = 'Retirement Ready';
+      title = 'Work Optional';
       ageLabel = `Achieved at Age ${evt.age}`;
       whyItMatters = 'Your assets have reached the sustainability threshold, meaning you can stop working and support your lifestyle forever.';
       break;
@@ -168,7 +168,8 @@ export default function MobileTimeline({
   timelineEvents,
   selectedEventIndex,
   setSelectedEventIndex,
-  handleEditRoadmapEvent
+  handleEditRoadmapEvent,
+  onEventTap
 }) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(350);
@@ -189,11 +190,8 @@ export default function MobileTimeline({
   // Dynamic Marker Sizing based on total events count (evenly spaced)
   const eventCount = timelineEvents.length;
   const sizes = useMemo(() => {
-    return { baseCircleSize: 48, activeCircleSize: 60 };
+    return { baseCircleSize: 40, activeCircleSize: 52 };
   }, []);
-
-  const showAge = eventCount <= 12;
-  const showTitle = eventCount <= 8;
 
   // Evenly spaced milestones
   const resolvedPositions = useMemo(() => {
@@ -236,7 +234,7 @@ export default function MobileTimeline({
         <span className="mobile-section-subtitle">Tap any event to see details and impact</span>
       </div>
 
-      <div className="mobile-roadmap-track" ref={containerRef} style={{ width: '100%', height: '140px', position: 'relative', overflow: 'hidden' }}>
+      <div className="mobile-roadmap-track" ref={containerRef} style={{ width: '100%', height: '150px', position: 'relative', overflow: 'visible' }}>
         {timelineEvents.length > 0 && (
           <div
             className="mobile-roadmap-line"
@@ -257,6 +255,15 @@ export default function MobileTimeline({
           const circleColor = getCircleColorClass(item.event.type);
           const shortLabel = getShortLabel(item.event);
           const topPosition = 38 - item.size / 2;
+
+          // Responsive density rules:
+          // 1–6 events: Show labels for all
+          // 7–10 events: Show labels for all, clamped to 2 lines
+          // 11+ events: Show labels only for selected, first, and last events. Hide intermediate labels.
+          let showLabelForThisEvent = true;
+          if (eventCount >= 11) {
+            showLabelForThisEvent = isSelected || item.index === 0 || item.index === eventCount - 1;
+          }
 
           return (
             <button
@@ -279,10 +286,9 @@ export default function MobileTimeline({
                 zIndex: isSelected ? 3 : 2
               }}
               onClick={() => {
-                if (isSelected && isEditableEvent(item.event)) {
-                  handleEditRoadmapEvent(item.event);
-                } else {
-                  setSelectedEventIndex(item.index);
+                setSelectedEventIndex(item.index);
+                if (onEventTap) {
+                  onEventTap(item.event);
                 }
               }}
             >
@@ -295,40 +301,53 @@ export default function MobileTimeline({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: isSelected ? '1.4rem' : '1.1rem',
+                  fontSize: isSelected ? '1.25rem' : '1.05rem',
                   transition: 'all 0.2s ease-in-out'
                 }}
               >
                 <span>{item.event.icon}</span>
               </div>
               
-              {showAge && (
-                <span
-                  className="mobile-roadmap-age"
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: isSelected ? '#0f172a' : '#ffffff',
-                    marginTop: '0.4rem'
-                  }}
-                >
-                  {item.event.age}
-                </span>
-              )}
+              {/* Age Pill is always visible for all events */}
+              <span
+                className="mobile-roadmap-age mobile-roadmap-age-pill"
+                style={{
+                  fontSize: '0.65rem',
+                  fontWeight: '700',
+                  color: '#ffffff',
+                  background: isSelected ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  marginTop: '0.5rem',
+                  border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: 1,
+                  boxShadow: isSelected ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {item.event.age}
+              </span>
 
-              {showTitle && (
+              {showLabelForThisEvent && (
                 <span
                   className="mobile-roadmap-label-text"
                   style={{
                     fontSize: '0.65rem',
                     color: isSelected ? '#ffffff' : 'var(--text-secondary)',
                     fontWeight: isSelected ? '700' : '500',
-                    marginTop: '0.1rem',
+                    marginTop: '0.3rem',
                     textAlign: 'center',
                     width: '100%',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'normal',
+                    lineHeight: '1.2'
                   }}
                 >
                   {shortLabel}
@@ -338,7 +357,6 @@ export default function MobileTimeline({
           );
         })}
       </div>
-
 
     </section>
   );

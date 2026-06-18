@@ -65,7 +65,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(roadmapBtn.className).toContain('active');
     
     // Should display Roadmap section titles
-    expect(screen.getByText('Interactive Roadmap')).toBeDefined();
+    expect(screen.getAllByText(/Work Optional Age/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Your Life Journey ✨')).toBeDefined();
     expect(screen.getByText('Budget Phases')).toBeDefined();
   });
@@ -227,23 +227,22 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const scroller = document.querySelector('.mobile-roadmap-track');
     expect(scroller.textContent).not.toContain('Eligible for Medicare. Premium drops from $10,000/yr to $4,000/yr.');
 
-    // 2. The first event (Medicare) is selected by default. Since it's not editable, clicking it again does not edit.
+    // 2. The first event (Medicare) is selected by default. It is not editable, so no edit details button exists in sheet.
     const medicareMilestoneBtn = screen.getByText('Medicare').closest('button');
     fireEvent.click(medicareMilestoneBtn);
+    expect(screen.queryByText('Edit Event Details')).toBeNull();
     expect(handleEditRoadmapEvent).not.toHaveBeenCalled();
 
-    // 3. Click the Social Security milestone to select it
+    // 3. Click the Social Security milestone to select it. It is calculated, so no edit details button exists in sheet.
     const ssMilestoneBtn = screen.getByText('Social Sec.').closest('button');
     fireEvent.click(ssMilestoneBtn);
+    expect(screen.queryByText('Edit Event Details')).toBeNull();
 
-    // 4. Click the Social Security milestone again (since it is selected and editable, it should trigger handleEditRoadmapEvent)
-    fireEvent.click(ssMilestoneBtn);
-    expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[2]);
-
-    // 5. Verify Target Retirement edit event callback
+    // 4. Click the Target Retirement milestone (which is editable)
     const retireMilestoneBtn = screen.getByText('Retire').closest('button');
     fireEvent.click(retireMilestoneBtn); // select it
-    fireEvent.click(retireMilestoneBtn); // edit it
+    const editRetireBtn = screen.getByText('Edit Event Details');
+    fireEvent.click(editRetireBtn); // click edit
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
   });
 
@@ -438,16 +437,17 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
       />
     );
 
-    // With 11 events, showAge (<=12) should be true, showTitle (<=8) should be false.
-    // Check that age elements exist but title labels do not.
+    // With 11 events, showAge should show age pills for all.
+    // Check that age elements exist.
     const ageElements = container.querySelectorAll('.mobile-roadmap-age');
     expect(ageElements.length).toBe(11);
 
+    // Labels are shown only for selected/first and last event (2 total)
     const titleElements = container.querySelectorAll('.mobile-roadmap-label-text');
-    expect(titleElements.length).toBe(0);
+    expect(titleElements.length).toBe(2);
   });
 
-  test('Consistent static marker sizes (48px base, 60px selected)', () => {
+  test('Consistent static marker sizes (40px base, 52px selected)', () => {
     const inputs = { currentAge: 35, lifeExpectancy: 85 };
     const timelineEvents = [
       { age: 35, title: 'Today', label: 'Today', icon: '👤', type: 'career' },
@@ -466,13 +466,13 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
 
     const circles = container.querySelectorAll('.mobile-roadmap-circle');
     
-    // First circle is base (48px)
-    expect(circles[0].style.width).toBe('48px');
-    expect(circles[0].style.height).toBe('48px');
+    // First circle is base (40px)
+    expect(circles[0].style.width).toBe('40px');
+    expect(circles[0].style.height).toBe('40px');
 
-    // Second circle is selected (60px)
-    expect(circles[1].style.width).toBe('60px');
-    expect(circles[1].style.height).toBe('60px');
+    // Second circle is selected (52px)
+    expect(circles[1].style.width).toBe('52px');
+    expect(circles[1].style.height).toBe('52px');
   });
 
   test('Net Worth graph highlights selected milestone age correctly', () => {

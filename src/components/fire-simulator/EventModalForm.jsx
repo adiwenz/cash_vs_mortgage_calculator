@@ -1048,7 +1048,7 @@ export default function EventModalForm({
           {type === 'retire' && (
             <>
               <div className="input-wrapper">
-                <span className="input-name">Retirement Age</span>
+                <span className="input-name">Work Optional Age</span>
                 <input
                   type="number"
                   className="input-number-box"

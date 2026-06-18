@@ -394,36 +394,36 @@ export function useTimelineEvents(inputs, displayedResults) {
       if (calc.retirementReadyAgeSurvival) {
         events.push({
           age: calc.retirementReadyAgeSurvival,
-          title: `Sustainable Retirement (lasts to Life Expectancy)`,
-          label: `Sustainable Retire`,
+          title: `Work Optional (Sustainable)`,
+          label: `Work Optional`,
           icon: '🎉',
           type: 'retirementReadySurvival',
           isMilestone: true,
-          description: `Age at which you can retire and have your portfolio survive through your life expectancy (Age ${inp.lifeExpectancy}) under current assumptions.`
+          description: `Age at which your portfolio is projected to support you through your life expectancy (Age ${inp.lifeExpectancy}) under current assumptions.`
         });
       }
     } else if (inp.readinessCriteria === 'lastsComfortable') {
       if (calc.retirementReadyAgeComfortable) {
         events.push({
           age: calc.retirementReadyAgeComfortable,
-          title: `Comfortable Retirement (lasts to Life Expectancy + 10)`,
-          label: `Comfortable Retire`,
+          title: `Work Optional (Comfortable)`,
+          label: `Work Optional`,
           icon: '🎉',
           type: 'retirementReadyComfortable',
           isMilestone: true,
-          description: `Age at which you can retire and have your portfolio survive through your life expectancy plus 10 years (Age ${inp.lifeExpectancy + 10}) under current assumptions.`
+          description: `Age at which your portfolio is projected to support you through your life expectancy plus 10 years (Age ${inp.lifeExpectancy + 10}) under current assumptions.`
         });
       }
     } else {
       if (calc.retirementReadyAgeSWR) {
         events.push({
           age: calc.retirementReadyAgeSWR,
-          title: `Indefinite Retirement (lasts indefinitely)`,
-          label: `Indefinite Retire`,
+          title: `Work Optional (Indefinite)`,
+          label: `Work Optional`,
           icon: '🎉',
           type: 'retirementReadySWR',
           isMilestone: true,
-          description: `Age at which your portfolio meets the safe perpetual Safe Withdrawal Rate (SWR) target (${formatCurrency(calc.retirementReadyTarget)}), ensuring it lasts indefinitely.`
+          description: `Age at which your portfolio meets the safe perpetual Safe Withdrawal Rate (SWR) target (${formatCurrency(calc.retirementReadyTarget)}), ensuring you can remain work optional indefinitely.`
         });
       }
     }

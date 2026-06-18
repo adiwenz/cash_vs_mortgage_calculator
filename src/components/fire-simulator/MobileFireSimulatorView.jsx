@@ -14,6 +14,7 @@ import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis } from './h
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
+import MobileWorkOptionalHero from './MobileWorkOptionalHero';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import EventModalForm from './EventModalForm';
@@ -265,6 +266,7 @@ export default function MobileFireSimulatorView({
   validation,
   handleCreateEvent,
   handleEditRoadmapEvent,
+  handleDeleteRoadmapEvent,
   handleSetBudgetClick,
   handleOpenSavingsDetails,
   isMobile,
@@ -342,6 +344,7 @@ export default function MobileFireSimulatorView({
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [activeEventForSheet, setActiveEventForSheet] = useState(null);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
@@ -712,29 +715,40 @@ export default function MobileFireSimulatorView({
 
           return (
             <div>
-              <h1 className="mobile-tab-title">Interactive Roadmap</h1>
-              <p className="mobile-tab-subtitle">Your life plan at a glance</p>
+              <MobileWorkOptionalHero
+                workOptionalAge={activeResults.retirementReadyAge}
+                trackPercent={isPlanOnTrack ? '78%' : '45%'}
+                isPlanOnTrack={isPlanOnTrack}
+              />
 
-              {/* Status Card (Avatar & circular track gauge) */}
-              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1e293b', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', position: 'relative' }}>
-                    👤
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Roadmap: <span style={{ color: 'var(--accent-emerald)', fontWeight: '700' }}>Path to FIRE</span></div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.15rem' }}>
-                      Current Status: <span style={{ color: '#60a5fa' }}>{inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}</span>
+              {/* Compact status card */}
+              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  {/* Current Status Column */}
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Current Status</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#60a5fa', marginTop: '0.25rem' }}>
+                      {inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}
                     </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.1rem' }}>
-                      Projected Retirement: <span style={{ color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)' }}>
-                        {activeResults.retirementReadyAge || 'N/A'} {isPlanOnTrack ? '(On track)' : '(Delayed)'}
+                  </div>
+                  
+                  {/* Divider */}
+                  <div style={{ width: '1px', height: '28px', background: 'rgba(255, 255, 255, 0.1)', margin: '0 1rem' }} />
+                  
+                  {/* Work Optional Age Column */}
+                  <div style={{ flex: 1.5, textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Work Optional Age</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', marginTop: '0.25rem' }}>
+                      {activeResults.retirementReadyAge || 'N/A'}{' '}
+                      <span style={{ fontSize: '0.75rem', fontWeight: '600', color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)' }}>
+                        {isPlanOnTrack ? '(On Track)' : '(Delayed)'}
                       </span>
                     </div>
                   </div>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '58px', height: '58px' }}>
+
+                {/* Circular Track Gauge */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '58px', height: '58px', marginLeft: '0.5rem' }}>
                   <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}>
                     <circle cx="29" cy="29" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
                     <circle cx="29" cy="29" r="24" fill="none" stroke={isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)'} strokeWidth="4"
@@ -745,14 +759,11 @@ export default function MobileFireSimulatorView({
                     />
                   </svg>
                   <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#ffffff', lineHeight: 1 }}>{isPlanOnTrack ? '78%' : '45%'}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff', lineHeight: 1 }}>{isPlanOnTrack ? '78%' : '45%'}</span>
                     <span style={{ fontSize: '0.45rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginTop: '1px' }}>Track</span>
                   </div>
                 </div>
               </div>
-
-
-
 
               {/* Life Journey Timeline */}
               <MobileTimeline
@@ -761,6 +772,7 @@ export default function MobileFireSimulatorView({
                 selectedEventIndex={selectedEventIndex}
                 setSelectedEventIndex={setSelectedEventIndex}
                 handleEditRoadmapEvent={handleEditRoadmapEvent}
+                onEventTap={setActiveEventForSheet}
               />
 
               {/* Net Worth Graph & Projections KPIs Card */}
@@ -2380,6 +2392,187 @@ export default function MobileFireSimulatorView({
           </div>
         );
       })()}
+
+      {/* Event Options Bottom Sheet */}
+      {activeEventForSheet && (
+        <div 
+          className="modal-backdrop" 
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh', 
+            background: 'rgba(10, 10, 18, 0.6)', 
+            backdropFilter: 'blur(4px)', 
+            zIndex: 2500, 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            justifyContent: 'center',
+            padding: 0
+          }}
+          onClick={() => setActiveEventForSheet(null)}
+        >
+          <div 
+            className="mobile-bottom-sheet"
+            style={{
+              width: '100%',
+              maxWidth: '500px',
+              background: 'var(--bg-secondary)',
+              borderTop: '1px solid var(--border-color)',
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
+              padding: '1.75rem',
+              boxSizing: 'border-box',
+              position: 'relative',
+              textAlign: 'left',
+              boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Slide up drag handle visual decoration */}
+            <div style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 1.25rem auto' }} />
+
+            {/* Close button in top-right */}
+            <button 
+              type="button" 
+              onClick={() => setActiveEventForSheet(null)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1.25rem',
+                background: 'rgba(255,255,255,0.06)',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '1.1rem'
+              }}
+            >
+              ×
+            </button>
+
+            {/* Event Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.25rem' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '50%', 
+                background: 'var(--primary-light)', 
+                border: '1px solid rgba(99, 102, 241, 0.3)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                fontSize: '1.6rem' 
+              }}>
+                {activeEventForSheet.icon}
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                  {activeEventForSheet.label || activeEventForSheet.title}
+                </h3>
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary)', marginTop: '0.15rem', display: 'inline-block' }}>
+                  Age {activeEventForSheet.age}
+                </span>
+              </div>
+            </div>
+
+            {/* Description/matters */}
+            {(() => {
+              const details = getRoadmapDetails(activeEventForSheet, formatCurrency, inputs);
+              return details?.whyItMatters ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.45', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                  {details.whyItMatters}
+                </p>
+              ) : null;
+            })()}
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {isEditableEvent(activeEventForSheet) ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEventForSheet(null);
+                      handleEditRoadmapEvent(activeEventForSheet);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem',
+                      borderRadius: '12px',
+                      background: 'var(--primary)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background var(--transition-fast)'
+                    }}
+                  >
+                    <span>Edit Event Details</span>
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEventForSheet(null);
+                      if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
+                        handleDeleteRoadmapEvent(activeEventForSheet);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem',
+                      borderRadius: '12px',
+                      background: 'rgba(244, 63, 94, 0.1)',
+                      border: '1px solid rgba(244, 63, 94, 0.2)',
+                      color: 'var(--accent-rose)',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <span>Delete Event</span>
+                    <span>→</span>
+                  </button>
+                </>
+              ) : (
+                <div style={{ 
+                  fontSize: '0.8rem', 
+                  color: 'var(--text-tertiary)', 
+                  textAlign: 'center', 
+                  padding: '0.75rem 1rem', 
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  fontWeight: '500'
+                }}>
+                  <span>ℹ️</span> This milestone is calculated from your plan.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

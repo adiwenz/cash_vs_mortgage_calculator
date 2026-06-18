@@ -362,7 +362,7 @@ export default function MarriageWizard({
                     />
                   </div>
                   <div className="input-wrapper">
-                    <span className="input-name">Spouse Retirement Age</span>
+                    <span className="input-name">Spouse Work Optional Age</span>
                     <input
                       type="number"
                       className="input-number-box"
@@ -891,7 +891,7 @@ export default function MarriageWizard({
             {/* Retirement Readiness Impact Card */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.2rem', marginTop: '0.2rem' }}>
               <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Before Retirement Age</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Before Work Optional Age</span>
                 <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
                   {beforeReadyAge ? `Age ${beforeReadyAge}` : 'Never Ready'}
                 </div>
@@ -904,7 +904,7 @@ export default function MarriageWizard({
                 background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
                 textAlign: 'center'
               }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Retirement Age</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Work Optional Age</span>
                 <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)', marginTop: '0.2rem' }}>
                   {afterReadyAge ? `Age ${afterReadyAge}` : 'Never Ready'}
                 </div>

@@ -1282,7 +1282,7 @@ export default function MobileEventWizard({
                 {draftEvent.type === 'retire' && (
                   <>
                     <div className="form-group-item">
-                      <label className="form-group-label">Desired Retirement Age</label>
+                      <label className="form-group-label">Desired Work Optional Age</label>
                       <div className="picker-slider-row">
                         <button 
                           type="button" 
@@ -1570,7 +1570,7 @@ export default function MobileEventWizard({
 
                     {/* Retirement Age Card */}
                     <div className="impact-metric-card">
-                      <span className="metric-lbl">Retirement Age</span>
+                      <span className="metric-lbl">Work Optional Age</span>
                       <div className="metric-vals">
                         <span className="metric-before">
                           {typeof impactMetrics.retirementAge.before === 'number' 
@@ -1851,7 +1851,7 @@ export default function MobileEventWizard({
                             <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(outcomeDetails.recommendedPayment)}/mo</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>New Retirement Age:</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>New Work Optional Age:</span>
                             <strong style={{ color: 'var(--text-primary)' }}>{renderRetirementAgeText(outcomeDetails.retirementAge)}</strong>
                           </div>
                         </div>

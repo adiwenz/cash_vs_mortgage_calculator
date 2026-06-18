@@ -422,7 +422,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const nwCard = screen.getByText('Net Worth at Age 85').closest('.impact-metric-card');
     expect(nwCard.textContent).not.toContain('$0→$0');
 
-    const ageCard = screen.getByText('Retirement Age').closest('.impact-metric-card');
+    const ageCard = screen.getByText('Work Optional Age').closest('.impact-metric-card');
     expect(ageCard.textContent).toContain('Needs Adjustment');
   });
 
@@ -433,7 +433,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const onClose = vi.fn();
 
     const mockGetInputsWithEvent = (inps, evt) => {
-      const copyEvt = { ...evt, id: 'child-1', enabled: true };
+      const copyEvt = { ...evt, id: 'jane-child-event', originalId: 'jane-child-event', enabled: true };
       return {
         newInputs: {
           ...inps,
@@ -443,10 +443,11 @@ describe('Mobile Event Wizard & Flow', () => {
       };
     };
 
-    render(
+    const { container } = render(
       <MobileEventWizard
         inputs={inputs}
-        editingEvent={{
+        updateInput={vi.fn()}
+        draftEvent={{
           type: 'haveChild',
           birthAge: 35,
           childName: 'Jane',
@@ -468,6 +469,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const childBtn = screen.getByText('Child / Adoption');
     fireEvent.click(childBtn);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
