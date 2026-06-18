@@ -70,6 +70,15 @@ export default function DesktopBudgetPanel({
   budgetScalingMode,
   handleToggleBudgetScalingMode
 }) {
+  const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
+  const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
+  const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
+    ? Math.round(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
+    : (budgetSavings.brokerage || 0);
+  const estPartnerBrokerageMonthly = savingsAllocMode === 'percentSurplus'
+    ? Math.round(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
+    : (budgetPartnerSavings.brokerage || 0);
+
   return (
     <div className="budget-modal-layout">
       {/* Left/Main Column */}
@@ -821,45 +830,51 @@ export default function DesktopBudgetPanel({
                       { key: 'emergency', label: 'Emergency Fund' },
                       { key: 'debt', label: 'Debt Payoff' },
                       { key: 'other', label: 'Other Savings' }
-                    ]).map(item => (
-                      <div key={item.key} className="breakdown-row budget-input-row" style={{ minHeight: '22px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span className="breakdown-row-label">{item.label}</span>
-                          {item.desc && !isEditingSavings && (
-                            <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: '-0.15rem' }}>
-                              {item.desc}
-                            </span>
+                    ]).map(item => {
+                      const isUncustomized = inputs.hasCustomizedSavingsAllocation !== true;
+                      const itemDesc = (item.key === 'brokerage' && isUncustomized)
+                        ? `Investing: ${formatCurrency(estBrokerageMonthly)}/mo`
+                        : item.desc;
+                      return (
+                        <div key={item.key} className="breakdown-row budget-input-row" style={{ minHeight: '22px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span className="breakdown-row-label">{item.label}</span>
+                            {itemDesc && !isEditingSavings && (
+                              <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: '-0.15rem' }}>
+                                {itemDesc}
+                              </span>
+                            )}
+                          </div>
+                          {isEditingSavings ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
+                              <div className="input-prefix-wrapper" style={{ width: '100px' }}>
+                                <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                <input
+                                  type="number"
+                                  className="input-number-box"
+                                  style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
+                                  value={budgetSavings[item.key] || 0}
+                                  onChange={(e) => handleSavingsChange(
+                                    item.key,
+                                    Math.max(0, parseFloat(e.target.value) || 0),
+                                    false
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="breakdown-row-dots" />
+                              <span className="breakdown-row-value">
+                                {savingsAllocMode === 'percentSurplus' 
+                                  ? `${budgetSavings[item.key] || 0}%` 
+                                  : formatCurrency(budgetSavings[item.key] || 0)}
+                              </span>
+                            </>
                           )}
                         </div>
-                        {isEditingSavings ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
-                            <div className="input-prefix-wrapper" style={{ width: '100px' }}>
-                              <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
-                                value={budgetSavings[item.key] || 0}
-                                onChange={(e) => handleSavingsChange(
-                                  item.key,
-                                  Math.max(0, parseFloat(e.target.value) || 0),
-                                  false
-                                )}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="breakdown-row-dots" />
-                            <span className="breakdown-row-value">
-                              {savingsAllocMode === 'percentSurplus' 
-                                ? `${budgetSavings[item.key] || 0}%` 
-                                : formatCurrency(budgetSavings[item.key] || 0)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {isMarriedMode && (
                       <div style={{ marginTop: '0.5rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
@@ -879,55 +894,61 @@ export default function DesktopBudgetPanel({
                           { key: 'cash', label: 'Partner Cash Savings' },
                           { key: 'debt', label: 'Partner Other Debt' },
                           { key: 'other', label: 'Partner Other Savings' }
-                        ].map(item => (
-                          <div 
-                            key={item.key} 
-                            className="budget-input-row"
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              gap: '0.5rem',
-                              padding: '0.4rem 0.5rem'
-                            }}
-                          >
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span className="breakdown-row-label">{item.label}</span>
-                              {item.desc && !isEditingSavings && (
-                                <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: '-0.15rem' }}>
-                                  {item.desc}
-                                </span>
+                        ].map(item => {
+                          const isUncustomized = inputs.hasCustomizedSavingsAllocation !== true;
+                          const itemDesc = (item.key === 'brokerage' && isUncustomized)
+                            ? `Investing: ${formatCurrency(estPartnerBrokerageMonthly)}/mo`
+                            : item.desc;
+                          return (
+                            <div 
+                              key={item.key} 
+                              className="budget-input-row"
+                              style={{ 
+                                display: 'flex', 
+                                justifyStyle: 'space-between', 
+                                alignItems: 'center', 
+                                gap: '0.5rem',
+                                padding: '0.4rem 0.5rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span className="breakdown-row-label">{item.label}</span>
+                                {itemDesc && !isEditingSavings && (
+                                  <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: '-0.15rem' }}>
+                                    {itemDesc}
+                                  </span>
+                                )}
+                              </div>
+                              {isEditingSavings ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
+                                  <div className="input-prefix-wrapper" style={{ width: '100px' }}>
+                                    <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                    <input
+                                      type="number"
+                                      className="input-number-box"
+                                      style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
+                                      value={budgetPartnerSavings[item.key] || 0}
+                                      onChange={(e) => handleSavingsChange(
+                                        item.key,
+                                        Math.max(0, parseFloat(e.target.value) || 0),
+                                        true
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="breakdown-row-dots" />
+                                  <span className="breakdown-row-value">
+                                    {savingsAllocMode === 'percentSurplus' 
+                                      ? `${budgetPartnerSavings[item.key] || 0}%` 
+                                      : formatCurrency(budgetPartnerSavings[item.key] || 0)}
+                                  </span>
+                                </>
                               )}
                             </div>
-                            {isEditingSavings ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
-                                <div className="input-prefix-wrapper" style={{ width: '100px' }}>
-                                  <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                  <input
-                                    type="number"
-                                    className="input-number-box"
-                                    style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
-                                    value={budgetPartnerSavings[item.key] || 0}
-                                    onChange={(e) => handleSavingsChange(
-                                      item.key,
-                                      Math.max(0, parseFloat(e.target.value) || 0),
-                                      true
-                                    )}
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="breakdown-row-dots" />
-                                <span className="breakdown-row-value">
-                                  {savingsAllocMode === 'percentSurplus' 
-                                    ? `${budgetPartnerSavings[item.key] || 0}%` 
-                                    : formatCurrency(budgetPartnerSavings[item.key] || 0)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 

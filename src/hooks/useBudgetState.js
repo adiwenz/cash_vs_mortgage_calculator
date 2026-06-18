@@ -35,8 +35,8 @@ export function useBudgetState(
   };
   
   const [budgetSavings, setBudgetSavings] = useState({
-    trad401k: 100, rothIra: 50, tradIra: 0, hsa: 50, brokerage: 0,
-    checking: 50, hysa: 50, emergency: 26, debt: 0, other: 0
+    trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 625,
+    checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
   });
   
   const [budgetPartnerSavings, setBudgetPartnerSavings] = useState({
@@ -290,6 +290,7 @@ export function useBudgetState(
       let newInputs = { ...scen.inputs };
       
       newInputs.filingStatus = budgetFilingStatus;
+      newInputs.hasCustomizedSavingsAllocation = true;
       if (!newInputs.budgetDetails) newInputs.budgetDetails = {};
       newInputs.budgetDetails.hsaCoverage = budgetHsaCoverage;
       if (updatedDefaultTemplate) {

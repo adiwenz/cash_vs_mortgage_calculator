@@ -1,5 +1,24 @@
 import { runFireSimulation } from './src/fireCalculations.js';
-import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
+import { DEFAULT_FIRE_INPUTS as ORIGINAL_DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
+const DEFAULT_FIRE_INPUTS = {
+  ...ORIGINAL_DEFAULT_FIRE_INPUTS,
+  hasCustomizedSavingsAllocation: true,
+  budgetDetails: {
+    ...ORIGINAL_DEFAULT_FIRE_INPUTS.budgetDetails,
+    savings: {
+      trad401k: 200,
+      rothIra: 100,
+      tradIra: 0,
+      hsa: 50,
+      brokerage: 0,
+      checking: 100,
+      hysa: 100,
+      emergency: 75,
+      debt: 0,
+      other: 0
+    }
+  }
+};
 
 console.log('--- Running Nominal vs Deflated Projections Verification ---');
 

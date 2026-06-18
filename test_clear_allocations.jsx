@@ -95,15 +95,15 @@ describe('Clear Budget Allocations Feature', () => {
     const editSavingsBtn = screen.getByRole('button', { name: /Edit Savings →/i });
     fireEvent.click(editSavingsBtn);
 
-    // Traditional 401k starts at 200
-    const check401k = getInputByWrapperText(/401\(k\) \(Pre-Tax\)/i);
-    expect(check401k.value).toBe('200');
+    // Brokerage starts at 625
+    const brokerageInput = getInputByWrapperText(/Taxable Brokerage/i);
+    expect(brokerageInput.value).toBe('625');
 
     // Click "Clear"
     const clearSavingsBtn = screen.getByRole('button', { name: /^Clear$/i });
     fireEvent.click(clearSavingsBtn);
 
-    // Verify 401k is now 0
-    expect(check401k.value).toBe('0');
+    // Verify Brokerage is now 0
+    expect(brokerageInput.value).toBe('0');
   });
 });

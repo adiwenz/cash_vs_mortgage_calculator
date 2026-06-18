@@ -12,10 +12,16 @@ export function getProfileFromInputs(inputs) {
     ? Math.max(currentAge, Number(retireEvent.age) || 65) 
     : lifeExpectancy;
 
+  let hasCustomizedSavingsAllocation = inputs.hasCustomizedSavingsAllocation;
+  if (hasCustomizedSavingsAllocation === undefined) {
+    hasCustomizedSavingsAllocation = false;
+  }
+
   return {
     currentAge,
     lifeExpectancy,
     targetRetirementAge,
+    hasCustomizedSavingsAllocation,
     expectedReturn: parseNum(inputs.expectedReturn, 7) / 100,
     postRetirementReturn: inputs.postRetirementReturn !== undefined
       ? parseNum(inputs.postRetirementReturn, 0) / 100

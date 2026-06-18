@@ -129,6 +129,7 @@ describe('buildSimulationDebugSnapshot', () => {
     // SCENARIO A: 100% Brokerage savings
     const inputsA = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       targetRetirementAge: 65,
       lifeExpectancy: 85,
@@ -185,6 +186,7 @@ describe('buildSimulationDebugSnapshot', () => {
     // SCENARIO B: 100% Cash savings
     const inputsB = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       targetRetirementAge: 65,
       lifeExpectancy: 85,

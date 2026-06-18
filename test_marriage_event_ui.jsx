@@ -218,12 +218,13 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // spouseMonthlySavings = 50000 * 0.15 / 12 = 625.
     // User total savings = 625. So ratio is 1:1.
     // Therefore partner's allocations should be identical to user's!
-    expect(getInputByWrapperText(/Partner Checking Account/i).value).toBe('100');
-    expect(getInputByWrapperText(/Partner High-Yield Savings/i).value).toBe('100');
-    expect(getInputByWrapperText(/Partner Emergency Fund/i).value).toBe('75');
-    expect(getInputByWrapperText(/Partner 401\(k\) \(Pre-Tax\)/i).value).toBe('200');
-    expect(getInputByWrapperText(/Partner Roth IRA/i).value).toBe('100');
-    expect(getInputByWrapperText(/Partner HSA/i).value).toBe('50');
+    expect(getInputByWrapperText(/Partner Checking Account/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner High-Yield Savings/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner Emergency Fund/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner 401\(k\) \(Pre-Tax\)/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner Roth IRA/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner HSA/i).value).toBe('0');
+    expect(getInputByWrapperText(/Partner Brokerage/i).value).toBe('625');
 
     // Close budget modal
     const cancelBtn = document.querySelector('.budget-modal-card .btn-secondary');

@@ -10,6 +10,7 @@ describe('Debt & Budget Integration', () => {
 
   beforeEach(() => {
     baseInputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    delete baseInputs.hasCustomizedSavingsAllocation;
     baseInputs.lifeEvents = baseInputs.lifeEvents || [];
     baseInputs.houseAssets = baseInputs.houseAssets || [];
     baseInputs.debtList = baseInputs.debtList || [];
@@ -119,6 +120,7 @@ describe('Debt & Budget Integration', () => {
   });
 
   test('Existing budgets Wants and Savings allocations are not silently modified when debt is added', () => {
+    baseInputs.hasCustomizedSavingsAllocation = true;
     // Add default budget details
     baseInputs.budgetDetails = {
       savings: {

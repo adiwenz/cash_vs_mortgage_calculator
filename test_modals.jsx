@@ -99,10 +99,10 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Assert default values
     const check401k = getInputByWrapperText(/401\(k\) \(Pre-Tax\)/i);
-    expect(check401k.value).toBe('200');
+    expect(check401k.value).toBe('0');
     
     const checkingAcc = getInputByWrapperText(/Checking Account/i);
-    expect(checkingAcc.value).toBe('100');
+    expect(checkingAcc.value).toBe('0');
     
     // Verify initial balance state
     expect(screen.getByText(/You’re on track/i)).toBeDefined();

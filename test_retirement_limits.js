@@ -3,6 +3,7 @@ import { runFireSimulation } from './src/fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS as ORIGINAL_DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
 const DEFAULT_FIRE_INPUTS = {
   ...ORIGINAL_DEFAULT_FIRE_INPUTS,
+  hasCustomizedSavingsAllocation: true,
   inflationRate: 0,
   incomeList: ORIGINAL_DEFAULT_FIRE_INPUTS.incomeList.map(inc => ({ ...inc, growthRate: 0 }))
 };

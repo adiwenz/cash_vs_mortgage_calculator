@@ -11,6 +11,7 @@ describe('Savings Allocation Routing Priority Regression Tests', () => {
   test('1. 100% checking does not contribute to brokerage', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       simpleIncome: 56004,
       targetRetirementAge: 65,
@@ -86,6 +87,7 @@ describe('Savings Allocation Routing Priority Regression Tests', () => {
   test('2. 100% brokerage receives contributions', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       simpleIncome: 56004,
       targetRetirementAge: 65,
@@ -154,6 +156,7 @@ describe('Savings Allocation Routing Priority Regression Tests', () => {
   test('3. No double counting', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       simpleIncome: 56004,
       targetRetirementAge: 65,
@@ -220,6 +223,7 @@ describe('Savings Allocation Routing Priority Regression Tests', () => {
   test('4. Allocation rules are fallback only', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       targetRetirementAge: 65,
       lifeExpectancy: 85,

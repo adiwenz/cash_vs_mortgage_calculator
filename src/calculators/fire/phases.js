@@ -348,6 +348,36 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     };
   }
 
+  if (!profile.hasCustomizedSavingsAllocation) {
+    const totalExpensesAmt = Object.keys(standardExpenses).filter(k => !k.startsWith('debt_')).reduce((sum, k) => sum + (Number(standardExpenses[k]) || 0), 0);
+    const totalSavingsAmt = Math.max(0, standardIncome - totalExpensesAmt);
+    standardSavings = {
+      trad401k: 0,
+      rothIra: 0,
+      tradIra: 0,
+      hsa: 0,
+      brokerage: totalSavingsAmt,
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
+      debt: 0,
+      other: 0
+    };
+    standardPartnerSavings = {
+      trad401k: 0,
+      rothIra: 0,
+      tradIra: 0,
+      hsa: 0,
+      brokerage: 0,
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
+      debt: 0,
+      other: 0
+    };
+    standardSavingsAllocMode = 'fixed';
+  }
+
   // Remove debt and childcare keys from standardExpenses
   Object.keys(standardExpenses).forEach(k => {
     if (k.startsWith('debt_') || k === 'childcare') {
@@ -852,6 +882,36 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       Object.keys(savedPhase.expenses).forEach(k => {
         resolvedExpenses[k] = savedPhase.expenses[k];
       });
+    }
+
+    if (!profile.hasCustomizedSavingsAllocation && start < targetRetirementAge) {
+      const totalExpensesAmt = Object.keys(resolvedExpenses).filter(k => !k.startsWith('debt_')).reduce((sum, k) => sum + (Number(resolvedExpenses[k]) || 0), 0);
+      const totalSavingsAmt = Math.max(0, resolvedIncome - totalExpensesAmt);
+      baseSavings = {
+        trad401k: 0,
+        rothIra: 0,
+        tradIra: 0,
+        hsa: 0,
+        brokerage: totalSavingsAmt,
+        checking: 0,
+        hysa: 0,
+        emergency: 0,
+        debt: 0,
+        other: 0
+      };
+      basePartnerSavings = {
+        trad401k: 0,
+        rothIra: 0,
+        tradIra: 0,
+        hsa: 0,
+        brokerage: 0,
+        checking: 0,
+        hysa: 0,
+        emergency: 0,
+        debt: 0,
+        other: 0
+      };
+      savingsAllocMode = 'fixed';
     }
 
     if (isMarried && start < targetRetirementAge) {

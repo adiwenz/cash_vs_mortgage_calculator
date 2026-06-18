@@ -41,7 +41,21 @@ export function expect(val) {
 
 // Returns a deep clone of the default inputs
 export function getMappedDefaultInputs() {
-  return JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+  inputs.hasCustomizedSavingsAllocation = true;
+  inputs.budgetDetails.savings = {
+    trad401k: 200,
+    rothIra: 100,
+    tradIra: 0,
+    hsa: 50,
+    brokerage: 0,
+    checking: 100,
+    hysa: 100,
+    emergency: 75,
+    debt: 0,
+    other: 0
+  };
+  return inputs;
 }
 
 // Translates raw simulation results into a yearly results structure for assertions and diagnostics

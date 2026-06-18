@@ -20,6 +20,8 @@ export const DEFAULT_FIRE_INPUTS = {
   simpleIncome: 50000,
   simpleExpenses: 42500,
   simpleInvestments: 5000,
+  hasCustomizedSavingsAllocation: false,
+  schemaVersion: 1,
   childCosts: {
     ages0to4: 15000,
     ages5to12: 15000,
@@ -41,14 +43,14 @@ export const DEFAULT_FIRE_INPUTS = {
   },
   budgetDetails: {
     savings: {
-      trad401k: 200,
-      rothIra: 100,
+      trad401k: 0,
+      rothIra: 0,
       tradIra: 0,
-      hsa: 50,
-      brokerage: 0,
-      checking: 100,
-      hysa: 100,
-      emergency: 75,
+      hsa: 0,
+      brokerage: 625,
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
       debt: 0,
       other: 0
     },

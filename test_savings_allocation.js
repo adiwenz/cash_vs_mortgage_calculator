@@ -12,6 +12,7 @@ describe('Savings Allocation Engine', () => {
       simpleIncome: 100000,
       simpleExpenses: 50000,
       includeTaxes: false,
+      hasCustomizedSavingsAllocation: true,
       assets: {
         cash: 10000,
         emergencyFund: 5000,
@@ -97,6 +98,7 @@ describe('Savings Allocation Engine', () => {
       simpleIncome: 60000,
       simpleExpenses: 50000,
       includeTaxes: false,
+      hasCustomizedSavingsAllocation: true,
       budgetDetails: {
         savings: {
           trad401k: 1000,
@@ -138,6 +140,7 @@ describe('Savings Allocation Engine', () => {
       simpleIncome: 100000,
       simpleExpenses: 50000,
       includeTaxes: false,
+      hasCustomizedSavingsAllocation: true,
       debtList: [
         {
           id: 'loan-1',
@@ -185,6 +188,7 @@ describe('Savings Allocation Engine', () => {
       simpleIncome: 40000,
       simpleExpenses: 50000,
       includeTaxes: false,
+      hasCustomizedSavingsAllocation: true,
       budgetDetails: {
         savings: {
           trad401k: 200,

@@ -58,6 +58,15 @@ export default function MobileBudgetPanel({
 }) {
   const [expandedSection, setExpandedSection] = useState('needs'); // 'needs', 'wants', or 'savings'
 
+  const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
+  const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
+  const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
+    ? Math.round(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
+    : (budgetSavings.brokerage || 0);
+  const estPartnerBrokerageMonthly = savingsAllocMode === 'percentSurplus'
+    ? Math.round(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
+    : (budgetPartnerSavings.brokerage || 0);
+
   return (
     <div className="mobile-budget-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--text-primary)', padding: '1rem' }}>
       
@@ -471,33 +480,46 @@ export default function MobileBudgetPanel({
                       { key: 'emergency', label: 'Emergency Fund' },
                       { key: 'debt', label: 'Debt Payoff' },
                       { key: 'other', label: 'Other Savings' }
-                    ]).map(item => (
-                      <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                        {isEditingSavings ? (
-                          <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                            <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                            <input
-                              type="number"
-                              className="input-number-box"
-                              style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
-                              value={budgetSavings[item.key] || 0}
-                              onChange={(e) => handleSavingsChange(
-                                item.key,
-                                Math.max(0, parseFloat(e.target.value) || 0),
-                                false
-                              )}
-                            />
+                    ]).map(item => {
+                      const isUncustomized = inputs.hasCustomizedSavingsAllocation !== true;
+                      const itemDesc = (item.key === 'brokerage' && isUncustomized)
+                        ? `Investing: ${formatCurrency(estBrokerageMonthly)}/mo`
+                        : null;
+                      return (
+                        <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                            {itemDesc && !isEditingSavings && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
+                                {itemDesc}
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                            {savingsAllocMode === 'percentSurplus' 
-                              ? `${budgetSavings[item.key] || 0}%` 
-                              : formatCurrency(budgetSavings[item.key] || 0)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                          {isEditingSavings ? (
+                            <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                              <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                                value={budgetSavings[item.key] || 0}
+                                onChange={(e) => handleSavingsChange(
+                                  item.key,
+                                  Math.max(0, parseFloat(e.target.value) || 0),
+                                  false
+                                )}
+                              />
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                              {savingsAllocMode === 'percentSurplus' 
+                                ? `${budgetSavings[item.key] || 0}%` 
+                                : formatCurrency(budgetSavings[item.key] || 0)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {isMarriedMode && (
                       <div style={{ marginTop: '0.5rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
@@ -517,33 +539,46 @@ export default function MobileBudgetPanel({
                           { key: 'cash', label: 'Partner Cash' },
                           { key: 'debt', label: 'Partner Debt' },
                           { key: 'other', label: 'Partner Other' }
-                        ].map(item => (
-                          <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                            {isEditingSavings ? (
-                              <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                                <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                <input
-                                  type="number"
-                                  className="input-number-box"
-                                  style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
-                                  value={budgetPartnerSavings[item.key] || 0}
-                                  onChange={(e) => handleSavingsChange(
-                                    item.key,
-                                    Math.max(0, parseFloat(e.target.value) || 0),
-                                    true
-                                  )}
-                                />
+                        ].map(item => {
+                          const isUncustomized = inputs.hasCustomizedSavingsAllocation !== true;
+                          const itemDesc = (item.key === 'brokerage' && isUncustomized)
+                            ? `Investing: ${formatCurrency(estPartnerBrokerageMonthly)}/mo`
+                            : null;
+                          return (
+                            <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                                {itemDesc && !isEditingSavings && (
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
+                                    {itemDesc}
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                                {savingsAllocMode === 'percentSurplus' 
-                                  ? `${budgetPartnerSavings[item.key] || 0}%` 
-                                  : formatCurrency(budgetPartnerSavings[item.key] || 0)}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                              {isEditingSavings ? (
+                                <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                                  <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                  <input
+                                    type="number"
+                                    className="input-number-box"
+                                    style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                                    value={budgetPartnerSavings[item.key] || 0}
+                                    onChange={(e) => handleSavingsChange(
+                                      item.key,
+                                      Math.max(0, parseFloat(e.target.value) || 0),
+                                      true
+                                    )}
+                                  />
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                                  {savingsAllocMode === 'percentSurplus' 
+                                    ? `${budgetPartnerSavings[item.key] || 0}%` 
+                                    : formatCurrency(budgetPartnerSavings[item.key] || 0)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 

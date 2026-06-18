@@ -7,6 +7,7 @@ describe('Budget Drift and Scaling Modes', () => {
 
   beforeEach(() => {
     baseInputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    baseInputs.hasCustomizedSavingsAllocation = true;
     baseInputs.lifeEvents = [
       {
         id: 'retire-1',

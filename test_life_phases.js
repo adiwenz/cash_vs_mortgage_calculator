@@ -8,6 +8,7 @@ describe('Life Phases Budgeting', () => {
 
   beforeEach(() => {
     baseInputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    baseInputs.hasCustomizedSavingsAllocation = true;
     baseInputs.lifeEvents = baseInputs.lifeEvents || [];
     baseInputs.householdMembers = [];
     baseInputs.incomeList = [];

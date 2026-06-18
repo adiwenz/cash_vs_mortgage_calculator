@@ -6,6 +6,7 @@ describe('Deeper Debugging and Brokerage Audit', () => {
   test('Acceptance Check Scenario: brokerage savings = 0, starting brokerage = 5000', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
+      hasCustomizedSavingsAllocation: true,
       currentAge: 35,
       targetRetirementAge: 65,
       lifeExpectancy: 85,
