@@ -21,6 +21,7 @@ export function getProfileFromInputs(inputs) {
       ? parseNum(inputs.postRetirementReturn, 0) / 100
       : parseNum(inputs.expectedReturn, 7) / 100,
     inflationRate: parseNum(inputs.inflationRate, 3) / 100,
+    cashReturnRate: parseNum(inputs.cashReturnRate, 2) / 100,
     lifestyleUpgrades: parseNum(inputs.lifestyleUpgrades, 0) / 100,
     swr: parseNum(inputs.swr, 4) / 100,
     fireMode: inputs.fireMode || 'traditional',

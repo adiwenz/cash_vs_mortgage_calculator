@@ -20,10 +20,10 @@ try {
     throw new Error('Could not locate required ages in simulation results.');
   }
 
-  // 1. Age 65 nominal net worth is between $950k and $1.1M
-  expect(age65.netWorth).toBeGreaterThanOrEqual(950000);
-  expect(age65.netWorth).toBeLessThanOrEqual(1100000);
-  console.log(`✅ Age 65 Net Worth ($${Math.round(age65.netWorth).toLocaleString()}) is inside the $950k - $1.1M range.`);
+  // 1. Age 65 nominal net worth is between $700k and $800k
+  expect(age65.netWorth).toBeGreaterThanOrEqual(700000);
+  expect(age65.netWorth).toBeLessThanOrEqual(800000);
+  console.log(`✅ Age 65 Net Worth ($${Math.round(age65.netWorth).toLocaleString()}) is inside the $700k - $800k range.`);
 
   // 2. Age 85 net worth is positive
   expect(age85.netWorth).toBeGreaterThan(0);

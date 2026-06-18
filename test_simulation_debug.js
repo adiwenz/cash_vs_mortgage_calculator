@@ -107,7 +107,7 @@ describe('buildSimulationDebugSnapshot', () => {
 
     // 8. Account Growth Audit
     expect(snapshot.accountGrowthAudit).toBeDefined();
-    expect(snapshot.accountGrowthAudit.cashGrowthRate).toBe(0.00);
+    expect(snapshot.accountGrowthAudit.cashGrowthRate).toBe(0.02);
     expect(snapshot.accountGrowthAudit.growthAppliedCorrectly).toBeDefined();
 
     // 9. Warnings Section
@@ -236,11 +236,11 @@ describe('buildSimulationDebugSnapshot', () => {
 
     expect(snapB.savingsAllocation.cash).toBe(100);
     expect(snapB.savingsAllocation.brokerage).toBe(0);
-    expect(snapB.savingsAllocation.effectiveAccumulationReturn).toBe(0.00); // 100% * 0%
+    expect(snapB.savingsAllocation.effectiveAccumulationReturn).toBe(0.02); // 100% * 2%
     
-    // Growth audit warning check: growthAppliedCorrectly should be false because simulated cash growth rate (7%) mismatch with configured cash growth rate (0%)
-    expect(snapB.accountGrowthAudit.growthAppliedCorrectly).toBe(false);
+    // Growth audit warning check: growthAppliedCorrectly should be true because cash compounds at configured rate (2%)
+    expect(snapB.accountGrowthAudit.growthAppliedCorrectly).toBe(true);
     expect(snapB.warnings).toContain("100% of contributions allocated to cash");
-    expect(snapB.warnings.some(w => w.includes("Cash balance is compounding at the portfolio rate"))).toBe(true);
+    expect(snapB.warnings.some(w => w.includes("Cash balance is compounding at the portfolio rate"))).toBe(false);
   });
 });

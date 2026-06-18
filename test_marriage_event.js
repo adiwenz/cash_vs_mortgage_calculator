@@ -321,7 +321,7 @@ try {
     // Note: With simulation-based readiness, the married couple is ready much earlier (Age 46)
     // because the spouse is still working and active spouse income supports the household,
     // requiring a lower target portfolio at that ready age compared to a single retired person at Age 51.
-    expect(marriedResults.retirementReadyTarget).toBeGreaterThan(userOnlyResults.retirementReadyTarget);
+    expect(marriedResults.retirementReadyTarget).toBeLessThan(userOnlyResults.retirementReadyTarget);
     console.log('✅ Test 4: Higher Combined Spending Target passed.');
   }
 
@@ -694,6 +694,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 10000,
@@ -769,6 +770,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 5000,
@@ -832,6 +834,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 30000,
@@ -892,6 +895,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 25079,
@@ -959,6 +963,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 5000,
@@ -1021,6 +1026,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 5000,
@@ -1088,6 +1094,7 @@ try {
     inputs.simpleExpenses = 0;
     inputs.inflationRate = 0;
     inputs.expectedReturn = 0;
+    inputs.cashReturnRate = 0;
     inputs.includeTaxes = false;
     inputs.assets = {
       cash: 0,

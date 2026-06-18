@@ -95,10 +95,19 @@ console.log('✅ PASS: Lifestyle gaps correctly detected and recorded.');
 // 4. Regression test: baseline curve === child cost + equal income boost curve (tax-unaware)
 console.log('Verifying baseline curve === child cost + equal income boost curve (tax-unaware)...');
 
+const childcareBudgetDetails = {
+  ...DEFAULT_FIRE_INPUTS.budgetDetails,
+  income: 50000 / 12,
+  expenses: {
+    ...DEFAULT_FIRE_INPUTS.budgetDetails.expenses,
+    misc: 42500 / 12 - (1500 + 300 + 600 + 400 + 300 + 300)
+  }
+};
+
 const baseTestInputs = {
   ...DEFAULT_FIRE_INPUTS,
   includeTaxes: false,
-  budgetDetails: null,
+  budgetDetails: childcareBudgetDetails,
   lifeEvents: [
     {
       id: 'retire-1',
@@ -114,13 +123,8 @@ const baseTestInputs = {
 const offsetTestInputs = {
   ...baseTestInputs,
   budgetDetails: {
-    ...DEFAULT_FIRE_INPUTS.budgetDetails,
-    income: 50000 / 12,
-    childcareIncome: (50000 / 12) + 1250, // $15,000/yr child cost = $1,250/mo bump
-    expenses: {
-      ...DEFAULT_FIRE_INPUTS.budgetDetails.expenses,
-      misc: 42500 / 12 - (1500 + 300 + 600 + 400 + 300 + 300)
-    }
+    ...childcareBudgetDetails,
+    childcareIncome: (50000 / 12) + 1250 // $15,000/yr child cost = $1,250/mo bump
   },
   lifeEvents: [
     ...baseTestInputs.lifeEvents,
@@ -221,7 +225,7 @@ console.log('Verifying child removal reverts trajectory to baseline...');
 
 const removedTestInputs = {
   ...offsetTestInputs,
-  budgetDetails: null,
+  budgetDetails: childcareBudgetDetails,
   incomeList: baseTestInputs.incomeList,
   spendingPhases: baseTestInputs.spendingPhases,
   lifeEvents: offsetTestInputs.lifeEvents.filter(e => e.type !== 'haveChild')

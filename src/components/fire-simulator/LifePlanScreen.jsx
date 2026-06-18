@@ -2276,6 +2276,17 @@ export default function LifePlanScreen({
                               />
                             </div>
                             <div className="input-wrapper">
+                              <span className="input-name">Cash Return Rate (%)</span>
+                              <input
+                                type="number"
+                                className="input-number-box"
+                                style={{ width: '100%' }}
+                                value={inputs.cashReturnRate !== undefined ? inputs.cashReturnRate : 2.0}
+                                step="0.1"
+                                onChange={(e) => updateInput('cashReturnRate', parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <div className="input-wrapper">
                               <span className="input-name">Inflation Rate (%)</span>
                               <input
                                 type="number"

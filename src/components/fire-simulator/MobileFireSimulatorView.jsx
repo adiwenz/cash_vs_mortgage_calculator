@@ -1121,6 +1121,22 @@ export default function MobileFireSimulatorView({
 
                 <div className="mobile-input-row">
                   <div className="mobile-input-label-col">
+                    <span className="mobile-input-title">Cash Return Rate (%)</span>
+                    <span className="mobile-input-desc">Checking and cash return rate</span>
+                  </div>
+                  <div className="mobile-input-box-wrapper">
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="mobile-input-box"
+                      value={inputs.cashReturnRate !== undefined ? inputs.cashReturnRate : 2.0}
+                      onChange={(e) => updateInput('cashReturnRate', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+
+                <div className="mobile-input-row">
+                  <div className="mobile-input-label-col">
                     <span className="mobile-input-title">Inflation Rate (%)</span>
                     <span className="mobile-input-desc">Annual cost of living increase</span>
                   </div>

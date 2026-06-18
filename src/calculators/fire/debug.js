@@ -355,9 +355,10 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
 
   const preRetReturn = normInputs.expectedReturn ?? 0.07;
   const postRetReturn = normInputs.postRetirementReturn ?? 0.05;
+  const configuredCashGrowthRate = normInputs.cashReturnRate !== undefined ? normInputs.cashReturnRate : 0.02;
 
   const effectiveAccumulationReturn = Number((
-    (savingsAllocation.cash * 0.00 +
+    (savingsAllocation.cash * configuredCashGrowthRate +
      savingsAllocation.brokerage * preRetReturn +
      savingsAllocation["401k"] * preRetReturn +
      savingsAllocation.rothIRA * preRetReturn +
@@ -365,7 +366,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
   ).toFixed(4));
 
   const effectiveRetirementReturn = Number((
-    (savingsAllocation.cash * 0.00 +
+    (savingsAllocation.cash * configuredCashGrowthRate +
      savingsAllocation.brokerage * postRetReturn +
      savingsAllocation["401k"] * postRetReturn +
      savingsAllocation.rothIRA * postRetReturn +
@@ -382,7 +383,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     cash: {
       startingBalance: (normInputs.assets?.cash ?? 0) + (normInputs.assets?.emergencyFund ?? 0) + (normInputs.assets?.checking ?? 0) + (normInputs.assets?.savings ?? 0),
       annualContribution: cashContrib,
-      growthRate: 0.00,
+      growthRate: configuredCashGrowthRate,
       retirementBalance: (retirementLog.cashBalance ?? 0) + (retirementLog.emergencyFundBalance ?? 0)
     },
     brokerage: {
@@ -481,8 +482,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
     });
 
   // 8. Account Growth Audit
-  const simulatedCashGrowthRate = preRetReturn;
-  const configuredCashGrowthRate = 0.00;
+  const simulatedCashGrowthRate = configuredCashGrowthRate;
   const growthAppliedCorrectly = (simulatedCashGrowthRate === configuredCashGrowthRate);
 
   const accountGrowthAudit = {
@@ -515,7 +515,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
   }
   warningsList.push("Retirement projections are highly sensitive to allocation assumptions");
   if (!growthAppliedCorrectly) {
-    warningsList.push(`Warning: Cash balance is compounding at the portfolio rate (${(preRetReturn * 100).toFixed(1)}%) in the simulation instead of its configured growth rate (0.00%).`);
+    warningsList.push(`Warning: Cash balance is compounding at the portfolio rate (${(preRetReturn * 100).toFixed(1)}%) in the simulation instead of its configured growth rate (${(configuredCashGrowthRate * 100).toFixed(2)}%).`);
   }
 
   // 10. Downloadable JSON

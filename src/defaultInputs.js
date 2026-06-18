@@ -6,6 +6,7 @@ export const DEFAULT_FIRE_INPUTS = {
   expectedReturn: 7.0,
   postRetirementReturn: 5.0,
   inflationRate: 3.0,
+  cashReturnRate: 2.0,
   lifestyleUpgrades: 0.0,
   swr: 4.0,
   fireMode: 'traditional',

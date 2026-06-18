@@ -15,9 +15,9 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
 
     // A starting portfolio of $5,000. It should grow by 7% (i.e. $350 growth), NOT show $5,000 growth!
     inputs.assets = {
-      cash: 5000,
+      cash: 0,
       emergencyFund: 0,
-      brokerage: 0,
+      brokerage: 5000,
       trad401k: 0,
       tradIra: 0,
       rothIra: 0,

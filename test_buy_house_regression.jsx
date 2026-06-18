@@ -161,9 +161,22 @@ describe('Buy House Event Regression Tests', () => {
     inputs.targetRetirementAge = 65;
     inputs.lifeExpectancy = 85;
     inputs.isAdvancedMode = true;
+    inputs.simpleIncome = 240000; // Align standardIncome with incomeList salary for baseline phase calculations
 
     // Increase income so that the budget is perfectly affordable
     inputs.budgetDetails.income = 20000; // $20k/month income
+    inputs.budgetDetails.savings = {
+      checking: 0,
+      hysa: 0,
+      emergency: 0,
+      brokerage: 10000,
+      trad401k: 0,
+      rothIra: 0,
+      hsa: 0,
+      tradIra: 0,
+      debt: 0,
+      other: 0
+    };
     inputs.incomeList = [
       {
         id: 'inc-1',
@@ -198,7 +211,6 @@ describe('Buy House Event Regression Tests', () => {
 
     const activeResults = runFireSimulation(inputs);
     const { result } = renderHook(() => useRecommendations(inputs, activeResults));
-    
     const improvementPlan = result.current.improvementPlan;
     if (improvementPlan) {
       const types = improvementPlan.rankedPlan.map(rec => rec.type);

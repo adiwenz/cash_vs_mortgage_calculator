@@ -72,6 +72,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
   const expectedReturn = profile.expectedReturn;
   const postRetirementReturn = profile.postRetirementReturn;
   const inflationRate = profile.inflationRate;
+  const cashReturnRate = profile.cashReturnRate !== undefined ? profile.cashReturnRate : 0.02;
   const lifestyleUpgrades = profile.lifestyleUpgrades;
   const swr = profile.swr;
   const fireMode = profile.fireMode;
@@ -482,17 +483,18 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     if (year > 0) {
       const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
+      const activeCashReturnRate = cashReturnRate;
       
-      checkingGrowth = checkingBalance * activeReturnRate;
-      hysaGrowth = hysaBalance * activeReturnRate;
-      emergencyGrowth = (balances.emergencyFund || 0) * activeReturnRate;
+      checkingGrowth = checkingBalance * activeCashReturnRate;
+      hysaGrowth = hysaBalance * activeCashReturnRate;
+      emergencyGrowth = (balances.emergencyFund || 0) * activeCashReturnRate;
       brokerageGrowth = (balances.brokerage || 0) * activeReturnRate;
       trad401kGrowth = (balances.trad401k || 0) * activeReturnRate;
       const tradIraGrowth = (balances.tradIra || 0) * activeReturnRate;
       rothIraGrowth = (balances.rothIra || 0) * activeReturnRate;
       hsaGrowth = (balances.hsa || 0) * activeReturnRate;
       const otherGrowth = (balances.other || 0) * activeReturnRate;
-      const cashGrowth = (balances.cash || 0) * activeReturnRate;
+      const cashGrowth = (balances.cash || 0) * activeCashReturnRate;
       const emergencyFundGrowth = emergencyGrowth;
 
       state.yearInvestmentGrowth = brokerageGrowth + trad401kGrowth + tradIraGrowth + rothIraGrowth + hsaGrowth + otherGrowth + cashGrowth + emergencyFundGrowth;
@@ -517,7 +519,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       balances.hsa *= (1 + activeReturnRate);
       balances.other *= (1 + activeReturnRate);
       balances.cash = checkingBalance + hysaBalance;
-      balances.emergencyFund *= (1 + activeReturnRate);
+      balances.emergencyFund *= (1 + activeCashReturnRate);
 
       if (state.cumulativeShortfall > 0) {
         state.yearInvestmentGrowth -= state.cumulativeShortfall * activeReturnRate;

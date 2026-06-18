@@ -75,7 +75,7 @@ try {
   expect(bYear11).toBeCloseTo(expectedBYear11, 0);
   console.log(`✅ Brokerage grows at 5% post-retirement: Year 10 (Age 45) = $${Math.round(bYear10)} -> Year 11 (Age 46) = $${Math.round(bYear11)} (Expected $${Math.round(expectedBYear11)}).`);
 
-  // 2. Verify Cash Growth (currently grows at market rate in the simulator)
+  // 2. Verify Cash Growth (grows at default cashReturnRate of 2%)
   const inputsCash = createCleanGrowthInputs();
   inputsCash.assets.cash = 10000;
   
@@ -86,10 +86,21 @@ try {
   const cYear1 = dataCash.find(d => d.age === 36).portfolio;
   
   expect(cYear0).toBe(10000);
-  expect(cYear1).toBeCloseTo(10700, 0);
-  console.log(`✅ Cash grows at the simulator's active return rate ($${cYear1}).`);
+  expect(cYear1).toBeCloseTo(10200, 0);
+  console.log(`✅ Cash grows at the default cash return rate of 2% ($${cYear1}).`);
 
-  // 3. Verify Emergency Fund Growth (currently grows at market rate in the simulator)
+  // 2b. Verify Cash Growth at Custom Rate (e.g. 3.5%)
+  const inputsCashCustom = createCleanGrowthInputs();
+  inputsCashCustom.assets.cash = 10000;
+  inputsCashCustom.cashReturnRate = 3.5;
+  
+  const resultsCashCustom = runFireSimulation(inputsCashCustom);
+  const dataCashCustom = resultsCashCustom.nominalData;
+  const cCustomYear1 = dataCashCustom.find(d => d.age === 36).portfolio;
+  expect(cCustomYear1).toBeCloseTo(10350, 0);
+  console.log(`✅ Cash grows at the custom cash return rate of 3.5% ($${cCustomYear1}).`);
+
+  // 3. Verify Emergency Fund Growth (grows at default cashReturnRate of 2%)
   const inputsEF = createCleanGrowthInputs();
   inputsEF.assets.emergencyFund = 10000;
   
@@ -100,8 +111,8 @@ try {
   const efYear1 = dataEF.find(d => d.age === 36).portfolio;
   
   expect(efYear0).toBe(10000);
-  expect(efYear1).toBeCloseTo(10700, 0);
-  console.log(`✅ Emergency fund grows at the simulator's active return rate ($${efYear1}).`);
+  expect(efYear1).toBeCloseTo(10200, 0);
+  console.log(`✅ Emergency fund grows at the default cash return rate of 2% ($${efYear1}).`);
 
   console.log('✅ test_account_growth_rates passed.');
   process.exit(0);
