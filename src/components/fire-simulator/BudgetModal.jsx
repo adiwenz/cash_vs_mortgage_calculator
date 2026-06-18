@@ -474,7 +474,7 @@ export default function BudgetModal({
       };
     }
 
-    if (idOrType === 'retire') return { name: 'Retirement', icon: '🏖️', type: 'retire' };
+    if (idOrType === 'retire') return { name: 'Stop Working', icon: '🏖️', type: 'retire' };
     if (idOrType === 'socialSecurity') return { name: 'Social Security', icon: '💰', type: 'socialSecurity' };
     
     return { name: idOrType, icon: '❓', type: idOrType };
@@ -495,7 +495,7 @@ export default function BudgetModal({
     if (activePhaseObj.type !== 'retire') {
       activeEventsList.push("Salary / Main Income");
     } else {
-      activeEventsList.push("Retirement Withdrawals");
+      activeEventsList.push("Stop Working Withdrawals");
     }
 
     // Base spending
@@ -600,7 +600,7 @@ export default function BudgetModal({
 
       // Retirement
       if (exp.type === 'retirement' || textLower.includes("retirement")) {
-        phaseChangesList.push("Retirement starts");
+        phaseChangesList.push("Stop Working starts");
         return;
       }
 

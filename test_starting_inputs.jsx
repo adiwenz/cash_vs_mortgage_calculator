@@ -4,22 +4,6 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    AreaChart: ({ children }) => <div data-testid="AreaChart">{children}</div>,
-    Area: () => <div data-testid="Area" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -35,6 +19,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('verifies initial default values of starting inputs', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
@@ -49,6 +34,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('clicking starting inputs resets their value to null (renders as empty)', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
@@ -74,6 +60,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('typing custom values in starting inputs works correctly', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
@@ -103,6 +90,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('blurring the savings rate field without typing restores the calculated rate', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
 
@@ -119,6 +107,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('typing in savings rate and blurring preserves the new calculated rate', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
 
@@ -134,6 +123,7 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('changing the income field preserves the savings rate and scales expenses', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
@@ -154,5 +144,31 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
     // Savings rate should still be 15%
     expect(preTaxSavingsRateInput.value).toBe('15');
+  });
+
+  test('verifies that the Details button opens the Current Savings Breakdown modal', () => {
+    render(<FireSimulator />);
+
+    const detailsButton = screen.getByRole('button', { name: /^Details$/i });
+    expect(detailsButton).toBeDefined();
+
+    // Click details button
+    fireEvent.click(detailsButton);
+
+    // Verify modal is open
+    expect(screen.getByText(/Current Savings Breakdown/i)).toBeDefined();
+  });
+
+  test('verifies that the Budget button next to Savings Rate opens the Budget modal', () => {
+    render(<FireSimulator />);
+
+    const budgetButton = screen.getByRole('button', { name: /^Budget$/i });
+    expect(budgetButton).toBeDefined();
+
+    // Click budget button
+    fireEvent.click(budgetButton);
+
+    // Verify budget modal is open
+    expect(screen.getByText(/Save Budget/i)).toBeDefined();
   });
 });

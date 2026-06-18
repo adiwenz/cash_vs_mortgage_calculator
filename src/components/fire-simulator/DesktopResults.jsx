@@ -363,7 +363,7 @@ export default function DesktopResults({
                     strokeDasharray="3 3"
                     strokeWidth={1.5}
                     label={{
-                      value: `Retirement: Age ${displayedResults.targetRetirementAge}`,
+                      value: `Stop Working: Age ${displayedResults.targetRetirementAge}`,
                       position: 'insideTopRight',
                       fill: 'var(--text-primary)',
                       fontSize: 9,
@@ -424,7 +424,7 @@ export default function DesktopResults({
             }}>
               <span style={{ fontSize: '1rem', marginTop: '-0.1rem' }}>💡</span>
               <div>
-                <strong style={{ color: 'var(--text-primary)' }}>Lifecycle Planning Note:</strong> Temporary deficits or portfolio drawdowns (where your Net Worth line dips or flattens, such as during high-expense childcare/daycare years or early retirement) are a normal and <strong>perfectly acceptable part of a long-term financial roadmap</strong>. As long as your portfolio recovery projections climb back up in the long run, your plan remains sustainable.
+                <strong style={{ color: 'var(--text-primary)' }}>Lifecycle Planning Note:</strong> Temporary deficits or portfolio drawdowns (where your Net Worth line dips or flattens, such as during high-expense childcare/daycare years or early stop working years) are a normal and <strong>perfectly acceptable part of a long-term financial roadmap</strong>. As long as your portfolio recovery projections climb back up in the long run, your plan remains sustainable.
               </div>
             </div>
           )}

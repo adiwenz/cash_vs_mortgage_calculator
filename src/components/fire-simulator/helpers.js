@@ -21,7 +21,7 @@ export const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirem
   switch (outcome) {
     case 'comfortable':
       return {
-        label: 'Comfortable Retirement',
+        label: 'Comfortable Plan',
         badge: '🟢 Comfortable',
         color: 'var(--accent-emerald)',
         bg: 'rgba(16, 185, 129, 0.1)',
@@ -29,7 +29,7 @@ export const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirem
       };
     case 'sustainable':
       return {
-        label: 'Sustainable Retirement',
+        label: 'Sustainable Plan',
         badge: '🟡 Sustainable',
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
@@ -37,15 +37,15 @@ export const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirem
       };
     case 'retirementGap':
       return {
-        label: 'Retirement Gap',
-        badge: '⚪ Retirement Gap',
+        label: 'Stop Working Gap',
+        badge: '⚪ Stop Working Gap',
         color: 'var(--text-secondary)',
         bg: 'rgba(148, 163, 184, 0.15)',
-        desc: `Your projected assets are projected to run out at Age ${runOutAge} (before life expectancy). Additional savings, later retirement, or reduced spending may be needed.`
+        desc: `Your projected portfolio is projected to run out at Age ${runOutAge} (before life expectancy). Additional savings, working longer, or reduced spending may be needed.`
       };
     default:
       return {
-        label: 'Sustainable Retirement',
+        label: 'Sustainable Plan',
         badge: '🟡 Sustainable',
         color: '#fbbf24',
         bg: 'rgba(251, 191, 36, 0.1)',
@@ -483,6 +483,7 @@ export const isEditableEvent = (evt) => {
 
 export const isFinancialEvent = (evt) => {
   if (!evt) return false;
+  if (evt.type === 'today' || evt.type === 'lifeExpectancy') return false;
   if (isEditableEvent(evt)) return false;
   const financialTypes = [
     'mortgageOff',

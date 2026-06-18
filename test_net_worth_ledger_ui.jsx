@@ -5,20 +5,6 @@ import DesktopResults from './src/components/fire-simulator/DesktopResults';
 import MobileFireSimulatorView from './src/components/fire-simulator/MobileFireSimulatorView';
 
 // Mock Recharts
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    ReferenceDot: () => <div data-testid="ReferenceDot" />
-  };
-});
-
 describe('Net Worth Ledger UI Collapse/Expand', () => {
   beforeEach(() => {
     cleanup();

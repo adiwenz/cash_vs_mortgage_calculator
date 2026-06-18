@@ -7,20 +7,6 @@ import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs';
 import { runFireSimulation } from './src/fireCalculations';
 
 // Mock Recharts
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: ({ x }) => <div data-testid="ReferenceLine" data-x={x} />,
-    ReferenceDot: ({ x, y }) => <div data-testid="ReferenceDot" data-x={x} data-y={y} />
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -51,46 +37,44 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(screen.getByText('Finley')).toBeDefined();
     
     // The bottom navigation tab buttons should exist
-    expect(screen.getByText('Overview', { selector: '.mobile-nav-item' })).toBeDefined();
-    expect(screen.getByText('Roadmap', { selector: '.mobile-nav-item' })).toBeDefined();
+    expect(screen.getByText('Plan', { selector: '.mobile-nav-item' })).toBeDefined();
     expect(screen.getByText('Results', { selector: '.mobile-nav-item' })).toBeDefined();
     expect(screen.getByText('Details', { selector: '.mobile-nav-item' })).toBeDefined();
   });
 
-  test('Roadmap tab is selected by default', () => {
+  test('Plan tab is selected by default', () => {
     render(<FireSimulator />);
     
-    // The Roadmap tab should have the active class style/representation
-    const roadmapBtn = screen.getByRole('button', { name: /Roadmap/i });
-    expect(roadmapBtn.className).toContain('active');
+    // The Plan tab should have the active class style/representation
+    const planBtn = screen.getByRole('button', { name: /^Plan$/i });
+    expect(planBtn.className).toContain('active');
     
-    // Should display Roadmap section titles
-    expect(screen.getByText('Interactive Roadmap')).toBeDefined();
-    expect(screen.getByText('Your Life Journey ✨')).toBeDefined();
+    // Should display Plan section titles
+    expect(screen.getByText(/Add life events to personalize/i)).toBeDefined();
     expect(screen.getByText('Budget Phases')).toBeDefined();
   });
 
   test('Bottom navigation switches tabs correctly', () => {
     render(<FireSimulator />);
     
-    // Switch to Overview Tab
-    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
-    fireEvent.click(overviewBtn);
-    expect(overviewBtn.className).toContain('active');
-    expect(screen.getByText('Status')).toBeDefined();
-    expect(screen.queryByText('Interactive Roadmap')).toBeNull();
-
     // Switch to Results Tab
     const resultsBtn = screen.getByRole('button', { name: /Results/i });
     fireEvent.click(resultsBtn);
     expect(resultsBtn.className).toContain('active');
     expect(screen.getByText('Compare projections and view progress charts')).toBeDefined();
+    expect(screen.queryByText(/Add life events to personalize/i)).toBeNull();
 
     // Switch to Details Tab
     const detailsBtn = screen.getByRole('button', { name: /^Details$/i });
     fireEvent.click(detailsBtn);
     expect(detailsBtn.className).toContain('active');
     expect(screen.getByText(/Starting Account Balances/i)).toBeDefined();
+
+    // Switch back to Plan Tab
+    const planBtn = screen.getByRole('button', { name: /^Plan$/i });
+    fireEvent.click(planBtn);
+    expect(planBtn.className).toContain('active');
+    expect(screen.getByText(/Add life events to personalize/i)).toBeDefined();
   });
 
   test('Tapping a phase expands phase inline details', () => {
@@ -220,7 +204,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
 
     // 1. Verify timeline nodes display shortened labels and NO sentences
     expect(screen.getByText('Medicare', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
-    expect(screen.getByText('Retire', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
+    expect(screen.getByText('Stop Working', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
     expect(screen.getByText('Social Sec.', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
 
     // Verify long sentences / descriptions are NOT rendered directly in the track
@@ -241,13 +225,13 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[2]);
 
     // 5. Verify Target Retirement edit event callback
-    const retireMilestoneBtn = screen.getByText('Retire').closest('button');
+    const retireMilestoneBtn = screen.getByText('Stop Working').closest('button');
     fireEvent.click(retireMilestoneBtn); // select it
     fireEvent.click(retireMilestoneBtn); // edit it
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
   });
 
-  test('Overview tab renders MobileRecommendationsPanel when plan is not on track', () => {
+  test('Plan tab renders recommendation banner and expanding it shows MobileRecommendationsPanel when plan is not on track', () => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
     const activeRes = runFireSimulation(inputs);
     const displayedRes = {
@@ -301,12 +285,18 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
       />
     );
 
-    // Default tab is Roadmap, click Overview to switch
-    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
-    fireEvent.click(overviewBtn);
+    // Verify Outcome Preview section is rendered (expanded by default)
+    const outcomeHeader = screen.getByText(/Outcome Preview/i);
+    expect(outcomeHeader).toBeDefined();
 
-    // Verify recommendations header and cards are rendered
-    expect(screen.getByText('💡 Actionable Recommendations')).toBeDefined();
+    // Verify recommendations banner is rendered
+    expect(screen.getByText(/Recommendation details available/i)).toBeDefined();
+
+    // Click "View Suggestions" to expand the phase containing MobileRecommendationsPanel
+    const viewSuggestionsBtn = screen.getByRole('button', { name: /View Suggestions/i });
+    fireEvent.click(viewSuggestionsBtn);
+
+    // Verify recommendations card are rendered
     expect(screen.getByText('Save More')).toBeDefined();
     expect(screen.getByText('Save an additional $500/month.')).toBeDefined();
 
@@ -316,7 +306,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(handleApplyImprovementScenario).toHaveBeenCalledWith(mockImprovementPlan.rankedPlan[0]);
   });
 
-  test('Roadmap tab renders MobileRecommendationsPanel inside recommendations stack when plan is not on track', () => {
+  test('Plan tab renders MobileRecommendationsPanel inside recommendations stack when plan is not on track', () => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
     const activeRes = runFireSimulation(inputs);
     const displayedRes = {

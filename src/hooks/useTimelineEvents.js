@@ -241,17 +241,15 @@ export function useTimelineEvents(inputs, displayedResults) {
             let desc = `Receiving ${label} of ${formatCurrency(ev.monthlyBenefit)}/month (${formatCurrency(ev.monthlyBenefit * 12)}/year).`;
             let ssTitle = label;
             if (ev.type === 'socialSecurity') {
+              ssTitle = 'Social Security';
               const ss = calc.socialSecurityDetails;
               const isEligible = ss ? ss.isEligible : true;
               let annualBenefit = ss ? ss.annualBenefit : (Number(ev.monthlyBenefit) || 0) * 12 * getSocialSecurityFactor(age);
               let monthlyBenefitVal = annualBenefit / 12;
               
               if (!isEligible) {
-                ssTitle = `Social Security starts at ${age}: Not Eligible`;
                 desc = `Not eligible for Social Security benefits. At least 10 working years are required. (Working Years: ${ss ? ss.workingYears : 0} / 10)`;
               } else {
-                ssTitle = `Social Security starts at ${age}: ~$${Math.round(annualBenefit).toLocaleString()}/yr`;
-                
                 if (age < 62) {
                   desc = `Social Security cannot be claimed before age 62 (Benefit: $0/mo).`;
                 } else {
@@ -261,7 +259,7 @@ export function useTimelineEvents(inputs, displayedResults) {
                   
                   desc = `Receiving Social Security of ${formatCurrency(monthlyBenefitVal)}/month (${formatCurrency(annualBenefit)}/year) claimed at age ${age}. `;
                   if (age === 67) {
-                    desc += `Full retirement benefit (100%).`;
+                    desc += `Full benefit (100%).`;
                   } else if (age < 67) {
                     desc += `Benefit is permanently reduced by ${penaltyPct}% from full benefit due to early claim.`;
                   } else {
@@ -284,11 +282,11 @@ export function useTimelineEvents(inputs, displayedResults) {
             events.push({
               originalId: ev.id,
               age,
-              title: `Target Retirement`,
-              label: `Retirement`,
+              title: `Stop Working Event`,
+              label: `Stop Working`,
               icon: '🏖️',
               type: 'retire',
-              description: `Target retirement age reached. Contributions stop, and you begin drawing down from your retirement portfolios at ${ev.spendingPercent !== undefined ? ev.spendingPercent : 70}% of your pre-retirement spending.`
+              description: `Target age to stop working. Contributions stop, and you begin drawing down from your portfolios at ${ev.spendingPercent !== undefined ? ev.spendingPercent : 70}% of your pre-retirement spending.`
             });
           } else if (ev.type === 'windfall') {
             events.push({
@@ -369,6 +367,62 @@ export function useTimelineEvents(inputs, displayedResults) {
       }
     });
 
+    // Ensure Social Security event is always present
+    const hasSS = events.some(e => e.type === 'socialSecurity');
+    if (!hasSS) {
+      events.push({
+        originalId: 'ss-1',
+        age: 67,
+        title: 'Social Security',
+        label: 'Social Security',
+        icon: '💰',
+        type: 'socialSecurity',
+        description: `Receiving Social Security benefits (default claiming age 67).`
+      });
+    }
+
+    // Ensure Stop Working Event is always present
+    const hasRetire = events.some(e => e.type === 'retire');
+    if (!hasRetire) {
+      events.push({
+        originalId: 'retire-1',
+        age: inp.targetRetirementAge || 65,
+        title: 'Stop Working Event',
+        label: 'Stop Working',
+        icon: '🏖️',
+        type: 'retire',
+        description: `Target age to stop working. Contributions stop, and you begin drawing down from your portfolios.`
+      });
+    }
+
+    // Ensure Today event is always present
+    const hasToday = events.some(e => e.type === 'today');
+    if (!hasToday) {
+      events.push({
+        age: inp.currentAge,
+        title: 'Today',
+        label: 'Today',
+        icon: '',
+        type: 'today',
+        isMilestone: true,
+        description: `Your current situation and starting point (Age ${inp.currentAge}).`
+      });
+    }
+
+    // Ensure Life Expectancy event is always present
+    const hasLifeExp = events.some(e => e.type === 'lifeExpectancy');
+    if (!hasLifeExp) {
+      events.push({
+        age: inp.lifeExpectancy,
+        title: 'Life Expectancy',
+        label: 'Life Expectancy',
+        icon: '',
+        type: 'lifeExpectancy',
+        isMilestone: true,
+        description: `Your life expectancy horizon (Age ${inp.lifeExpectancy}).`
+      });
+    }
+
     // 4. Mathematical Milestones (e.g. debt payoffs)
     const calculationMilestones = calc.dynamicMilestones || [];
     calculationMilestones.forEach(m => {
@@ -394,32 +448,32 @@ export function useTimelineEvents(inputs, displayedResults) {
       if (calc.retirementReadyAgeSurvival) {
         events.push({
           age: calc.retirementReadyAgeSurvival,
-          title: `Sustainable Retirement (lasts to Life Expectancy)`,
-          label: `Sustainable Retire`,
+          title: `Can Stop Working`,
+          label: `Can Stop Working`,
           icon: '🎉',
           type: 'retirementReadySurvival',
           isMilestone: true,
-          description: `Age at which you can retire and have your portfolio survive through your life expectancy (Age ${inp.lifeExpectancy}) under current assumptions.`
+          description: `Age at which you can stop working and have your portfolio survive through your life expectancy (Age ${inp.lifeExpectancy}) under current assumptions.`
         });
       }
     } else if (inp.readinessCriteria === 'lastsComfortable') {
       if (calc.retirementReadyAgeComfortable) {
         events.push({
           age: calc.retirementReadyAgeComfortable,
-          title: `Comfortable Retirement (lasts to Life Expectancy + 10)`,
-          label: `Comfortable Retire`,
+          title: `Can Stop Working`,
+          label: `Can Stop Working`,
           icon: '🎉',
           type: 'retirementReadyComfortable',
           isMilestone: true,
-          description: `Age at which you can retire and have your portfolio survive through your life expectancy plus 10 years (Age ${inp.lifeExpectancy + 10}) under current assumptions.`
+          description: `Age at which you can stop working and have your portfolio survive through your life expectancy plus 10 years (Age ${inp.lifeExpectancy + 10}) under current assumptions.`
         });
       }
     } else {
       if (calc.retirementReadyAgeSWR) {
         events.push({
           age: calc.retirementReadyAgeSWR,
-          title: `Indefinite Retirement (lasts indefinitely)`,
-          label: `Indefinite Retire`,
+          title: `Can Stop Working`,
+          label: `Can Stop Working`,
           icon: '🎉',
           type: 'retirementReadySWR',
           isMilestone: true,

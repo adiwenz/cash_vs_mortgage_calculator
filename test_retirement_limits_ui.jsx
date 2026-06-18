@@ -6,17 +6,6 @@ import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs';
 import BudgetModal from './src/components/fire-simulator/BudgetModal';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    PieChart: ({ children }) => <div data-testid="PieChart">{children}</div>,
-    Pie: ({ children }) => <div data-testid="Pie">{children}</div>,
-    Cell: () => <div data-testid="Cell" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}

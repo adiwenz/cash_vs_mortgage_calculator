@@ -205,10 +205,10 @@ export function useRecommendations(inputs, activeResults) {
       list.push({
         type: 'retire65',
         icon: '📅',
-        title: 'Retire at Age 65',
+        title: 'Stop Working at Age 65',
         details: hasShortfallAt65
-          ? 'Delay your retirement to Age 65 and adjust your budget to save more to bridge the remaining shortfall.'
-          : 'Delay your retirement to Age 65. Under your current plan, your assets are projected to fully support you at age 65 with no additional savings needed.',
+          ? 'Delay stopping work to Age 65 and adjust your budget to save more to bridge the remaining shortfall.'
+          : 'Delay stopping work to Age 65. Under your current plan, your assets are projected to fully support you at age 65 with no additional savings needed.',
         bulletPoints: [
           `Working until 65 adds ${65 - targetRetirementAge} more working/saving years to your plan.`,
           ...(hasShortfallAt65
@@ -217,7 +217,7 @@ export function useRecommendations(inputs, activeResults) {
                 `This will compound over your remaining ${65 - currentAge} working years to bridge the remaining ${formatCurrency(newShortfall)} shortfall at age 65.`
               ]
             : [
-                'This completely resolves your projected retirement shortfall with no other changes needed!'
+                'This completely resolves your projected shortfall with no other changes needed!'
               ])
         ],
         readyAge: 65,
@@ -228,17 +228,17 @@ export function useRecommendations(inputs, activeResults) {
       });
     }
 
-    // 2. Retire at the retirement ready age
+    // 2. Stop working at the Can Stop Working Age
     if (currentReadyAge) {
       list.push({
         type: 'retireReadyAge',
         icon: '⏳',
-        title: 'Retire at Retirement Ready Age',
-        details: `Delay your retirement to Age ${currentReadyAge} (your Retirement Ready Age) so that your current saving and spending rates are sufficient to support you without any additional changes.`,
+        title: 'Stop Working at Can Stop Working Age',
+        details: `Delay stopping work to Age ${currentReadyAge} (your Can Stop Working Age) so that your current saving and spending rates are sufficient to support you without any additional changes.`,
         bulletPoints: [
           `Working until Age ${currentReadyAge} allows your assets to compound for ${currentReadyAge - targetRetirementAge} more years.`,
           'No additional savings or income changes are required under your current budget.',
-          'This completely resolves your projected retirement gap.'
+          'This completely resolves your projected gap.'
         ],
         readyAge: currentReadyAge,
         yearsImprovement: null,
@@ -248,7 +248,7 @@ export function useRecommendations(inputs, activeResults) {
       });
     }
 
-    // 3. Retire at requested date
+    // 3. Stop working at requested date
     const saveMoreAmt100 = calculateSaveMoreRecommendation(
       shortfall,
       rateOfReturn,
@@ -259,12 +259,12 @@ export function useRecommendations(inputs, activeResults) {
     list.push({
       type: 'retireRequestedDate',
       icon: '🎯',
-      title: 'Retire at Requested Retirement Date',
-      details: `Maintain your target retirement age of Age ${targetRetirementAge} and adjust your budget to save more to bridge the shortfall.`,
+      title: 'Stop Working at Target Age',
+      details: `Maintain your target stop working age of Age ${targetRetirementAge} and adjust your budget to save more to bridge the shortfall.`,
       bulletPoints: [
-        `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before retirement.`,
+        `Save and invest an additional ${formatCurrency(saveMoreAmt100)}/year (approx. ${formatCurrency(Math.round(saveMoreAmt100 / 12))}/month) before stopping work.`,
         `This will compound over your remaining ${yearsUntilRetirement} working years at an assumed ${(rateOfReturn * 100).toFixed(0)}% annual rate of return.`,
-        `This completely bridges your projected retirement gap at Age ${targetRetirementAge}.`
+        `This completely bridges your projected gap at Age ${targetRetirementAge}.`
       ],
       readyAge: targetRetirementAge,
       yearsImprovement: currentReadyAge ? Math.max(0, currentReadyAge - targetRetirementAge) : null,
@@ -306,7 +306,7 @@ export function useRecommendations(inputs, activeResults) {
         details: `Increase your income by ${formatCurrency(rec.peakCost)}/year permanently.`,
         bulletPoints: [
           `This offsets childcare costs today and helps you build additional savings after childcare expenses end.`,
-          `A promotion or career advancement that offsets childcare costs and keeps your retirement plan on track. After childcare ends, the additional income becomes available for savings.`
+          `A promotion or career advancement that offsets childcare costs and keeps your plan on track. After childcare ends, the additional income becomes available for savings.`
         ],
         readyAge: readyAge || targetRetirementAge,
         yearsImprovement: yearsImprovement,

@@ -73,7 +73,9 @@ export default function App() {
     };
   });
 
-  const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  }); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
 
   // Mobile drawer & collapsible sections state
@@ -177,6 +179,7 @@ export default function App() {
   // Theme synchronization
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
   }, [theme]);
 
   // Handle inputs change

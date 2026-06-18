@@ -163,10 +163,10 @@ export default function MobileEventWizard({
     { type: 'windfall', label: 'Windfall / Inflow', category: 'Goals', icon: '💰', popular: false },
     { type: 'custom', label: 'Custom Goal', category: 'Goals', icon: '🎯', popular: true },
     
-    { type: 'retire', label: 'Retirement', category: 'Retirement', icon: '🏖️', popular: true },
-    { type: 'socialSecurity', label: 'Social Security', category: 'Retirement', icon: '💰', popular: true },
-    { type: 'pension', label: 'Pension Inflow', category: 'Retirement', icon: '📜', popular: false },
-    { type: 'rentalIncome', label: 'Rental Income', category: 'Retirement', icon: '🏢', popular: false }
+    { type: 'retire', label: 'Stop Working', category: 'Stop Working', icon: '🏖️', popular: true },
+    { type: 'socialSecurity', label: 'Social Security', category: 'Stop Working', icon: '💰', popular: true },
+    { type: 'pension', label: 'Pension Inflow', category: 'Stop Working', icon: '📜', popular: false },
+    { type: 'rentalIncome', label: 'Rental Income', category: 'Stop Working', icon: '🏢', popular: false }
   ];
 
   // Initialize event with defaults
@@ -446,7 +446,7 @@ export default function MobileEventWizard({
       } else if (t === 'marriage') {
         createdPhaseText = `💍 Married Life (Age ${draftEvent.age}+)`;
       } else if (t === 'retire') {
-        createdPhaseText = `🏖️ Retired (Age ${draftEvent.age}+)`;
+        createdPhaseText = `🏖️ Stopped Working (Age ${draftEvent.age}+)`;
       }
       
       return {
@@ -623,7 +623,7 @@ export default function MobileEventWizard({
               {searchQuery === '' && (
                 <>
                   {/* Categories Sections */}
-                  {['Family', 'Career', 'Housing', 'Debt', 'Goals', 'Retirement'].map((cat) => {
+                  {['Family', 'Career', 'Housing', 'Debt', 'Goals', 'Stop Working'].map((cat) => {
                     const catItems = eventTypes.filter(e => e.category === cat && !e.popular);
                     if (catItems.length === 0) return null;
                     return (
@@ -1282,7 +1282,7 @@ export default function MobileEventWizard({
                 {draftEvent.type === 'retire' && (
                   <>
                     <div className="form-group-item">
-                      <label className="form-group-label">Desired Retirement Age</label>
+                      <label className="form-group-label">Desired Stop Working Age</label>
                       <div className="picker-slider-row">
                         <button 
                           type="button" 
@@ -1303,7 +1303,7 @@ export default function MobileEventWizard({
                     </div>
 
                     <div className="form-group-item">
-                      <label className="form-group-label">Retirement Spending Need (% of pre-retire lifestyle)</label>
+                      <label className="form-group-label">Stop Working Spending Need (% of pre-stop working lifestyle)</label>
                       <div className="slider-input-group">
                         <input 
                           type="range" 
@@ -1570,7 +1570,7 @@ export default function MobileEventWizard({
 
                     {/* Retirement Age Card */}
                     <div className="impact-metric-card">
-                      <span className="metric-lbl">Retirement Age</span>
+                      <span className="metric-lbl">Can Stop Working Age</span>
                       <div className="metric-vals">
                         <span className="metric-before">
                           {typeof impactMetrics.retirementAge.before === 'number' 
@@ -1811,7 +1811,7 @@ export default function MobileEventWizard({
                   : houseRebalanceSummary.balancedRetirementAge;
 
                 const renderRetirementAgeText = (age) => {
-                  const baseAge = houseRebalanceSummary.baselineRetirementAge;
+                  const baseAge = houseRebalanceSummary.baselineStopWorkingAge;
                   if (age === null || age === undefined || age === "Not achievable" || baseAge === null || baseAge === undefined) {
                     return 'Not achievable';
                   }
@@ -1851,7 +1851,7 @@ export default function MobileEventWizard({
                             <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(outcomeDetails.recommendedPayment)}/mo</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>New Retirement Age:</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>New Can Stop Working Age:</span>
                             <strong style={{ color: 'var(--text-primary)' }}>{renderRetirementAgeText(outcomeDetails.retirementAge)}</strong>
                           </div>
                         </div>
@@ -1936,7 +1936,7 @@ export default function MobileEventWizard({
                           ? 'Your retirement plan can support a higher home price, but your available liquid assets at the purchase age are the limiting factor.'
                           : houseRebalanceSummary.constraint === 'both'
                           ? 'This purchase is limited by both upfront cash and monthly affordability.'
-                          : 'Your upfront cash is sufficient, but the monthly ownership costs would delay retirement.'}
+                          : 'Your upfront cash is sufficient, but the monthly ownership costs would delay when you can stop working.'}
                       </p>
                       
                       {/* Primary Focus Card */}
@@ -1964,7 +1964,7 @@ export default function MobileEventWizard({
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>Retirement:</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>Can Stop Working:</span>
                           <strong style={{ color: 'var(--text-primary)' }}>{renderRetirementAgeText(selectedRetirementAge)}</strong>
                         </div>
 
@@ -2022,15 +2022,15 @@ export default function MobileEventWizard({
                           <div className="animate-slide-down" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem', padding: '0.5rem', background: 'rgba(255, 255, 255, 0.01)', border: '1px dashed var(--border-color)', borderRadius: '6px', fontSize: '0.75rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-secondary)' }}>Comfortable:</span>
-                              <strong style={{ color: 'var(--text-primary)' }}>{affordablePriceConservative !== null ? formatCurrency(affordablePriceConservative) : 'N/A'} (Retirement: {renderRetirementAgeText(houseRebalanceSummary.conservativeRetirementAge)})</strong>
+                              <strong style={{ color: 'var(--text-primary)' }}>{affordablePriceConservative !== null ? formatCurrency(affordablePriceConservative) : 'N/A'} (Can Stop Working: {renderRetirementAgeText(houseRebalanceSummary.conservativeRetirementAge)})</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-secondary)' }}>Balanced (Default):</span>
-                              <strong style={{ color: 'var(--primary)' }}>{affordablePriceBalanced !== null ? formatCurrency(affordablePriceBalanced) : 'N/A'} (Retirement: {renderRetirementAgeText(houseRebalanceSummary.balancedRetirementAge)})</strong>
+                              <strong style={{ color: 'var(--primary)' }}>{affordablePriceBalanced !== null ? formatCurrency(affordablePriceBalanced) : 'N/A'} (Can Stop Working: {renderRetirementAgeText(houseRebalanceSummary.balancedRetirementAge)})</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-secondary)' }}>Stretch:</span>
-                              <strong style={{ color: 'var(--text-primary)' }}>{affordablePriceAggressive !== null ? formatCurrency(affordablePriceAggressive) : 'N/A'} (Retirement: {renderRetirementAgeText(houseRebalanceSummary.aggressiveRetirementAge)})</strong>
+                              <strong style={{ color: 'var(--text-primary)' }}>{affordablePriceAggressive !== null ? formatCurrency(affordablePriceAggressive) : 'N/A'} (Can Stop Working: {renderRetirementAgeText(houseRebalanceSummary.aggressiveRetirementAge)})</strong>
                             </div>
                           </div>
                         )}
@@ -2137,23 +2137,23 @@ export default function MobileEventWizard({
                   wantsReduction, 
                   savingsReduction, 
                   totalCashFlowImprovement, 
-                  baselineRetirementAge, 
+                  baselineStopWorkingAge, 
                   newRetirementAge, 
                   retirementReadyAge 
                 } = houseImpactSummary;
 
                 const hasAdjustments = (wantsReduction > 0 || savingsReduction > 0);
-                const isDelayed = baselineRetirementAge !== undefined && baselineRetirementAge !== null && newRetirementAge !== undefined && newRetirementAge !== null && newRetirementAge > baselineRetirementAge;
+                const isDelayed = baselineStopWorkingAge !== undefined && baselineStopWorkingAge !== null && newRetirementAge !== undefined && newRetirementAge !== null && newRetirementAge > baselineStopWorkingAge;
                 const retirementColor = isDelayed ? 'var(--accent-orange, #f97316)' : 'var(--accent-emerald)';
 
                 const renderRetirementImpact = () => {
-                  if (baselineRetirementAge === undefined || baselineRetirementAge === null || newRetirementAge === undefined || newRetirementAge === null) {
+                  if (baselineStopWorkingAge === undefined || baselineStopWorkingAge === null || newRetirementAge === undefined || newRetirementAge === null) {
                     return `Age ${retirementReadyAge || 'N/A'}`;
                   }
-                  if (baselineRetirementAge === newRetirementAge) {
+                  if (baselineStopWorkingAge === newRetirementAge) {
                     return `Unchanged (Age ${newRetirementAge})`;
                   }
-                  return `${baselineRetirementAge} → ${newRetirementAge}`;
+                  return `${baselineStopWorkingAge} → ${newRetirementAge}`;
                 };
 
                 return (
@@ -2479,21 +2479,23 @@ export default function MobileEventWizard({
                   <span className="action-arrow">→</span>
                 </button>
 
-                <button 
-                  type="button" 
-                  className="manage-action-row delete"
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
-                      onDelete();
-                    }
-                  }}
-                >
-                  <div className="action-left">
-                    <Trash2 size={18} className="action-icon red" />
-                    <span>Delete Event</span>
-                  </div>
-                  <span className="action-arrow">→</span>
-                </button>
+                {draftEvent?.type !== 'retire' && draftEvent?.type !== 'socialSecurity' && (
+                  <button 
+                    type="button" 
+                    className="manage-action-row delete"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
+                        onDelete();
+                      }
+                    }}
+                  >
+                    <div className="action-left">
+                      <Trash2 size={18} className="action-icon red" />
+                      <span>Delete Event</span>
+                    </div>
+                    <span className="action-arrow">→</span>
+                  </button>
+                )}
               </div>
 
               {/* Event Timeline */}

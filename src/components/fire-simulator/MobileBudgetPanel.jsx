@@ -447,7 +447,7 @@ export default function MobileBudgetPanel({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {isRetirementPhase ? (
                   <div style={{ padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
-                    🏖️ Savings are disabled during retirement. You are now drawing down from your portfolio.
+                    🏖️ Savings are disabled during your stop working years. You are now drawing down from your portfolio.
                   </div>
                 ) : (
                   <>

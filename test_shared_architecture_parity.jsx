@@ -8,20 +8,6 @@ import { useTimelineEvents } from './src/hooks/useTimelineEvents';
 import { useBudgetPhases } from './src/hooks/useBudgetPhases';
 
 // Mock Recharts
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    ReferenceDot: () => <div data-testid="ReferenceDot" />
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -111,13 +97,9 @@ describe('Shared Simulator Architecture - Desktop & Mobile Parity', () => {
     globalThis.innerWidth = 375;
     const { container: mobileContainer } = render(<FireSimulator />);
     
-    // Click bottom navigation button for "Overview"
-    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
-    fireEvent.click(overviewBtn);
+    // Mobile shows retirement age in Plan tab under Outcome Preview / KPIs
+    const mobileSummaryText = mobileContainer.textContent || "";
     
-    // Mobile shows retirement age in Hero Card / Status / Overview
-    const mobileSummaryText = mobileContainer.querySelector('.mobile-snapshot-grid')?.textContent || "";
-
     // Both should reflect the expected retirement age calculated by the simulation hook
     expect(desktopSummaryText).toContain(expectedAge);
     expect(mobileSummaryText).toContain(expectedAge);

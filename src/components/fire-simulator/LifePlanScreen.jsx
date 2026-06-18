@@ -162,7 +162,7 @@ const generateLifeStory = (inp, results) => {
         : results.retirementReadyTarget;
     list.push({
       age: retirementReadyAge,
-      text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Retirement (Target: ${formatCurrency(targetValForStory)})</strong>`
+      text: `<strong style="color: var(--accent-emerald)">Reach ${roadmapLabel} Financial Freedom (Target: ${formatCurrency(targetValForStory)})</strong>`
     });
   }
 
@@ -207,7 +207,7 @@ const downloadTimelineCSV = (timeline) => {
     'Age', 'Year', 'Gross Income', 'Taxes', 'Net Income', 'Expenses',
     'Contributions', 'Withdrawals', 'Investment Growth', 'Debt Balance',
     'Asset Balance', 'Net Worth', 'Scaling Mode', 'Multiplier', 'Budget Drift',
-    'Retirement Status', 'Active Events', 'Warnings/Errors',
+    'Stop Working Status', 'Active Events', 'Warnings/Errors',
     'Routing Source', 'Ignored Rules', 'Routing Warning',
     'Brokerage Starting Balance', 'Brokerage Explicit Contribution',
     'Brokerage Allocation Rule Contribution', 'Brokerage Surplus Fallback Contribution',
@@ -390,9 +390,37 @@ export default function LifePlanScreen({
 
   timelineEvents,
   editingEvent,
-  dragOccurredRef
+  dragOccurredRef,
+
+  setEditingEvent,
+  handleStep1Change,
+  handleOpenSavingsDetails,
+  lastNonZeroSavingsRateRef,
+  todayAssets,
+  todayDebt,
+  todayNetWorth
 }) {
   const [selectedPhaseId, setSelectedPhaseId] = useState(null);
+  const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
+  const [savingsRateOverride, setSavingsRateOverride] = useState(null);
+  const [activeSavingsRate, setActiveSavingsRate] = useState(null);
+  
+  const hasUserEvents = useMemo(() => {
+    const list = timelineEvents || [];
+    const excludedTypes = [
+      'today',
+      'lifeExpectancy',
+      'socialSecurity',
+      'retire',
+      'medicareEligibility',
+      'retirementReadySurvival',
+      'retirementReadyComfortable',
+      'retirementReadySWR',
+      'coastFire'
+    ];
+    return list.some(e => !excludedTypes.includes(e.type));
+  }, [timelineEvents]);
+
   const trackRef = useRef(null);
   const [trackWidth, setTrackWidth] = useState(800);
 
@@ -575,351 +603,241 @@ export default function LifePlanScreen({
     <>
               <div className="roadmap-step-container">
                 
-                {/* visual Retirement Plan Summary Card (Full-Width at Top) */}
-                {(() => {
-                  const details = getOutcomeDetails(
-                    activeResults.retirementOutcome,
-                    activeResults.runOutAge,
-                    inputs.readinessCriteria,
-                    activeResults.retirementReadyAge,
-                    inputs.lifeExpectancy
-                  );
-      
-                  const readyAge = activeResults.retirementReadyAge;
-      
-                  return (
-                    <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                          🏆 Retirement Plan Summary
-                          {showDebugButton && (
-                            <button
-                              id="debug-export-btn"
-                              type="button"
-                              onClick={() => {
-                                setDebugTab('assumptions');
-                                setShowDebugDrawer(true);
-                              }}
-                              style={{
-                                padding: '0.2rem 0.5rem',
-                                fontSize: '0.7rem',
-                                borderRadius: '4px',
-                                background: 'var(--accent-orange, #f59e0b)',
-                                color: '#0f172a',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '700',
-                                marginLeft: '0.5rem',
-                                transition: 'opacity 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px'
-                              }}
-                              onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                              onMouseOut={(e) => e.target.style.opacity = '1'}
-                            >
-                              ⚙️ Debug
-                            </button>
-                          )}
-                        </h3>
-                        <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
-                          <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
-                            >
-                              Sustainable
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: 'var(--primary)' }}>Sustainable Retirement:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
-                            >
-                              Comfortable
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: '#fbbf24' }}>Comfortable Retirement:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
-                            >
-                              Indefinite
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: '#10b981' }}>Indefinite Retirement:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
-                                </span>
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-      
-                      {/* View Values In Preference Toggle */}
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'flex-end', 
-                        gap: '0.5rem', 
-                        marginBottom: '0.65rem',
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        <span>View Values In:</span>
-                        <div className="segmented-control" style={{ 
-                          background: 'var(--bg-secondary)', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '6px', 
-                          padding: '2px', 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${displayMode === 'future' ? 'active' : ''}`}
-                            style={{
-                              padding: '0.2rem 0.6rem',
-                              fontSize: '0.7rem',
-                              borderRadius: '4px',
-                              background: displayMode === 'future' ? 'var(--primary)' : 'transparent',
-                              color: displayMode === 'future' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onClick={() => setDisplayMode('future')}
-                          >
-                            Future Dollars
-                          </button>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${displayMode === 'today' ? 'active' : ''}`}
-                            style={{
-                              padding: '0.2rem 0.6rem',
-                              fontSize: '0.7rem',
-                              borderRadius: '4px',
-                              background: displayMode === 'today' ? 'var(--primary)' : 'transparent',
-                              color: displayMode === 'today' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '2px'
-                            }}
-                            onClick={() => setDisplayMode('today')}
-                          >
-                            Today’s Dollars
-                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                              <span className="toggle-tooltip-icon" style={{ width: '10px', height: '10px', fontSize: '7px', lineHeight: '10px' }}>i</span>
-                              <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
-                                Today’s Dollars adjusts future values for inflation to show equivalent purchasing power.
-                              </span>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* Outcome Banner (Compact) */}
-                      <div style={{ 
-                        background: details.bg, 
-                        border: `1px solid ${details.color}44`, 
-                        borderRadius: '6px', 
-                        padding: '0.35rem 0.75rem',
-                        marginBottom: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
-                          {details.badge}
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.35', flex: 1, minWidth: '250px' }}>
-                          {details.desc}
-                        </p>
-                      </div>
-
-                      {activeResults.yearsWithLimitsReached > 0 && (
-                        <div style={{ 
-                          background: 'rgba(99, 102, 241, 0.08)', 
-                          border: '1px solid rgba(99, 102, 241, 0.2)', 
-                          borderRadius: '6px', 
-                          padding: '0.35rem 0.75rem',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.75rem',
-                          color: 'var(--text-secondary)'
-                        }}>
-                          <span>ℹ️</span>
-                          <span style={{ lineHeight: '1.45' }}>
-                            Retirement account limits were reached in <strong>{activeResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(activeResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{activeResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Planning Concepts & Key Values Grid (6-Column Compact) */}
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
-                        gap: '0.5rem', 
-                        paddingTop: '0' 
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Planned Retirement</span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? 'Sustainable Age' 
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                              ? 'Comfortable Age' 
-                              : 'Indefinite Age'}
-                          </span>
-                          <strong style={{ fontSize: readyAge ? '1.05rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', fontWeight: '800' }}>
-                            {readyAge ? `Age ${readyAge}` : 'Current Plan Needs Adjustment'}
-                          </strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? 'retire sustainably, taking SS at selected year' 
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                                ? 'retire comfortably, taking SS at the selected year' 
-                                : 'retire indefinitely, taking SS at selected year'}
-                          </span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                                ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
-                                : formatCurrency(displayedResults.retirementReadyTarget)}
-                          </strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
-                          </strong>
-                        </div>
-                      </div>
-      
-                      {/* 🏖 Retire Today Compact Secondary Card */}
-                      <div style={{ 
-                        marginTop: '0.65rem', 
-                        padding: '0.4rem 0.6rem', 
-                        background: 'rgba(255, 255, 255, 0.015)', 
-                        border: '1px solid var(--border-color)', 
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.75rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ fontSize: '1rem' }}>🏖️</span>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-primary)' }}>🏖 Retire Today</span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>“Portfolio needed today to replace your current spending.”</span>
-                          </div>
-                        </div>
-                        <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                          {formatCurrency(displayedResults.retireTodayTarget)}
-                        </strong>
-                      </div>
-      
-                      {/* Retirement Improvement Plan Banner (Compact) */}
-                      {activeStep === 2 && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                        <div className="improvement-banner-container" style={{ marginTop: '0.65rem', padding: '0.35rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="improvement-banner-btn"
-                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
-                            onClick={() => setShowImprovementModal(true)}
-                          >
-                            View Action Plan
-                          </button>
-                        </div>
-                      )}
-      
+                {/* Current Situation Card */}
+                <div 
+                  className="glass-card situation-summary-card" 
+                  style={{ 
+                    padding: '1rem 1.25rem', 
+                    marginBottom: '0.75rem', 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '700', margin: 0, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      👤 Current Situation
+                    </h3>
+                  </div>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(5, 1fr)', 
+                    gap: '1rem',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Current Age</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '1rem',
+                          fontWeight: '800',
+                          padding: '0.35rem 0.5rem',
+                          boxSizing: 'border-box'
+                        }}
+                        value={inputs.currentAge === null ? '' : inputs.currentAge}
+                        placeholder="e.g. 35"
+                        onClick={() => handleStep1Change('currentAge', null)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                        }}
+                      />
                     </div>
-                  );
-                })()}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Annual Income</span>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            color: 'var(--text-primary)',
+                            fontSize: '1rem',
+                            fontWeight: '800',
+                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
+                            boxSizing: 'border-box'
+                          }}
+                          value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
+                          placeholder="e.g. 120000"
+                          onClick={() => {
+                            setActiveSavingsRate(simpleSavingsRate);
+                            handleStep1Change('simpleIncome', null);
+                          }}
+                          onBlur={() => {
+                            setActiveSavingsRate(null);
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newIncome = val === '' ? null : (parseFloat(val) || 0);
+                            handleStep1Change('simpleIncome', newIncome);
+                            if (newIncome !== null) {
+                              const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
+                              const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                              handleStep1Change('simpleExpenses', newExpenses);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Annual Spending</span>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            color: 'var(--text-primary)',
+                            fontSize: '1rem',
+                            fontWeight: '800',
+                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
+                            boxSizing: 'border-box'
+                          }}
+                          value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Current Savings</span>
+                        <button
+                          type="button"
+                          onClick={handleOpenSavingsDetails}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--primary)',
+                            fontSize: '0.65rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            padding: 0,
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Details
+                        </button>
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            color: 'var(--text-primary)',
+                            fontSize: '1rem',
+                            fontWeight: '800',
+                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
+                            boxSizing: 'border-box'
+                          }}
+                          value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
+                          placeholder="e.g. 250000"
+                          onClick={() => handleStep1Change('simpleInvestments', null)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Savings Rate</span>
+                        <button
+                          type="button"
+                          onClick={() => handleSetBudgetClick()}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--primary)',
+                            fontSize: '0.65rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            padding: 0,
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Budget
+                        </button>
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          className="input-number-box"
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            color: 'var(--accent-emerald)',
+                            fontSize: '1rem',
+                            fontWeight: '800',
+                            padding: '0.35rem 1.25rem 0.35rem 0.5rem',
+                            boxSizing: 'border-box',
+                            textAlign: 'right'
+                          }}
+                          value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
+                          placeholder="e.g. 20"
+                          onClick={() => setSavingsRateOverride('')}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSavingsRateOverride(val);
+                            if (val === '') {
+                              return;
+                            }
+                            const rate = parseFloat(val) || 0;
+                            const clampedRate = Math.min(100, Math.max(0, rate));
+                            if (lastNonZeroSavingsRateRef) {
+                              lastNonZeroSavingsRateRef.current = clampedRate;
+                            }
+                            const income = Number(inputs.simpleIncome) || 0;
+                            const newExpenses = Math.round(income * (1 - clampedRate / 100));
+                            handleStep1Change('simpleExpenses', newExpenses);
+                          }}
+                          onBlur={() => {
+                            setSavingsRateOverride(null);
+                          }}
+                        />
+                        <span style={{ position: 'absolute', right: '8px', color: 'var(--accent-emerald)', fontSize: '0.9rem', fontWeight: 'bold' }}>%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
                 {/* Centerpiece Timeline */}
-                <div className="glass-card timeline-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
+                <div className="glass-card timeline-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.4rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Interactive Roadmap</h3>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Click milestones to view details</span>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                        Interactive Roadmap
+                      </h3>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        Click milestones to view details
+                      </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
@@ -1047,7 +965,7 @@ export default function LifePlanScreen({
                         <div className="timeline-summary-title" style={{ marginRight: '0.5rem' }}>Current Plan</div>
                         <div className="timeline-summary-items" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                           <div className="plan-chip">💼 Working: {currentAge}–{targetRetirementAge}</div>
-                          {retiredStr && <div className="plan-chip">🏖️ Retired: {targetRetirementAge}–{lifeExpectancy}</div>}
+                          {retiredStr && <div className="plan-chip">🏖️ Stopped Working: {targetRetirementAge}–{lifeExpectancy}</div>}
                           {homeSpans.map((h, i) => (
                             <div className="plan-chip" key={i}>
                               🏠 Homeowner ({h.name}): {h.buyAge}{h.sellAge ? `–${h.sellAge}` : '+'}
@@ -1060,7 +978,6 @@ export default function LifePlanScreen({
                     );
                   })()}
       
-                  {/* Timeline Layout Wrapper (Timeline + Details Drawer) */}
                   <div className="timeline-layout-wrapper">
                     
                     {/* Horizontal Timeline */}
@@ -1195,6 +1112,9 @@ export default function LifePlanScreen({
                                         </div>
                                       );
                                     } else {
+                                      if (evt.type === 'today' || evt.type === 'lifeExpectancy') {
+                                        return null;
+                                      }
                                       const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
                                       const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
                                       return (
@@ -1663,9 +1583,350 @@ export default function LifePlanScreen({
                       </div>
                     </div>
                   </div>
+
+
                 </div>
       
       
+                {/* visual Outcome Preview Card (Full-Width below timeline) */}
+                {(() => {
+                  const details = getOutcomeDetails(
+                    activeResults.retirementOutcome,
+                    activeResults.runOutAge,
+                    inputs.readinessCriteria,
+                    activeResults.retirementReadyAge,
+                    inputs.lifeExpectancy
+                  );
+      
+                  const readyAge = activeResults.retirementReadyAge;
+      
+                  return (
+                    <div className="glass-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <h3 style={{ fontSize: '1.0rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                          🏆 Outcome Preview
+                          {showDebugButton && (
+                            <button
+                              id="debug-export-btn"
+                              type="button"
+                              onClick={() => {
+                                setDebugTab('assumptions');
+                                setShowDebugDrawer(true);
+                              }}
+                              style={{
+                                padding: '0.2rem 0.5rem',
+                                fontSize: '0.7rem',
+                                borderRadius: '4px',
+                                background: 'var(--accent-orange, #f59e0b)',
+                                color: '#0f172a',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '700',
+                                marginLeft: '0.5rem',
+                                transition: 'opacity 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}
+                              onMouseOver={(e) => e.target.style.opacity = '0.8'}
+                              onMouseOut={(e) => e.target.style.opacity = '1'}
+                            >
+                              ⚙️ Debug
+                            </button>
+                          )}
+                        </h3>
+                        <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
+                          <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
+                            <button
+                              type="button"
+                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
+                              style={{ 
+                                flex: 1, 
+                                fontSize: '0.7rem', 
+                                padding: '0.35rem 0.5rem', 
+                                borderRadius: '6px', 
+                                background: inputs.readinessCriteria === 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
+                                color: inputs.readinessCriteria === 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
+                            >
+                              Sustainable
+                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                                <span className="toggle-tooltip-icon">i</span>
+                                <span className="toggle-tooltip-text">
+                                  <strong style={{ color: 'var(--primary)' }}>Sustainable Plan:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
+                                </span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
+                              style={{ 
+                                flex: 1, 
+                                fontSize: '0.7rem', 
+                                padding: '0.35rem 0.5rem', 
+                                borderRadius: '6px', 
+                                background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
+                                color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
+                            >
+                              Comfortable
+                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                                <span className="toggle-tooltip-icon">i</span>
+                                <span className="toggle-tooltip-text">
+                                  <strong style={{ color: '#fbbf24' }}>Comfortable Plan:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
+                                </span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
+                              style={{ 
+                                flex: 1, 
+                                fontSize: '0.7rem', 
+                                padding: '0.35rem 0.5rem', 
+                                borderRadius: '6px', 
+                                background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
+                                color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
+                            >
+                              Indefinite
+                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                                <span className="toggle-tooltip-icon">i</span>
+                                <span className="toggle-tooltip-text">
+                                  <strong style={{ color: '#10b981' }}>Indefinite Plan:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
+                                </span>
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+       
+                      {/* View Values In Preference Toggle */}
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'flex-end', 
+                        gap: '0.5rem', 
+                        marginBottom: '0.65rem',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        <span>View Values In:</span>
+                        <div className="segmented-control" style={{ 
+                          background: 'var(--bg-secondary)', 
+                          border: '1px solid var(--border-color)', 
+                          borderRadius: '6px', 
+                          padding: '2px', 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          <button
+                            type="button"
+                            className={`segmented-control-btn ${displayMode === 'future' ? 'active' : ''}`}
+                            style={{
+                              padding: '0.2rem 0.6rem',
+                              fontSize: '0.7rem',
+                              borderRadius: '4px',
+                              background: displayMode === 'future' ? 'var(--primary)' : 'transparent',
+                              color: displayMode === 'future' ? '#fff' : 'var(--text-secondary)',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onClick={() => setDisplayMode('future')}
+                          >
+                            Future Dollars
+                          </button>
+                          <button
+                            type="button"
+                            className={`segmented-control-btn ${displayMode === 'today' ? 'active' : ''}`}
+                            style={{
+                              padding: '0.2rem 0.6rem',
+                              fontSize: '0.7rem',
+                              borderRadius: '4px',
+                              background: displayMode === 'today' ? 'var(--primary)' : 'transparent',
+                              color: displayMode === 'today' ? '#fff' : 'var(--text-secondary)',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }}
+                            onClick={() => setDisplayMode('today')}
+                          >
+                            Today’s Dollars
+                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                              <span className="toggle-tooltip-icon" style={{ width: '10px', height: '10px', fontSize: '7px', lineHeight: '10px' }}>i</span>
+                              <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                                Today’s Dollars adjusts future values for inflation to show equivalent purchasing power.
+                              </span>
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Outcome Banner (Compact) */}
+                      <div style={{ 
+                        background: details.bg, 
+                        border: `1px solid ${details.color}44`, 
+                        borderRadius: '6px', 
+                        padding: '0.35rem 0.75rem',
+                        marginBottom: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
+                          {details.badge}
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.35', flex: 1, minWidth: '250px' }}>
+                          {details.desc}
+                        </p>
+                      </div>
+ 
+                      {activeResults.yearsWithLimitsReached > 0 && (
+                        <div style={{ 
+                          background: 'rgba(99, 102, 241, 0.08)', 
+                          border: '1px solid rgba(99, 102, 241, 0.2)', 
+                          borderRadius: '6px', 
+                          padding: '0.35rem 0.75rem',
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)'
+                        }}>
+                          <span>ℹ️</span>
+                          <span style={{ lineHeight: '1.45' }}>
+                            Contribution limits were reached in <strong>{activeResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(activeResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{activeResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Planning Concepts & Key Values Grid (6-Column Compact) */}
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                        gap: '0.5rem', 
+                        paddingTop: '0' 
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Can Stop Working</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                            {inputs.readinessCriteria === 'lastsLifeExp' 
+                              ? 'Sustainable Age' 
+                              : inputs.readinessCriteria === 'lastsComfortable' 
+                              ? 'Comfortable Age' 
+                              : 'Indefinite Age'}
+                          </span>
+                          <strong style={{ fontSize: readyAge ? '1.05rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', fontWeight: '800' }}>
+                            {readyAge ? `Age ${readyAge}` : 'Plan Needs Adjustment'}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
+                            {inputs.readinessCriteria === 'lastsLifeExp' 
+                              ? 'stop working sustainably, taking SS at selected year' 
+                              : inputs.readinessCriteria === 'lastsComfortable' 
+                                ? 'stop working comfortably, taking SS at the selected year' 
+                                : 'stop working indefinitely, taking SS at selected year'}
+                          </span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                            {inputs.readinessCriteria === 'lastsLifeExp' 
+                              ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
+                              : inputs.readinessCriteria === 'lastsComfortable' 
+                                ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
+                                : formatCurrency(displayedResults.retirementReadyTarget)}
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
+                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                            {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
+                          </strong>
+                        </div>
+                      </div>
+       
+                      {/* 🏖 Stop Working Today Compact Secondary Card */}
+                      <div style={{ 
+                        marginTop: '0.65rem', 
+                        padding: '0.4rem 0.6rem', 
+                        background: 'rgba(255, 255, 255, 0.015)', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '1rem' }}>🏖️</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-primary)' }}>🏖 Stop Working Today</span>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>“Portfolio needed today to replace your current spending.”</span>
+                          </div>
+                        </div>
+                        <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                          {formatCurrency(displayedResults.retireTodayTarget)}
+                        </strong>
+                      </div>
+       
+                      {/* Financial Freedom Action Plan Banner (Compact) */}
+                      {activeStep === 2 && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                        <div className="improvement-banner-container" style={{ marginTop: '0.65rem', padding: '0.35rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="improvement-banner-btn"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
+                            onClick={() => setShowImprovementModal(true)}
+                          >
+                            View Action Plan
+                          </button>
+                        </div>
+                      )}
+       
+                    </div>
+                  );
+                })()}
+
                 {/* Wealth Journey Graph (Full Width, directly below timeline) */}
                 {validation.errors.length === 0 && (
                   <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1784,7 +2045,7 @@ export default function LifePlanScreen({
                             hide={!showNetWorth}
                           />
       
-                          {/* 1. Planned Retirement Age */}
+                          {/* 1. Can Stop Working Age */}
                           {displayedResults.targetRetirementAge && (
                             <ReferenceLine
                               x={displayedResults.targetRetirementAge}
@@ -3027,7 +3288,7 @@ export default function LifePlanScreen({
                                 background: row.retirementStatus === 'Retired' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(245, 158, 11, 0.15)',
                                 color: row.retirementStatus === 'Retired' ? '#6366f1' : '#f59e0b'
                               }}>
-                                {row.retirementStatus}
+                                {row.retirementStatus === 'Retired' ? 'Stopped Working' : row.retirementStatus}
                               </span>
                             </td>
                             <td style={{ padding: '0.4rem', textAlign: 'left', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -3096,6 +3357,177 @@ export default function LifePlanScreen({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {isCurrentSituationModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsCurrentSituationModalOpen(false)}>
+          <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                👤 Edit Current Situation
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setIsCurrentSituationModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
+              >
+                ✖
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Current Age */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.currentAge === null ? '' : inputs.currentAge}
+                    placeholder="e.g. 35"
+                    onClick={() => handleStep1Change('currentAge', null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
+                  Your current age today (e.g. 35)
+                </span>
+              </div>
+
+              {/* Annual Income */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
+                    placeholder="e.g. 120000"
+                    onClick={() => {
+                      setActiveSavingsRate(simpleSavingsRate);
+                      handleStep1Change('simpleIncome', null);
+                    }}
+                    onBlur={() => {
+                      setActiveSavingsRate(null);
+                    }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const newIncome = val === '' ? null : (parseFloat(val) || 0);
+                      handleStep1Change('simpleIncome', newIncome);
+                      if (newIncome !== null) {
+                        const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
+                        const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                        handleStep1Change('simpleExpenses', newExpenses);
+                      }
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
+                  Your total yearly gross income (e.g. $120,000)
+                </span>
+              </div>
+
+              {/* Savings Rate */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCurrentSituationModalOpen(false);
+                        handleSetBudgetClick();
+                      }}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      📊 Calculate from budget
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
+                    placeholder="e.g. 20"
+                    onClick={() => setSavingsRateOverride('')}
+                    onBlur={() => setSavingsRateOverride(null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSavingsRateOverride(val);
+                      if (val === '') {
+                        return;
+                      }
+                      const rate = parseFloat(val) || 0;
+                      const clampedRate = Math.min(100, Math.max(0, rate));
+                      if (lastNonZeroSavingsRateRef) {
+                        lastNonZeroSavingsRateRef.current = clampedRate;
+                      }
+                      const income = Number(inputs.simpleIncome) || 0;
+                      const newExpenses = Math.round(income * (1 - clampedRate / 100));
+                      handleStep1Change('simpleExpenses', newExpenses);
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
+                  Percent of income saved pre-tax (e.g. 20%)
+                </span>
+              </div>
+
+              {/* Current Savings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCurrentSituationModalOpen(false);
+                        handleOpenSavingsDetails();
+                      }}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      ✏️ Details
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
+                    placeholder="e.g. 250000"
+                    onClick={() => handleStep1Change('simpleInvestments', null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
+                  Your total savings, retirement, and investment accounts combined (e.g. $250,000)
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
+                onClick={() => setIsCurrentSituationModalOpen(false)}
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

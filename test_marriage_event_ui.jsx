@@ -4,22 +4,6 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    AreaChart: ({ children }) => <div data-testid="AreaChart">{children}</div>,
-    Area: () => <div data-testid="Area" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -37,10 +21,10 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     render(<FireSimulator />);
     
     // Set starting savings/investments to 100k so retirement is sustainable for the single user
-    const currentSavingsInput = getInputByWrapperText(/Current Savings \(\$\)/i);
+    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
     fireEvent.change(currentSavingsInput, { target: { value: '100000' } });
 
-    // Click "Build My Life Plan" to go to Step 2
+    // Click "Start Planning" to go to Step 2
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
 

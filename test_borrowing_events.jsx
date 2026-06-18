@@ -8,22 +8,6 @@ import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
 import { initializeActiveLoans } from './src/calculators/fire/debts.js';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    AreaChart: ({ children }) => <div data-testid="AreaChart">{children}</div>,
-    Area: () => <div data-testid="Area" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -151,15 +135,17 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     vi.clearAllMocks();
   });
 
-  test("Today Screen onboarding card displays correct initial starting state", async () => {
+  test("Plan Screen displays correct initial starting state", async () => {
     render(<FireSimulator />);
     
-    // Check mountain peak title
-    expect(screen.getByText(/Imagine Your Future/i)).toBeDefined();
+    // Check Current Situation card title
+    expect(screen.getAllByText(/Current Situation/i)[0]).toBeDefined();
     
-    // Check that categories are removed
-    expect(screen.queryByText(/Marriage/i)).toBeNull();
-    expect(screen.queryByText(/Children/i)).toBeNull();
+    // Check baseline events on the timeline
+    expect(screen.getAllByText(/Today/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Can Stop Working/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Social Security/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Life Expectancy/i).length).toBeGreaterThan(0);
   });
 
   const navigateToStep2 = () => {

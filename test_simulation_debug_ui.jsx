@@ -4,22 +4,6 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    AreaChart: ({ children }) => <div data-testid="AreaChart">{children}</div>,
-    Area: () => <div data-testid="Area" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -48,9 +32,7 @@ describe('Simulation Debugger UI Tests', () => {
   test('Debug button is hidden by default in production mode without URL param', () => {
     render(<FireSimulator />);
 
-    // First go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
-    fireEvent.click(buildBtn);
+
 
     const debugBtn = screen.queryByRole('button', { name: /Debug/i });
     expect(debugBtn).toBeNull();
@@ -60,9 +42,7 @@ describe('Simulation Debugger UI Tests', () => {
     import.meta.env.DEV = true;
     render(<FireSimulator />);
 
-    // First go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
-    fireEvent.click(buildBtn);
+
 
     const debugBtn = screen.getByRole('button', { name: /Debug/i });
     expect(debugBtn).toBeDefined();
@@ -75,9 +55,7 @@ describe('Simulation Debugger UI Tests', () => {
 
     render(<FireSimulator />);
 
-    // First go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
-    fireEvent.click(buildBtn);
+
 
     const debugBtn = screen.getByRole('button', { name: /Debug/i });
     expect(debugBtn).toBeDefined();
@@ -87,9 +65,7 @@ describe('Simulation Debugger UI Tests', () => {
     import.meta.env.DEV = true;
     render(<FireSimulator />);
 
-    // Go to Step 2
-    const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
-    fireEvent.click(buildBtn);
+
 
     const debugBtn = screen.getByRole('button', { name: /Debug/i });
     fireEvent.click(debugBtn);

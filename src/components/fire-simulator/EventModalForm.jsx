@@ -128,12 +128,12 @@ export default function EventModalForm({
           {type === 'haveChild' && '👶 Have a Child'}
           {type === 'careerChange' && '💼 Career Change'}
           {type === 'move' && '📍 Move / Relocate'}
-          {type === 'retire' && '🏖 Schedule Retirement'}
+          {type === 'retire' && '🏖 Schedule Stop Working'}
           {type === 'socialSecurity' && '💰 Claim Social Security'}
           {type === 'pension' && '📜 Add Pension'}
           {type === 'rentalIncome' && '🏢 Add Rental Income'}
           {type === 'annuity' && '📈 Add Annuity'}
-          {type === 'otherRetirementIncome' && '💵 Add Other Retirement Income'}
+          {type === 'otherRetirementIncome' && '💵 Add Other Non-Work Income'}
           {type === 'windfall' && '💰 Windfall / Inheritance'}
           {type === 'college' && '🎓 College Tuition'}
           {type === 'debtPayoff' && '💸 Debt Payoff Plan'}
@@ -1048,7 +1048,7 @@ export default function EventModalForm({
           {type === 'retire' && (
             <>
               <div className="input-wrapper">
-                <span className="input-name">Retirement Age</span>
+                <span className="input-name">Can Stop Working Age</span>
                 <input
                   type="number"
                   className="input-number-box"
@@ -1672,8 +1672,8 @@ export default function EventModalForm({
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: editingEvent.id ? 'space-between' : 'flex-end' }}>
-          {editingEvent.id && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: (editingEvent.id && type !== 'retire' && type !== 'socialSecurity') ? 'space-between' : 'flex-end' }}>
+          {editingEvent.id && type !== 'retire' && type !== 'socialSecurity' && (
             <button
               type="button"
               className="btn-secondary"

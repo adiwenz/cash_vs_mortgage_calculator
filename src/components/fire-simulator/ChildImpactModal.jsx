@@ -29,8 +29,8 @@ export default function ChildImpactModal({
         
         <p style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
           {isStillReady 
-            ? "Congratulations! Your retirement plan remains fully on track and sustainable with this child event. No further adjustments are needed."
-            : "Adding child-related costs changes the timeline and may require adjustments to savings, spending, or retirement assumptions. Raising a child is a beautiful journey, and these figures help you plan with confidence. You can refine child spending details in your budget at any time."
+            ? "Congratulations! Your plan remains fully on track and sustainable with this child event. No further adjustments are needed."
+            : "Adding child-related costs changes the timeline and may require adjustments to savings, spending, or stop working assumptions. Raising a child is a beautiful journey, and these figures help you plan with confidence. You can refine child spending details in your budget at any time."
           }
         </p>
 
@@ -39,7 +39,7 @@ export default function ChildImpactModal({
             <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Before Child:</div>
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: isBeforeReady ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
               {beforeAge 
-                ? (beforeAge <= targetRet ? `✓ Retirement Ready at Age ${beforeAge}` : `⚠ Retires Late at Age ${beforeAge}`)
+                ? (beforeAge <= targetRet ? `✓ Can Stop Working at Age ${beforeAge}` : `⚠ Can Stop Working Late at Age ${beforeAge}`)
                 : '⚠ Current Plan Needs Adjustment'}
             </div>
           </div>
@@ -47,7 +47,7 @@ export default function ChildImpactModal({
             <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 'bold' }}>After Child:</div>
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: isAfterReady ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', marginTop: '0.2rem' }}>
               {afterAge 
-                ? (afterAge <= targetRet ? `✓ Retirement Ready at Age ${afterAge}` : `⚠ Retires Late at Age ${afterAge}`)
+                ? (afterAge <= targetRet ? `✓ Can Stop Working at Age ${afterAge}` : `⚠ Can Stop Working Late at Age ${afterAge}`)
                 : '⚠ Current Plan Needs Adjustment'}
             </div>
           </div>

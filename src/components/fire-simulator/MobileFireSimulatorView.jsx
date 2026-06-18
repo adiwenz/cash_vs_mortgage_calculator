@@ -10,7 +10,7 @@ import {
   Sparkles,
   Info
 } from 'lucide-react';
-import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis } from './helpers';
+import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
@@ -255,6 +255,12 @@ function LedgerRow({ row, formatCurrency }) {
 export default function MobileFireSimulatorView({
   inputs,
   updateInput,
+  handleStep1Change,
+  handleOpenSavingsDetails,
+  lastNonZeroSavingsRateRef,
+  todayAssets,
+  todayDebt,
+  todayNetWorth,
   displayMode,
   setDisplayMode,
   activeResults,
@@ -266,7 +272,6 @@ export default function MobileFireSimulatorView({
   handleCreateEvent,
   handleEditRoadmapEvent,
   handleSetBudgetClick,
-  handleOpenSavingsDetails,
   isMobile,
   totalNetWorth,
   activeStep,
@@ -337,8 +342,30 @@ export default function MobileFireSimulatorView({
   showImprovementModal,
   setShowImprovementModal
 }) {
-  const [activeTab, setActiveTab] = useState('Roadmap'); // 'Overview' | 'Roadmap' | 'Results' | 'Details'
+  const [activeTab, setActiveTab] = useState('Plan'); // 'Plan' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
+  const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
+  const [savingsRateOverride, setSavingsRateOverride] = useState(null);
+  const [activeSavingsRate, setActiveSavingsRate] = useState(null);
+  const [isCurrentSituationExpanded, setIsCurrentSituationExpanded] = useState(true);
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(true);
+  const [isOutcomePreviewExpanded, setIsOutcomePreviewExpanded] = useState(true);
+
+  const hasUserEvents = useMemo(() => {
+    const list = timelineEvents || [];
+    const excludedTypes = [
+      'today',
+      'lifeExpectancy',
+      'socialSecurity',
+      'retire',
+      'medicareEligibility',
+      'retirementReadySurvival',
+      'retirementReadyComfortable',
+      'retirementReadySWR',
+      'coastFire'
+    ];
+    return list.some(e => !excludedTypes.includes(e.type));
+  }, [timelineEvents]);
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
@@ -420,7 +447,7 @@ export default function MobileFireSimulatorView({
   const getPhaseTags = (p) => {
     const tags = [];
     if (p.label?.toLowerCase().includes('retirement') || p.icon === '🏖️' || p.icon === '🏖') {
-      tags.push({ text: 'Retirement', color: 'green' });
+      tags.push({ text: 'Stopped Working', color: 'green' });
       if (p.startAge >= 65 || p.endAge > 65) {
         tags.push({ text: 'Medicare', color: 'blue' });
       }
@@ -444,7 +471,7 @@ export default function MobileFireSimulatorView({
     const isRetirement = p.label?.toLowerCase().includes('retirement') || p.icon === '🏖️' || p.icon === '🏖';
     
     if (isRetirement) {
-      items.push({ label: 'Retirement', value: 'Income reduced', isPositive: false });
+      items.push({ label: 'Stopped Working', value: 'Income reduced', isPositive: false });
       const ssEvent = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
       if (ssEvent) {
         const claimingAge = Number(ssEvent.claimingAge || 67);
@@ -554,139 +581,8 @@ export default function MobileFireSimulatorView({
 
       {/* Main Tab Content */}
       <div style={{ flex: 1 }}>
-        {/* OVERVIEW TAB */}
-        {activeTab === 'Overview' && (
-          <div>
-            <h1 className="mobile-tab-title">Overview</h1>
-            <p className="mobile-tab-subtitle">Your plan performance at a glance</p>
-
-            {/* Hero Card */}
-            <div className={`mobile-card ${isPlanOnTrack ? 'mobile-card-glow-green' : 'mobile-card-glow-purple'}`}>
-              <div className="mobile-hero-status">
-                <span className="mobile-hero-badge">Status</span>
-                <span className="mobile-hero-msg">
-                  {isPlanOnTrack 
-                    ? "✨ You're fully on track!" 
-                    : activeResults.retirementReadyAge === null
-                      ? "⚠️ Plan requires adjustments"
-                      : `⏳ Retirement delayed by ${retirementReadyDifference} years`
-                  }
-                </span>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: '1.4' }}>
-                  {isPlanOnTrack 
-                    ? "Your projected assets are sustainable and will last through your full life expectancy with safety margin."
-                    : "Your budget or events cause a shortfall. Check the roadmap and recommendations to optimize your trajectory."
-                  }
-                </p>
-              </div>
-            </div>
-
-            {/* Retirement Snapshot */}
-            <div className="mobile-snapshot-grid">
-              <div className="mobile-snapshot-item">
-                <div className="mobile-snapshot-label">Retirement Age</div>
-                <div className="mobile-snapshot-val" style={{ color: isPlanOnTrack ? '#10b981' : '#f59e0b' }}>
-                  {activeResults.retirementReadyAge || 'N/A'}
-                </div>
-              </div>
-              <div className="mobile-snapshot-item">
-                <div className="mobile-snapshot-label">FI Number</div>
-                <div className="mobile-snapshot-val">
-                  {formatCurrency(displayedResults.fiNumber || 0)}
-                </div>
-              </div>
-              <div className="mobile-snapshot-item">
-                <div className="mobile-snapshot-label">Proj. Portfolio</div>
-                <div className="mobile-snapshot-val">
-                  {formatCurrency(displayedResults.portfolioAtRetirement || 0)}
-                </div>
-              </div>
-            </div>
-
-            {!isPlanOnTrack && (
-              <div style={{ padding: '0 0.75rem' }}>
-                <MobileRecommendationsPanel
-                  improvementPlan={improvementPlan}
-                  handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                  targetRetirementAge={inputs.targetRetirementAge}
-                  showHeader={true}
-                />
-              </div>
-            ) }
-
-            {/* Current Phase Card */}
-            {currentAgePhase && (
-              <div 
-                className="mobile-card" 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setSelectedMobilePhaseId(currentAgePhase.id)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>
-                      You are currently in
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                      <span style={{ fontSize: '1.25rem' }}>{currentAgePhase.icon}</span>
-                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>{currentAgePhase.label}</span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#a78bfa', fontWeight: '600', marginTop: '0.1rem' }}>
-                      Age {currentAgePhase.startAge}–{currentAgePhase.endAge}
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="mobile-rec-arrow" />
-                </div>
-              </div>
-            )}
-
-            {/* Upcoming Event Card */}
-            {upcomingEvent && (
-              <div 
-                className="mobile-card"
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  const idx = timelineEvents.findIndex(e => e.originalId === upcomingEvent.id || e.label === upcomingEvent.label);
-                  if (idx !== -1) {
-                    setSelectedEventIndex(idx);
-                  }
-                  setActiveTab('Roadmap');
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>
-                      Next milestone
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                      <span style={{ fontSize: '1.25rem' }}>
-                        {upcomingEvent.type === 'haveChild' ? '👶' : 
-                         upcomingEvent.type === 'buyHouse' ? '🏠' : 
-                         upcomingEvent.type === 'marriage' ? '💍' : 
-                         upcomingEvent.type === 'retire' ? '🏖️' : '📅'}
-                      </span>
-                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>
-                        {upcomingEvent.type === 'haveChild' 
-                          ? `${upcomingEvent.childName || 'Child'} arrives` 
-                          : upcomingEvent.type === 'buyHouse'
-                            ? 'Buy home'
-                            : upcomingEvent.type === 'marriage'
-                              ? 'Get married'
-                              : upcomingEvent.name || upcomingEvent.type}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', fontWeight: '600', marginTop: '0.1rem' }}>
-                      In {upcomingEvent.diff} years (Age {upcomingEvent.eventAge})
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="mobile-rec-arrow" />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ROADMAP TAB */}
-        {activeTab === 'Roadmap' && (() => {
+        {/* PLAN TAB */}
+        {activeTab === 'Plan' && (() => {
           const finalYearLog = chartData[chartData.length - 1];
           const finalNetWorth = finalYearLog ? finalYearLog.netWorth : 0;
           
@@ -710,418 +606,761 @@ export default function MobileFireSimulatorView({
             return formatCurrency(val);
           };
 
+          const simpleSavingsRate = inputs.simpleIncome 
+            ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) 
+            : 0;
+
           return (
             <div>
-              <h1 className="mobile-tab-title">Interactive Roadmap</h1>
-              <p className="mobile-tab-subtitle">Your life plan at a glance</p>
+              <h1 className="mobile-tab-title">Plan</h1>
+              <p className="mobile-tab-subtitle">Your situation, life plan, and outcomes</p>
 
-              {/* Status Card (Avatar & circular track gauge) */}
-              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1e293b', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', position: 'relative' }}>
-                    👤
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Roadmap: <span style={{ color: 'var(--accent-emerald)', fontWeight: '700' }}>Path to FIRE</span></div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.15rem' }}>
-                      Current Status: <span style={{ color: '#60a5fa' }}>{inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}</span>
+              {/* 1. CURRENT SITUATION SECTION */}
+              <div style={{ marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCurrentSituationExpanded(!isCurrentSituationExpanded)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.85rem 1rem',
+                    background: 'var(--bg-tertiary)',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>👤 Current Situation</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isCurrentSituationExpanded ? '▼' : '▶'}</span>
+                </button>
+                {isCurrentSituationExpanded && (
+                  <div 
+                    style={{ padding: '1rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Starting Inputs</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff', marginTop: '0.1rem' }}>
-                      Projected Retirement: <span style={{ color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)' }}>
-                        {activeResults.retirementReadyAge || 'N/A'} {isPlanOnTrack ? '(On track)' : '(Delayed)'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '58px', height: '58px' }}>
-                  <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}>
-                    <circle cx="29" cy="29" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
-                    <circle cx="29" cy="29" r="24" fill="none" stroke={isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)'} strokeWidth="4"
-                      strokeDasharray={`${2 * Math.PI * 24}`}
-                      strokeDashoffset={`${2 * Math.PI * 24 * (1 - (isPlanOnTrack ? 0.78 : 0.45))}`}
-                      strokeLinecap="round"
-                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-                    />
-                  </svg>
-                  <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#ffffff', lineHeight: 1 }}>{isPlanOnTrack ? '78%' : '45%'}</span>
-                    <span style={{ fontSize: '0.45rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginTop: '1px' }}>Track</span>
-                  </div>
-                </div>
-              </div>
-
-
-
-
-              {/* Life Journey Timeline */}
-              <MobileTimeline
-                inputs={inputs}
-                timelineEvents={timelineEvents}
-                selectedEventIndex={selectedEventIndex}
-                setSelectedEventIndex={setSelectedEventIndex}
-                handleEditRoadmapEvent={handleEditRoadmapEvent}
-              />
-
-              {/* Net Worth Graph & Projections KPIs Card */}
-              {(() => {
-                const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
-                const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
-                const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
-                
-                const eventAges = Array.from(new Set([
-                  inputs.currentAge,
-                  ...timelineEvents.map(e => Number(e.age)),
-                  inputs.lifeExpectancy
-                ])).sort((a, b) => a - b);
-
-                return (
-                  <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 0.5rem', marginTop: '0.25rem' }}>
                       <div>
-                        <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                          📈 Net Worth Curve
-                        </h3>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Current Age</span>
+                        <input
+                          type="number"
+                          className="input-number-box"
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                            fontWeight: '800',
+                            padding: '0.25rem 0.4rem',
+                            boxSizing: 'border-box'
+                          }}
+                          value={inputs.currentAge === null ? '' : inputs.currentAge}
+                          placeholder="e.g. 35"
+                          onClick={() => handleStep1Change('currentAge', null)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                          }}
+                        />
                       </div>
-                      
-                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
-                          <span>Net Worth</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: '8px', height: '2px', borderTop: '2px dashed #3b82f6', display: 'inline-block' }}></span>
-                          <span>Income</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: '8px', height: '2px', borderTop: '2px dashed #10b981', display: 'inline-block' }}></span>
-                          <span>Expenses</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
-                          <XAxis
-                            dataKey="age"
-                            ticks={eventAges}
-                            stroke="var(--text-tertiary)"
-                            fontSize={8}
-                          />
-                          <YAxis
-                            stroke="var(--text-tertiary)"
-                            fontSize={8}
-                            tickFormatter={formatYAxis}
-                          />
-                          <Tooltip
-                            content={({ active, payload, label }) => {
-                              if (active && payload && payload.length) {
-                                return (
-                                  <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
-                                    <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
-                                    {payload.map((item) => (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
-                                        <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
+                      <div>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Income</span>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
+                          <input
+                            type="number"
+                            className="input-number-box"
+                            style={{
+                              width: '100%',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: '800',
+                              padding: '0.25rem 0.4rem 0.25rem 1rem',
+                              boxSizing: 'border-box'
+                            }}
+                            value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
+                            placeholder="e.g. 120000"
+                            onClick={() => {
+                              setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                              handleStep1Change('simpleIncome', null);
+                            }}
+                            onBlur={() => {
+                              setActiveSavingsRate(null);
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const newIncome = val === '' ? null : (parseFloat(val) || 0);
+                              handleStep1Change('simpleIncome', newIncome);
+                              if (newIncome !== null) {
+                                const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                                const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                                handleStep1Change('simpleExpenses', newExpenses);
                               }
-                              return null;
                             }}
                           />
-                          <Line
-                            type="monotone"
-                            dataKey="netWorth"
-                            name="Net Worth"
-                            stroke="#a78bfa"
-                            strokeWidth={3}
-                            dot={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="income"
-                            name="Income"
-                            stroke="#3b82f6"
-                            strokeDasharray="4 4"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="expenses"
-                            name="Expenses"
-                            stroke="#10b981"
-                            strokeDasharray="4 4"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                          {selectedAge !== null && (
-                            <ReferenceLine
-                              x={selectedAge}
-                              stroke="var(--primary)"
-                              strokeDasharray="3 3"
-                              strokeWidth={1.5}
-                            />
-                          )}
-                          {selectedAge !== null && selectedPoint && (
-                            <ReferenceDot
-                              x={selectedAge}
-                              y={selectedNetWorth}
-                              r={6}
-                              fill="#a78bfa"
-                              stroke="#ffffff"
-                              strokeWidth={2}
-                              isFront={true}
-                            />
-                          )}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* Projections KPIs stats grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Proj. NW</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
-                          {formatCompact(finalNetWorth)}
-                        </strong>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>FI Conf.</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
-                          {fiConfidence}
-                        </strong>
+                      <div>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Spending</span>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
+                          <input
+                            type="number"
+                            className="input-number-box"
+                            style={{
+                              width: '100%',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: '800',
+                              padding: '0.25rem 0.4rem 0.25rem 1rem',
+                              boxSizing: 'border-box'
+                            }}
+                            value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Monthly Burn</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
-                          {formatCurrency(burnVal)}
-                        </strong>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.2rem', marginBottom: '0.2rem' }}>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Savings</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsSavingsDetailsOpen(true)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--primary)',
+                              fontSize: '0.55rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Details
+                          </button>
+                        </div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
+                          <input
+                            type="number"
+                            className="input-number-box"
+                            style={{
+                              width: '100%',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: '800',
+                              padding: '0.25rem 0.4rem 0.25rem 1rem',
+                              boxSizing: 'border-box'
+                            }}
+                            value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
+                            placeholder="e.g. 250000"
+                            onClick={() => handleStep1Change('simpleInvestments', null)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Success Rate</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
-                          {successRate}
-                        </strong>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.2rem', marginBottom: '0.2rem' }}>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Savings Rate</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSetBudgetClick()}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--primary)',
+                              fontSize: '0.55rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Budget
+                          </button>
+                        </div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="input-number-box"
+                            style={{
+                              width: '100%',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              color: 'var(--accent-emerald)',
+                              fontSize: '0.85rem',
+                              fontWeight: '800',
+                              padding: '0.25rem 0.95rem 0.25rem 0.4rem',
+                              boxSizing: 'border-box',
+                              textAlign: 'right'
+                            }}
+                            value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
+                            placeholder="e.g. 20"
+                            onClick={() => setSavingsRateOverride('')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSavingsRateOverride(val);
+                              if (val === '') {
+                                return;
+                              }
+                              const rate = parseFloat(val) || 0;
+                              const clampedRate = Math.min(100, Math.max(0, rate));
+                              if (lastNonZeroSavingsRateRef && lastNonZeroSavingsRateRef.current !== undefined) {
+                                lastNonZeroSavingsRateRef.current = clampedRate;
+                              }
+                              const income = Number(inputs.simpleIncome) || 0;
+                              const newExpenses = Math.round(income * (1 - clampedRate / 100));
+                              handleStep1Change('simpleExpenses', newExpenses);
+                            }}
+                            onBlur={() => {
+                              setSavingsRateOverride(null);
+                            }}
+                          />
+                          <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.75rem', fontWeight: 'bold' }}>%</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              })()}
+                )}
+              </div>
 
+              {/* 2. TIMELINE SECTION */}
+              <div style={{ marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.85rem 1rem',
+                    background: 'var(--bg-tertiary)',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    🗺️ Timeline
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isTimelineExpanded ? '▼' : '▶'}</span>
+                </button>
+                {isTimelineExpanded && (
+                  <div style={{ padding: '0.75rem' }}>
+                    {!hasUserEvents && (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', margin: '0.25rem 0 1rem 0', lineHeight: '1.4' }}>
+                        Add life events to personalize your future.
+                      </p>
+                    )}
 
+                    <MobileTimeline
+                      inputs={inputs}
+                      timelineEvents={timelineEvents}
+                      selectedEventIndex={selectedEventIndex}
+                      setSelectedEventIndex={setSelectedEventIndex}
+                      handleEditRoadmapEvent={handleEditRoadmapEvent}
+                    />
 
-              {/* Collapsible Budget Phases */}
-              <section style={{ textAlign: 'left', marginTop: '1.5rem' }}>
-                <div className="mobile-section-header">
-                  <h2 className="mobile-section-title">Budget Phases</h2>
-                  <span className="mobile-section-subtitle">Tap a phase to view budget details</span>
-                </div>
+                        {/* Net Worth Graph & Projections KPIs Card */}
+                        {(() => {
+                          const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
+                          const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
+                          const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
+                          
+                          const eventAges = Array.from(new Set([
+                            inputs.currentAge,
+                            ...timelineEvents.map(e => Number(e.age)),
+                            inputs.lifeExpectancy
+                          ])).sort((a, b) => a - b);
 
-                <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {normalizedPhases.map((p, idx) => {
-                    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
-                    const badgeColor = colors[idx % colors.length];
-                    const isExpanded = expandedPhaseId === p.id;
+                          return (
+                            <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left', padding: '0.75rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                                <div>
+                                  <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                                    📈 Net Worth Curve
+                                  </h3>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
+                                    <span>NW</span>
+                                  </div>
+                                </div>
+                              </div>
 
-                    const totalExpenses = Object.values(p.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-                    const totalSavings = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
-                                         (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+                              <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
+                                    <XAxis
+                                      dataKey="age"
+                                      ticks={eventAges}
+                                      stroke="var(--text-tertiary)"
+                                      fontSize={8}
+                                    />
+                                    <YAxis
+                                      stroke="var(--text-tertiary)"
+                                      fontSize={8}
+                                      tickFormatter={formatYAxis}
+                                    />
+                                    <Tooltip
+                                      content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                          return (
+                                            <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
+                                              <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
+                                              {payload.map((item) => (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
+                                                  <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
+                                                  <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }}
+                                    />
+                                    <Line
+                                      type="monotone"
+                                      dataKey="netWorth"
+                                      name="Net Worth"
+                                      stroke="#a78bfa"
+                                      strokeWidth={3}
+                                      dot={false}
+                                    />
+                                    <Line
+                                      type="monotone"
+                                      dataKey="income"
+                                      name="Income"
+                                      stroke="#3b82f6"
+                                      strokeDasharray="4 4"
+                                      strokeWidth={2}
+                                      dot={false}
+                                    />
+                                    <Line
+                                      type="monotone"
+                                      dataKey="expenses"
+                                      name="Expenses"
+                                      stroke="#10b981"
+                                      strokeDasharray="4 4"
+                                      strokeWidth={2}
+                                      dot={false}
+                                    />
+                                    {selectedAge !== null && (
+                                      <>
+                                        <ReferenceLine
+                                          x={selectedAge}
+                                          stroke="var(--primary)"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1.5}
+                                        />
+                                        <ReferenceDot
+                                          x={selectedAge}
+                                          y={selectedPoint ? selectedPoint.netWorth : 0}
+                                          r={5}
+                                          fill="var(--primary)"
+                                          stroke="#fff"
+                                          strokeWidth={1.5}
+                                          isFront={true}
+                                        />
+                                      </>
+                                    )}
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </div>
 
-                    return (
-                      <div 
-                        key={p.id}
-                        className={`mobile-phase-card ${isExpanded ? 'expanded' : ''}`}
-                        style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', cursor: 'pointer' }}
-                        onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div 
-                              className="mobile-phase-badge-num"
-                              style={{ backgroundColor: badgeColor, width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '800', color: '#ffffff' }}
-                            >
-                              {idx + 1}
+                              {/* Projections KPIs stats grid */}
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
+                                <div style={{ textAlign: 'center' }}>
+                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Proj. NW</span>
+                                  <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
+                                    {formatCompact(finalNetWorth)}
+                                  </strong>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>FI Conf.</span>
+                                  <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
+                                    {fiConfidence}
+                                  </strong>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Burn/Mo</span>
+                                  <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
+                                    {formatCurrency(burnVal)}
+                                  </strong>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Success</span>
+                                  <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
+                                    {successRate}
+                                  </strong>
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <span style={{ fontSize: '0.95rem' }}>{p.icon}</span>
-                                <span className="mobile-phase-card-title" style={{ fontWeight: '700', fontSize: '0.95rem', color: '#ffffff' }}>{p.label}</span>
-                              </div>
-                              <span className="mobile-phase-card-age" style={{ fontSize: '0.8rem', color: '#a78bfa', display: 'block', marginTop: '0.1rem', fontWeight: '600' }}>Age {p.startAge}–{p.endAge}</span>
-                            </div>
-                          </div>
-                          <ChevronRight size={18} style={{ color: 'var(--text-tertiary)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
-                        </div>
+                          );
+                        })()}
 
-                        {isExpanded && (
-                          <div 
-                            className="mobile-phase-expanded-content" 
-                            style={{ marginTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.85rem' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem 0.5rem', textAlign: 'left' }}>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
-                                <strong style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', display: 'block', marginTop: '0.1rem' }}>
-                                  {formatCurrency(p.income || 0)}/mo
-                                </strong>
-                              </div>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
-                                <strong style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.1rem' }}>
-                                  {formatCurrency(totalExpenses)}/mo
-                                </strong>
-                              </div>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
-                                <strong style={{ fontSize: '0.8rem', color: '#3b82f6', display: 'block', marginTop: '0.1rem' }}>
-                                  {formatCurrency(totalSavings)}/mo
-                                </strong>
-                              </div>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
-                                <strong style={{ fontSize: '0.8rem', color: '#ffffff', display: 'block', marginTop: '0.1rem' }}>
-                                  {formatCurrency(p.expenses?.housing || 0)}/mo
-                                </strong>
-                              </div>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>👶 Children Cost</span>
-                                <strong style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginTop: '0.1rem' }}>
-                                  {formatCurrency(p.expenses?.childcare || 0)}/mo
-                                </strong>
-                              </div>
-                              <div className="phase-metric-item">
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>⚖️ Tax Status</span>
-                                <strong style={{ fontSize: '0.8rem', color: '#ffffff', display: 'block', marginTop: '0.1rem' }}>
-                                  {p.isMarried ? 'Married Joint' : 'Single'}
-                                </strong>
-                              </div>
-                            </div>
+                        {/* Collapsible Budget Phases */}
+                        <div style={{ marginTop: '1.25rem' }}>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: '800', marginBottom: '0.5rem', color: 'var(--text-primary)', textAlign: 'left' }}>Budget Phases</h4>
+                          <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {normalizedPhases.map((p, idx) => {
+                              const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+                              const badgeColor = colors[idx % colors.length];
+                              const isExpanded = expandedPhaseId === p.id;
 
-                            <button
-                              type="button"
-                              className="mobile-phase-edit-btn"
-                              style={{ 
-                                width: '100%', 
-                                padding: '0.45rem', 
-                                background: 'rgba(255,255,255,0.04)', 
-                                border: '1px solid rgba(255,255,255,0.08)', 
-                                borderRadius: '8px', 
-                                fontSize: '0.7rem', 
-                                color: 'var(--primary)', 
-                                fontWeight: '600', 
-                                cursor: 'pointer',
-                                marginTop: '0.85rem'
-                              }}
-                              onClick={() => handleSetBudgetClick(p.id)}
-                            >
-                              ⚙️ Edit Budget Configuration
-                            </button>
+                              const totalExpenses = Object.values(p.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                              const totalSavings = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
+                                                   (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
 
-                            {/* Phase Recommendations Section */}
-                            <div className="mobile-phase-recs-section" style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
-                              <h4 style={{ fontWeight: '700', fontSize: '0.85rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ffffff' }}>
-                                💡 Recommendations
-                              </h4>
-                              
-                              {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
-                                <MobileRecommendationsPanel
-                                  improvementPlan={improvementPlan}
-                                  handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                                  targetRetirementAge={inputs.targetRetirementAge}
-                                  showHeader={false}
-                                />
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                  {p.label?.toLowerCase().includes('retirement') || p.icon === '🏖️' || p.icon === '🏖' ? (
-                                    <>
+                              return (
+                                <div 
+                                  key={p.id}
+                                  className={`mobile-phase-card ${isExpanded ? 'expanded' : ''}`}
+                                  style={{ display: 'flex', flexDirection: 'column', padding: '0.75rem', background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: '12px', cursor: 'pointer' }}
+                                  onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                       <div 
-                                        className="mobile-rec-card"
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                        onClick={() => {
-                                          const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
-                                          if (ssEv) handleEditRoadmapEvent(ssEv);
-                                        }}
+                                        style={{ backgroundColor: badgeColor, width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '800', color: '#ffffff' }}
                                       >
-                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                          <div style={{ fontSize: '1.25rem' }}>📅</div>
-                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Delaying claiming to age 70 increases annual benefits by ~8% per year.</span>
-                                          </div>
-                                        </div>
-                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                                        {idx + 1}
                                       </div>
-                                      
-                                      <div 
-                                        className="mobile-rec-card"
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                        onClick={() => handleSetBudgetClick(p.id)}
-                                      >
-                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                          <div style={{ fontSize: '1.25rem' }}>💸</div>
-                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Cutting spending by $200/mo improves portfolio longevity projection.</span>
-                                          </div>
+                                      <div style={{ textAlign: 'left' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          <span style={{ fontSize: '0.85rem' }}>{p.icon}</span>
+                                          <span className="mobile-phase-card-title" style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.label === 'Retirement' ? 'Can Stop Working' : p.label}</span>
                                         </div>
-                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
-                                      </div>
-                                    </>
-                                  ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
-                                    <div 
-                                      className="mobile-rec-card"
-                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                    >
-                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '1.25rem' }}>🍼</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Optimize Childcare Costs</span>
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Look into tax-free Dependent Care FSAs to save up to 30% on childcare.</span>
-                                        </div>
+                                        <span className="mobile-phase-card-age" style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', fontWeight: '600' }}>Age {p.startAge}–{p.endAge}</span>
                                       </div>
                                     </div>
-                                  ) : (
+                                    <ChevronRight size={16} style={{ color: 'var(--text-tertiary)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                                  </div>
+
+                                  {isExpanded && (
                                     <div 
-                                      className="mobile-rec-card"
-                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                      onClick={() => handleSetBudgetClick(p.id)}
+                                      className="mobile-phase-expanded-content" 
+                                      style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '1.25rem' }}>📈</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Increase Savings Rate</span>
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Try allocating 1% more of your monthly income to investments.</span>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', textAlign: 'left' }}>
+                                        <div>
+                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
+                                          <strong style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', display: 'block' }}>
+                                            {formatCurrency(p.income || 0)}/mo
+                                          </strong>
+                                        </div>
+                                        <div>
+                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
+                                          <strong style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', display: 'block' }}>
+                                            {formatCurrency(totalExpenses)}/mo
+                                          </strong>
+                                        </div>
+                                        <div>
+                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
+                                          <strong style={{ fontSize: '0.75rem', color: '#3b82f6', display: 'block' }}>
+                                            {formatCurrency(totalSavings)}/mo
+                                          </strong>
+                                        </div>
+                                        <div>
+                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
+                                          <strong style={{ fontSize: '0.75rem', color: 'var(--text-primary)', display: 'block' }}>
+                                            {formatCurrency(p.expenses?.housing || 0)}/mo
+                                          </strong>
                                         </div>
                                       </div>
-                                      <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+
+                                      {/* Phase Impact details */}
+                                      {(() => {
+                                        const logs = displayedResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
+                                        const avgIncome = logs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, logs.length);
+                                        const avgSavings = logs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, logs.length);
+                                        const phaseSurplusVal = Math.round(avgSavings / 12);
+                                        const phaseSavingsRateVal = avgIncome > 0 ? Math.round((avgSavings / avgIncome) * 100) : 0;
+
+                                        const baseLogs = displayedBaselineResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
+                                        const baseAvgIncome = baseLogs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, baseLogs.length);
+                                        const baseAvgSavings = baseLogs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, baseLogs.length);
+                                        const baseSurplus = Math.round(baseAvgSavings / 12);
+                                        const baseSavingsRate = baseAvgIncome > 0 ? Math.round((baseAvgSavings / baseAvgIncome) * 100) : 0;
+
+                                        const nwAt85 = Math.round(displayedResults.data.find(d => d.age === 85)?.netWorth || 0);
+                                        const baseNwAt85 = Math.round(displayedBaselineResults.data.find(d => d.age === 85)?.netWorth || 0);
+
+                                        const surplusDiff = phaseSurplusVal - baseSurplus;
+                                        const rateDiff = phaseSavingsRateVal - baseSavingsRate;
+                                        const nwDiff = nwAt85 - baseNwAt85;
+
+                                        return (
+                                          <div style={{ marginTop: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', textAlign: 'left' }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Phase Impact</span>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.7rem' }}>
+                                              <div>
+                                                <span style={{ color: 'var(--text-tertiary)' }}>Surplus: </span>
+                                                <strong style={{ color: phaseSurplusVal >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{formatCurrency(phaseSurplusVal)}/mo</strong>
+                                              </div>
+                                              <div>
+                                                <span style={{ color: 'var(--text-tertiary)' }}>Rate: </span>
+                                                <strong>{phaseSavingsRateVal}%</strong>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {/* Recommendations stack */}
+                                      <div style={{ marginTop: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', textAlign: 'left' }}>
+                                        <h5 style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--text-primary)', margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          💡 Recommendations
+                                        </h5>
+
+                                        <div className="mobile-recs-stack">
+                                          {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
+                                            <MobileRecommendationsPanel
+                                              improvementPlan={improvementPlan}
+                                              handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
+                                              targetRetirementAge={inputs.targetRetirementAge}
+                                              showHeader={false}
+                                            />
+                                          ) : p.label === 'Retirement' || p.label === 'Can Stop Working' || p.icon === '🏖️' || p.icon === '🏖' ? (
+                                            <>
+                                              <div 
+                                                className="mobile-rec-card"
+                                                style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', cursor: 'pointer' }}
+                                                onClick={() => {
+                                                  const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
+                                                  if (ssEv) handleEditRoadmapEvent(ssEv);
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                  <span>📅</span>
+                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
+                                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Claiming later increases benefits.</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              
+                                              <div 
+                                                className="mobile-rec-card"
+                                                style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                                onClick={() => handleSetBudgetClick(p.id)}
+                                              >
+                                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                  <span>💸</span>
+                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
+                                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Improves longevity projection.</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </>
+                                          ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
+                                            <div 
+                                              className="mobile-rec-card"
+                                              style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                              onClick={() => handleCreateEvent('careerChange')}
+                                            >
+                                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                <span>💼</span>
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Increase Income</span>
+                                                  <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Offset childcare expenses.</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                                              No recommendations for this phase.
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        style={{ 
+                                          width: '100%', 
+                                          padding: '0.4rem', 
+                                          background: 'rgba(255,255,255,0.04)', 
+                                          border: '1px solid var(--border-color)', 
+                                          borderRadius: '8px', 
+                                          fontSize: '0.7rem', 
+                                          color: 'var(--primary)', 
+                                          fontWeight: '600', 
+                                          cursor: 'pointer',
+                                          marginTop: '0.75rem'
+                                        }}
+                                        onClick={() => handleSetBudgetClick(p.id)}
+                                      >
+                                        ⚙️ Edit Budget Configuration
+                                      </button>
                                     </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="mobile-roadmap-edit-btn"
+                          style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                          onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+                        >
+                          + Add Life Event
+                        </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. OUTCOME PREVIEW SECTION */}
+              <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
                 <button
                   type="button"
-                  className="mobile-roadmap-edit-btn"
-                  style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                  onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+                  onClick={() => setIsOutcomePreviewExpanded(!isOutcomePreviewExpanded)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.85rem 1rem',
+                    background: 'var(--bg-tertiary)',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
                 >
-                  + Add Life Event
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🏆 Outcome Preview</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isOutcomePreviewExpanded ? '▼' : '▶'}</span>
                 </button>
-              </section>
+                {isOutcomePreviewExpanded && (() => {
+                  const details = getOutcomeDetails(
+                    activeResults.retirementOutcome,
+                    activeResults.runOutAge,
+                    inputs.readinessCriteria,
+                    activeResults.retirementReadyAge,
+                    inputs.lifeExpectancy
+                  );
+                  const readyAge = activeResults.retirementReadyAge;
 
+                  return (
+                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                      {/* Outcome Status Banner */}
+                      <div style={{ 
+                        background: details.bg, 
+                        border: `1px solid ${details.color}44`, 
+                        borderRadius: '8px', 
+                        padding: '0.5rem 0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
+                          {details.badge}
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.35' }}>
+                          {details.desc}
+                        </p>
+                      </div>
+
+                      {/* KPIs Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Can Stop Working</span>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>
+                            {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Age' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable Age' : 'Indefinite Age'}
+                          </span>
+                          <strong style={{ fontSize: readyAge ? '0.95rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange)', fontWeight: '800' }}>
+                            {readyAge ? `Age ${readyAge}` : 'Adjustment Needed'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Freedom Number</span>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                            {inputs.readinessCriteria === 'lastsLifeExp' 
+                              ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
+                              : inputs.readinessCriteria === 'lastsComfortable' 
+                                ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
+                                : formatCurrency(displayedResults.retirementReadyTarget)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Projected Portfolio</span>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>
+                            {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Action Plan Banner if available */}
+                      {!isPlanOnTrack && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                        <div style={{ marginTop: '0.25rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>💡 Recommendation details available.</span>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
+                            onClick={() => {
+                              // Switch active phase to expand/show recs
+                              if (normalizedPhases.length > 0) {
+                                setExpandedPhaseId(normalizedPhases[0].id);
+                              }
+                            }}
+                          >
+                            View Suggestions
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Floating Action Button */}
               {!editingEvent && (
                 <button
                   type="button"
@@ -1133,9 +1372,7 @@ export default function MobileFireSimulatorView({
               )}
             </div>
           );
-        })()}
-
-        {/* RESULTS TAB */}
+        })()}        {/* RESULTS TAB */}
         {activeTab === 'Results' && (
           <div>
             <h1 className="mobile-tab-title">Results</h1>
@@ -1146,7 +1383,7 @@ export default function MobileFireSimulatorView({
               {[
                 { id: 'netWorth', label: 'Net Worth' },
                 { id: 'assetsDebt', label: 'Assets vs Debt' },
-                { id: 'progress', label: 'Retirement Progress' },
+                { id: 'progress', label: 'Financial Freedom Progress' },
                 { id: 'incomeSpending', label: 'Income vs Spending' }
               ].map(tab => (
                 <button
@@ -1945,7 +2182,7 @@ export default function MobileFireSimulatorView({
                     </div>
 
                     <div className="mobile-impact-item">
-                      <div className="mobile-impact-label">Retirement Age</div>
+                      <div className="mobile-impact-label">Can Stop Working Age</div>
                       <div className="mobile-impact-val" style={{ color: isPlanOnTrack ? '#10b981' : '#f59e0b' }}>
                         {isPlanOnTrack ? 'On Track' : 'Delayed'}
                       </div>
@@ -2109,20 +2346,11 @@ export default function MobileFireSimulatorView({
         <nav className="mobile-bottom-nav">
           <button
             type="button"
-            className={`mobile-nav-item ${activeTab === 'Overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Overview')}
-          >
-            <Home size={20} />
-            Overview
-          </button>
-
-          <button
-            type="button"
-            className={`mobile-nav-item ${activeTab === 'Roadmap' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Roadmap')}
+            className={`mobile-nav-item ${activeTab === 'Plan' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Plan')}
           >
             <Map size={20} />
-            Roadmap
+            Plan
           </button>
 
           <button
@@ -2226,7 +2454,7 @@ export default function MobileFireSimulatorView({
           <div className="improvement-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="improvement-modal-header">
               <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                💡 Retirement Improvement Plan
+                💡 Financial Freedom Action Plan
               </h3>
               <button 
                 type="button" 
@@ -2238,7 +2466,7 @@ export default function MobileFireSimulatorView({
             </div>
             
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: '1.45' }}>
-              Your current path may not fully support retirement. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or retiring slightly later can make a massive difference:
+              Your current path may not fully support your stop working plan. We've generated a personalized action plan with adjustments that could improve your projection. Earning more, saving more, or stopping work slightly later can make a massive difference:
             </p>
 
             <div className="improvement-plan-grid">
@@ -2306,7 +2534,7 @@ export default function MobileFireSimulatorView({
                         <strong className="kpi-item-value">Age {scenario.readyAge}</strong>
                       </div>
                       <div className="improvement-plan-kpi-item">
-                        <span className="kpi-item-label">Retirement Gain</span>
+                        <span className="kpi-item-label">Plan Improvement</span>
                         <strong className="kpi-item-value gain-value" style={{ fontSize: '0.8rem' }}>
                           {scenario.yearsImprovement !== null && scenario.yearsImprovement > 0 ? (
                             `⚡ ${scenario.yearsImprovement} ${scenario.yearsImprovement === 1 ? 'Year' : 'Years'} Sooner (vs. Age ${activeResults.retirementReadyAge} on current path)`
@@ -2380,6 +2608,179 @@ export default function MobileFireSimulatorView({
           </div>
         );
       })()}
+
+      {/* Edit Current Situation Modal */}
+      {isCurrentSituationModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsCurrentSituationModalOpen(false)} style={{ zIndex: 1000 }}>
+          <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                👤 Edit Current Situation
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setIsCurrentSituationModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
+              >
+                ✖
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+              {/* Current Age */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Age</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.currentAge === null ? '' : inputs.currentAge}
+                    placeholder="e.g. 35"
+                    onClick={() => handleStep1Change('currentAge', null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
+                  Your current age today (e.g. 35)
+                </span>
+              </div>
+
+              {/* Annual Income */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
+                    placeholder="e.g. 120000"
+                    onClick={() => {
+                      setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                      handleStep1Change('simpleIncome', null);
+                    }}
+                    onBlur={() => {
+                      setActiveSavingsRate(null);
+                    }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const newIncome = val === '' ? null : (parseFloat(val) || 0);
+                      handleStep1Change('simpleIncome', newIncome);
+                      if (newIncome !== null) {
+                        const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                        const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                        handleStep1Change('simpleExpenses', newExpenses);
+                      }
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
+                  Your total yearly gross income (e.g. $120,000)
+                </span>
+              </div>
+
+              {/* Savings Rate */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCurrentSituationModalOpen(false);
+                        handleSetBudgetClick();
+                      }}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      📊 Budget
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="input-number-box"
+                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={savingsRateOverride !== null ? savingsRateOverride : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0)}
+                    placeholder="e.g. 20"
+                    onClick={() => setSavingsRateOverride('')}
+                    onBlur={() => setSavingsRateOverride(null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSavingsRateOverride(val);
+                      if (val === '') {
+                        return;
+                      }
+                      const rate = parseFloat(val) || 0;
+                      const clampedRate = Math.min(100, Math.max(0, rate));
+                      if (lastNonZeroSavingsRateRef && lastNonZeroSavingsRateRef.current !== undefined) {
+                        lastNonZeroSavingsRateRef.current = clampedRate;
+                      }
+                      const income = Number(inputs.simpleIncome) || 0;
+                      const newExpenses = Math.round(income * (1 - clampedRate / 100));
+                      handleStep1Change('simpleExpenses', newExpenses);
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
+                  Percent of income saved pre-tax (e.g. 20%)
+                </span>
+              </div>
+
+              {/* Current Savings */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCurrentSituationModalOpen(false);
+                        handleOpenSavingsDetails();
+                      }}
+                      className="list-builder-edit-btn"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      ✏️ Details
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    className="input-number-box"
+                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
+                    value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
+                    placeholder="e.g. 250000"
+                    onClick={() => handleStep1Change('simpleInvestments', null)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                    }}
+                  />
+                </div>
+                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
+                  Your total savings, retirement, and investment accounts combined (e.g. $250,000)
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
+                onClick={() => setIsCurrentSituationModalOpen(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

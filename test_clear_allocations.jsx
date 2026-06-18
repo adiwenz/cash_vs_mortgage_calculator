@@ -4,17 +4,6 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    PieChart: ({ children }) => <div data-testid="PieChart">{children}</div>,
-    Pie: ({ children }) => <div data-testid="Pie">{children}</div>,
-    Cell: () => <div data-testid="Cell" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -45,7 +34,7 @@ describe('Clear Budget Allocations Feature', () => {
     render(<FireSimulator />);
 
     // 1. Open Budget Modal
-    const budgetBtn = screen.getByRole('button', { name: /Calculate from budget/i });
+    const budgetBtn = screen.getByRole('button', { name: /Set Budget|Calculate from budget/i });
     fireEvent.click(budgetBtn);
     expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
@@ -69,7 +58,7 @@ describe('Clear Budget Allocations Feature', () => {
     expect(housingInput.value).toBe('0');
 
     // 3. Clear Wants section
-    const wantsCard = screen.getAllByText(/Wants/i)[0];
+    const wantsCard = document.querySelector('.budget-modal-card .budget-card.wants') || screen.getAllByText(/Wants/i)[0];
     fireEvent.click(wantsCard);
 
     // Turn on editing for Wants
@@ -88,7 +77,7 @@ describe('Clear Budget Allocations Feature', () => {
     expect(diningOutInput.value).toBe('0');
 
     // 4. Clear Savings section
-    const savingsCard = screen.getAllByText(/Save & Invest/i)[0];
+    const savingsCard = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
     fireEvent.click(savingsCard);
 
     // Turn on editing for Savings

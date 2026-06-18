@@ -4,22 +4,6 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    Legend: () => <div data-testid="Legend" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
-    AreaChart: ({ children }) => <div data-testid="AreaChart">{children}</div>,
-    Area: () => <div data-testid="Area" />,
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -59,6 +43,15 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     }
   };
 
+  const navigateToStep2WithTimeline = () => {
+    navigateToStep2();
+    // Select Career Change from the dropdown to add an event and force the timeline to render
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'careerChange' } });
+    const saveBtn = screen.getByRole('button', { name: /Save Event/i });
+    fireEvent.click(saveBtn);
+  };
+
   // Helper to find input/select elements by their nearby label text
   const getInputByWrapperText = (textRegex) => {
     const elements = screen.getAllByText(textRegex);
@@ -83,14 +76,14 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     render(<FireSimulator />);
     
     // Open Budget Modal from Step 1
-    const budgetBtn = screen.getByRole('button', { name: /Calculate from budget/i });
+    const budgetBtn = screen.getByRole('button', { name: /Set Budget|Calculate from budget/i });
     fireEvent.click(budgetBtn);
     
     // Assert Modal is Open and renders correct title
     expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
 
     // Expand the Savings section by clicking the card
-    const savingsCard = screen.getAllByText(/Save & Invest/i)[0];
+    const savingsCard = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
     fireEvent.click(savingsCard);
 
     // Click Edit Savings to enable inputs
@@ -627,7 +620,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
   });
 
   test('9. Budget Phases UI Refinement - Segmented Timeline and Modal Interaction', async () => {
-    navigateToStep2();
+    navigateToStep2WithTimeline();
 
     // 1. Budget Phases row rendering inside the roadmap grid under Layer 3
     const budgetRow = document.querySelector('.budget-phases-timeline-row');
@@ -676,7 +669,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
   });
 
   test('10. Budget Phases Responsive Rendering and Tooltips', () => {
-    navigateToStep2();
+    navigateToStep2WithTimeline();
 
     const budgetRow = document.querySelector('.budget-phases-timeline-row');
     expect(budgetRow).not.toBeNull();
@@ -729,7 +722,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
   });
 
   test('11. Budget Modal - Compact Info Interaction & Popover', async () => {
-    navigateToStep2();
+    navigateToStep2WithTimeline();
 
     // Open the Budget Modal by clicking the first budget segment
     const budgetRow = document.querySelector('.budget-phases-timeline-row');

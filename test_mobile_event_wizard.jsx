@@ -10,19 +10,6 @@ import { getChildCostOffsetRecommendations } from './src/recommendations';
 import { useState, useMemo, useEffect } from 'react';
 
 // Mock Recharts
-vi.mock('recharts', () => {
-  return {
-    ResponsiveContainer: ({ children }) => <div data-testid="ResponsiveContainer">{children}</div>,
-    LineChart: ({ children }) => <div data-testid="LineChart">{children}</div>,
-    Line: () => <div data-testid="Line" />,
-    XAxis: () => <div data-testid="XAxis" />,
-    YAxis: () => <div data-testid="YAxis" />,
-    CartesianGrid: () => <div data-testid="CartesianGrid" />,
-    Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />
-  };
-});
-
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
@@ -79,7 +66,7 @@ describe('Mobile Event Wizard & Flow', () => {
     );
 
     // 1. Inline button "+ Add Life Event"
-    const inlineBtn = screen.getByRole('button', { name: /^\+ Add Life Event/i });
+    const inlineBtn = screen.getByRole('button', { name: /^\+\s*Add Life Event$/i });
     expect(inlineBtn).toBeDefined();
     fireEvent.click(inlineBtn);
     expect(setEditingEvent).toHaveBeenCalledWith({ type: 'selectType', isNew: true });
@@ -422,7 +409,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const nwCard = screen.getByText('Net Worth at Age 85').closest('.impact-metric-card');
     expect(nwCard.textContent).not.toContain('$0→$0');
 
-    const ageCard = screen.getByText('Retirement Age').closest('.impact-metric-card');
+    const ageCard = screen.getByText('Can Stop Working Age').closest('.impact-metric-card');
     expect(ageCard.textContent).toContain('Needs Adjustment');
   });
 
@@ -545,6 +532,7 @@ describe('Mobile Event Wizard & Flow', () => {
       return (
         <MobileFireSimulator
           inputs={inputs}
+          improvementPlan={improvementPlan}
           updateInput={vi.fn()}
           displayMode="deflated"
           setDisplayMode={vi.fn()}
@@ -577,7 +565,7 @@ describe('Mobile Event Wizard & Flow', () => {
     };
 
     const { rerender } = render(<Wrapper initialInputs={defaultInputs} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Plan$/i }));
 
     // Default inputs on track: no recommendations panel should be rendered
     expect(screen.queryByText('💡 Actionable Recommendations')).toBeNull();
@@ -603,8 +591,10 @@ describe('Mobile Event Wizard & Flow', () => {
     rerender(<Wrapper initialInputs={childInputs} />);
 
     // Now the plan requires adjustments. Verify status message and recommendations panel
-    expect(screen.getByText(/Plan requires adjustments/i)).toBeDefined();
-    expect(screen.getByText('💡 Actionable Recommendations')).toBeDefined();
+    expect(screen.getByText(/Adjustment Needed/i)).toBeDefined();
+    expect(screen.getByText(/Recommendation details available/i)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /View Suggestions/i }));
+    
     expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
 
     // 3. Click "Apply Recommendation" button on the card
@@ -613,8 +603,8 @@ describe('Mobile Event Wizard & Flow', () => {
 
     // 4. Verifying recommendation applied:
     // When applied, incomeList has the child income boost added, which offsets the costs,
-    // making the plan on track again, and "💡 Actionable Recommendations" disappears.
-    expect(screen.queryByText('💡 Actionable Recommendations')).toBeNull();
-    expect(screen.getByText(/You're fully on track/i)).toBeDefined();
+    // making the plan on track again, and the banner disappears.
+    expect(screen.queryByText(/Recommendation details available/i)).toBeNull();
+    expect(screen.getAllByText(/Comfortable/i).length).toBeGreaterThan(0);
   });
 });

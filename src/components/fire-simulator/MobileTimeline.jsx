@@ -6,7 +6,7 @@ const getShortLabel = (evt) => {
   if (!evt) return '';
   if (evt.type === 'socialSecurity') return 'Social Sec.';
   if (evt.type === 'medicareEligibility') return 'Medicare';
-  if (evt.type === 'retire') return 'Retire';
+  if (evt.type === 'retire') return 'Stop Working';
   if (evt.type === 'haveChild') {
     return evt.label.replace('Have Child:', '').trim() || 'Have Child';
   }
@@ -24,7 +24,7 @@ const getShortLabel = (evt) => {
   if (evt.type === 'borrowing') return 'Borrowing';
   if (evt.type === 'payoffPlanEnd') return 'Loan Off';
   if (evt.type === 'coastFire') return 'Coast FIRE';
-  if (evt.type.startsWith('retirementReady')) return 'Retire Ready';
+  if (evt.type.startsWith('retirementReady')) return 'Can Stop Working';
   
   let cleanLabel = evt.label || '';
   if (cleanLabel.includes(':')) {
@@ -57,7 +57,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
   switch (evt.type) {
     case 'socialSecurity':
       title = 'Social Security';
-      whyItMatters = 'Provides guaranteed, inflation-adjusted retirement income and reduces the drawdown rate required from your investment portfolios.';
+      whyItMatters = 'Provides guaranteed, inflation-adjusted income and reduces the drawdown rate required from your investment portfolios.';
       break;
     case 'medicareEligibility':
       title = 'Medicare';
@@ -69,7 +69,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
       }
       break;
     case 'retire':
-      title = 'Target Retirement';
+      title = 'Target Stop Working';
       ageLabel = `Begins at Age ${evt.age}`;
       whyItMatters = 'Transition from the wealth accumulation stage to the wealth preservation and portfolio distribution stage.';
       break;
@@ -82,7 +82,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
       }
       break;
     case 'childSupportEnds':
-      whyItMatters = 'Child support and childcare expenses end, freeing up significant cash flow to accelerate retirement savings.';
+      whyItMatters = 'Child support and childcare expenses end, freeing up significant cash flow to accelerate savings.';
       break;
     case 'marriage':
       title = 'Marriage';
@@ -122,12 +122,12 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
     case 'coastFire':
       title = 'Coast FIRE Reached';
       ageLabel = `Achieved at Age ${evt.age}`;
-      whyItMatters = 'Your portfolio is large enough to grow and cover retirement expenses by your target age without further savings.';
+      whyItMatters = 'Your portfolio is large enough to grow and cover lifestyle expenses by your target age without further savings.';
       break;
     case 'retirementReadySurvival':
     case 'retirementReadyComfortable':
     case 'retirementReadySWR':
-      title = 'Retirement Ready';
+      title = 'Can Stop Working';
       ageLabel = `Achieved at Age ${evt.age}`;
       whyItMatters = 'Your assets have reached the sustainability threshold, meaning you can stop working and support your lifestyle forever.';
       break;
@@ -253,6 +253,9 @@ export default function MobileTimeline({
         )}
 
         {resolvedPositions.map((item) => {
+          if (item.event.type === 'today' || item.event.type === 'lifeExpectancy') {
+            return null;
+          }
           const isSelected = selectedEventIndex === item.index;
           const circleColor = getCircleColorClass(item.event.type);
           const shortLabel = getShortLabel(item.event);

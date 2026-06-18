@@ -206,11 +206,11 @@ describe('New Default Savings Allocation', () => {
     render(<FireSimulator />);
 
     // Open Budget Modal from Step 1
-    const budgetBtn = screen.getByRole('button', { name: /Calculate from budget/i });
+    const budgetBtn = screen.getByRole('button', { name: /Set Budget|Calculate from budget/i });
     fireEvent.click(budgetBtn);
 
     // Expand the Savings section
-    const savingsCard = screen.getAllByText(/Save & Invest/i)[0];
+    const savingsCard = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
     fireEvent.click(savingsCard);
 
     // Click Edit Savings to enable inputs
