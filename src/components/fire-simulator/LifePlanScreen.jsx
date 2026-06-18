@@ -11,6 +11,9 @@ import {
 } from 'recharts';
 import { formatCurrency, formatYAxis, getOutcomeDetails, isEditableEvent, isFinancialEvent } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
+import CurrentSituationCard from './CurrentSituationCard';
+import OutcomeHeroCard from './OutcomeHeroCard';
+import ProjectionGraph from './ProjectionGraph';
 import { propPIAmount, getActiveChildrenCountAtAge } from '../../simulatorMathUtils';
 import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot, getNormalizedPhases } from '../../fireCalculations';
 
@@ -398,7 +401,9 @@ export default function LifePlanScreen({
   lastNonZeroSavingsRateRef,
   todayAssets,
   todayDebt,
-  todayNetWorth
+  todayNetWorth,
+  setEditingCondition,
+  handleRemoveCurrentCondition
 }) {
   const [selectedPhaseId, setSelectedPhaseId] = useState(null);
   const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
@@ -599,1546 +604,728 @@ export default function LifePlanScreen({
     ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
     : 0;
 
+  const getLifePhases = (inputs) => {
+    const curAge = inputs.currentAge || 35;
+    const retAge = inputs.targetRetirementAge || 60;
+    const lifeExp = inputs.lifeExpectancy || 90;
+
+    const childEvent = (inputs.lifeEvents || []).find(e => e.type === 'haveChild' && e.enabled);
+    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+    
+    let familyStart = null;
+    if (childEvent) {
+      familyStart = Number(childEvent.birthAge || childEvent.age);
+    }
+    if (marriageEvent) {
+      const weddingAge = Number(marriageEvent.weddingAge || marriageEvent.age);
+      if (familyStart === null || weddingAge < familyStart) {
+        familyStart = weddingAge;
+      }
+    }
+
+    const phases = [];
+
+    // Phase 1: Early Career
+    let p1End = retAge;
+    if (familyStart !== null && familyStart > curAge && familyStart < retAge) {
+      p1End = familyStart;
+    } else if (curAge < 45 && retAge > 45) {
+      p1End = 45;
+    }
+
+    if (p1End > curAge) {
+      phases.push({
+        name: curAge < 45 ? "Early Career" : "Family Years",
+        startAge: curAge,
+        endAge: p1End
+      });
+    }
+
+    // Phase 2: Family Years
+    let p2Start = p1End;
+    let p2End = retAge;
+    if (p2End > p2Start) {
+      phases.push({
+        name: "Family Years",
+        startAge: p2Start,
+        endAge: p2End
+      });
+    }
+
+    // Phase 3: Freedom
+    let p3Start = retAge;
+    let p3End = Math.min(lifeExp, Math.max(retAge, 80));
+    if (p3End > p3Start) {
+      phases.push({
+        name: "Freedom",
+        startAge: p3Start,
+        endAge: p3End
+      });
+    }
+
+    // Phase 4: Legacy
+    let p4Start = p3End;
+    let p4End = lifeExp;
+    if (p4End > p4Start) {
+      phases.push({
+        name: "Legacy",
+        startAge: p4Start,
+        endAge: p4End
+      });
+    }
+
+    return phases;
+  };
+
+  const getBudgetPhaseName = (p, inputs) => {
+    const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
+    if (isRetired) {
+      const hasSS = p.activeEvents?.includes('socialSecurity') || p.label?.toLowerCase().includes('social security') || p.icon === '🏖️💰' || p.icon === '💰';
+      return hasSS ? "Social Security" : "Retirement";
+    }
+    
+    const lowerLabel = p.label?.toLowerCase() || '';
+    if (lowerLabel.includes('childcare')) return "Childcare";
+    if (lowerLabel.includes('mortgage')) return "Mortgage";
+    if (lowerLabel.includes('student loan')) return "Student Loan";
+    if (lowerLabel.includes('credit card')) return "Credit Card";
+    if (lowerLabel.includes('auto loan') || lowerLabel.includes('car loan')) return "Auto Loan";
+    if (lowerLabel.includes('debt-free')) return "Debt-Free";
+    if (lowerLabel.includes('sabbatical')) return "Sabbatical";
+    if (lowerLabel.includes('barista fire')) return "Barista FIRE";
+    
+    if (p.childCount > 0) return "Childcare";
+    if (p.activeDebts && p.activeDebts.length > 0) {
+      if (p.activeDebts.some(d => d.type === 'mortgage')) return "Mortgage";
+      return "Debt Payoff";
+    }
+    
+    return "Working";
+  };
+
+  const getBudgetPhaseCostImpact = (p, inputs, displayedResults) => {
+    const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
+    if (isRetired) {
+      const hasSS = p.activeEvents?.includes('socialSecurity') || p.label?.toLowerCase().includes('social security') || p.icon === '🏖️💰' || p.icon === '💰';
+      if (hasSS && displayedResults.socialSecurityDetails?.isEligible) {
+        const ssAnnual = displayedResults.socialSecurityDetails.annualBenefit;
+        return '-$' + Math.round(ssAnnual / 1000) + 'k/yr';
+      }
+      return '';
+    }
+
+    const hasChildcare = p.label?.toLowerCase().includes('childcare') || p.childCount > 0;
+    if (hasChildcare) {
+      let ccCost = 0;
+      if (p.expenses?.childcare) {
+        ccCost = Number(p.expenses.childcare) * 12;
+      } else {
+        ccCost = (p.childCount || 1) * 15000;
+      }
+      return '+$' + Math.round(ccCost / 1000) + 'k/yr';
+    }
+
+    const hasMortgage = p.label?.toLowerCase().includes('mortgage') || (p.activeDebts && p.activeDebts.some(d => d.type === 'mortgage'));
+    if (hasMortgage) {
+      const activeMortgages = (p.activeDebts || []).filter(d => d.type === 'mortgage');
+      const mortgageAnnual = activeMortgages.reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0) * 12;
+      if (mortgageAnnual > 0) {
+        return '+$' + Math.round(mortgageAnnual / 1000) + 'k/yr';
+      }
+    }
+
+    if (p.activeDebts && p.activeDebts.length > 0) {
+      const debtAnnual = (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0) * 12;
+      if (debtAnnual > 0) {
+        return '+$' + Math.round(debtAnnual / 1000) + 'k/yr';
+      }
+    }
+
+    return '';
+  };
+
   return (
     <>
               <div className="roadmap-step-container">
                 
-                {/* Current Situation Card */}
-                <div 
-                  className="glass-card situation-summary-card" 
-                  style={{ 
-                    padding: '1rem 1.25rem', 
-                    marginBottom: '0.75rem', 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem'
+        <div className="desktop-dashboard-grid">
+          
+          {/* Left Column */}
+          <div className="desktop-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <CurrentSituationCard
+              inputs={inputs}
+              handleStep1Change={handleStep1Change}
+              handleSetBudgetClick={handleSetBudgetClick}
+              handleOpenSavingsDetails={handleOpenSavingsDetails}
+              lastNonZeroSavingsRateRef={lastNonZeroSavingsRateRef}
+              setEditingCondition={setEditingCondition}
+              handleRemoveCurrentCondition={handleRemoveCurrentCondition}
+              setIsCurrentSituationModalOpen={setIsCurrentSituationModalOpen}
+            />
+            
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{
+                width: '100%',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                boxSizing: 'border-box',
+                marginBottom: '0.5rem'
+              }}
+              onClick={() => handleSetBudgetClick()}
+            >
+              💼 Set Budget
+            </button>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+              <div style={{ flex: 1 }}>
+                <select
+                  className="add-event-dropdown"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    padding: '0 1.5rem 0 0.5rem',
+                    fontSize: '0.78rem',
+                    fontWeight: '700',
+                    lineHeight: '34px',
+                    boxSizing: 'border-box'
                   }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleCreateEvent(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  defaultValue=""
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: '700', margin: 0, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      👤 Current Situation
-                    </h3>
+                  <option value="" disabled>➕ Add Life Decision...</option>
+                  <option value="marriage">💍 Get Married</option>
+                  <option value="buyHouse">🏠 Buy a House</option>
+                  <option value="haveChild">👶 Have a Child</option>
+                  <option value="careerChange">💼 Career Change</option>
+                  <option value="move">📍 Move / Relocate</option>
+                  <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
+                    🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
+                  </option>
+                  <option value="socialSecurity">💰 Social Security</option>
+                  <option value="pension">📜 Pension</option>
+                  <option value="rentalIncome">🏢 Rental Income</option>
+                  <option value="annuity">📈 Annuity</option>
+                  <option value="otherRetirementIncome">💵 Other Income</option>
+                  <option value="windfall">💰 Windfall</option>
+                  <option value="college">🎓 College Costs</option>
+                  <option value="debtPayoff">💸 Debt Payoff</option>
+                  <option value="custom">➕ Custom Event</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <select
+                  className="add-event-dropdown"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    padding: '0 1.5rem 0 0.5rem',
+                    fontSize: '0.78rem',
+                    fontWeight: '700',
+                    lineHeight: '34px',
+                    boxSizing: 'border-box'
+                  }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleCreateEvent(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>💳 Borrowing...</option>
+                  <option value="studentLoan">Student Loan</option>
+                  <option value="carLoan">Car Loan</option>
+                  <option value="personalLoan">Personal Loan</option>
+                  <option value="creditCard">Credit Card Balance</option>
+                </select>
+              </div>
+            </div>
+            {showDebugButton && (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{
+                  width: '100%',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  boxSizing: 'border-box',
+                  marginTop: '0.5rem'
+                }}
+                onClick={() => {
+                  setDebugTab('assumptions');
+                  setShowDebugDrawer(true);
+                }}
+              >
+                ⚙️ Debug
+              </button>
+            )}
+          </div>
+
+          {/* Right Column */}
+          <div className="desktop-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
+            
+            {/* Outcome Hero Card */}
+            <OutcomeHeroCard
+              readyAge={displayedResults.retirementReadyAge}
+              targetRetirementAge={displayedResults.targetRetirementAge}
+              freedomNumber={displayedResults.freedomNumber}
+              planStatus={displayedResults.planStatus}
+              onViewRecommendations={() => setShowImprovementModal(true)}
+            />
+
+            {/* Compact 3-Layer Timeline */}
+            {validation.errors.length === 0 && (
+              <div className="glass-card timeline-card" style={{ padding: '0.5rem 0.75rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="timeline-layout-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
+                    <div className="timeline-grid" style={{ minWidth: '850px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      
+                      {/* Layer 1: Events */}
+                      {(() => {
+                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                        if (totalYears <= 0) return null;
+
+                        return (
+                          <div className="timeline-row compact-row" style={{ height: '44px', minHeight: '44px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+                              Events
+                            </div>
+                            <div className="timeline-row-content events-row-content" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
+                              <div className="timeline-track-inner" style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+                                <div className="events-axis-line" style={{ position: 'absolute', left: 0, right: 0, height: '2px', background: 'var(--border-color)', top: '50%', transform: 'translateY(-50%)', margin: 0 }} />
+                                
+                                {timelineEvents.map((evt, idx) => {
+                                  const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
+                                  const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
+                                  const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
+
+                                  const isSelected = !!(editingEvent && (
+                                    (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
+                                    (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
+                                  ));
+
+                                  const displayAge = (() => {
+                                    if (isPrimaryDragging) {
+                                      return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+                                    }
+                                    if (isLinkedDragging) {
+                                      const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
+                                      const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
+                                      const linkedEndDisplayAge = draggedDisplayAge + offset;
+                                      return linkedEndDisplayAge;
+                                    }
+                                    if (isDraggingThis && evt.type === 'retire') {
+                                      return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+                                    }
+                                    return evt.age;
+                                  })();
+                                  const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
+                                  const isFinancial = isFinancialEvent(evt);
+                                  const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
+
+                                  if (evt.type === 'lifeExpectancy') {
+                                    return null;
+                                  }
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={'financial-milestone-wrapper milestone-circle-wrapper' + (isDraggingThis ? ' dragging' : '') + (isSelected ? ' selected' : '') + (shouldPulse ? ' pulse-highlight-event' : '')}
+                                      style={{
+                                        position: 'absolute',
+                                        left: percent + '%',
+                                        top: '50%',
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: isDraggingThis ? 10 : 3,
+                                        cursor: 'grab'
+                                      }}
+                                      onMouseDown={(e) => handleNodeDragStart(e, evt)}
+                                      onTouchStart={(e) => handleNodeDragStart(e, evt)}
+                                      onClick={(e) => {
+                                        if (dragOccurredRef.current) {
+                                          e.stopPropagation();
+                                          return;
+                                        }
+                                        if (isEditableEvent(evt)) {
+                                          handleEditRoadmapEvent(evt);
+                                        }
+                                      }}
+                                    >
+                                      <div className="financial-milestone-dot milestone-glow-circle" style={{ width: '26px', height: '26px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)', borderRadius: '50%', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                                        {evt.icon}
+                                      </div>
+
+                                      <div className={'timeline-tooltip' + (percent < 20 ? ' align-left' : percent > 80 ? ' align-right' : '')}>
+                                        <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
+                                          {evt.icon} {evt.title}
+                                        </div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
+                                          <div>Age {Math.floor(displayAge)} • {evt.description}</div>
+                                          {(() => {
+                                            if (evt.type === 'mortgageOff') {
+                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
+                                              if (asset) {
+                                                return (
+                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
+                                                    P&I Savings: {formatCurrency(propPIAmount(asset))}/yr
+                                                  </div>
+                                                );
+                                              }
+                                            }
+                                            if (evt.type === 'childSupportEnds') {
+                                              return (
+                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
+                                                  Support expenses have ended
+                                                </div>
+                                              );
+                                            }
+                                            if (evt.type === 'socialSecurity') {
+                                              const ss = displayedResults.socialSecurityDetails;
+                                              if (ss && ss.isEligible) {
+                                                return (
+                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
+                                                    Benefit: {formatCurrency(ss.monthlyBenefit)}/mo ({formatCurrency(ss.annualBenefit)}/yr)
+                                                  </div>
+                                                );
+                                              }
+                                            }
+                                            return null;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Layer 2: Life Phases */}
+                      {(() => {
+                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                        if (totalYears <= 0) return null;
+
+                        const phases = getLifePhases(inputs);
+
+                        return (
+                          <div className="timeline-row compact-row" style={{ height: '30px', minHeight: '30px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+                              Life Phases
+                            </div>
+                            <div className="timeline-row-content life-phase-track" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
+                              <div className="timeline-track-inner" style={{ position: 'relative', height: '100%' }}>
+                                {phases.map((p, idx) => {
+                                  const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
+                                  const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
+                                  const widthPct = endPct - startPct;
+                                  if (widthPct <= 0) return null;
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="life-phase-span pill-span"
+                                      style={{
+                                        position: 'absolute',
+                                        left: startPct + '%',
+                                        width: widthPct + '%',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        height: '24px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.68rem',
+                                        fontWeight: '700',
+                                        boxSizing: 'border-box',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-secondary)',
+                                        borderRadius: '12px',
+                                        padding: '0 8px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {p.name} {p.startAge}–{p.endAge}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Layer 3: Budget Phases */}
+                      {(() => {
+                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                        if (totalYears <= 0) return null;
+
+                        const getBudgetPhaseThemeClass = (p) => {
+                          const label = p.label || '';
+                          const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
+                          const hasSS = p.activeEvents?.includes('socialSecurity') || label.includes('Social Security') || p.icon === '🏖️💰' || p.icon === '💰';
+                          
+                          if (isRetired) {
+                            if (hasSS) return 'theme-retired-ss';
+                            return 'theme-retired';
+                          }
+                          
+                          const lowerLabel = label.toLowerCase();
+                          const hasChildcare = lowerLabel.includes('childcare');
+                          const hasStudentLoan = lowerLabel.includes('student loan') || p.activeDebts?.some(d => d.type === 'studentLoan');
+                          const hasHouse = lowerLabel.includes('house') || lowerLabel.includes('mortgage') || p.activeDebts?.some(d => d.type === 'mortgage');
+                          const hasOtherDebt = p.activeDebts && p.activeDebts.length > 0;
+                          
+                          if (hasChildcare) {
+                            if (hasOtherDebt) return 'theme-working-childcare-debt';
+                            return 'theme-working-childcare';
+                          }
+                          if (hasStudentLoan) return 'theme-working-student-loan';
+                          if (hasHouse) return 'theme-working-house';
+                          
+                          return 'theme-working-standard';
+                        };
+
+                        return (
+                          <div className="timeline-row compact-row budget-phases-timeline-row" style={{ height: '30px', minHeight: '30px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+                              Budget Phases
+                            </div>
+                            <div className="timeline-row-content budget-phases-track" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
+                              <div ref={trackRef} className="timeline-track-inner" style={{ position: 'relative', height: '100%', display: 'flex' }}>
+                                {normalizedPhases.map((p) => {
+                                  const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
+                                  const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
+                                  const widthPct = endPct - startPct;
+                                  if (widthPct <= 0) return null;
+
+                                  const isCurrentAge = inputs.currentAge >= p.startAge && inputs.currentAge < p.endAge;
+                                  const themeClass = getBudgetPhaseThemeClass(p);
+                                  
+                                  const phaseName = getBudgetPhaseName(p, inputs);
+                                  const costImpact = getBudgetPhaseCostImpact(p, inputs, displayedResults);
+                                  
+                                  const pillLabelText = costImpact ? (p.icon || '') + ' ' + phaseName + ' ' + costImpact : (p.icon || '') + ' ' + phaseName;
+
+                                  const phaseNeedsTotal = (Number(p.expenses?.housing) || 0) +
+                                                         (Number(p.expenses?.utilities) || 0) +
+                                                         (Number(p.expenses?.food) || 0) +
+                                                         (Number(p.expenses?.transportation) || 0) +
+                                                         (Number(p.expenses?.healthcare) || 0) +
+                                                         (p.isMarried ? (Number(p.expenses?.debt) || 0) : 0) +
+                                                         (Number(p.expenses?.childcare) || 0) +
+                                                         (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0);
+
+                                  const phaseWantsTotal = (Number(p.expenses?.leisure) || 0) +
+                                                         (Number(p.expenses?.diningOut) || 0) +
+                                                         (Number(p.expenses?.misc) || 0);
+
+                                  const phaseSavingsTotal = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
+                                                           (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+
+                                  return (
+                                    <div
+                                      key={p.id}
+                                      className={'budget-segment pill-span budget-timeline-lane-segment ' + themeClass + (isCurrentAge ? ' current-age-phase' : '') + (activeSelectedPhaseId === p.id ? ' selected' : '')}
+                                      style={{
+                                        position: 'absolute',
+                                        left: startPct + '%',
+                                        width: widthPct + '%',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        height: '24px',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.68rem',
+                                        fontWeight: '700',
+                                        boxSizing: 'border-box',
+                                        padding: '0 8px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSetBudgetClick(p.id);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleSetBudgetClick(p.id);
+                                        }
+                                      }}
+                                      tabIndex={0}
+                                      aria-label={p.label + ' (Age ' + p.startAge + '–' + p.endAge + ')'}
+                                    >
+                                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                        {pillLabelText}
+                                      </span>
+
+                                      <div className={'timeline-tooltip' + (startPct < 20 ? ' align-left' : startPct > 80 ? ' align-right' : '')}>
+                                        <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          <span>{p.icon}</span> <span>{p.label}</span>
+                                        </div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '200px', lineHeight: '1.4', textAlign: 'left' }}>
+                                          <div><strong>Age:</strong> {p.startAge}–{p.endAge}</div>
+                                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '0.25rem', paddingTop: '0.25rem' }}>
+                                            <strong>Active Events:</strong> {p.activeEvents && p.activeEvents.length > 0 ? p.activeEvents.map(evId => getEventDetails(evId)?.name || evId).join(', ') : 'None'}
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.15rem 0.5rem', marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
+                                            <div>Monthly Income:</div>
+                                            <div style={{ textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatCurrency(p.income || 0)}</div>
+                                            <div>Needs:</div>
+                                            <div style={{ textAlign: 'right' }}>{formatCurrency(phaseNeedsTotal)}</div>
+                                            <div>Wants:</div>
+                                            <div style={{ textAlign: 'right' }}>{formatCurrency(phaseWantsTotal)}</div>
+                                            <div>Save & Invest:</div>
+                                            <div style={{ textAlign: 'right', color: 'var(--accent-blue)' }}>{formatCurrency(phaseSavingsTotal)}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Chronological Ticks */}
+                      <div className="timeline-row" style={{ height: '20px', minHeight: '20px', position: 'relative' }}>
+                        <div className="timeline-row-label" style={{ opacity: 0, borderRight: 'none', width: '120px', minWidth: '120px' }}>Ages</div>
+                        <div className="timeline-row-content ticks-row-content" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
+                          <div className="timeline-track-inner" style={{ position: 'relative', height: '100%' }}>
+                            {(() => {
+                              const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+                              const ticks = [];
+                              const tickInterval = 5;
+                              const startTick = Math.ceil(inputs.currentAge / tickInterval) * tickInterval;
+                              const endTick = Math.floor(inputs.lifeExpectancy / tickInterval) * tickInterval;
+                              for (let age = startTick; age <= endTick; age += tickInterval) {
+                                ticks.push(age);
+                              }
+                              return ticks.map((age, idx) => {
+                                const percent = totalYears > 0 ? ((age - inputs.currentAge) / totalYears) * 100 : 0;
+                                return (
+                                  <div key={idx} className="timeline-tick-new" style={{ left: percent + '%' }}>
+                                    <div className="timeline-tick-mark-new" />
+                                    <span className="timeline-tick-label-new">{age}</span>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(5, 1fr)', 
-                    gap: '1rem',
-                    alignItems: 'center'
-                  }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Current Age</span>
+                </div>
+              </div>
+            )}
+
+            {/* Projection Graph */}
+            {validation.errors.length === 0 && (
+              <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      Wealth Journey
+                      <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                        <span className="toggle-tooltip-icon">i</span>
+                        <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                          Shows values at the start of the fiscal year.
+                        </span>
+                      </span>
+                    </h3>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
                       <input
-                        type="number"
-                        className="input-number-box"
-                        style={{
-                          width: '100%',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          color: 'var(--text-primary)',
-                          fontSize: '1rem',
-                          fontWeight: '800',
-                          padding: '0.35rem 0.5rem',
-                          boxSizing: 'border-box'
-                        }}
-                        value={inputs.currentAge === null ? '' : inputs.currentAge}
-                        placeholder="e.g. 35"
-                        onClick={() => handleStep1Change('currentAge', null)}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
-                        }}
+                        type="checkbox"
+                        checked={showAssets}
+                        onChange={(e) => setShowAssets(e.target.checked)}
+                        style={{ accentColor: '#10b981', cursor: 'pointer' }}
                       />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Annual Income</span>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
-                        <input
-                          type="number"
-                          className="input-number-box"
-                          style={{
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            color: 'var(--text-primary)',
-                            fontSize: '1rem',
-                            fontWeight: '800',
-                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
-                            boxSizing: 'border-box'
-                          }}
-                          value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
-                          placeholder="e.g. 120000"
-                          onClick={() => {
-                            setActiveSavingsRate(simpleSavingsRate);
-                            handleStep1Change('simpleIncome', null);
-                          }}
-                          onBlur={() => {
-                            setActiveSavingsRate(null);
-                          }}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const newIncome = val === '' ? null : (parseFloat(val) || 0);
-                            handleStep1Change('simpleIncome', newIncome);
-                            if (newIncome !== null) {
-                              const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
-                              const newExpenses = Math.round(newIncome * (1 - rate / 100));
-                              handleStep1Change('simpleExpenses', newExpenses);
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Annual Spending</span>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
-                        <input
-                          type="number"
-                          className="input-number-box"
-                          style={{
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            color: 'var(--text-primary)',
-                            fontSize: '1rem',
-                            fontWeight: '800',
-                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
-                            boxSizing: 'border-box'
-                          }}
-                          value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Current Savings</span>
-                        <button
-                          type="button"
-                          onClick={handleOpenSavingsDetails}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--primary)',
-                            fontSize: '0.65rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            padding: 0,
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          Details
-                        </button>
-                      </div>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ position: 'absolute', left: '8px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: 'bold' }}>$</span>
-                        <input
-                          type="number"
-                          className="input-number-box"
-                          style={{
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            color: 'var(--text-primary)',
-                            fontSize: '1rem',
-                            fontWeight: '800',
-                            padding: '0.35rem 0.5rem 0.35rem 1.25rem',
-                            boxSizing: 'border-box'
-                          }}
-                          value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
-                          placeholder="e.g. 250000"
-                          onClick={() => handleStep1Change('simpleInvestments', null)}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Savings Rate</span>
-                        <button
-                          type="button"
-                          onClick={() => handleSetBudgetClick()}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--primary)',
-                            fontSize: '0.65rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            padding: 0,
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          Budget
-                        </button>
-                      </div>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          className="input-number-box"
-                          style={{
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            color: 'var(--accent-emerald)',
-                            fontSize: '1rem',
-                            fontWeight: '800',
-                            padding: '0.35rem 1.25rem 0.35rem 0.5rem',
-                            boxSizing: 'border-box',
-                            textAlign: 'right'
-                          }}
-                          value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
-                          placeholder="e.g. 20"
-                          onClick={() => setSavingsRateOverride('')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSavingsRateOverride(val);
-                            if (val === '') {
-                              return;
-                            }
-                            const rate = parseFloat(val) || 0;
-                            const clampedRate = Math.min(100, Math.max(0, rate));
-                            if (lastNonZeroSavingsRateRef) {
-                              lastNonZeroSavingsRateRef.current = clampedRate;
-                            }
-                            const income = Number(inputs.simpleIncome) || 0;
-                            const newExpenses = Math.round(income * (1 - clampedRate / 100));
-                            handleStep1Change('simpleExpenses', newExpenses);
-                          }}
-                          onBlur={() => {
-                            setSavingsRateOverride(null);
-                          }}
-                        />
-                        <span style={{ position: 'absolute', right: '8px', color: 'var(--accent-emerald)', fontSize: '0.9rem', fontWeight: 'bold' }}>%</span>
-                      </div>
-                    </div>
+                      <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={showDebt}
+                        onChange={(e) => setShowDebt(e.target.checked)}
+                        style={{ accentColor: '#ef4444', cursor: 'pointer' }}
+                      />
+                      <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={showNetWorth}
+                        onChange={(e) => setShowNetWorth(e.target.checked)}
+                        style={{ accentColor: '#8b5cf6', cursor: 'pointer' }}
+                      />
+                      <span style={{ color: '#8b5cf6', fontWeight: '700' }}>Net Worth (Purple)</span>
+                    </label>
                   </div>
                 </div>
                 
-                {/* Centerpiece Timeline */}
-                <div className="glass-card timeline-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                        Interactive Roadmap
-                      </h3>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        Click milestones to view details
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
-                        <button
-                          type="button"
-                          className="add-event-dropdown"
-                          style={{
-                            width: '100%',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundImage: 'none',
-                            paddingRight: '1rem',
-                            paddingLeft: '1rem',
-                            fontSize: '0.78rem',
-                            whiteSpace: 'nowrap'
-                          }}
-                          onClick={() => handleSetBudgetClick()}
-                        >
-                          Set Budget
-                        </button>
-                      </div>
-                      <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
-                        <select
-                          className="add-event-dropdown"
-                          style={{ width: '100%', height: '32px', padding: '0 2rem 0 1rem', fontSize: '0.78rem', lineHeight: '30px' }}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleCreateEvent(e.target.value);
-                              e.target.value = ''; // reset selection
-                            }
-                          }}
-                          defaultValue=""
-                        >
-                          <option value="" disabled>➕ Add Life Decision...</option>
-                          <option value="marriage">💍 Get Married</option>
-                          <option value="buyHouse">🏠 Buy a House</option>
-                          <option value="haveChild">👶 Have a Child</option>
-                          <option value="careerChange">💼 Career Change</option>
-                          <option value="move">📍 Move / Relocate</option>
-                          <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
-                            🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
-                          </option>
-                          <option value="socialSecurity">💰 Social Security</option>
-                          <option value="pension">📜 Pension</option>
-                          <option value="rentalIncome">🏢 Rental Income</option>
-                          <option value="annuity">📈 Annuity</option>
-                          <option value="otherRetirementIncome">💵 Other Income</option>
-                          <option value="windfall">💰 Windfall</option>
-                          <option value="college">🎓 College Costs</option>
-                          <option value="debtPayoff">💸 Debt Payoff</option>
-                          <option value="custom">➕ Custom Event</option>
-                        </select>
-                      </div>
-                      <div style={{ width: '100%', minWidth: '150px', maxWidth: '200px' }}>
-                        <select
-                          className="add-event-dropdown"
-                          style={{ width: '100%', height: '32px', padding: '0 2rem 0 1rem', fontSize: '0.78rem', lineHeight: '30px' }}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleCreateEvent(e.target.value);
-                              e.target.value = ''; // reset selection
-                            }
-                          }}
-                          defaultValue=""
-                        >
-                          <option value="" disabled>💳 Borrowing...</option>
-                          <option value="studentLoan">Student Loan</option>
-                          <option value="carLoan">Car Loan</option>
-                          <option value="personalLoan">Personal Loan</option>
-                          <option value="creditCard">Credit Card Balance</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-      
-                  {/* Compact Summary Row */}
-                  {(() => {
-                    const currentAge = inputs.currentAge;
-                    const lifeExpectancy = inputs.lifeExpectancy;
-                    const targetRetirementAge = inputs.targetRetirementAge;
-      
-                    // 1. Working & Retired
-                    const retiredStr = targetRetirementAge < lifeExpectancy;
-      
-                    // 2. Homeownership spans
-                    const homeSpans = [];
-                    (inputs.lifeEvents || []).forEach(ev => {
-                      if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
-                        const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
-                        const name = asset?.name || 'Primary Home';
-                        const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-                        const sellEv = (inputs.lifeEvents || []).find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
-                        const sellAge = sellEv ? Number(sellEv.age) : null;
-                        homeSpans.push({ name, buyAge, sellAge });
-                      }
-                    });
-      
-                    // 3. Marriage span
-                    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-                    const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
-                    const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
-                    let marriedStr = null;
-                    if (marriageEvent) {
-                      const start = Number(marriageEvent.age);
-                      const end = divorceEvent ? Number(divorceEvent.age) : null;
-                      marriedStr = end ? `💍 Married: ${start}–${end}` : `💍 Married: ${start}+`;
-                    } else if (hasSpouseInHousehold) {
-                      const end = divorceEvent ? Number(divorceEvent.age) : null;
-                      marriedStr = end ? `💍 Married: ${currentAge}–${end}` : `💍 Married: ${currentAge}+`;
-                    }
-      
-                    // 4. Child Expenses span
-                    const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-                    let childStr = null;
-                    if (childEvents.length > 0) {
-                      const minChildAge = Math.min(...childEvents.map(ev => Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30));
-                      const maxChildAge = Math.max(...childEvents.map(ev => (Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30) + (ev.includeCollege ? 22 : 18)));
-                      childStr = `👶 Child Expenses: ${minChildAge}–${Math.min(lifeExpectancy, maxChildAge)}`;
-                    }
-      
-                    return (
-                      <div className="timeline-summary-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', padding: '0.25rem 1rem 0.75rem 1rem', background: 'transparent', border: 'none', margin: 0 }}>
-                        <div className="timeline-summary-title" style={{ marginRight: '0.5rem' }}>Current Plan</div>
-                        <div className="timeline-summary-items" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                          <div className="plan-chip">💼 Working: {currentAge}–{targetRetirementAge}</div>
-                          {retiredStr && <div className="plan-chip">🏖️ Stopped Working: {targetRetirementAge}–{lifeExpectancy}</div>}
-                          {homeSpans.map((h, i) => (
-                            <div className="plan-chip" key={i}>
-                              🏠 Homeowner ({h.name}): {h.buyAge}{h.sellAge ? `–${h.sellAge}` : '+'}
-                            </div>
-                          ))}
-                          {marriedStr && <div className="plan-chip">{marriedStr}</div>}
-                          {childStr && <div className="plan-chip">{childStr}</div>}
-                        </div>
-                      </div>
-                    );
-                  })()}
-      
-                  <div className="timeline-layout-wrapper">
-                    
-                    {/* Horizontal Timeline */}
-                    <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
-                      <div className="timeline-grid" style={{ minWidth: '850px' }}>
-                        
-                        {/* Layer 1: MILESTONES / EVENTS */}
-                        {(() => {
-                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                          if (totalYears <= 0) return null;
-      
-                          return (
-                            <div className="timeline-row">
-                              <div className="timeline-row-label">
-                                <span style={{ fontWeight: 700 }}>Events</span>
-                              </div>
-                              <div className="timeline-row-content events-row-content">
-                                <div className="timeline-track-inner">
-                                  <div className="events-axis-line" />
-                                  {timelineEvents.map((evt, idx) => {
-                                    const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
-                                    const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
-                                    const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
-      
-                                    const isSelected = !!(editingEvent && (
-                                      (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
-                                      (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
-                                    ));
-      
-                                    const displayAge = (() => {
-                                      if (isPrimaryDragging) {
-                                        return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-                                      }
-                                      if (isLinkedDragging) {
-                                        const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
-                                        const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
-                                        const linkedEndDisplayAge = draggedDisplayAge + offset;
-      
-                                        // Temporary console assertions as requested
-                                        console.log('[Child Linked Drag Debug]', {
-                                          childStartAge: draggedDisplayAge,
-                                          childEndAge: evt.age,
-                                          childEndOffset: offset,
-                                          draggedDisplayAge,
-                                          linkedEndDisplayAge
-                                        });
-                                        if (offset !== 0 && linkedEndDisplayAge === draggedDisplayAge) {
-                                          console.error('[Assert Failed] linkedEndDisplayAge is equal to draggedDisplayAge during dragging preview!');
-                                        }
-      
-                                        return linkedEndDisplayAge;
-                                      }
-                                      if (isDraggingThis && evt.type === 'retire') {
-                                        return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-                                      }
-                                      return evt.age;
-                                    })();
-                                    const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
-                                    const isFinancial = isFinancialEvent(evt);
-                                    const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
-      
-                                    if (isFinancial) {
-                                      return (
-                                        <div
-                                          key={idx}
-                                          className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
-                                          style={{
-                                            left: `${percent}%`,
-                                            bottom: `${16 + (evt.stackIndex * 38)}px`
-                                          }}
-                                          onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                                          onTouchStart={(e) => handleNodeDragStart(e, evt)}
-                                          onClick={(e) => {
-                                            if (dragOccurredRef.current) {
-                                              e.stopPropagation();
-                                              return;
-                                            }
-                                            if (isEditableEvent(evt)) {
-                                              handleEditRoadmapEvent(evt);
-                                            }
-                                          }}
-                                        >
-                                          <div className="financial-milestone-dot">
-                                            {evt.icon}
-                                          </div>
-      
-                                          {/* Tooltip on hover */}
-                                          <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
-                                            <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                                              {evt.icon} {evt.title}
-                                            </div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
-                                              <div>Age {Math.floor(displayAge)} • {evt.description}</div>
-                                              {/* Additional Tooltip Details */}
-                                              {(() => {
-                                                if (evt.type === 'mortgageOff') {
-                                                  const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                                  if (asset) {
-                                                    return (
-                                                      <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                        P&I Savings: {formatCurrency(propPIAmount(asset))}/yr
-                                                      </div>
-                                                    );
-                                                  }
-                                                }
-                                                if (evt.type === 'childSupportEnds') {
-                                                  return (
-                                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                                      Support expenses have ended
-                                                    </div>
-                                                  );
-                                                }
-                                                if (evt.type === 'socialSecurity') {
-                                                  const ss = displayedResults.socialSecurityDetails;
-                                                  if (ss && ss.isEligible) {
-                                                    return (
-                                                      <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                        Benefit: {formatCurrency(ss.monthlyBenefit)}/mo ({formatCurrency(ss.annualBenefit)}/yr)
-                                                      </div>
-                                                    );
-                                                  }
-                                                }
-                                                return null;
-                                              })()}
-                                            </div>
-                                          </div>
-      
-                                          {/* Line connector down to axis */}
-                                          {evt.stackIndex > 0 && (
-                                            <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
-                                          )}
-                                        </div>
-                                      );
-                                    } else {
-                                      if (evt.type === 'today' || evt.type === 'lifeExpectancy') {
-                                        return null;
-                                      }
-                                      const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
-                                      const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
-                                      return (
-                                        <div
-                                          key={idx}
-                                          className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
-                                          style={{
-                                            left: `${percent}%`,
-                                            bottom: `${16 + (evt.stackIndex * 38)}px`
-                                          }}
-                                          onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                                          onTouchStart={(e) => handleNodeDragStart(e, evt)}
-                                          onClick={(e) => {
-                                            if (dragOccurredRef.current) {
-                                              e.stopPropagation();
-                                              return;
-                                            }
-                                            if (isEditableEvent(evt)) {
-                                              handleEditRoadmapEvent(evt);
-                                            }
-                                          }}
-                                        >
-                                          <div className="milestone-glow-circle">
-                                            {evt.icon}
-                                          </div>
-      
-                                          {/* Tooltip on hover */}
-                                          <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
-                                            <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                                              {evt.icon} {evt.title}
-                                            </div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
-                                              <div>Age {Math.floor(displayAge)} • {evt.description}</div>
-                                              {/* Additional Tooltip Details */}
-                                              {(() => {
-                                                if (evt.type === 'buyHouse') {
-                                                  const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                                  if (asset) {
-                                                    return (
-                                                      <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                        Price: {formatCurrency(asset.purchasePrice || asset.homePrice || 0)} 
-                                                        {asset.purchaseType !== 'cash' && ` (${asset.mortgageRate || 6.5}% APR)`}
-                                                      </div>
-                                                    );
-                                                  }
-                                                }
-                                                if (evt.type === 'sellHouse') {
-                                                  const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                                  if (asset) {
-                                                    return (
-                                                      <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                        Property: {asset.name}
-                                                      </div>
-                                                    );
-                                                  }
-                                                }
-                                                if (evt.type === 'haveChild') {
-                                                  const ev = inputs.lifeEvents?.find(e => e.id === evt.originalId);
-                                                  if (ev) {
-                                                    return (
-                                                      <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                                        Support Term: {ev.includeCollege ? 22 : 18} years
-                                                      </div>
-                                                    );
-                                                  }
-                                                }
-                                                if (evt.type === 'marriage') {
-                                                  return (
-                                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
-                                                      Spouse Income: {formatCurrency(evt.spouseIncome)}/yr
-                                                    </div>
-                                                  );
-                                                }
-                                                return null;
-                                              })()}
-                                            </div>
-                                          </div>
-      
-                                          {/* Line connector down to axis */}
-                                          {evt.stackIndex > 0 && (
-                                            <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-      
-                        {/* Layer 2: DECISION PHASES (MARRIAGE, CHILDCARE, HOMEOWNERSHIP) */}
-                        {(() => {
-                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                          if (totalYears <= 0) return null;
-      
-                          const activeCommitments = [];
-      
-                          // Homeownership spans
-                          inputs.lifeEvents.forEach(ev => {
-                            if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
-                              const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
-                              const houseName = asset?.name || 'Primary Home';
-                              const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-                              const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
-                              const sellAge = sellEv ? Number(sellEv.age) : inputs.lifeExpectancy;
-                              activeCommitments.push({
-                                id: `house-${ev.houseId}`,
-                                label: houseName,
-                                emoji: '🏠',
-                                startAge: buyAge,
-                                endAge: sellAge,
-                                className: 'commitment-span home'
-                              });
-                            }
-                          });
-      
-                          // Childcare support
-                          const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-                          if (childEvents.length > 0) {
-                            const activeAges = [];
-                            for (let age = inputs.currentAge; age < inputs.lifeExpectancy; age++) {
-                              if (getActiveChildrenCountAtAge(age, inputs.lifeEvents) > 0) {
-                                activeAges.push(age);
-                              }
-                            }
-                            
-                            const ccIntervals = [];
-                            if (activeAges.length > 0) {
-                              let start = activeAges[0];
-                              let prev = activeAges[0];
-                              for (let i = 1; i < activeAges.length; i++) {
-                                if (activeAges[i] === prev + 1) {
-                                  prev = activeAges[i];
-                                } else {
-                                  ccIntervals.push({ start, end: prev + 1 });
-                                  start = activeAges[i];
-                                  prev = activeAges[i];
-                                }
-                              }
-                              ccIntervals.push({ start, end: prev + 1 });
-                            }
-      
-                            ccIntervals.forEach((interval, idx) => {
-                              activeCommitments.push({
-                                id: `childcare-${idx}`,
-                                label: 'Childcare & Support',
-                                emoji: '👶',
-                                startAge: interval.start,
-                                endAge: interval.end,
-                                className: 'commitment-span childcare'
-                              });
-                            });
-                          }
-      
-                          // Marriage
-                          const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-                          const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
-                          const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
-                          if (marriageEvent || hasSpouseInHousehold) {
-                            const start = marriageEvent ? Number(marriageEvent.age) : inputs.currentAge;
-                            const end = divorceEvent ? Number(divorceEvent.age) : inputs.lifeExpectancy;
-                            activeCommitments.push({
-                              id: 'marriage',
-                              label: 'Marriage',
-                              emoji: '💍',
-                              startAge: start,
-                              endAge: end,
-                              className: 'commitment-span marriage'
-                            });
-                          }
+                <ProjectionGraph
+                  chartData={chartData}
+                  inputs={inputs}
+                  displayedResults={displayedResults}
+                  showAssets={showAssets}
+                  showDebt={showDebt}
+                  showNetWorth={showNetWorth}
+                  setSelectedYear={setSelectedYear}
+                />
 
-                          // Payoff Plans
-                          (inputs.lifeEvents || []).forEach(ev => {
-                            if (ev.enabled && ev.type === 'payoffPlan') {
-                              const borrowing = (inputs.lifeEvents || []).find(b => b.id === ev.borrowingId);
-                              const borrowingName = borrowing ? borrowing.name : 'Borrowing';
-                              let start = Number(ev.startAge);
-                              let end = Number(ev.payoffAge);
-
-                              // Apply drag offset in real-time if we are currently dragging this payoff plan or its linked borrowing event
-                              if (draggingInfo) {
-                                if (draggingInfo.type === 'borrowing' && draggingInfo.originalId === ev.borrowingId) {
-                                  const shift = draggingInfo.currentAge - draggingInfo.initialAge;
-                                  start = draggingInfo.currentAge;
-                                  end = ev.payoffAge + shift;
-                                } else if (draggingInfo.type === 'payoffPlanEnd' && draggingInfo.originalId === ev.id) {
-                                  const minPossibleEnd = start + 1;
-                                  end = Math.max(minPossibleEnd, draggingInfo.currentAge);
-                                }
-                              }
-                              
-                              if (end > start && start < inputs.lifeExpectancy) {
-                                activeCommitments.push({
-                                  id: ev.id,
-                                  label: `Payoff: ${borrowingName}`,
-                                  emoji: '🏁',
-                                  startAge: start,
-                                  endAge: Math.min(inputs.lifeExpectancy, end),
-                                  className: 'commitment-span payoffPlan'
-                                });
-                              }
-                            }
-                          });
-      
-                          return activeCommitments.map(c => {
-                            const startPct = Math.max(0, Math.min(100, ((c.startAge - inputs.currentAge) / totalYears) * 100));
-                            const endPct = Math.max(0, Math.min(100, ((c.endAge - inputs.currentAge) / totalYears) * 100));
-                            const widthPct = endPct - startPct;
-                            if (widthPct <= 0) return null;
-      
-                            const isRowHighlighted = !!(editingEvent && (
-                              (editingEvent.type === 'haveChild' && c.id.startsWith('childcare')) ||
-                              (editingEvent.type === 'marriage' && c.id === 'marriage') ||
-                              ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`) ||
-                              (editingEvent.type === 'payoffPlan' && c.id === editingEvent.id) ||
-                              (editingEvent.type === 'borrowing' && (inputs.lifeEvents || []).some(le => le.type === 'payoffPlan' && le.id === c.id && le.borrowingId === editingEvent.id))
-                            ));
-      
-                            return (
-                              <div className={`timeline-row ${isRowHighlighted ? 'highlighted' : ''}`} key={c.id}>
-                                <div className="timeline-row-label">
-                                  <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
-                                </div>
-                                <div className="timeline-row-content commitment-track">
-                                  <div className="timeline-track-inner">
-                                    <div
-                                      className={`${c.className} ${isRowHighlighted ? 'highlighted' : ''}`}
-                                      style={{
-                                        left: `${startPct}%`,
-                                        width: `${widthPct}%`
-                                      }}
-                                    >
-                                      {c.emoji} {c.label} (Age {c.startAge}–{c.endAge === inputs.lifeExpectancy ? `${c.startAge}+` : c.endAge})
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          });
-                        })()}
-      
-                        {/* Layer 3: LIFE PHASES */}
-                        {(() => {
-                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                          if (totalYears <= 0) return null;
-                          const retAge = inputs.targetRetirementAge || inputs.lifeExpectancy;
-                          const workPct = Math.max(0, Math.min(100, ((retAge - inputs.currentAge) / totalYears) * 100));
-      
-                          return (
-                            <div className="timeline-row">
-                              <div className="timeline-row-label">Life Phases</div>
-                              <div className="timeline-row-content life-phase-track">
-                                <div className="timeline-track-inner">
-                                  {workPct > 0 && (
-                                    <div
-                                      className="life-phase-span work-save"
-                                      style={{
-                                        left: '0%',
-                                        width: `${workPct}%`
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
-                                        <span style={{ fontWeight: 700 }}>💼 Work & Save</span>
-                                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {inputs.currentAge}–{retAge}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                  {workPct < 100 && (
-                                    <div
-                                      className="life-phase-span retirement"
-                                      style={{
-                                        left: `${workPct}%`,
-                                        width: `${100 - workPct}%`
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
-                                        <span style={{ fontWeight: 700 }}>🏖️ Retirement</span>
-                                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {retAge}–{inputs.lifeExpectancy}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-      
-                        {/* Layer 4: BUDGET PHASES */}
-                        {(() => {
-                          const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                          if (totalYears <= 0) return null;
-
-                          const getBudgetPhaseThemeClass = (p) => {
-                            const label = p.label || '';
-                            const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
-                            const hasSS = p.activeEvents?.includes('socialSecurity') || label.includes('Social Security') || p.icon === '🏖️💰' || p.icon === '💰';
-                            
-                            if (isRetired) {
-                              if (hasSS) return 'theme-retired-ss'; // Emerald / Teal
-                              return 'theme-retired'; // Amber / Gold
-                            }
-                            
-                            // Working phases
-                            const lowerLabel = label.toLowerCase();
-                            const hasChildcare = lowerLabel.includes('childcare');
-                            const hasStudentLoan = lowerLabel.includes('student loan') || p.activeDebts?.some(d => d.type === 'studentLoan');
-                            const hasHouse = lowerLabel.includes('house') || lowerLabel.includes('mortgage') || p.activeDebts?.some(d => d.type === 'mortgage');
-                            const hasOtherDebt = p.activeDebts && p.activeDebts.length > 0;
-                            
-                            if (hasChildcare) {
-                              if (hasOtherDebt) return 'theme-working-childcare-debt'; // Coral / Rose
-                              return 'theme-working-childcare'; // Magenta / Pink-Purple
-                            }
-                            if (hasStudentLoan) return 'theme-working-student-loan'; // Purple
-                            if (hasHouse) return 'theme-working-house'; // Cyan / Blue
-                            
-                            return 'theme-working-standard'; // Indigo / Blue
-                          };
-      
-                          return (
-                            <div className="timeline-row budget-phases-timeline-row">
-                              <div className="timeline-row-label">📊 Budget Phases</div>
-                              <div className="timeline-row-content budget-phases-track">
-                                <div ref={trackRef} className="timeline-track-inner" style={{ display: 'flex', height: '100%', position: 'relative' }}>
-                                  {normalizedPhases.map((p) => {
-                                    const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
-                                    const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
-                                    const widthPct = endPct - startPct;
-                                    if (widthPct <= 0) return null;
- 
-                                    const isCurrentAge = inputs.currentAge >= p.startAge && inputs.currentAge < p.endAge;
-                                    const widthPx = (widthPct / 100) * trackWidth;
- 
-                                    const phaseNeedsTotal = (Number(p.expenses?.housing) || 0) +
-                                                           (Number(p.expenses?.utilities) || 0) +
-                                                           (Number(p.expenses?.food) || 0) +
-                                                           (Number(p.expenses?.transportation) || 0) +
-                                                           (Number(p.expenses?.healthcare) || 0) +
-                                                           (p.isMarried ? (Number(p.expenses?.debt) || 0) : 0) +
-                                                           (Number(p.expenses?.childcare) || 0) +
-                                                           (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.[`debt_${d.id}`]) || d.monthlyPayment || 0), 0);
- 
-                                    const phaseWantsTotal = (Number(p.expenses?.leisure) || 0) +
-                                                           (Number(p.expenses?.diningOut) || 0) +
-                                                           (Number(p.expenses?.misc) || 0);
- 
-                                    const phaseSavingsTotal = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
-                                                             (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
- 
-                                    const shortLabel = p.label ? p.label.split(' + ')[0] : '';
-                                    
-                                    let content = null;
-                                    if (widthPx > 180) {
-                                      content = (
-                                        <div className="segment-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                          <span style={{ fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', width: '100%', fontSize: '0.68rem', textAlign: 'center' }}>
-                                            {p.icon} {p.label}
-                                          </span>
-                                          <span style={{ fontSize: '0.58rem', opacity: 0.85 }}>
-                                            Age {p.startAge}–{p.endAge}
-                                          </span>
-                                        </div>
-                                      );
-                                    } else if (widthPx >= 100) {
-                                      content = (
-                                        <div className="segment-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '0.68rem', fontWeight: 700 }}>
-                                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', width: '100%', textAlign: 'center' }}>
-                                            {p.icon} {p.label}
-                                          </span>
-                                        </div>
-                                      );
-                                    } else if (widthPx >= 50) {
-                                      content = (
-                                        <div className="segment-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.95rem' }}>
-                                          {p.icon}
-                                        </div>
-                                      );
-                                    }
-                                    
-                                    const themeClass = getBudgetPhaseThemeClass(p);
- 
-                                    return (
-                                      <div
-                                        key={p.id}
-                                        className={`budget-segment budget-timeline-lane-segment ${themeClass} ${isCurrentAge ? 'current-age-phase' : ''} ${activeSelectedPhaseId === p.id ? 'selected' : ''}`}
-                                        style={{
-                                          position: 'absolute',
-                                          left: `${startPct}%`,
-                                          width: `${widthPct}%`
-                                        }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSetBudgetClick(p.id);
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleSetBudgetClick(p.id);
-                                          }
-                                        }}
-                                        tabIndex={0}
-                                        aria-label={`${p.label} (Age ${p.startAge}–${p.endAge})`}
-                                      >
-                                        {content}
-                                        <div className={`timeline-tooltip ${startPct < 20 ? 'align-left' : startPct > 80 ? 'align-right' : ''}`}>
-                                          <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <span>{p.icon}</span> <span>{p.label}</span>
-                                          </div>
-                                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '200px', lineHeight: '1.4', textAlign: 'left' }}>
-                                            <div><strong>Age:</strong> {p.startAge}–{p.endAge}</div>
-                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '0.25rem', paddingTop: '0.25rem' }}>
-                                              <strong>Active Events:</strong> {p.activeEvents && p.activeEvents.length > 0 ? p.activeEvents.map(evId => getEventDetails(evId)?.name || evId).join(', ') : 'None'}
-                                            </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.15rem 0.5rem', marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
-                                              <div>Monthly Income:</div>
-                                              <div style={{ textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatCurrency(p.income || 0)}</div>
-                                              <div>Needs:</div>
-                                              <div style={{ textAlign: 'right' }}>{formatCurrency(phaseNeedsTotal)}</div>
-                                              <div>Wants:</div>
-                                              <div style={{ textAlign: 'right' }}>{formatCurrency(phaseWantsTotal)}</div>
-                                              <div>Save & Invest:</div>
-                                              <div style={{ textAlign: 'right', color: 'var(--accent-blue)' }}>{formatCurrency(phaseSavingsTotal)}</div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-      
-                        {/* CHRONOLOGICAL AGE TICKS */}
-                        <div className="timeline-row">
-                          <div className="timeline-row-label" style={{ opacity: 0, borderRight: 'none' }}>Ages</div>
-                          <div className="timeline-row-content ticks-row-content">
-                            <div className="timeline-track-inner">
-                              {(() => {
-                                const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                                const ticks = [];
-                                const tickInterval = 5;
-                                const startTick = Math.ceil(inputs.currentAge / tickInterval) * tickInterval;
-                                const endTick = Math.floor(inputs.lifeExpectancy / tickInterval) * tickInterval;
-                                for (let age = startTick; age <= endTick; age += tickInterval) {
-                                  ticks.push(age);
-                                }
-                                return ticks.map((age, idx) => {
-                                  const percent = totalYears > 0 ? ((age - inputs.currentAge) / totalYears) * 100 : 0;
-                                  return (
-                                    <div key={idx} className="timeline-tick-new" style={{ left: `${percent}%` }}>
-                                      <div className="timeline-tick-mark-new" />
-                                      <span className="timeline-tick-label-new">{age}</span>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-      
-                      </div>
-                    </div>
-                  </div>
-
-
-                </div>
-      
-      
-                {/* visual Outcome Preview Card (Full-Width below timeline) */}
-                {(() => {
-                  const details = getOutcomeDetails(
-                    activeResults.retirementOutcome,
-                    activeResults.runOutAge,
-                    inputs.readinessCriteria,
-                    activeResults.retirementReadyAge,
-                    inputs.lifeExpectancy
-                  );
-      
-                  const readyAge = activeResults.retirementReadyAge;
-      
-                  return (
-                    <div className="glass-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1.0rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                          🏆 Outcome Preview
-                          {showDebugButton && (
-                            <button
-                              id="debug-export-btn"
-                              type="button"
-                              onClick={() => {
-                                setDebugTab('assumptions');
-                                setShowDebugDrawer(true);
-                              }}
-                              style={{
-                                padding: '0.2rem 0.5rem',
-                                fontSize: '0.7rem',
-                                borderRadius: '4px',
-                                background: 'var(--accent-orange, #f59e0b)',
-                                color: '#0f172a',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '700',
-                                marginLeft: '0.5rem',
-                                transition: 'opacity 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px'
-                              }}
-                              onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                              onMouseOut={(e) => e.target.style.opacity = '1'}
-                            >
-                              ⚙️ Debug
-                            </button>
-                          )}
-                        </h3>
-                        <div className="segmented-control-container" style={{ margin: 0, minWidth: '400px', width: '100%', maxWidth: '500px' }}>
-                          <div className="segmented-control" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '2px', display: 'flex', width: '100%' }}>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsLifeExp' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsLifeExp' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsLifeExp' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsLifeExp')}
-                            >
-                              Sustainable
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: 'var(--primary)' }}>Sustainable Plan:</strong> Money is projected to last through planned Life Expectancy (Age {inputs.lifeExpectancy || 85}), drawing the portfolio down to $0.
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsComfortable' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsComfortable' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsComfortable' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsComfortable')}
-                            >
-                              Comfortable
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: '#fbbf24' }}>Comfortable Plan:</strong> Money is projected to last 10 years beyond planned Life Expectancy (Age {Number(inputs.lifeExpectancy || 85) + 10}), providing a solid longevity safety buffer.
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`segmented-control-btn ${inputs.readinessCriteria === 'lastsIndefinitely' ? 'active' : ''}`}
-                              style={{ 
-                                flex: 1, 
-                                fontSize: '0.7rem', 
-                                padding: '0.35rem 0.5rem', 
-                                borderRadius: '6px', 
-                                background: inputs.readinessCriteria === 'lastsIndefinitely' ? 'var(--primary)' : 'transparent',
-                                color: inputs.readinessCriteria === 'lastsIndefinitely' ? '#fff' : 'var(--text-secondary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              onClick={() => updateInput('readinessCriteria', 'lastsIndefinitely')}
-                            >
-                              Indefinite
-                              <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                                <span className="toggle-tooltip-icon">i</span>
-                                <span className="toggle-tooltip-text">
-                                  <strong style={{ color: '#10b981' }}>Indefinite Plan:</strong> Portfolio meets the Safe Withdrawal Rate (SWR) target, ensuring it remains intact or grows, lasting indefinitely.
-                                </span>
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-       
-                      {/* View Values In Preference Toggle */}
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'flex-end', 
-                        gap: '0.5rem', 
-                        marginBottom: '0.65rem',
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        <span>View Values In:</span>
-                        <div className="segmented-control" style={{ 
-                          background: 'var(--bg-secondary)', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '6px', 
-                          padding: '2px', 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${displayMode === 'future' ? 'active' : ''}`}
-                            style={{
-                              padding: '0.2rem 0.6rem',
-                              fontSize: '0.7rem',
-                              borderRadius: '4px',
-                              background: displayMode === 'future' ? 'var(--primary)' : 'transparent',
-                              color: displayMode === 'future' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onClick={() => setDisplayMode('future')}
-                          >
-                            Future Dollars
-                          </button>
-                          <button
-                            type="button"
-                            className={`segmented-control-btn ${displayMode === 'today' ? 'active' : ''}`}
-                            style={{
-                              padding: '0.2rem 0.6rem',
-                              fontSize: '0.7rem',
-                              borderRadius: '4px',
-                              background: displayMode === 'today' ? 'var(--primary)' : 'transparent',
-                              color: displayMode === 'today' ? '#fff' : 'var(--text-secondary)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '2px'
-                            }}
-                            onClick={() => setDisplayMode('today')}
-                          >
-                            Today’s Dollars
-                            <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                              <span className="toggle-tooltip-icon" style={{ width: '10px', height: '10px', fontSize: '7px', lineHeight: '10px' }}>i</span>
-                              <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
-                                Today’s Dollars adjusts future values for inflation to show equivalent purchasing power.
-                              </span>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* Outcome Banner (Compact) */}
-                      <div style={{ 
-                        background: details.bg, 
-                        border: `1px solid ${details.color}44`, 
-                        borderRadius: '6px', 
-                        padding: '0.35rem 0.75rem',
-                        marginBottom: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
-                          {details.badge}
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.35', flex: 1, minWidth: '250px' }}>
-                          {details.desc}
-                        </p>
-                      </div>
- 
-                      {activeResults.yearsWithLimitsReached > 0 && (
-                        <div style={{ 
-                          background: 'rgba(99, 102, 241, 0.08)', 
-                          border: '1px solid rgba(99, 102, 241, 0.2)', 
-                          borderRadius: '6px', 
-                          padding: '0.35rem 0.75rem',
-                          marginBottom: '0.5rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.75rem',
-                          color: 'var(--text-secondary)'
-                        }}>
-                          <span>ℹ️</span>
-                          <span style={{ lineHeight: '1.45' }}>
-                            Contribution limits were reached in <strong>{activeResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(activeResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{activeResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Planning Concepts & Key Values Grid (6-Column Compact) */}
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
-                        gap: '0.5rem', 
-                        paddingTop: '0' 
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Can Stop Working</span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? 'Sustainable Age' 
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                              ? 'Comfortable Age' 
-                              : 'Indefinite Age'}
-                          </span>
-                          <strong style={{ fontSize: readyAge ? '1.05rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)', fontWeight: '800' }}>
-                            {readyAge ? `Age ${readyAge}` : 'Plan Needs Adjustment'}
-                          </strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? 'stop working sustainably, taking SS at selected year' 
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                                ? 'stop working comfortably, taking SS at the selected year' 
-                                : 'stop working indefinitely, taking SS at selected year'}
-                          </span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                                ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
-                                : formatCurrency(displayedResults.retirementReadyTarget)}
-                          </strong>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>Projected Portfolio</span>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
-                          </strong>
-                        </div>
-                      </div>
-       
-                      {/* 🏖 Stop Working Today Compact Secondary Card */}
-                      <div style={{ 
-                        marginTop: '0.65rem', 
-                        padding: '0.4rem 0.6rem', 
-                        background: 'rgba(255, 255, 255, 0.015)', 
-                        border: '1px solid var(--border-color)', 
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.75rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ fontSize: '1rem' }}>🏖️</span>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-primary)' }}>🏖 Stop Working Today</span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>“Portfolio needed today to replace your current spending.”</span>
-                          </div>
-                        </div>
-                        <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                          {formatCurrency(displayedResults.retireTodayTarget)}
-                        </strong>
-                      </div>
-       
-                      {/* Financial Freedom Action Plan Banner (Compact) */}
-                      {activeStep === 2 && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                        <div className="improvement-banner-container" style={{ marginTop: '0.65rem', padding: '0.35rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-light)' }}>💡 Action Plan Available:</span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjustments are available to improve your projection.</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="improvement-banner-btn"
-                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
-                            onClick={() => setShowImprovementModal(true)}
-                          >
-                            View Action Plan
-                          </button>
-                        </div>
-                      )}
-       
-                    </div>
-                  );
-                })()}
-
-                {/* Wealth Journey Graph (Full Width, directly below timeline) */}
-                {validation.errors.length === 0 && (
-                  <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          Wealth Journey
-                          <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                            <span className="toggle-tooltip-icon">i</span>
-                            <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
-                              Shows values at the start of the fiscal year.
-                            </span>
-                          </span>
-                        </h3>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                          <input
-                            type="checkbox"
-                            checked={showAssets}
-                            onChange={(e) => setShowAssets(e.target.checked)}
-                            style={{ accentColor: '#10b981', cursor: 'pointer' }}
-                          />
-                          <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                          <input
-                            type="checkbox"
-                            checked={showDebt}
-                            onChange={(e) => setShowDebt(e.target.checked)}
-                            style={{ accentColor: '#ef4444', cursor: 'pointer' }}
-                          />
-                          <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                          <input
-                            type="checkbox"
-                            checked={showNetWorth}
-                            onChange={(e) => setShowNetWorth(e.target.checked)}
-                            style={{ accentColor: '#8b5cf6', cursor: 'pointer' }}
-                          />
-                          <span style={{ color: '#8b5cf6', fontWeight: '700' }}>Net Worth (Purple)</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="chart-container-inner" style={{ height: '240px', cursor: 'crosshair' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={chartData}
-                          margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
-                          onClick={(data) => {
-                            if (data && data.activeLabel) {
-                              setSelectedYear(Number(data.activeLabel));
-                            }
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                          <XAxis
-                            dataKey="age"
-                            stroke="var(--text-tertiary)"
-                            fontFamily="var(--font-body)"
-                            fontSize={10}
-                          />
-                          <YAxis
-                            stroke="var(--text-tertiary)"
-                            fontFamily="var(--font-body)"
-                            fontSize={10}
-                            tickFormatter={formatYAxis}
-                          />
-                          <Tooltip
-                            content={({ active, payload, label }) => {
-                              if (active && payload && payload.length) {
-                                return (
-                                  <div className="custom-chart-tooltip">
-                                    <p style={{ fontWeight: '700', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-                                      Age {label}
-                                    </p>
-                                    {payload.map((item) => (
-                                      <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
-                                        <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="assets"
-                            name="Total Assets"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={false}
-                            hide={!showAssets}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="debt"
-                            name="Total Debt"
-                            stroke="#ef4444"
-                            strokeWidth={2}
-                            dot={false}
-                            hide={!showDebt}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="netWorth"
-                            name="Net Worth"
-                            stroke="#8b5cf6"
-                            strokeWidth={2.5}
-                            dot={false}
-                            hide={!showNetWorth}
-                          />
-      
-                          {/* 1. Can Stop Working Age */}
-                          {displayedResults.targetRetirementAge && (
-                            <ReferenceLine
-                              x={displayedResults.targetRetirementAge}
-                              stroke="#a855f7"
-                              strokeDasharray="3 3"
-                              strokeWidth={1.5}
-                              label={{
-                                value: `Work Optional: Age ${displayedResults.targetRetirementAge}`,
-                                position: 'insideTopRight',
-                                fill: 'var(--text-primary)',
-                                fontSize: 9,
-                                dy: 10
-                              }}
-                            />
-                          )}
-      
-                          {/* 2. Retirement Ready Age */}
-                          {displayedResults.retirementReadyAge && (
-                            <ReferenceLine
-                              x={displayedResults.retirementReadyAge}
-                              stroke="#10b981"
-                              strokeDasharray="4 4"
-                              strokeWidth={1.5}
-                              label={{
-                                value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${displayedResults.retirementReadyAge}`,
-                                position: 'insideTopRight',
-                                fill: 'var(--text-primary)',
-                                fontSize: 9,
-                                dy: 25
-                              }}
-                            />
-                          )}
-      
-                          {/* 3. Assets Depleted Age */}
-                          {displayedResults.runOutAge && (
-                            <ReferenceLine
-                              x={displayedResults.runOutAge}
-                              stroke="#ef4444"
-                              strokeDasharray="4 4"
-                              strokeWidth={1.5}
-                              label={{
-                                value: `Assets Run Out: Age ${displayedResults.runOutAge}`,
-                                position: 'insideTopRight',
-                                fill: 'var(--text-primary)',
-                                fontSize: 9,
-                                dy: 40
-                              }}
-                            />
-                          )}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    {((inputs.lifeEvents || []).some(e => e.type === 'haveChild' && e.enabled) || displayedResults.runOutAge !== null) && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '0.6rem',
-                        padding: '0.65rem 0.85rem',
-                        background: 'rgba(99, 102, 241, 0.04)',
-                        border: '1px dashed rgba(99, 102, 241, 0.25)',
-                        borderRadius: '6px',
-                        marginTop: '0.5rem',
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)',
-                        lineHeight: '1.45'
-                      }}>
-                        <span style={{ fontSize: '1rem', marginTop: '-0.1rem' }}>💡</span>
-                        <div>
-                          <strong style={{ color: 'var(--text-primary)' }}>Lifecycle Planning Note:</strong> Temporary deficits or portfolio drawdowns (where your Net Worth line dips or flattens, such as during high-expense childcare/daycare years or early retirement) are a normal and <strong>perfectly acceptable part of a long-term financial roadmap</strong>. As long as your portfolio recovery projections climb back up in the long run, your plan remains sustainable.
-                        </div>
-                      </div>
-                    )}
-                    {displayedResults.yearsWithLimitsReached > 0 && (
-                      <div style={{ 
-                        background: 'rgba(99, 102, 241, 0.08)', 
-                        border: '1px solid rgba(99, 102, 241, 0.2)', 
-                        borderRadius: '6px', 
-                        padding: '0.35rem 0.75rem',
-                        marginTop: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        <span>ℹ️</span>
-                        <span style={{ lineHeight: '1.45' }}>
-                          Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
-                        </span>
-                      </div>
-                    )}
+                {displayedResults.yearsWithLimitsReached > 0 && (
+                  <div style={{
+                    marginTop: '0.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    fontSize: '0.7rem',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    <span>ℹ️</span>
+                    <span style={{ lineHeight: '1.3' }}>
+                      Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+                    </span>
                   </div>
                 )}
+              </div>
+            )}
+
+          </div>
+        </div>
+
       
                 <div className="roadmap-grid-layout">
                   
@@ -3361,177 +2548,7 @@ export default function LifePlanScreen({
           </div>
         </div>
       )}
-      {isCurrentSituationModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsCurrentSituationModalOpen(false)}>
-          <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                👤 Edit Current Situation
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setIsCurrentSituationModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
-              >
-                ✖
-              </button>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Current Age */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Age</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.currentAge === null ? '' : inputs.currentAge}
-                    placeholder="e.g. 35"
-                    onClick={() => handleStep1Change('currentAge', null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
-                  Your current age today (e.g. 35)
-                </span>
-              </div>
-
-              {/* Annual Income */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
-                    placeholder="e.g. 120000"
-                    onClick={() => {
-                      setActiveSavingsRate(simpleSavingsRate);
-                      handleStep1Change('simpleIncome', null);
-                    }}
-                    onBlur={() => {
-                      setActiveSavingsRate(null);
-                    }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const newIncome = val === '' ? null : (parseFloat(val) || 0);
-                      handleStep1Change('simpleIncome', newIncome);
-                      if (newIncome !== null) {
-                        const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
-                        const newExpenses = Math.round(newIncome * (1 - rate / 100));
-                        handleStep1Change('simpleExpenses', newExpenses);
-                      }
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
-                  Your total yearly gross income (e.g. $120,000)
-                </span>
-              </div>
-
-              {/* Savings Rate */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrentSituationModalOpen(false);
-                        handleSetBudgetClick();
-                      }}
-                      className="list-builder-edit-btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    >
-                      📊 Calculate from budget
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="input-number-box"
-                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
-                    placeholder="e.g. 20"
-                    onClick={() => setSavingsRateOverride('')}
-                    onBlur={() => setSavingsRateOverride(null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSavingsRateOverride(val);
-                      if (val === '') {
-                        return;
-                      }
-                      const rate = parseFloat(val) || 0;
-                      const clampedRate = Math.min(100, Math.max(0, rate));
-                      if (lastNonZeroSavingsRateRef) {
-                        lastNonZeroSavingsRateRef.current = clampedRate;
-                      }
-                      const income = Number(inputs.simpleIncome) || 0;
-                      const newExpenses = Math.round(income * (1 - clampedRate / 100));
-                      handleStep1Change('simpleExpenses', newExpenses);
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
-                  Percent of income saved pre-tax (e.g. 20%)
-                </span>
-              </div>
-
-              {/* Current Savings */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrentSituationModalOpen(false);
-                        handleOpenSavingsDetails();
-                      }}
-                      className="list-builder-edit-btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    >
-                      ✏️ Details
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '160px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
-                    placeholder="e.g. 250000"
-                    onClick={() => handleStep1Change('simpleInvestments', null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left', paddingLeft: '0.1rem' }}>
-                  Your total savings, retirement, and investment accounts combined (e.g. $250,000)
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
-                onClick={() => setIsCurrentSituationModalOpen(false)}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

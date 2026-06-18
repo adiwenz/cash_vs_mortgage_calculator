@@ -698,7 +698,7 @@ export function useRecommendations(inputs, activeResults) {
           bulletPoints: [
             `Reduce dining out, leisure, or other Needs categories by $${houseDeficit}/month.`,
             `This fits the mortgage into your existing income without overallocating your budget.`,
-            `Maintains your current savings rate and retirement ready age.`
+            `Maintains your current savings rate and stop working age.`
           ],
           readyAge: currentReadyAge || targetRetirementAge,
           yearsImprovement: null,
