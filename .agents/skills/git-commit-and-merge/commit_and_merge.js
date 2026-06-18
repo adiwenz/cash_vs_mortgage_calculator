@@ -5,7 +5,8 @@ import fs from 'fs';
 // Helper to run commands
 function runCmd(cmd, options = {}) {
   try {
-    return execSync(cmd, { encoding: 'utf8', ...options }).trim();
+    const res = execSync(cmd, { encoding: 'utf8', ...options });
+    return typeof res === 'string' ? res.trim() : res;
   } catch (error) {
     console.error(`\n❌ Error running command: ${cmd}`);
     if (error.message) console.error(error.message);

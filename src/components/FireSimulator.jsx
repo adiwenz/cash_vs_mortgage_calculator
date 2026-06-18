@@ -6,7 +6,7 @@ import { useBudgetPhases } from '../hooks/useBudgetPhases';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useBudgetState } from '../hooks/useBudgetState';
 import { useEventActions } from '../hooks/useEventActions';
-import { applyBalancedBudgetAdjustments, splitPhasesAtAge, applyBudgetAdjustmentsForLevel } from '../calculators/fire/rebalance';
+import { applyBalancedBudgetAdjustments, splitPhasesAtAge, applyBudgetAdjustmentsForLevel, resolveBuyHouseEvent } from '../calculators/fire/rebalance';
 
 import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView';
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
@@ -872,17 +872,57 @@ export default function FireSimulator() {
     } else if (strategyId === 'updatePrice') {
       const affordablePrice = houseRebalanceSummary.selectedAffordablePrice;
       if (affordablePrice !== undefined && affordablePrice !== null) {
-        const originalPrice = Number(buyHouseEv.homePrice !== undefined ? buyHouseEv.homePrice : (buyHouseEv.purchasePrice !== undefined ? buyHouseEv.purchasePrice : 0)) || 0;
-        let newDownPayment = buyHouseEv.downPayment || 0;
-        if (originalPrice > 0 && buyHouseEv.purchaseType !== 'cash') {
-          const ratio = (buyHouseEv.downPayment || 0) / originalPrice;
+        const resolvedBuyHouseEv = resolveBuyHouseEvent(buyHouseEv, newInputs);
+        const originalPrice = Number(resolvedBuyHouseEv.homePrice !== undefined ? resolvedBuyHouseEv.homePrice : (resolvedBuyHouseEv.purchasePrice !== undefined ? resolvedBuyHouseEv.purchasePrice : 0)) || 0;
+        let newDownPayment = resolvedBuyHouseEv.downPayment || 0;
+        if (originalPrice > 0 && resolvedBuyHouseEv.purchaseType !== 'cash') {
+          const ratio = (resolvedBuyHouseEv.downPayment || 0) / originalPrice;
           newDownPayment = Math.round(affordablePrice * ratio);
         }
+        const finalDownPayment = Math.min(newDownPayment, affordablePrice);
         newInputs.lifeEvents[buyHouseEventIndex] = {
-          ...buyHouseEv,
+          ...resolvedBuyHouseEv,
           homePrice: affordablePrice,
-          downPayment: Math.min(newDownPayment, affordablePrice)
+          purchasePrice: affordablePrice,
+          downPayment: finalDownPayment
         };
+
+        if (resolvedBuyHouseEv.houseId && newInputs.houseAssets) {
+          newInputs.houseAssets = newInputs.houseAssets.map(h => {
+            if (h.id === resolvedBuyHouseEv.houseId) {
+              return {
+                ...h,
+                homePrice: affordablePrice,
+                purchasePrice: affordablePrice,
+                downPayment: finalDownPayment
+              };
+            }
+            return h;
+          });
+        }
+
+        if (newInputs.debtList) {
+          newInputs.debtList = newInputs.debtList.map(d => {
+            if (d.houseId === resolvedBuyHouseEv.houseId || d.id === `mortgage-${resolvedBuyHouseEv.houseId}`) {
+              const principal = Math.max(0, affordablePrice - finalDownPayment);
+              let rateFraction = (Number(resolvedBuyHouseEv.mortgageRate) || 6.5) / 100 / 12;
+              let totalMonths = (Number(resolvedBuyHouseEv.loanTerm) || Number(resolvedBuyHouseEv.loanTermYears) || 30) * 12;
+              let monthlyPayment;
+              if (rateFraction === 0) {
+                monthlyPayment = principal / totalMonths;
+              } else {
+                monthlyPayment = principal * (rateFraction * Math.pow(1 + rateFraction, totalMonths)) / (Math.pow(1 + rateFraction, totalMonths) - 1);
+              }
+              return {
+                ...d,
+                balance: principal,
+                payment: Math.round(monthlyPayment)
+              };
+            }
+            return d;
+          });
+        }
+
         if (houseRebalanceSummary.selectedOption === 'balanced') {
           applyBalancedBudgetAdjustments(newInputs, buyHouseEv, affordablePrice, scen.inputs);
         } else if (houseRebalanceSummary.selectedOption === 'aggressive' || houseRebalanceSummary.selectedOption === 'stretch') {
@@ -902,6 +942,23 @@ export default function FireSimulator() {
           : chosenOption === 'aggressive'
           ? houseRebalanceSummary.aggressiveRetirementAge
           : houseRebalanceSummary.balancedRetirementAge;
+
+        if (newAge !== undefined && newAge !== null) {
+          const oldRetAge = newInputs.targetRetirementAge;
+          newInputs.targetRetirementAge = newAge;
+          newInputs.lifeEvents = (newInputs.lifeEvents || []).map(e => {
+            if (e.type === 'retire') {
+              return { ...e, age: newAge };
+            }
+            return e;
+          });
+          newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+            if (inc.endAge === oldRetAge) {
+              return { ...inc, endAge: newAge };
+            }
+            return inc;
+          });
+        }
 
         let notificationMsg = `✓ House price adjusted to ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(affordablePrice)}.`;
         if (baselineAge !== undefined && newAge !== undefined && newAge !== null && newAge !== baselineAge) {

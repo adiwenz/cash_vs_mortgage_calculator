@@ -35,11 +35,38 @@ function formatCurrency(val) {
   }).format(val);
 }
 
-function sumNonDebtExpenses(expensesMap) {
+function sumNonDebtExpenses(expensesMap, activeProperties = [], age = null) {
   if (!expensesMap) return 0;
+  let housingCost = Number(expensesMap.housing) || 0;
+  if (activeProperties.length > 0 && age !== null) {
+    activeProperties.forEach(prop => {
+      if (age >= prop.purchaseAge) {
+        const p = prop.homePrice || 0;
+        const propTaxRate = prop.propertyTaxRate || 0;
+        const insRate = prop.insuranceRate || 0;
+        const maintRate = prop.maintenanceRate || 0;
+        
+        const monthlyPropTax = (p * propTaxRate) / 12;
+        const monthlyIns = (p * insRate) / 12;
+        const monthlyMaint = (p * maintRate) / 12;
+        const monthlyHoa = prop.hoa || 0;
+        const monthlyUtil = prop.utilitiesIncrease || 0;
+        
+        let monthlyPmi = 0;
+        if (prop.purchaseType !== 'cash' && prop.downPayment < p * 0.2) {
+          const pmiRate = prop.pmiRate || 0.5;
+          const loanAmount = Math.max(0, p - prop.downPayment);
+          monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+        }
+        
+        const propertyNonMortgageCosts = monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
+        housingCost = Math.max(0, housingCost - Math.round(propertyNonMortgageCosts));
+      }
+    });
+  }
   return Object.keys(expensesMap)
-    .filter(k => !k.startsWith('debt_') && k !== '🏠 Mortgage' && k !== 'mortgage')
-    .reduce((sum, k) => sum + (Number(expensesMap[k]) || 0), 0);
+    .filter(k => !k.startsWith('debt_') && k !== '🏠 Mortgage' && k !== 'mortgage' && k !== 'housing')
+    .reduce((sum, k) => sum + (Number(expensesMap[k]) || 0), 0) + housingCost;
 }
 
 function getAssetLabel(key) {
@@ -728,11 +755,49 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     let spendingForYear = 0;
 
     if (activePhaseForAge) {
-      const monthlyNonDebt = sumNonDebtExpenses(activePhaseForAge.expenses);
+      const monthlyNonDebt = sumNonDebtExpenses(activePhaseForAge.expenses, purchasedProperties, age);
       if (budgetScalingMode === 'lifestyle') {
         spendingForYear = (monthlyNonDebt * 12) * incomeMultiplier;
       } else {
         spendingForYear = (monthlyNonDebt * 12) * Math.pow(1 + inflationRate + lifestyleUpgrades, age - currentAge);
+      }
+
+      // Double-counting rent check
+      const hasActiveOwnedPrimaryResidence = purchasedProperties.some(prop => age >= prop.purchaseAge);
+      if (hasActiveOwnedPrimaryResidence && activePhaseForAge.expenses) {
+        const activeProps = purchasedProperties.filter(prop => age >= prop.purchaseAge);
+        const hasKeepRentFalseProp = activeProps.some(prop => !prop.keepRent);
+        if (hasKeepRentFalseProp) {
+          let expectedPropertyCosts = 0;
+          activeProps.forEach(prop => {
+            if (!prop.keepRent) {
+              const p = prop.homePrice || 0;
+              const propTaxRate = prop.propertyTaxRate || 0;
+              const insRate = prop.insuranceRate || 0;
+              const maintRate = prop.maintenanceRate || 0;
+              
+              const monthlyPropTax = (p * propTaxRate) / 12;
+              const monthlyIns = (p * insRate) / 12;
+              const monthlyMaint = (p * maintRate) / 12;
+              const monthlyHoa = prop.hoa || 0;
+              const monthlyUtil = prop.utilitiesIncrease || 0;
+              
+              let monthlyPmi = 0;
+              if (prop.purchaseType !== 'cash' && prop.downPayment < p * 0.2) {
+                const pmiRate = prop.pmiRate || 0.5;
+                const loanAmount = Math.max(0, p - prop.downPayment);
+                monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+              }
+              
+              expectedPropertyCosts += monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
+            }
+          });
+          
+          const actualHousingExpense = Number(activePhaseForAge.expenses.housing) || 0;
+          if (actualHousingExpense > expectedPropertyCosts + 50) {
+            console.warn(`[WARNING] Possible double-counting rent and ownership costs at age ${age}: phase housing expense is ${actualHousingExpense} but expected property non-mortgage costs are ${Math.round(expectedPropertyCosts)}.`);
+          }
+        }
       }
     } else {
       spendingForYear = (Number(profile.simpleExpenses) || 42500) * Math.pow(1 + inflationRate + lifestyleUpgrades, age - currentAge);
@@ -1430,6 +1495,12 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     }
     taxes += state.annualEarlyWithdrawalPenalties;
 
+    if (state.cumulativeShortfall <= 0.01) {
+      state.cumulativeShortfall = 0;
+      state.hasRunOut = false;
+      state.runOutAge = null;
+    }
+
     const currentDebtSum = activeLoans.reduce((sum, l) => sum + l.balance, 0) + debtBalance;
 
     const customAssetsSum = customAssets.reduce((sum, ca) => sum + ca.balance, 0);
@@ -1529,6 +1600,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       liquidAssetsAfterPurchase = liquidAssetsBeforePurchase - cashNeeded;
       netWorthAfterPurchase = netWorthBeforePurchase - closingCostsPaidValue;
       netWorthImpactFromPurchase = netWorthAfterPurchase - netWorthBeforePurchase;
+
+      const netWorthDeltaFromDownPaymentTransfer = netWorthAfterPurchase - netWorthBeforePurchase + closingCostsPaidValue;
+      if (Math.abs(netWorthDeltaFromDownPaymentTransfer) > 1.0) {
+        console.warn(`[WARNING] Down payment asset transfer affected net worth at age ${age}: delta is ${netWorthDeltaFromDownPaymentTransfer}`);
+      }
     }
 
     let homeAccountingDebug = null;
@@ -1877,7 +1953,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       savingsKeys.forEach(k => {
         baseMonthlySavings += (Number(savingsObj[k]) || 0) + (Number(partnerSavingsObj[k]) || 0);
       });
-      baseMonthlyExpenses = sumNonDebtExpenses(activePhaseForAge.expenses);
+      baseMonthlyExpenses = sumNonDebtExpenses(activePhaseForAge.expenses, purchasedProperties, age);
     }
     const scaledMonthlySavings = baseMonthlySavings * savingsMultiplier;
     const scaledMonthlyExpenses = baseMonthlyExpenses * scalingMultiplier;

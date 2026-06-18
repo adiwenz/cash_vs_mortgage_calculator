@@ -63,7 +63,7 @@ export function getActiveEventsForInterval(startAge, endAge, enabledEvents, prof
     } else if (e.type === 'buyHouse') {
       const purchaseAge = Number(e.purchaseAge !== undefined ? e.purchaseAge : e.age);
       let saleAge = profile.lifeExpectancy;
-      const sellEv = enabledEvents.find(ev => ev.type === 'sellHouse' && ev.houseId === e.id);
+      const sellEv = enabledEvents.find(ev => ev.type === 'sellHouse' && (ev.houseId === e.id || (e.houseId && ev.houseId === e.houseId)));
       if (sellEv) {
         saleAge = Number(sellEv.age);
       } else if (e.yearsUntilSale !== undefined && e.yearsUntilSale !== null && e.yearsUntilSale !== '') {
@@ -673,78 +673,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       });
     }
 
-    enabledEvents.forEach(ev => {
-      if (ev.type === 'buyHouse') {
-        const purchaseAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-        let saleAge = profile.lifeExpectancy;
-        const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.id);
-        if (sellEv) {
-          saleAge = Number(sellEv.age);
-        } else if (ev.yearsUntilSale !== undefined && ev.yearsUntilSale !== null && ev.yearsUntilSale !== '') {
-          const val = Number(ev.yearsUntilSale);
-          if (!isNaN(val) && val > 0) {
-            if (val < profile.currentAge) {
-              saleAge = purchaseAge + val;
-            } else {
-              saleAge = val;
-            }
-          }
-        }
-        
-        if (start >= purchaseAge && start < saleAge) {
-          const asset = (ev.houseId && profile.houseAssets)
-            ? profile.houseAssets.find(h => h.id === ev.houseId)
-            : ev;
-          const p = Number(asset.homePrice !== undefined ? asset.homePrice : (asset.purchasePrice !== undefined ? asset.purchasePrice : 0)) || 0;
-          const dp = Number(asset.downPayment) || 0;
-          const isCash = dp >= p || asset.purchaseType === 'cash';
-          
-          const keepRent = !!asset.keepRent;
-          
-          const propTaxRate = (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100;
-          const insRate = (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : (asset.insurance !== undefined ? Number(asset.insurance) : 0.35)) / 100;
-          const maintRate = (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100;
-          
-          const monthlyPropTax = (p * propTaxRate) / 12;
-          const monthlyIns = (p * insRate) / 12;
-          const monthlyMaint = (p * maintRate) / 12;
-          const monthlyHoa = Number(asset.hoaCost !== undefined ? asset.hoaCost : asset.hoa) || 0;
-          const monthlyUtil = Number(asset.utilitiesIncrease) || 0;
-          
-          let monthlyPmi = 0;
-          if (asset.purchaseType !== 'cash' && dp < p * 0.2) {
-            const pmiRate = asset.pmi !== undefined ? Number(asset.pmi) : 0.5;
-            const loanAmount = Math.max(0, p - dp);
-            monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
-          }
-          
-          const nonMortgageCosts = monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
-          
-          if (!keepRent) {
-            resolvedExpenses.housing = Math.round(nonMortgageCosts);
-          } else {
-            resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
-          }
-          
-          if (!isCash) {
-            const rate = (asset.mortgageRate !== undefined ? Number(asset.mortgageRate) : 6.5) / 100;
-            const mortgageTerm = asset.loanTerm !== undefined ? Number(asset.loanTerm) : (asset.loanTermYears !== undefined ? Number(asset.loanTermYears) : 30);
-            const loanAmount = Math.max(0, p - dp);
-            
-            if (start < purchaseAge + mortgageTerm) {
-              let annualPI = 0;
-              if (loanAmount > 0 && mortgageTerm > 0) {
-                const r = rate / 12;
-                const n = mortgageTerm * 12;
-                const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-                annualPI = monthlyPayment * 12;
-              }
-              resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + Math.round(annualPI / 12);
-            }
-          }
-        }
-      }
-    });
+
 
     let childCostsScale = 1.0;
     if (start >= targetRetirementAge) {
@@ -883,6 +812,92 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
         resolvedExpenses[k] = savedPhase.expenses[k];
       });
     }
+
+    let housingOverwritten = false;
+    resolvedExpenses['🏠 Mortgage'] = 0;
+    activeDebts.forEach(debt => {
+      if (debt.type === 'mortgage' && debt.id && debt.id.startsWith('mortgage-existing-')) {
+        resolvedExpenses['🏠 Mortgage'] += debt.monthlyPayment;
+      }
+    });
+
+    enabledEvents.forEach(ev => {
+      if (ev.type === 'buyHouse') {
+        const purchaseAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
+        let saleAge = profile.lifeExpectancy;
+        const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && (e.houseId === ev.id || (ev.houseId && e.houseId === ev.houseId)));
+        if (sellEv) {
+          saleAge = Number(sellEv.age);
+        } else if (ev.yearsUntilSale !== undefined && ev.yearsUntilSale !== null && ev.yearsUntilSale !== '') {
+          const val = Number(ev.yearsUntilSale);
+          if (!isNaN(val) && val > 0) {
+            if (val < profile.currentAge) {
+              saleAge = purchaseAge + val;
+            } else {
+              saleAge = val;
+            }
+          }
+        }
+        
+        if (start >= purchaseAge && start < saleAge) {
+          const asset = (ev.houseId && profile.houseAssets)
+            ? profile.houseAssets.find(h => h.id === ev.houseId)
+            : ev;
+          const p = Number(asset.homePrice !== undefined ? asset.homePrice : (asset.purchasePrice !== undefined ? asset.purchasePrice : 0)) || 0;
+          const dp = Number(asset.downPayment) || 0;
+          const isCash = dp >= p || asset.purchaseType === 'cash';
+          
+          const keepRent = !!asset.keepRent;
+          
+          const propTaxRate = (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100;
+          const insRate = (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : (asset.insurance !== undefined ? Number(asset.insurance) : 0.35)) / 100;
+          const maintRate = (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100;
+          
+          const monthlyPropTax = (p * propTaxRate) / 12;
+          const monthlyIns = (p * insRate) / 12;
+          const monthlyMaint = (p * maintRate) / 12;
+          const monthlyHoa = Number(asset.hoaCost !== undefined ? asset.hoaCost : asset.hoa) || 0;
+          const monthlyUtil = Number(asset.utilitiesIncrease) || 0;
+          
+          let monthlyPmi = 0;
+          if (asset.purchaseType !== 'cash' && dp < p * 0.2) {
+            const pmiRate = asset.pmi !== undefined ? Number(asset.pmi) : 0.5;
+            const loanAmount = Math.max(0, p - dp);
+            monthlyPmi = (loanAmount * (pmiRate / 100)) / 12;
+          }
+          
+          const nonMortgageCosts = monthlyPropTax + monthlyIns + monthlyMaint + monthlyHoa + monthlyUtil + monthlyPmi;
+          
+          if (!keepRent) {
+            if (!housingOverwritten) {
+              resolvedExpenses.housing = Math.round(nonMortgageCosts);
+              housingOverwritten = true;
+            } else {
+              resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
+            }
+          } else {
+            resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
+          }
+          
+          if (!isCash) {
+            const rate = (asset.mortgageRate !== undefined ? Number(asset.mortgageRate) : 6.5) / 100;
+            const mortgageTerm = asset.loanTerm !== undefined ? Number(asset.loanTerm) : (asset.loanTermYears !== undefined ? Number(asset.loanTermYears) : 30);
+            const loanAmount = Math.max(0, p - dp);
+            
+            if (start < purchaseAge + mortgageTerm) {
+              let annualPI = 0;
+              if (loanAmount > 0 && mortgageTerm > 0) {
+                const r = rate / 12;
+                const n = mortgageTerm * 12;
+                const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                annualPI = monthlyPayment * 12;
+              }
+              resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + Math.round(annualPI / 12);
+            }
+          }
+        }
+      }
+    });
 
     if (!profile.hasCustomizedSavingsAllocation && start < targetRetirementAge) {
       const totalExpensesAmt = Object.keys(resolvedExpenses).filter(k => !k.startsWith('debt_')).reduce((sum, k) => sum + (Number(resolvedExpenses[k]) || 0), 0);

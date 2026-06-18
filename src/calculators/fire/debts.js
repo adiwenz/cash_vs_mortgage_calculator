@@ -209,7 +209,7 @@ export function getActiveDebtsForAge(profile, events, age) {
       const payoffAge = startAge + termYears;
       
       // Check if there is a sellHouse event for this house
-      const sellEv = lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.id && e.enabled);
+      const sellEv = lifeEvents.find(e => e.type === 'sellHouse' && (e.houseId === ev.id || (ev.houseId && e.houseId === ev.houseId)) && e.enabled);
       const endAge = sellEv ? Number(sellEv.age) : payoffAge;
       
       if (age >= startAge && age < endAge) {

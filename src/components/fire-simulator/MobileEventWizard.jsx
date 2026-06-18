@@ -170,48 +170,57 @@ export default function MobileEventWizard({
 
   // Initialize event with defaults
   const selectEventType = (type) => {
-    let defaults = { type, isNew: true };
-    const curAge = inputs.currentAge || 35;
-    
-    if (type === 'buyHouse') {
-      defaults = {
-        ...defaults,
-        purchaseAge: Math.min(85, curAge + 5),
-        homePrice: 500000,
-        downPayment: 100000,
-        purchaseType: 'mortgage',
-        mortgageRate: 6.5,
-        loanTerm: 30,
-        points: 0,
-        pmi: 0.5,
-        closingCosts: 3,
-        propertyTax: 1.1,
-        insurance: 0.35,
-        hoa: 0,
-        maintenance: 1,
-        utilitiesIncrease: 0,
-        appreciationRate: 3,
-        sellingCost: 6,
-        currentRent: 0,
-        rentGrowth: 3,
-        renterInsurance: 0,
-        investmentReturn: 7,
-        inflation: 3
-      };
-    } else if (type === 'haveChild') {
-      defaults = {
-        ...defaults,
-        childName: 'Child',
-        childStartAge: 0,
-        birthAge: curAge,
-        costMethod: 'default',
-        customAges0to4: 15000,
-        customAges5to12: 9000,
-        customAges13to18: 12000,
-        customAges19to22: 20000,
-        includeCollege: false
-      };
-    } else if (type === 'careerChange') {
+    const preserveFields = draftEvent && (
+      draftEvent.type === type || 
+      (draftEvent.type === 'borrowing' && draftEvent.borrowingType === type)
+    );
+
+    let defaults;
+    if (preserveFields) {
+      defaults = { ...draftEvent, type: draftEvent.type, isNew: !draftEvent.id };
+    } else {
+      defaults = { type, isNew: true };
+      const curAge = inputs.currentAge || 35;
+      
+      if (type === 'buyHouse') {
+        defaults = {
+          ...defaults,
+          purchaseAge: Math.min(85, curAge + 5),
+          homePrice: 500000,
+          downPayment: 100000,
+          purchaseType: 'mortgage',
+          mortgageRate: 6.5,
+          loanTerm: 30,
+          points: 0,
+          pmi: 0.5,
+          closingCosts: 3,
+          propertyTax: 1.1,
+          insurance: 0.35,
+          hoa: 0,
+          maintenance: 1,
+          utilitiesIncrease: 0,
+          appreciationRate: 3,
+          sellingCost: 6,
+          currentRent: 0,
+          rentGrowth: 3,
+          renterInsurance: 0,
+          investmentReturn: 7,
+          inflation: 3
+        };
+      } else if (type === 'haveChild') {
+        defaults = {
+          ...defaults,
+          childName: 'Child',
+          childStartAge: 0,
+          birthAge: curAge,
+          costMethod: 'default',
+          customAges0to4: 15000,
+          customAges5to12: 9000,
+          customAges13to18: 12000,
+          customAges19to22: 20000,
+          includeCollege: false
+        };
+      } else if (type === 'careerChange') {
       defaults = { 
         ...defaults, 
         name: 'Senior Role', 
@@ -356,9 +365,10 @@ export default function MobileEventWizard({
         defaults.minPayment = 100;
       }
     }
+  }
 
-    setDraftEvent(defaults);
-    setStep(3); // Advance to Timing screen
+  setDraftEvent(defaults);
+  setStep(3); // Advance to Timing screen
   };
 
   // Run temp simulation and compile impact metrics
@@ -1079,31 +1089,34 @@ export default function MobileEventWizard({
                         type="number" 
                         value={draftEvent.homePrice || 500000} 
                         onChange={(e) => {
-                          const p = Number(e.target.value);
-                          setDraftEvent(prev => ({
-                            ...prev,
-                            homePrice: p,
-                            downPayment: Math.round(p * 0.2)
-                          }));
+                          const p = Number(e.target.value) || 0;
+                          setDraftEvent(prev => {
+                            const pct = prev.homePrice > 0 ? (prev.downPayment / prev.homePrice) : 0.20;
+                            return {
+                              ...prev,
+                              homePrice: p,
+                              downPayment: Math.round(p * pct)
+                            };
+                          });
                         }} 
                         className="mobile-wizard-input-text"
                       />
                     </div>
 
                     <div className="form-group-item">
-                      <label className="form-group-label">Down Payment</label>
+                      <label className="form-group-label">Down Payment (%)</label>
                       <div className="slider-input-group">
                         <input 
                           type="range" 
                           min={0} 
-                          max={draftEvent.homePrice || 500000} 
-                          step={5000} 
-                          value={draftEvent.downPayment || 100000}
-                          onChange={(e) => updateDraft('downPayment', Number(e.target.value))}
+                          max={100} 
+                          step={1} 
+                          value={draftEvent.homePrice > 0 ? Math.round(((draftEvent.downPayment || 0) / draftEvent.homePrice) * 100) : 20}
+                          onChange={(e) => updateDraft('downPayment', Math.round((draftEvent.homePrice || 0) * (Number(e.target.value) / 100)))}
                           className="mobile-wizard-slider"
                         />
                         <div className="slider-val-box">
-                          {formatCurrency(draftEvent.downPayment || 100000)} ({Math.round(((draftEvent.downPayment || 0) / (draftEvent.homePrice || 1)) * 100)}%)
+                          {draftEvent.homePrice > 0 ? Math.round(((draftEvent.downPayment || 0) / draftEvent.homePrice) * 100) : 20}% ({formatCurrency(draftEvent.downPayment || 0)})
                         </div>
                       </div>
                     </div>

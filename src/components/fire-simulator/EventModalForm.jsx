@@ -160,17 +160,31 @@ export default function EventModalForm({
                   className="input-number-box"
                   style={{ width: '100%' }}
                   value={editingEvent.homePrice}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, homePrice: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const newPrice = parseFloat(e.target.value) || 0;
+                    const currentPct = editingEvent.homePrice > 0 ? (editingEvent.downPayment / editingEvent.homePrice) : 0.20;
+                    setEditingEvent({
+                      ...editingEvent,
+                      homePrice: newPrice,
+                      downPayment: Math.round(newPrice * currentPct)
+                    });
+                  }}
                 />
               </div>
               <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
-                <span className="input-name">Down Payment ($)</span>
+                <span className="input-name">Down Payment (%)</span>
                 <input
                   type="number"
                   className="input-number-box"
                   style={{ width: '100%' }}
-                  value={editingEvent.downPayment}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, downPayment: parseFloat(e.target.value) || 0 })}
+                  value={editingEvent.homePrice > 0 ? Math.round((editingEvent.downPayment / editingEvent.homePrice) * 100) : 20}
+                  onChange={(e) => {
+                    const pct = parseFloat(e.target.value) || 0;
+                    setEditingEvent({
+                      ...editingEvent,
+                      downPayment: Math.round((editingEvent.homePrice || 0) * (pct / 100))
+                    });
+                  }}
                 />
               </div>
 

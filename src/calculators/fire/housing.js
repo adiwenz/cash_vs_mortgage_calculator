@@ -55,7 +55,8 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
           utilitiesIncrease: asset.utilitiesIncrease !== undefined ? Number(asset.utilitiesIncrease) : 0,
           sellingCostRate: asset.sellingCost !== undefined ? Number(asset.sellingCost) : (asset.sellingCostRate !== undefined ? Number(asset.sellingCostRate) : 6),
           yearsUntilSale: asset.yearsUntilSale !== undefined ? asset.yearsUntilSale : '',
-          inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3
+          inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3,
+          keepRent: asset.keepRent !== undefined ? !!asset.keepRent : (ev.keepRent !== undefined ? !!ev.keepRent : false)
         });
       } else {
         const rate = (asset.mortgageRate !== undefined ? Number(asset.mortgageRate) : 6.5) / 100;
@@ -91,7 +92,8 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
           utilitiesIncrease: asset.utilitiesIncrease !== undefined ? Number(asset.utilitiesIncrease) : 0,
           sellingCostRate: asset.sellingCost !== undefined ? Number(asset.sellingCost) : (asset.sellingCostRate !== undefined ? Number(asset.sellingCostRate) : 6),
           yearsUntilSale: asset.yearsUntilSale !== undefined ? asset.yearsUntilSale : '',
-          inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3
+          inflation: asset.inflation !== undefined ? Number(asset.inflation) : 3,
+          keepRent: asset.keepRent !== undefined ? !!asset.keepRent : (ev.keepRent !== undefined ? !!ev.keepRent : false)
         });
       }
     }

@@ -489,10 +489,6 @@ export const isFinancialEvent = (evt) => {
     'childSupportEnds',
     'medicareEligibility',
     'socialSecurity',
-    'retirementReadySurvival',
-    'retirementReadyComfortable',
-    'retirementReadySWR',
-    'coastFire',
     'debtPayoff',
     'pension',
     'rentalIncome',
@@ -502,7 +498,18 @@ export const isFinancialEvent = (evt) => {
   if (financialTypes.includes(evt.type)) {
     return true;
   }
-  if (evt.isMilestone && !evt.originalId && evt.type !== 'retire' && evt.type !== 'buyHouse' && evt.type !== 'sellHouse' && evt.type !== 'haveChild' && evt.type !== 'marriage') {
+  const mainMilestoneTypes = [
+    'retire',
+    'buyHouse',
+    'sellHouse',
+    'haveChild',
+    'marriage',
+    'retirementReadySurvival',
+    'retirementReadyComfortable',
+    'retirementReadySWR',
+    'coastFire'
+  ];
+  if (evt.isMilestone && !evt.originalId && !mainMilestoneTypes.includes(evt.type)) {
     return true;
   }
   return false;
