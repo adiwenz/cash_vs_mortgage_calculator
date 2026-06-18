@@ -341,14 +341,9 @@ describe('IRS Retirement Limits Helpers and UI Capping', () => {
       />
     );
 
-    // Expand "Save & Invest" section in Mobile view
-    const savingsHeader = screen.getByText(/Save & Invest/i);
-    fireEvent.click(savingsHeader);
-
-    // Find the "Edit Section" button inside it
-    const editBtns = screen.getAllByRole('button', { name: /Edit Section/i });
-    const editSavingsBtn = editBtns[editBtns.length - 1]; // Savings is the last section
-    fireEvent.click(editSavingsBtn);
+    // Tapping Savings opens the Savings Allocation sheet directly
+    const savingsRow = screen.getByText('Brokerage, cash, retirement');
+    fireEvent.click(savingsRow);
 
     const input401k = getInputByWrapperText(/401\(k\)/i);
     
