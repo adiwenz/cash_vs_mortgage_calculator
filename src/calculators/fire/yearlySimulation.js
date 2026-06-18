@@ -332,7 +332,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     const age = currentAge + year;
     const nominalFactor = Math.pow(1 + inflationRate, year);
     state.annualEarlyWithdrawalPenalties = 0;
-    const activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge);
+    let activePhaseForAge = simPhases.find(p => age >= p.startAge && age < p.endAge);
+    if (!activePhaseForAge && simPhases.length > 0 && age >= simPhases[simPhases.length - 1].startAge) {
+      activePhaseForAge = simPhases[simPhases.length - 1];
+    }
+
 
     // Save starting balances for telemetry
     const checkingStart = checkingBalance;

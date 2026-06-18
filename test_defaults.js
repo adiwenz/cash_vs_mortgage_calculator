@@ -305,7 +305,7 @@ try {
 
   const sustainableInputs = {
     ...DEFAULT_FIRE_INPUTS,
-    lifeEvents: DEFAULT_FIRE_INPUTS.lifeEvents.map(e => e.type === 'retire' ? { ...e, age: 64 } : e)
+    lifeEvents: DEFAULT_FIRE_INPUTS.lifeEvents.map(e => e.type === 'retire' ? { ...e, age: 63 } : e)
   };
   const sustainableRes = runFireSimulation(sustainableInputs);
   expect(sustainableRes.retirementOutcome).toBe('sustainable');
