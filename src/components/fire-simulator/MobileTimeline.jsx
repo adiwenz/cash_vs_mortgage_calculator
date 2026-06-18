@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { isEditableEvent } from './helpers';
 
 const getShortLabel = (evt) => {
@@ -163,12 +162,15 @@ const getCircleColorClass = (type) => {
   return 'circle-purple';
 };
 
+const getEmojiFontSize = (isSelected) => {
+  return isSelected ? '1.25rem' : '1.05rem';
+};
+
 export default function MobileTimeline({
   inputs,
   timelineEvents,
   selectedEventIndex,
   setSelectedEventIndex,
-  handleEditRoadmapEvent,
   onEventTap
 }) {
   const containerRef = useRef(null);
@@ -185,10 +187,8 @@ export default function MobileTimeline({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const totalYears = (inputs?.lifeExpectancy || 85) - (inputs?.currentAge || 35);
-
-  // Dynamic Marker Sizing based on total events count (evenly spaced)
   const eventCount = timelineEvents.length;
+
   const sizes = useMemo(() => {
     return { baseCircleSize: 40, activeCircleSize: 52 };
   }, []);
@@ -198,8 +198,8 @@ export default function MobileTimeline({
     if (timelineEvents.length === 0) return [];
 
     const W = containerWidth || 350;
-    const paddingLeft = 36;
-    const paddingRight = 36;
+    const paddingLeft = sizes.activeCircleSize / 2 + 8;
+    const paddingRight = sizes.activeCircleSize / 2 + 8;
     const usableWidth = W - paddingLeft - paddingRight;
 
     return timelineEvents.map((evt, idx) => {
@@ -220,8 +220,6 @@ export default function MobileTimeline({
       };
     });
   }, [timelineEvents, containerWidth, selectedEventIndex, sizes]);
-
-  const selectedEvent = timelineEvents[selectedEventIndex] || timelineEvents[0];
 
   const lineLeft = resolvedPositions.length > 0 ? resolvedPositions[0].x : 0;
   const lineRight = resolvedPositions.length > 0 ? resolvedPositions[resolvedPositions.length - 1].x : 0;
@@ -257,9 +255,9 @@ export default function MobileTimeline({
           const topPosition = 38 - item.size / 2;
 
           // Responsive density rules:
-          // 1–6 events: Show labels for all
-          // 7–10 events: Show labels for all, clamped to 2 lines
-          // 11+ events: Show labels only for selected, first, and last events. Hide intermediate labels.
+          // 1–6 events: Show age pills and labels for all
+          // 7–10 events: Show age pills and labels for all, clamped to 2 lines
+          // 11+ events: Show age pills for all events; show labels only for: selected event, first event, last event. Hide non-selected intermediate labels.
           let showLabelForThisEvent = true;
           if (eventCount >= 11) {
             showLabelForThisEvent = isSelected || item.index === 0 || item.index === eventCount - 1;
@@ -288,24 +286,33 @@ export default function MobileTimeline({
               onClick={() => {
                 setSelectedEventIndex(item.index);
                 if (onEventTap) {
-                  onEventTap(item.event);
+                  onEventTap(item.event, item.index);
                 }
               }}
             >
               <div
-                className={`mobile-roadmap-circle ${isSelected ? 'active pulse' : ''} ${circleColor}`}
                 style={{
-                  width: `${item.size}px`,
-                  height: `${item.size}px`,
-                  borderRadius: '50%',
+                  height: `${sizes.activeCircleSize}px`,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: isSelected ? '1.25rem' : '1.05rem',
-                  transition: 'all 0.2s ease-in-out'
+                  justifyContent: 'center'
                 }}
               >
-                <span>{item.event.icon}</span>
+                <div
+                  className={`mobile-roadmap-circle ${isSelected ? 'active pulse' : ''} ${circleColor}`}
+                  style={{
+                    width: `${item.size}px`,
+                    height: `${item.size}px`,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: getEmojiFontSize(isSelected),
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                >
+                  <span>{item.event.icon}</span>
+                </div>
               </div>
               
               {/* Age Pill is always visible for all events */}
@@ -357,7 +364,6 @@ export default function MobileTimeline({
           );
         })}
       </div>
-
     </section>
   );
 }

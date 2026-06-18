@@ -8,7 +8,10 @@ import {
   ChevronRight, 
   ArrowLeft, 
   Sparkles,
-  Info
+  Info,
+  X,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
@@ -771,7 +774,6 @@ export default function MobileFireSimulatorView({
                 timelineEvents={timelineEvents}
                 selectedEventIndex={selectedEventIndex}
                 setSelectedEventIndex={setSelectedEventIndex}
-                handleEditRoadmapEvent={handleEditRoadmapEvent}
                 onEventTap={setActiveEventForSheet}
               />
 
@@ -1036,88 +1038,7 @@ export default function MobileFireSimulatorView({
                               ⚙️ Edit Budget Configuration
                             </button>
 
-                            {/* Phase Recommendations Section */}
-                            <div className="mobile-phase-recs-section" style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
-                              <h4 style={{ fontWeight: '700', fontSize: '0.85rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ffffff' }}>
-                                💡 Recommendations
-                              </h4>
-                              
-                              {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
-                                <MobileRecommendationsPanel
-                                  improvementPlan={improvementPlan}
-                                  handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                                  targetRetirementAge={inputs.targetRetirementAge}
-                                  showHeader={false}
-                                />
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                  {p.label?.toLowerCase().includes('retirement') || p.icon === '🏖️' || p.icon === '🏖' ? (
-                                    <>
-                                      <div 
-                                        className="mobile-rec-card"
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                        onClick={() => {
-                                          const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
-                                          if (ssEv) handleEditRoadmapEvent(ssEv);
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                          <div style={{ fontSize: '1.25rem' }}>📅</div>
-                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Delaying claiming to age 70 increases annual benefits by ~8% per year.</span>
-                                          </div>
-                                        </div>
-                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
-                                      </div>
-                                      
-                                      <div 
-                                        className="mobile-rec-card"
-                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                        onClick={() => handleSetBudgetClick(p.id)}
-                                      >
-                                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                          <div style={{ fontSize: '1.25rem' }}>💸</div>
-                                          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Cutting spending by $200/mo improves portfolio longevity projection.</span>
-                                          </div>
-                                        </div>
-                                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
-                                      </div>
-                                    </>
-                                  ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
-                                    <div 
-                                      className="mobile-rec-card"
-                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                    >
-                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '1.25rem' }}>🍼</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Optimize Childcare Costs</span>
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Look into tax-free Dependent Care FSAs to save up to 30% on childcare.</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div 
-                                      className="mobile-rec-card"
-                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}
-                                      onClick={() => handleSetBudgetClick(p.id)}
-                                    >
-                                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '1.25rem' }}>📈</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#ffffff' }}>Increase Savings Rate</span>
-                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Try allocating 1% more of your monthly income to investments.</span>
-                                        </div>
-                                      </div>
-                                      <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+
                           </div>
                         )}
                       </div>
@@ -1983,121 +1904,7 @@ export default function MobileFireSimulatorView({
               );
             })()}
 
-            {/* Recommendations stack */}
-            <div className="mobile-card" style={{ textAlign: 'left' }}>
-              <h3 style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                💡 Recommendations
-              </h3>
 
-              <div className="mobile-recs-stack">
-                {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
-                  <MobileRecommendationsPanel
-                    improvementPlan={improvementPlan}
-                    handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                    targetRetirementAge={inputs.targetRetirementAge}
-                    showHeader={false}
-                  />
-                ) : selectedPhaseObj.label?.toLowerCase().includes('retirement') || selectedPhaseObj.icon === '🏖️' || selectedPhaseObj.icon === '🏖' ? (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
-                        if (ssEv) handleEditRoadmapEvent(ssEv);
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">📅</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Delay Social Security</span>
-                          <span className="mobile-rec-desc">Delaying claiming to age 70 increases annual benefits by ~8% per year.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                    
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💸</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Reduce Spending</span>
-                          <span className="mobile-rec-desc">Cutting spending by $200/mo improves portfolio longevity projection.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                ) : selectedPhaseObj.label?.toLowerCase().includes('child') || selectedPhaseObj.icon === '👶' ? (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        handleCreateEvent('careerChange');
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💼</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Increase income</span>
-                          <span className="mobile-rec-desc">+$500/mo extra income could offset childcare costs.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">⚙️</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Adjust savings allocation</span>
-                          <span className="mobile-rec-desc">Optimize pre-tax vs brokerage funding in this high-expense phase.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💰</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Increase savings rate</span>
-                          <span className="mobile-rec-desc">Boost 401(k) allocations by 3% to take advantage of compound growth.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        setSelectedMobilePhaseId(null);
-                        setActiveTab('Details');
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">📈</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Adjust asset allocation</span>
-                          <span className="mobile-rec-desc">Review expected pre-retirement returns for long-term growth.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Sticky CTA Button at Bottom */}
@@ -2178,6 +1985,7 @@ export default function MobileFireSimulatorView({
           setShowImprovementModal={setShowImprovementModal}
         />
       )}
+
       <ChildImpactModal
         childImpactSummary={childImpactSummary}
         inputs={inputs}
@@ -2528,7 +2336,11 @@ export default function MobileFireSimulatorView({
                     onClick={() => {
                       setActiveEventForSheet(null);
                       if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
-                        handleDeleteRoadmapEvent(activeEventForSheet);
+                        if (handleDeleteEvent) {
+                          handleDeleteEvent(activeEventForSheet);
+                        } else if (handleDeleteRoadmapEvent) {
+                          handleDeleteRoadmapEvent(activeEventForSheet);
+                        }
                       }
                     }}
                     style={{

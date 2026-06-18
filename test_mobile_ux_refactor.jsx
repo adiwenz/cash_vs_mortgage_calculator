@@ -190,6 +190,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     ];
 
     const handleEditRoadmapEvent = vi.fn();
+    const handleDeleteEvent = vi.fn();
 
     render(
       <MobileFireSimulator
@@ -205,6 +206,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         validation={{}}
         handleCreateEvent={vi.fn()}
         handleEditRoadmapEvent={handleEditRoadmapEvent}
+        handleDeleteEvent={handleDeleteEvent}
         handleSetBudgetClick={vi.fn()}
         handleOpenSavingsDetails={vi.fn()}
         isMobile={true}
@@ -244,6 +246,15 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const editRetireBtn = screen.getByText('Edit Event Details');
     fireEvent.click(editRetireBtn); // click edit
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
+
+    // 6. Test Delete Event confirmation flow from bottom sheet
+    const deleteConfirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
+    fireEvent.click(retireMilestoneBtn); // open bottom sheet again
+    const deleteBtn = screen.getByText('Delete Event');
+    fireEvent.click(deleteBtn);
+    expect(deleteConfirmSpy).toHaveBeenCalled();
+    expect(handleDeleteEvent).toHaveBeenCalledWith(timelineEvents[1]);
+    deleteConfirmSpy.mockRestore();
   });
 
   test('Overview tab renders MobileRecommendationsPanel when plan is not on track', () => {
@@ -315,7 +326,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(handleApplyImprovementScenario).toHaveBeenCalledWith(mockImprovementPlan.rankedPlan[0]);
   });
 
-  test('Roadmap tab renders MobileRecommendationsPanel inside recommendations stack when plan is not on track', () => {
+  test('Roadmap tab does not render MobileRecommendationsPanel inside budget phases', () => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
     const activeRes = runFireSimulation(inputs);
     const displayedRes = {
@@ -371,15 +382,9 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const workSavePhaseBtn = screen.getByText('Working', { selector: '.mobile-phase-card-title' });
     fireEvent.click(workSavePhaseBtn);
 
-    // Verify recommendations header is rendered
-    expect(screen.getByText('💡 Recommendations')).toBeDefined();
-
-    // Since plan is not on track, it should render MobileRecommendationsPanel instead of static mockup recommendations
-    expect(screen.getByText('Save More')).toBeDefined();
-    expect(screen.getByText('Save an additional $500/month.')).toBeDefined();
-
-    // It should NOT render "Delay Social Security" or "Reduce Spending" which are mockup recommendations
-    expect(screen.queryByText('Delay Social Security')).toBeNull();
+    // Verify recommendations header is NOT rendered
+    expect(screen.queryByText('💡 Recommendations')).toBeNull();
+    expect(screen.queryByText('Save More')).toBeNull();
   });
 
   test('Dense cluster even spacing logic', () => {
@@ -397,7 +402,6 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={0}
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 
@@ -407,17 +411,17 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     // Extract positions
     const positions = Array.from(buttons).map(btn => parseFloat(btn.style.left));
     
-    // Total usable width = W - 72. Positions must increase linearly:
+    // Total usable width = W - (paddingLeft + paddingRight). Positions must increase linearly:
     const diff1 = positions[1] - positions[0];
     const diff2 = positions[2] - positions[1];
     const diff3 = positions[3] - positions[2];
     
     expect(diff1).toBeCloseTo(diff2, 1);
     expect(diff2).toBeCloseTo(diff3, 1);
-    expect(positions[0]).toBe(36); // Pinned left
+    expect(positions[0]).toBe(34); // 52/2 + 8 = 34
   });
 
-  test('Many events (10+) density visibility rules', () => {
+  test('Many events (11+) density visibility rules', () => {
     const inputs = { currentAge: 35, lifeExpectancy: 85 };
     const timelineEvents = Array.from({ length: 11 }, (_, i) => ({
       age: 35 + i * 4,
@@ -433,7 +437,6 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={0}
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 
@@ -460,7 +463,6 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
         timelineEvents={timelineEvents}
         selectedEventIndex={1} // Select the second one
         setSelectedEventIndex={vi.fn()}
-        handleEditRoadmapEvent={vi.fn()}
       />
     );
 

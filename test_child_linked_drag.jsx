@@ -162,6 +162,7 @@ describe('Child Event Linked Dragging Regression Test', () => {
     expect(childMilestonesPostDrop.length).toBe(2);
 
     console.log = originalLog;
+    fs.mkdirSync('./scratch', { recursive: true });
     fs.writeFileSync('./scratch/drag_debug.log', logBuffer.join('\n'));
   });
 });
