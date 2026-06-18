@@ -477,7 +477,7 @@ export function useTimelineEvents(inputs, displayedResults) {
           icon: '🎉',
           type: 'retirementReadySWR',
           isMilestone: true,
-          description: `Age at which your portfolio meets the safe perpetual Safe Withdrawal Rate (SWR) target (${formatCurrency(calc.retirementReadyTarget)}), ensuring it lasts indefinitely.`
+          description: `Age at which your portfolio meets the safe perpetual Safe Withdrawal Rate (SWR) target (${formatCurrency(calc.retirementReadyTarget)}), ensuring you can stop working indefinitely.`
         });
       }
     }

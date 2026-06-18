@@ -158,8 +158,8 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(postMarriageSpending).toBeLessThan(preMarriageSpending * 2);
 
     // Capture before/after retirement ages
-    const beforeRetAgeLabel = screen.getByText(/Before Retirement Age/i).closest('div');
-    const afterRetAgeLabel = screen.getByText(/After Retirement Age/i).closest('div');
+    const beforeRetAgeLabel = screen.getByText(/Before Work Optional Age/i).closest('div');
+    const afterRetAgeLabel = screen.getByText(/After Work Optional Age/i).closest('div');
     
     const beforeRetAge = parseInt(beforeRetAgeLabel.textContent.match(/Age\s+(\d+)/i)[1], 10);
     const afterRetAge = parseInt(afterRetAgeLabel.textContent.match(/Age\s+(\d+)/i)[1], 10);

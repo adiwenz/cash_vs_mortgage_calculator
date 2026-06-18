@@ -444,7 +444,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(editProfileBtn);
 
     // Verify Spouse Retirement Age input is present in Step 1
-    const spouseRetAgeInput = getInputByWrapperText(/Spouse Retirement Age/i);
+    const spouseRetAgeInput = getInputByWrapperText(/Spouse Work Optional Age/i);
     expect(spouseRetAgeInput).toBeDefined();
     expect(spouseRetAgeInput.placeholder).toContain('65 (optional)');
     

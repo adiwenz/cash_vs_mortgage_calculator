@@ -56,7 +56,7 @@ export default function MobileBudgetPanel({
   budgetScalingMode,
   handleToggleBudgetScalingMode
 }) {
-  const [expandedSection, setExpandedSection] = useState('needs'); // 'needs', 'wants', or 'savings'
+  const [activeEditCategory, setActiveEditCategory] = useState(null); // 'needs', 'wants', 'savings', or null
 
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
   const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
@@ -68,7 +68,7 @@ export default function MobileBudgetPanel({
     : (budgetPartnerSavings.brokerage || 0);
 
   return (
-    <div className="mobile-budget-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--text-primary)', padding: '1rem' }}>
+    <div className="mobile-budget-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--text-primary)', padding: '1rem', position: 'relative' }}>
       
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
@@ -77,7 +77,7 @@ export default function MobileBudgetPanel({
             🎯 {modalTitle} {activePhaseObj && `(Age ${activePhaseObj.startAge}–${activePhaseObj.endAge})`}
           </h3>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            Tap a section below to expand & edit.
+            Tap Needs, Wants, or Savings to edit this phase.
           </span>
         </div>
         <button 
@@ -168,6 +168,125 @@ export default function MobileBudgetPanel({
           </div>
         </div>
 
+        {/* Needs / Wants / Savings breakdown card */}
+        <div style={{ 
+          background: 'rgba(255,255,255,0.02)', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: '8px', 
+          padding: '0.85rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.75rem' 
+        }}>
+          {/* Needs Row */}
+          <div 
+            onClick={() => {
+              setIsEditingNeeds(true);
+              setActiveEditCategory('needs');
+            }}
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.35rem', 
+              cursor: 'pointer', 
+              paddingBottom: '0.5rem', 
+              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--accent-emerald)', fontWeight: 'bold', fontSize: '0.9rem' }}>Needs</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{formatCurrency(needsTotal)}/mo</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{takeHomeIncome > 0 ? Math.round((needsTotal / takeHomeIncome) * 100) : 0}%</span>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>›</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Housing, food, healthcare
+            </div>
+            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (needsTotal / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-emerald)' }} />
+            </div>
+          </div>
+
+          {/* Wants Row */}
+          <div 
+            onClick={() => {
+              setIsEditingWants(true);
+              setActiveEditCategory('wants');
+            }}
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.35rem', 
+              cursor: 'pointer', 
+              paddingBottom: '0.5rem', 
+              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--accent-amber)', fontWeight: 'bold', fontSize: '0.9rem' }}>Wants</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{formatCurrency(wantsTotal)}/mo</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{takeHomeIncome > 0 ? Math.round((wantsTotal / takeHomeIncome) * 100) : 0}%</span>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>›</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Dining, travel, fun
+            </div>
+            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (wantsTotal / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-amber)' }} />
+            </div>
+          </div>
+
+          {/* Savings Row */}
+          <div 
+            onClick={() => {
+              setIsEditingSavings(true);
+              setActiveEditCategory('savings');
+            }}
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.35rem', 
+              cursor: 'pointer', 
+              paddingBottom: '0.5rem', 
+              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--accent-violet)', fontWeight: 'bold', fontSize: '0.9rem' }}>Savings</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0}%</span>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>›</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Brokerage, cash, retirement
+            </div>
+            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-violet)' }} />
+            </div>
+          </div>
+
+          {/* Remaining Row (non-tappable) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.9rem' }}>Remaining</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingRight: '1rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: remainingBalance < 0 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                  {formatCurrency(remainingBalance)}/mo
+                </span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {remainingBalance < 0 ? 'Over budget' : 'Unallocated surplus'}
+            </div>
+          </div>
+        </div>
+
         {/* Strategy Controls (Strategy & Scaling) */}
         {!isRetirementPhase && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -225,33 +344,163 @@ export default function MobileBudgetPanel({
           </div>
         )}
 
-        {/* Accordion 1: Needs */}
-        <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' }}>
-          <button 
-            type="button"
-            onClick={() => setExpandedSection(expandedSection === 'needs' ? null : 'needs')}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '0.85rem 1rem', 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-primary)',
-              cursor: 'pointer' 
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.1rem' }}>🏠</span>
-              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Needs</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({formatCurrency(needsTotal)}/mo)</span>
-            </div>
-            <span>{expandedSection === 'needs' ? '▼' : '▶'}</span>
-          </button>
+        {/* Warning banner */}
+        {(() => {
+          const warnings = [];
+          if (!isRetirementPhase) {
+            const userAge = activePhaseObj?.startAge || inputs.currentAge || 30;
+            const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+            const spouseMember = (inputs.lifeEvents || []).find(e => e.type === 'spouseMember');
+            const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
+              ? Number(spouseMember.currentAge)
+              : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : inputs.currentAge || 30);
+            const ageDifference = spouseCurrentAge - (inputs.currentAge || 30);
+            const spouseAge = userAge + ageDifference;
 
-          {expandedSection === 'needs' && (
-            <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+            const hasBrokerage = inputs.assets && inputs.assets.brokerage !== undefined;
+            const redirectTargetName = hasBrokerage ? 'brokerage account' : 'cash account';
+
+            // User 401(k)
+            const user401kVal = (budgetSavings.trad401k || 0) * 12;
+            const user401kLimit = getRetirementLimit('401k', userAge, 'single');
+            if (user401kVal > user401kLimit) {
+              warnings.push(`Your 401(k) contribution of $${user401kVal.toLocaleString()}/year exceeds the IRS limit of $${user401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+            }
+
+            // Spouse 401(k)
+            if (isMarriedMode) {
+              const spouse401kVal = (budgetPartnerSavings.trad401k || 0) * 12;
+              const spouse401kLimit = getRetirementLimit('401k', spouseAge, 'single');
+              if (spouse401kVal > spouse401kLimit) {
+                warnings.push(`Your spouse's 401(k) contribution of $${spouse401kVal.toLocaleString()}/year exceeds the IRS limit of $${spouse401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+              }
+            }
+
+            // User IRA
+            const userTradIraVal = (budgetSavings.tradIra || 0) * 12;
+            const userRothIraVal = (budgetSavings.rothIra || 0) * 12;
+            const userIraTotal = userTradIraVal + userRothIraVal;
+            const userIraLimit = getRetirementLimit('traditionalIRA', userAge, 'single');
+            if (userIraTotal > userIraLimit) {
+              warnings.push(`Your combined IRA contributions of $${userIraTotal.toLocaleString()}/year exceed the IRS limit of $${userIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+            }
+
+            // Spouse IRA
+            if (isMarriedMode) {
+              const spouseTradIraVal = (budgetPartnerSavings.tradIra || 0) * 12;
+              const spouseRothIraVal = (budgetPartnerSavings.rothIra || 0) * 12;
+              const spouseIraTotal = spouseTradIraVal + spouseRothIraVal;
+              const spouseIraLimit = getRetirementLimit('traditionalIRA', spouseAge, 'single');
+              if (spouseIraTotal > spouseIraLimit) {
+                warnings.push(`Your spouse's combined IRA contributions of $${spouseIraTotal.toLocaleString()}/year exceed the IRS limit of $${spouseIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+              }
+            }
+
+            // User HSA
+            const userHsaVal = (budgetSavings.hsa || 0) * 12;
+            const userHsaLimit = getRetirementLimit('hsa', userAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+            if (userHsaVal > userHsaLimit) {
+              warnings.push(`Your HSA contribution of $${userHsaVal.toLocaleString()}/year exceeds the IRS limit of $${userHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+            }
+
+            // Spouse HSA
+            if (isMarriedMode) {
+              const spouseHsaVal = (budgetPartnerSavings.hsa || 0) * 12;
+              const spouseHsaLimit = getRetirementLimit('hsa', spouseAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
+              if (spouseHsaVal > spouseHsaLimit) {
+                warnings.push(`Your spouse's HSA contribution of $${spouseHsaVal.toLocaleString()}/year exceeds the IRS limit of $${spouseHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
+              }
+            }
+          }
+          if (warnings.length === 0) return null;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.75rem', padding: '0 0.5rem' }}>
+              {warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '0.35rem 0.5rem', borderRadius: '4px' }}>
+                  ⚠️ {w}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+      </div>
+
+      {/* Footer controls for Mobile */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto' }}>
+        <button
+          type="button"
+          className="btn-secondary"
+          style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem' }}
+          onClick={handleCloseBudgetModal}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          style={{ flex: 2, padding: '0.65rem', fontSize: '0.85rem' }}
+          onClick={() => handleSaveBudget(defaultTemplate)}
+        >
+          Save Budget
+        </button>
+      </div>
+
+      {/* Fixed Category Editor Sheet Modal */}
+      {activeEditCategory && (
+        <div 
+          className="mobile-category-editor-overlay"
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'var(--bg-secondary, #1e293b)', 
+            zIndex: 2100, 
+            display: 'flex', 
+            flexDirection: 'column',
+            padding: '1rem',
+            paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))',
+            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+            boxSizing: 'border-box'
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <div>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0, color: 'var(--text-primary)' }}>
+                {activeEditCategory === 'needs' && '🏠 Needs Allocation'}
+                {activeEditCategory === 'wants' && '🎉 Wants Allocation'}
+                {activeEditCategory === 'savings' && '💰 Savings Allocation'}
+              </h4>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {activeEditCategory === 'needs' && `Total: ${formatCurrency(needsTotal)}/mo`}
+                {activeEditCategory === 'wants' && `Total: ${formatCurrency(wantsTotal)}/mo`}
+                {activeEditCategory === 'savings' && `Total: ${isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo`}
+              </span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => {
+                setIsEditingNeeds(false);
+                setIsEditingWants(false);
+                setIsEditingSavings(false);
+                setActiveEditCategory(null);
+              }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.25rem', padding: '0.5rem' }}
+            >
+              ✖
+            </button>
+          </div>
+
+          {/* Scrollable Body */}
+          <div 
+            className="mobile-category-editor-body"
+            style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingRight: '0.25rem', paddingBottom: '1.5rem' }}
+          >
+            {/* Needs Itemized Inputs */}
+            {activeEditCategory === 'needs' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {(() => {
                   const needsItems = [
@@ -277,12 +526,16 @@ export default function MobileBudgetPanel({
                   return (
                     <div 
                       key={item.key} 
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}
                     >
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         {icon}{item.label} {isSpecialLocked && '🔒'}
                       </span>
-                      {isEditingNeeds && !isSpecialLocked ? (
+                      {isSpecialLocked ? (
+                        <span style={{ fontSize: '0.9rem', fontWeight: '500', color: 'var(--accent-amber)' }}>
+                          {formatCurrency(budgetExpenses[item.key] || (item.key === '🏠 Mortgage' && budgetExpenses['mortgage']) || 0)}
+                        </span>
+                      ) : (
                         <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                           <span className="currency-symbol">$</span>
                           <input
@@ -296,154 +549,52 @@ export default function MobileBudgetPanel({
                             })}
                           />
                         </div>
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', fontWeight: '500', color: isSpecialLocked ? 'var(--accent-amber)' : 'var(--text-primary)' }}>
-                          {formatCurrency(budgetExpenses[item.key] || (item.key === '🏠 Mortgage' && budgetExpenses['mortgage']) || 0)}
-                        </span>
                       )}
                     </div>
                   );
                 })}
 
                 {activeDebts.filter(debt => debt.type !== 'mortgage').map(debt => (
-                  <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{debt.icon} {debt.name}</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                  <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{debt.icon} {debt.name}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>
                       {formatCurrency(budgetExpenses[`debt_${debt.id}`] || debt.monthlyPayment)}
                     </span>
                   </div>
                 ))}
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
-                    onClick={() => setIsEditingNeeds(!isEditingNeeds)}
-                  >
-                    {isEditingNeeds ? 'Done ✓' : 'Edit Section'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                    onClick={handleClearNeeds}
-                  >
-                    Clear 🗑️
-                  </button>
-                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Accordion 2: Wants */}
-        <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' }}>
-          <button 
-            type="button"
-            onClick={() => setExpandedSection(expandedSection === 'wants' ? null : 'wants')}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '0.85rem 1rem', 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-primary)',
-              cursor: 'pointer' 
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.1rem' }}>🎉</span>
-              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Wants</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({formatCurrency(wantsTotal)}/mo)</span>
-            </div>
-            <span>{expandedSection === 'wants' ? '▼' : '▶'}</span>
-          </button>
-
-          {expandedSection === 'wants' && (
-            <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+            {/* Wants Itemized Inputs */}
+            {activeEditCategory === 'wants' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {[
                   { key: 'leisure', label: 'Leisure & Travel' },
                   { key: 'diningOut', label: 'Dining Out' },
                   { key: 'misc', label: 'Miscellaneous' }
                 ].map(item => (
-                  <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                    {isEditingWants ? (
-                      <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                        <span className="currency-symbol">$</span>
-                        <input
-                          type="number"
-                          className="input-number-box"
-                          style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
-                          value={budgetExpenses[item.key] || 0}
-                          onChange={(e) => setBudgetExpenses({
-                            ...budgetExpenses,
-                            [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
-                          })}
-                        />
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                        {formatCurrency(budgetExpenses[item.key] || 0)}
-                      </span>
-                    )}
+                  <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                    <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                      <span className="currency-symbol">$</span>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                        value={budgetExpenses[item.key] || 0}
+                        onChange={(e) => setBudgetExpenses({
+                          ...budgetExpenses,
+                          [item.key]: Math.max(0, parseFloat(e.target.value) || 0)
+                        })}
+                      />
+                    </div>
                   </div>
                 ))}
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
-                    onClick={() => setIsEditingWants(!isEditingWants)}
-                  >
-                    {isEditingWants ? 'Done ✓' : 'Edit Section'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                    onClick={handleClearWants}
-                  >
-                    Clear 🗑️
-                  </button>
-                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Accordion 3: Save & Invest */}
-        <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' }}>
-          <button 
-            type="button"
-            onClick={() => setExpandedSection(expandedSection === 'savings' ? null : 'savings')}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '0.85rem 1rem', 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-primary)',
-              cursor: 'pointer' 
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.1rem' }}>💰</span>
-              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Save & Invest</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo)</span>
-            </div>
-            <span>{expandedSection === 'savings' ? '▼' : '▶'}</span>
-          </button>
-
-          {expandedSection === 'savings' && (
-            <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+            {/* Savings Itemized Inputs */}
+            {activeEditCategory === 'savings' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {isRetirementPhase ? (
                   <div style={{ padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
@@ -452,7 +603,7 @@ export default function MobileBudgetPanel({
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                         {isMarriedMode ? '👤 Your Savings' : 'Monthly Savings'}
                       </span>
                     </div>
@@ -486,44 +637,36 @@ export default function MobileBudgetPanel({
                         ? `Investing: ${formatCurrency(estBrokerageMonthly)}/mo`
                         : null;
                       return (
-                        <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
+                        <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                            {itemDesc && !isEditingSavings && (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                            {itemDesc && (
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
                                 {itemDesc}
                               </span>
                             )}
                           </div>
-                          {isEditingSavings ? (
-                            <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                              <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
-                                value={budgetSavings[item.key] || 0}
-                                onChange={(e) => handleSavingsChange(
-                                  item.key,
-                                  Math.max(0, parseFloat(e.target.value) || 0),
-                                  false
-                                )}
-                              />
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                              {savingsAllocMode === 'percentSurplus' 
-                                ? `${budgetSavings[item.key] || 0}%` 
-                                : formatCurrency(budgetSavings[item.key] || 0)}
-                            </span>
-                          )}
+                          <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                            <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                            <input
+                              type="number"
+                              className="input-number-box"
+                              style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                              value={budgetSavings[item.key] || 0}
+                              onChange={(e) => handleSavingsChange(
+                                item.key,
+                                Math.max(0, parseFloat(e.target.value) || 0),
+                                false
+                              )}
+                            />
+                          </div>
                         </div>
                       );
                     })}
 
                     {isMarriedMode && (
                       <div style={{ marginTop: '0.5rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'block', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'block', marginBottom: '0.35rem' }}>
                           👥 Partner Savings
                         </span>
                         
@@ -545,169 +688,70 @@ export default function MobileBudgetPanel({
                             ? `Investing: ${formatCurrency(estPartnerBrokerageMonthly)}/mo`
                             : null;
                           return (
-                            <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0' }}>
+                            <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                                {itemDesc && !isEditingSavings && (
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                                {itemDesc && (
                                   <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
                                     {itemDesc}
                                   </span>
                                 )}
                               </div>
-                              {isEditingSavings ? (
-                                <div className="input-prefix-wrapper" style={{ width: '110px' }}>
-                                  <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                  <input
-                                    type="number"
-                                    className="input-number-box"
-                                    style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
-                                    value={budgetPartnerSavings[item.key] || 0}
-                                    onChange={(e) => handleSavingsChange(
-                                      item.key,
-                                      Math.max(0, parseFloat(e.target.value) || 0),
-                                      true
-                                    )}
-                                  />
-                                </div>
-                              ) : (
-                                <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                                  {savingsAllocMode === 'percentSurplus' 
-                                    ? `${budgetPartnerSavings[item.key] || 0}%` 
-                                    : formatCurrency(budgetPartnerSavings[item.key] || 0)}
-                                </span>
-                              )}
+                              <div className="input-prefix-wrapper" style={{ width: '110px' }}>
+                                <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
+                                <input
+                                  type="number"
+                                  className="input-number-box"
+                                  style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                                  value={budgetPartnerSavings[item.key] || 0}
+                                  onChange={(e) => handleSavingsChange(
+                                    item.key,
+                                    Math.max(0, parseFloat(e.target.value) || 0),
+                                    true
+                                  )}
+                                />
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
-
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
-                        onClick={() => setIsEditingSavings(!isEditingSavings)}
-                      >
-                        {isEditingSavings ? 'Done ✓' : 'Edit Section'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                        onClick={handleClearSavings}
-                      >
-                        Clear 🗑️
-                      </button>
-                    </div>
                   </>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      {/* Warning banner */}
-      {(() => {
-        const warnings = [];
-        if (!isRetirementPhase) {
-          const userAge = activePhaseObj?.startAge || inputs.currentAge || 30;
-          const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-          const spouseMember = (inputs.lifeEvents || []).find(e => e.type === 'spouseMember');
-          const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
-            ? Number(spouseMember.currentAge)
-            : (marriageEvent && marriageEvent.spouseCurrentAge !== undefined ? Number(marriageEvent.spouseCurrentAge) : inputs.currentAge || 30);
-          const ageDifference = spouseCurrentAge - (inputs.currentAge || 30);
-          const spouseAge = userAge + ageDifference;
-
-          const hasBrokerage = inputs.assets && inputs.assets.brokerage !== undefined;
-          const redirectTargetName = hasBrokerage ? 'brokerage account' : 'cash account';
-
-          // User 401(k)
-          const user401kVal = (budgetSavings.trad401k || 0) * 12;
-          const user401kLimit = getRetirementLimit('401k', userAge, 'single');
-          if (user401kVal > user401kLimit) {
-            warnings.push(`Your 401(k) contribution of $${user401kVal.toLocaleString()}/year exceeds the IRS limit of $${user401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-          }
-
-          // Spouse 401(k)
-          if (isMarriedMode) {
-            const spouse401kVal = (budgetPartnerSavings.trad401k || 0) * 12;
-            const spouse401kLimit = getRetirementLimit('401k', spouseAge, 'single');
-            if (spouse401kVal > spouse401kLimit) {
-              warnings.push(`Your spouse's 401(k) contribution of $${spouse401kVal.toLocaleString()}/year exceeds the IRS limit of $${spouse401kLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-            }
-          }
-
-          // User IRA
-          const userTradIraVal = (budgetSavings.tradIra || 0) * 12;
-          const userRothIraVal = (budgetSavings.rothIra || 0) * 12;
-          const userIraTotal = userTradIraVal + userRothIraVal;
-          const userIraLimit = getRetirementLimit('traditionalIRA', userAge, 'single');
-          if (userIraTotal > userIraLimit) {
-            warnings.push(`Your combined IRA contributions of $${userIraTotal.toLocaleString()}/year exceed the IRS limit of $${userIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-          }
-
-          // Spouse IRA
-          if (isMarriedMode) {
-            const spouseTradIraVal = (budgetPartnerSavings.tradIra || 0) * 12;
-            const spouseRothIraVal = (budgetPartnerSavings.rothIra || 0) * 12;
-            const spouseIraTotal = spouseTradIraVal + spouseRothIraVal;
-            const spouseIraLimit = getRetirementLimit('traditionalIRA', spouseAge, 'single');
-            if (spouseIraTotal > spouseIraLimit) {
-              warnings.push(`Your spouse's combined IRA contributions of $${spouseIraTotal.toLocaleString()}/year exceed the IRS limit of $${spouseIraLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-            }
-          }
-
-          // User HSA
-          const userHsaVal = (budgetSavings.hsa || 0) * 12;
-          const userHsaLimit = getRetirementLimit('hsa', userAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
-          if (userHsaVal > userHsaLimit) {
-            warnings.push(`Your HSA contribution of $${userHsaVal.toLocaleString()}/year exceeds the IRS limit of $${userHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-          }
-
-          // Spouse HSA
-          if (isMarriedMode) {
-            const spouseHsaVal = (budgetPartnerSavings.hsa || 0) * 12;
-            const spouseHsaLimit = getRetirementLimit('hsa', spouseAge, budgetHsaCoverage === 'family' ? 'married' : 'single');
-            if (spouseHsaVal > spouseHsaLimit) {
-              warnings.push(`Your spouse's HSA contribution of $${spouseHsaVal.toLocaleString()}/year exceeds the IRS limit of $${spouseHsaLimit.toLocaleString()}. Excess contributions will automatically be redirected to your ${redirectTargetName}.`);
-            }
-          }
-        }
-        if (warnings.length === 0) return null;
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.75rem', padding: '0 1rem' }}>
-            {warnings.map((w, i) => (
-              <div key={i} style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '0.35rem 0.5rem', borderRadius: '4px' }}>
-                ⚠️ {w}
-              </div>
-            ))}
+            )}
           </div>
-        );
-      })()}
 
-      {/* Footer controls for Mobile */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto' }}>
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem' }}
-          onClick={handleCloseBudgetModal}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn-primary"
-          style={{ flex: 2, padding: '0.65rem', fontSize: '0.85rem' }}
-          onClick={() => handleSaveBudget(defaultTemplate)}
-        >
-          Save Budget
-        </button>
-      </div>
+          {/* Sticky Footer */}
+          <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto', background: 'var(--bg-secondary, #1e293b)' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              onClick={() => {
+                if (activeEditCategory === 'needs') handleClearNeeds();
+                if (activeEditCategory === 'wants') handleClearWants();
+                if (activeEditCategory === 'savings') handleClearSavings();
+              }}
+            >
+              Clear Category
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ flex: 2, padding: '0.65rem', fontSize: '0.85rem' }}
+              onClick={() => {
+                setIsEditingNeeds(false);
+                setIsEditingWants(false);
+                setIsEditingSavings(false);
+                setActiveEditCategory(null);
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

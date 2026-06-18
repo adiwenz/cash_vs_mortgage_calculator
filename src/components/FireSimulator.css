@@ -3326,3 +3326,16 @@
     transform: scale(1);
   }
 }
+
+.mobile-bottom-sheet {
+  animation: mobileBottomSheetSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mobileBottomSheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

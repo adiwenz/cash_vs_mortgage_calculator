@@ -889,7 +889,7 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
     expect(screen.getByText(/\$1,108\/mo/i)).toBeDefined();
     expect(screen.getByText(/Total Housing Cost:/i)).toBeDefined();
     expect(screen.getAllByText(/\$1,818\/mo/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/New Retirement Age:/i)).toBeDefined();
+    expect(screen.getByText(/New Work Optional Age:/i)).toBeDefined();
     expect(screen.getAllByText(/Not achievable/i).length).toBeGreaterThanOrEqual(1);
 
     // Verify budget adjustments are shown

@@ -2053,7 +2053,7 @@ export default function LifePlanScreen({
                               strokeDasharray="3 3"
                               strokeWidth={1.5}
                               label={{
-                                value: `Retirement: Age ${displayedResults.targetRetirementAge}`,
+                                value: `Work Optional: Age ${displayedResults.targetRetirementAge}`,
                                 position: 'insideTopRight',
                                 fill: 'var(--text-primary)',
                                 fontSize: 9,

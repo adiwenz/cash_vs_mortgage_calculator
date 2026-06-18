@@ -478,6 +478,20 @@ export const getDefaultValuesForType = (type, currentAge) => {
 
 export const isEditableEvent = (evt) => {
   if (!evt) return false;
+  const calculatedTypes = [
+    'medicareEligibility',
+    'socialSecurity',
+    'mortgageOff',
+    'retirementReadySurvival',
+    'retirementReadyComfortable',
+    'retirementReadySWR',
+    'payoffPlanEnd',
+    'childSupportEnds',
+    'coastFire'
+  ];
+  if (calculatedTypes.includes(evt.type)) {
+    return false;
+  }
   return !!evt.originalId || evt.type === 'retire';
 };
 

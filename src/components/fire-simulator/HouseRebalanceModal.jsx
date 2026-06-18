@@ -95,7 +95,7 @@ export default function HouseRebalanceModal({
               <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(outcomeDetails.recommendedPayment)}/mo</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>New Retirement Age:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>New Work Optional Age:</span>
               <strong style={{ color: 'var(--text-primary)' }}>{renderRetirementAgeText(outcomeDetails.retirementAge)}</strong>
             </div>
           </div>

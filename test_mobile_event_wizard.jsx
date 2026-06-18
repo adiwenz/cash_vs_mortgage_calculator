@@ -65,17 +65,11 @@ describe('Mobile Event Wizard & Flow', () => {
       />
     );
 
-    // 1. Inline button "+ Add Life Event"
-    const inlineBtn = screen.getByRole('button', { name: /^\+\s*Add Life Event$/i });
-    expect(inlineBtn).toBeDefined();
-    fireEvent.click(inlineBtn);
-    expect(setEditingEvent).toHaveBeenCalledWith({ type: 'selectType', isNew: true });
-
-    // 2. FAB button "➕ Add Life Event"
+    // 1. FAB button "➕ Add Life Event"
     const fabBtn = screen.getByRole('button', { name: /^➕ Add Life Event/i });
     expect(fabBtn).toBeDefined();
     fireEvent.click(fabBtn);
-    expect(setEditingEvent).toHaveBeenLastCalledWith({ type: 'selectType', isNew: true });
+    expect(setEditingEvent).toHaveBeenCalledWith({ type: 'selectType', isNew: true });
   });
 
   test('Wizard overlay hides bottom navigation bar', () => {
@@ -420,7 +414,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const onClose = vi.fn();
 
     const mockGetInputsWithEvent = (inps, evt) => {
-      const copyEvt = { ...evt, id: 'child-1', enabled: true };
+      const copyEvt = { ...evt, id: 'jane-child-event', originalId: 'jane-child-event', enabled: true };
       return {
         newInputs: {
           ...inps,
@@ -430,10 +424,11 @@ describe('Mobile Event Wizard & Flow', () => {
       };
     };
 
-    render(
+    const { container } = render(
       <MobileEventWizard
         inputs={inputs}
-        editingEvent={{
+        updateInput={vi.fn()}
+        draftEvent={{
           type: 'haveChild',
           birthAge: 35,
           childName: 'Jane',
@@ -455,6 +450,7 @@ describe('Mobile Event Wizard & Flow', () => {
     const childBtn = screen.getByText('Child / Adoption');
     fireEvent.click(childBtn);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -605,6 +601,6 @@ describe('Mobile Event Wizard & Flow', () => {
     // When applied, incomeList has the child income boost added, which offsets the costs,
     // making the plan on track again, and the banner disappears.
     expect(screen.queryByText(/Recommendation details available/i)).toBeNull();
-    expect(screen.getAllByText(/Comfortable/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/On Track/i).length).toBeGreaterThan(0);
   });
 });

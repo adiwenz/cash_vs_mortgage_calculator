@@ -8,12 +8,16 @@ import {
   ChevronRight, 
   ArrowLeft, 
   Sparkles,
-  Info
+  Info,
+  X,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
+import MobileWorkOptionalHero from './MobileWorkOptionalHero';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import EventModalForm from './EventModalForm';
@@ -271,6 +275,7 @@ export default function MobileFireSimulatorView({
   validation,
   handleCreateEvent,
   handleEditRoadmapEvent,
+  handleDeleteRoadmapEvent,
   handleSetBudgetClick,
   isMobile,
   totalNetWorth,
@@ -344,7 +349,7 @@ export default function MobileFireSimulatorView({
 }) {
   const [activeTab, setActiveTab] = useState('Plan'); // 'Plan' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
-  const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
+
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
   const [isCurrentSituationExpanded, setIsCurrentSituationExpanded] = useState(true);
@@ -369,6 +374,7 @@ export default function MobileFireSimulatorView({
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [activeEventForSheet, setActiveEventForSheet] = useState(null);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
@@ -612,11 +618,8 @@ export default function MobileFireSimulatorView({
 
           return (
             <div>
-              <h1 className="mobile-tab-title">Plan</h1>
-              <p className="mobile-tab-subtitle">Your situation, life plan, and outcomes</p>
-
               {/* 1. CURRENT SITUATION SECTION */}
-              <div style={{ marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+              <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
                 <button
                   type="button"
                   onClick={() => setIsCurrentSituationExpanded(!isCurrentSituationExpanded)}
@@ -640,14 +643,14 @@ export default function MobileFireSimulatorView({
                 </button>
                 {isCurrentSituationExpanded && (
                   <div 
-                    style={{ padding: '1rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+                    style={{ padding: '1rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Starting Inputs</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 0.5rem', marginTop: '0.25rem' }}>
                       <div>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Current Age</span>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Current Age</span>
                         <input
                           type="number"
                           className="input-number-box"
@@ -672,7 +675,7 @@ export default function MobileFireSimulatorView({
                         />
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Income</span>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Income</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
                           <input
@@ -712,7 +715,7 @@ export default function MobileFireSimulatorView({
                         </div>
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Spending</span>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Spending</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
                           <input
@@ -851,513 +854,435 @@ export default function MobileFireSimulatorView({
                 )}
               </div>
 
-              {/* 2. TIMELINE SECTION */}
-              <div style={{ marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.85rem 1rem',
-                    background: 'var(--bg-tertiary)',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    fontWeight: '700',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    🗺️ Timeline
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isTimelineExpanded ? '▼' : '▶'}</span>
-                </button>
-                {isTimelineExpanded && (
-                  <div style={{ padding: '0.75rem' }}>
-                    {!hasUserEvents && (
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', margin: '0.25rem 0 1rem 0', lineHeight: '1.4' }}>
-                        Add life events to personalize your future.
-                      </p>
-                    )}
+              {/* 2. ROADMAP VISUAL HERO & TIMELINE FROM MAIN */}
+              <MobileWorkOptionalHero
+                workOptionalAge={activeResults.retirementReadyAge}
+                trackPercent={isPlanOnTrack ? '78%' : '45%'}
+                isPlanOnTrack={isPlanOnTrack}
+              />
 
-                    <MobileTimeline
-                      inputs={inputs}
-                      timelineEvents={timelineEvents}
-                      selectedEventIndex={selectedEventIndex}
-                      setSelectedEventIndex={setSelectedEventIndex}
-                      handleEditRoadmapEvent={handleEditRoadmapEvent}
-                    />
-
-                        {/* Net Worth Graph & Projections KPIs Card */}
-                        {(() => {
-                          const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
-                          const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
-                          const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
-                          
-                          const eventAges = Array.from(new Set([
-                            inputs.currentAge,
-                            ...timelineEvents.map(e => Number(e.age)),
-                            inputs.lifeExpectancy
-                          ])).sort((a, b) => a - b);
-
-                          return (
-                            <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left', padding: '0.75rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-                                <div>
-                                  <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                                    📈 Net Worth Curve
-                                  </h3>
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
-                                </div>
-                                
-                                <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
-                                    <span>NW</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
-                                    <XAxis
-                                      dataKey="age"
-                                      ticks={eventAges}
-                                      stroke="var(--text-tertiary)"
-                                      fontSize={8}
-                                    />
-                                    <YAxis
-                                      stroke="var(--text-tertiary)"
-                                      fontSize={8}
-                                      tickFormatter={formatYAxis}
-                                    />
-                                    <Tooltip
-                                      content={({ active, payload, label }) => {
-                                        if (active && payload && payload.length) {
-                                          return (
-                                            <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
-                                              <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
-                                              {payload.map((item) => (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
-                                                  <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                                  <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      }}
-                                    />
-                                    <Line
-                                      type="monotone"
-                                      dataKey="netWorth"
-                                      name="Net Worth"
-                                      stroke="#a78bfa"
-                                      strokeWidth={3}
-                                      dot={false}
-                                    />
-                                    <Line
-                                      type="monotone"
-                                      dataKey="income"
-                                      name="Income"
-                                      stroke="#3b82f6"
-                                      strokeDasharray="4 4"
-                                      strokeWidth={2}
-                                      dot={false}
-                                    />
-                                    <Line
-                                      type="monotone"
-                                      dataKey="expenses"
-                                      name="Expenses"
-                                      stroke="#10b981"
-                                      strokeDasharray="4 4"
-                                      strokeWidth={2}
-                                      dot={false}
-                                    />
-                                    {selectedAge !== null && (
-                                      <>
-                                        <ReferenceLine
-                                          x={selectedAge}
-                                          stroke="var(--primary)"
-                                          strokeDasharray="3 3"
-                                          strokeWidth={1.5}
-                                        />
-                                        <ReferenceDot
-                                          x={selectedAge}
-                                          y={selectedPoint ? selectedPoint.netWorth : 0}
-                                          r={5}
-                                          fill="var(--primary)"
-                                          stroke="#fff"
-                                          strokeWidth={1.5}
-                                          isFront={true}
-                                        />
-                                      </>
-                                    )}
-                                  </LineChart>
-                                </ResponsiveContainer>
-                              </div>
-
-                              {/* Projections KPIs stats grid */}
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
-                                <div style={{ textAlign: 'center' }}>
-                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Proj. NW</span>
-                                  <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
-                                    {formatCompact(finalNetWorth)}
-                                  </strong>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>FI Conf.</span>
-                                  <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
-                                    {fiConfidence}
-                                  </strong>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Burn/Mo</span>
-                                  <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
-                                    {formatCurrency(burnVal)}
-                                  </strong>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Success</span>
-                                  <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
-                                    {successRate}
-                                  </strong>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Collapsible Budget Phases */}
-                        <div style={{ marginTop: '1.25rem' }}>
-                          <h4 style={{ fontSize: '0.85rem', fontWeight: '800', marginBottom: '0.5rem', color: 'var(--text-primary)', textAlign: 'left' }}>Budget Phases</h4>
-                          <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {normalizedPhases.map((p, idx) => {
-                              const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
-                              const badgeColor = colors[idx % colors.length];
-                              const isExpanded = expandedPhaseId === p.id;
-
-                              const totalExpenses = Object.values(p.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-                              const totalSavings = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
-                                                   (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
-
-                              return (
-                                <div 
-                                  key={p.id}
-                                  className={`mobile-phase-card ${isExpanded ? 'expanded' : ''}`}
-                                  style={{ display: 'flex', flexDirection: 'column', padding: '0.75rem', background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border-color)', borderRadius: '12px', cursor: 'pointer' }}
-                                  onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                      <div 
-                                        style={{ backgroundColor: badgeColor, width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '800', color: '#ffffff' }}
-                                      >
-                                        {idx + 1}
-                                      </div>
-                                      <div style={{ textAlign: 'left' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                          <span style={{ fontSize: '0.85rem' }}>{p.icon}</span>
-                                          <span className="mobile-phase-card-title" style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.label === 'Retirement' ? 'Can Stop Working' : p.label}</span>
-                                        </div>
-                                        <span className="mobile-phase-card-age" style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', fontWeight: '600' }}>Age {p.startAge}–{p.endAge}</span>
-                                      </div>
-                                    </div>
-                                    <ChevronRight size={16} style={{ color: 'var(--text-tertiary)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
-                                  </div>
-
-                                  {isExpanded && (
-                                    <div 
-                                      className="mobile-phase-expanded-content" 
-                                      style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', textAlign: 'left' }}>
-                                        <div>
-                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
-                                          <strong style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', display: 'block' }}>
-                                            {formatCurrency(p.income || 0)}/mo
-                                          </strong>
-                                        </div>
-                                        <div>
-                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
-                                          <strong style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', display: 'block' }}>
-                                            {formatCurrency(totalExpenses)}/mo
-                                          </strong>
-                                        </div>
-                                        <div>
-                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
-                                          <strong style={{ fontSize: '0.75rem', color: '#3b82f6', display: 'block' }}>
-                                            {formatCurrency(totalSavings)}/mo
-                                          </strong>
-                                        </div>
-                                        <div>
-                                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
-                                          <strong style={{ fontSize: '0.75rem', color: 'var(--text-primary)', display: 'block' }}>
-                                            {formatCurrency(p.expenses?.housing || 0)}/mo
-                                          </strong>
-                                        </div>
-                                      </div>
-
-                                      {/* Phase Impact details */}
-                                      {(() => {
-                                        const logs = displayedResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
-                                        const avgIncome = logs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, logs.length);
-                                        const avgSavings = logs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, logs.length);
-                                        const phaseSurplusVal = Math.round(avgSavings / 12);
-                                        const phaseSavingsRateVal = avgIncome > 0 ? Math.round((avgSavings / avgIncome) * 100) : 0;
-
-                                        const baseLogs = displayedBaselineResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
-                                        const baseAvgIncome = baseLogs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, baseLogs.length);
-                                        const baseAvgSavings = baseLogs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, baseLogs.length);
-                                        const baseSurplus = Math.round(baseAvgSavings / 12);
-                                        const baseSavingsRate = baseAvgIncome > 0 ? Math.round((baseAvgSavings / baseAvgIncome) * 100) : 0;
-
-                                        const nwAt85 = Math.round(displayedResults.data.find(d => d.age === 85)?.netWorth || 0);
-                                        const baseNwAt85 = Math.round(displayedBaselineResults.data.find(d => d.age === 85)?.netWorth || 0);
-
-                                        const surplusDiff = phaseSurplusVal - baseSurplus;
-                                        const rateDiff = phaseSavingsRateVal - baseSavingsRate;
-                                        const nwDiff = nwAt85 - baseNwAt85;
-
-                                        return (
-                                          <div style={{ marginTop: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Phase Impact</span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.7rem' }}>
-                                              <div>
-                                                <span style={{ color: 'var(--text-tertiary)' }}>Surplus: </span>
-                                                <strong style={{ color: phaseSurplusVal >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{formatCurrency(phaseSurplusVal)}/mo</strong>
-                                              </div>
-                                              <div>
-                                                <span style={{ color: 'var(--text-tertiary)' }}>Rate: </span>
-                                                <strong>{phaseSavingsRateVal}%</strong>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {/* Recommendations stack */}
-                                      <div style={{ marginTop: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', textAlign: 'left' }}>
-                                        <h5 style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--text-primary)', margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                          💡 Recommendations
-                                        </h5>
-
-                                        <div className="mobile-recs-stack">
-                                          {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
-                                            <MobileRecommendationsPanel
-                                              improvementPlan={improvementPlan}
-                                              handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                                              targetRetirementAge={inputs.targetRetirementAge}
-                                              showHeader={false}
-                                            />
-                                          ) : p.label === 'Retirement' || p.label === 'Can Stop Working' || p.icon === '🏖️' || p.icon === '🏖' ? (
-                                            <>
-                                              <div 
-                                                className="mobile-rec-card"
-                                                style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', cursor: 'pointer' }}
-                                                onClick={() => {
-                                                  const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
-                                                  if (ssEv) handleEditRoadmapEvent(ssEv);
-                                                }}
-                                              >
-                                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                                                  <span>📅</span>
-                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
-                                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Claiming later increases benefits.</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              
-                                              <div 
-                                                className="mobile-rec-card"
-                                                style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                                                onClick={() => handleSetBudgetClick(p.id)}
-                                              >
-                                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                                                  <span>💸</span>
-                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
-                                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Improves longevity projection.</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </>
-                                          ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
-                                            <div 
-                                              className="mobile-rec-card"
-                                              style={{ padding: '0.4rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                                              onClick={() => handleCreateEvent('careerChange')}
-                                            >
-                                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                                                <span>💼</span>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#ffffff' }}>Increase Income</span>
-                                                  <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>Offset childcare expenses.</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                                              No recommendations for this phase.
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      <button
-                                        type="button"
-                                        style={{ 
-                                          width: '100%', 
-                                          padding: '0.4rem', 
-                                          background: 'rgba(255,255,255,0.04)', 
-                                          border: '1px solid var(--border-color)', 
-                                          borderRadius: '8px', 
-                                          fontSize: '0.7rem', 
-                                          color: 'var(--primary)', 
-                                          fontWeight: '600', 
-                                          cursor: 'pointer',
-                                          marginTop: '0.75rem'
-                                        }}
-                                        onClick={() => handleSetBudgetClick(p.id)}
-                                      >
-                                        ⚙️ Edit Budget Configuration
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="mobile-roadmap-edit-btn"
-                          style={{ marginTop: '1rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                          onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
-                        >
-                          + Add Life Event
-                        </button>
+              {/* Compact status card */}
+              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  {/* Current Status Column */}
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Current Status</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#60a5fa', marginTop: '0.25rem' }}>
+                      {inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* 3. OUTCOME PREVIEW SECTION */}
-              <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsOutcomePreviewExpanded(!isOutcomePreviewExpanded)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.85rem 1rem',
-                    background: 'var(--bg-tertiary)',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    fontWeight: '700',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>🏆 Outcome Preview</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isOutcomePreviewExpanded ? '▼' : '▶'}</span>
-                </button>
-                {isOutcomePreviewExpanded && (() => {
-                  const details = getOutcomeDetails(
-                    activeResults.retirementOutcome,
-                    activeResults.runOutAge,
-                    inputs.readinessCriteria,
-                    activeResults.retirementReadyAge,
-                    inputs.lifeExpectancy
-                  );
-                  const readyAge = activeResults.retirementReadyAge;
-
-                  return (
-                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
-                      {/* Outcome Status Banner */}
-                      <div style={{ 
-                        background: details.bg, 
-                        border: `1px solid ${details.color}44`, 
-                        borderRadius: '8px', 
-                        padding: '0.5rem 0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: details.color }}>
-                          {details.badge}
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.35' }}>
-                          {details.desc}
-                        </p>
-                      </div>
-
-                      {/* KPIs Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Can Stop Working</span>
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>Age {inputs.targetRetirementAge}</strong>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable Age' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable Age' : 'Indefinite Age'}
+                  
+                  {/* Divider */}
+                  <div style={{ width: '1px', height: '28px', background: 'rgba(255, 255, 255, 0.1)', margin: '0 1rem' }} />
+                  
+                  {/* Work Optional Age Column */}
+                  <div style={{ flex: 1.5, textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Can Stop Working Age</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#ffffff', marginTop: '0.25rem' }}>
+                      {activeResults.retirementReadyAge ? (
+                        <>
+                          {activeResults.retirementReadyAge}{' '}
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)' }}>
+                            {isPlanOnTrack ? '(On Track)' : '(Delayed)'}
                           </span>
-                          <strong style={{ fontSize: readyAge ? '0.95rem' : '0.8rem', color: readyAge ? 'var(--accent-emerald)' : 'var(--accent-orange)', fontWeight: '800' }}>
-                            {readyAge ? `Age ${readyAge}` : 'Adjustment Needed'}
-                          </strong>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Freedom Number</span>
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {inputs.readinessCriteria === 'lastsLifeExp' 
-                              ? formatCurrency(displayedResults.retirementReadyTargetSurvival)
-                              : inputs.readinessCriteria === 'lastsComfortable' 
-                                ? formatCurrency(displayedResults.retirementReadyTargetComfortable)
-                                : formatCurrency(displayedResults.retirementReadyTarget)}
-                          </strong>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', display: 'block' }}>Projected Portfolio</span>
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-                            {displayedResults.targetRetirementAge === inputs.lifeExpectancy ? 'Adjust plan' : formatCurrency(displayedResults.portfolioAtRetirement)}
-                          </strong>
-                        </div>
-                      </div>
-
-                      {/* Action Plan Banner if available */}
-                      {!isPlanOnTrack && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
-                        <div style={{ marginTop: '0.25rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>💡 Recommendation details available.</span>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', margin: 0 }}
-                            onClick={() => {
-                              // Switch active phase to expand/show recs
-                              if (normalizedPhases.length > 0) {
-                                setExpandedPhaseId(normalizedPhases[0].id);
-                              }
-                            }}
-                          >
-                            View Suggestions
-                          </button>
-                        </div>
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--accent-rose)', fontSize: '0.85rem' }}>
+                          Adjustment Needed
+                        </span>
                       )}
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
+
+                {/* Circular Track Gauge */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '58px', height: '58px', marginLeft: '0.5rem' }}>
+                  <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx="29" cy="29" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                    <circle cx="29" cy="29" r="24" fill="none" stroke={isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange)'} strokeWidth="4"
+                      strokeDasharray={`${2 * Math.PI * 24}`}
+                      strokeDashoffset={`${2 * Math.PI * 24 * (1 - (isPlanOnTrack ? 0.78 : 0.45))}`}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                    />
+                  </svg>
+                  <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#ffffff', lineHeight: 1 }}>{isPlanOnTrack ? '78%' : '45%'}</span>
+                    <span style={{ fontSize: '0.45rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginTop: '1px' }}>Track</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Plan Banner if available */}
+              {!isPlanOnTrack && improvementPlan && improvementPlan.rankedPlan.length > 0 && (
+                <div style={{ marginTop: '-0.75rem', marginBottom: '1.5rem', padding: '0.85rem 1rem', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>💡 Recommendation details available.</span>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', margin: 0 }}
+                    onClick={() => {
+                      // Switch active phase to expand/show recs
+                      if (normalizedPhases.length > 0) {
+                        setExpandedPhaseId(normalizedPhases[0].id);
+                      }
+                    }}
+                  >
+                    View Suggestions
+                  </button>
+                </div>
+              )}
+
+              {/* Life Journey Timeline */}
+              <MobileTimeline
+                inputs={inputs}
+                timelineEvents={timelineEvents}
+                selectedEventIndex={selectedEventIndex}
+                setSelectedEventIndex={setSelectedEventIndex}
+                onEventTap={setActiveEventForSheet}
+              />
+
+              {/* Net Worth Graph & Projections KPIs Card */}
+              {(() => {
+                const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
+                const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
+                const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
+                
+                const eventAges = Array.from(new Set([
+                  inputs.currentAge,
+                  ...timelineEvents.map(e => Number(e.age)),
+                  inputs.lifeExpectancy
+                ])).sort((a, b) => a - b);
+
+                return (
+                  <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                      <div>
+                        <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                          📈 Net Worth Curve
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
+                          <span>NW</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
+                          <XAxis
+                            dataKey="age"
+                            ticks={eventAges}
+                            stroke="var(--text-tertiary)"
+                            fontSize={8}
+                          />
+                          <YAxis
+                            stroke="var(--text-tertiary)"
+                            fontSize={8}
+                            tickFormatter={formatYAxis}
+                          />
+                          <Tooltip
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
+                                    <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
+                                    {payload.map((item) => (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
+                                        <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
+                                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="netWorth"
+                            name="Net Worth"
+                            stroke="#a78bfa"
+                            strokeWidth={3}
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="income"
+                            name="Income"
+                            stroke="#3b82f6"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="expenses"
+                            name="Expenses"
+                            stroke="#10b981"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          {selectedAge !== null && (
+                            <>
+                              <ReferenceLine
+                                x={selectedAge}
+                                stroke="var(--primary)"
+                                strokeDasharray="3 3"
+                                strokeWidth={1.5}
+                              />
+                              <ReferenceDot
+                                x={selectedAge}
+                                y={selectedPoint ? selectedPoint.netWorth : 0}
+                                r={5}
+                                fill="var(--primary)"
+                                stroke="#fff"
+                                strokeWidth={1.5}
+                                isFront={true}
+                              />
+                            </>
+                          )}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Projections KPIs stats grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Proj. NW</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
+                          {formatCompact(finalNetWorth)}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>FI Conf.</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
+                          {fiConfidence}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Burn/Mo</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
+                          {formatCurrency(burnVal)}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Success</span>
+                        <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
+                          {successRate}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Collapsible Budget Phases */}
+              <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
+                <div className="mobile-section-header">
+                  <h2 className="mobile-section-title">Budget Phases</h2>
+                  <span className="mobile-section-subtitle">Tap a phase to view budget details</span>
+                </div>
+                <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {normalizedPhases.map((p, idx) => {
+                    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+                    const badgeColor = colors[idx % colors.length];
+                    const isExpanded = expandedPhaseId === p.id;
+
+                    const totalExpenses = Object.values(p.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                    const totalSavings = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
+                                         (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+
+                    return (
+                      <div 
+                        key={p.id}
+                        className={"mobile-phase-card " + (isExpanded ? "expanded" : "")}
+                        style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', cursor: 'pointer' }}
+                        onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div 
+                              className="mobile-phase-badge-num"
+                              style={{ backgroundColor: badgeColor, width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '800', color: '#ffffff' }}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div style={{ textAlign: 'left' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ fontSize: '0.95rem' }}>{p.icon}</span>
+                                <span className="mobile-phase-card-title" style={{ fontWeight: '700', fontSize: '0.95rem', color: '#ffffff' }}>{p.label === 'Retirement' ? 'Can Stop Working' : p.label}</span>
+                              </div>
+                              <span className="mobile-phase-card-age" style={{ fontSize: '0.8rem', color: '#a78bfa', display: 'block', marginTop: '0.1rem', fontWeight: '600' }}>Age {p.startAge}–{p.endAge}</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={18} style={{ color: 'var(--text-tertiary)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                        </div>
+
+                        {isExpanded && (
+                          <div 
+                            className="mobile-phase-expanded-content" 
+                            style={{ marginTop: '0.85rem', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '0.85rem' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', textAlign: 'left' }}>
+                              <div>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
+                                <strong style={{ fontSize: '0.85rem', color: 'var(--accent-emerald)', display: 'block' }}>
+                                  {formatCurrency(p.income || 0)}/mo
+                                </strong>
+                              </div>
+                              <div>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
+                                <strong style={{ fontSize: '0.85rem', color: 'var(--accent-rose)', display: 'block' }}>
+                                  {formatCurrency(totalExpenses)}/mo
+                                </strong>
+                              </div>
+                              <div>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
+                                <strong style={{ fontSize: '0.85rem', color: '#3b82f6', display: 'block' }}>
+                                  {formatCurrency(totalSavings)}/mo
+                                </strong>
+                              </div>
+                              <div>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
+                                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)', display: 'block' }}>
+                                  {formatCurrency(p.expenses?.housing || 0)}/mo
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Phase Impact details */}
+                            {(() => {
+                              const logs = displayedResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
+                              const avgIncome = logs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, logs.length);
+                              const avgSavings = logs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, logs.length);
+                              const phaseSurplusVal = Math.round(avgSavings / 12);
+                              const phaseSavingsRateVal = avgIncome > 0 ? Math.round((avgSavings / avgIncome) * 100) : 0;
+
+                              const baseLogs = displayedBaselineResults.data.filter(d => d.age >= p.startAge && d.age < p.endAge);
+                              const baseAvgIncome = baseLogs.reduce((sum, d) => sum + (d.income || 0), 0) / Math.max(1, baseLogs.length);
+                              const baseAvgSavings = baseLogs.reduce((sum, d) => sum + (d.savings || 0), 0) / Math.max(1, baseLogs.length);
+                              const baseSurplus = Math.round(baseAvgSavings / 12);
+                              const baseSavingsRate = baseAvgIncome > 0 ? Math.round((baseAvgSavings / baseAvgIncome) * 100) : 0;
+
+                              return (
+                                <div style={{ marginTop: '1rem', borderTop: '1px dashed rgba(255, 255, 255, 0.1)', paddingTop: '0.75rem', textAlign: 'left' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>Phase Impact</span>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
+                                    <div>
+                                      <span style={{ color: 'var(--text-tertiary)' }}>Surplus: </span>
+                                      <strong style={{ color: phaseSurplusVal >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{formatCurrency(phaseSurplusVal)}/mo</strong>
+                                    </div>
+                                    <div>
+                                      <span style={{ color: 'var(--text-tertiary)' }}>Rate: </span>
+                                      <strong>{phaseSavingsRateVal}%</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Recommendations stack */}
+                            <div style={{ marginTop: '1rem', borderTop: '1px dashed rgba(255, 255, 255, 0.1)', paddingTop: '0.75rem', textAlign: 'left' }}>
+                              <h5 style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--text-primary)', margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                💡 Recommendations
+                              </h5>
+                              <div className="mobile-recs-stack">
+                                {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
+                                  <MobileRecommendationsPanel
+                                    improvementPlan={improvementPlan}
+                                    handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
+                                    targetRetirementAge={inputs.targetRetirementAge}
+                                    showHeader={false}
+                                  />
+                                ) : p.label === 'Retirement' || p.label === 'Can Stop Working' || p.icon === '🏖️' || p.icon === '🏖' ? (
+                                  <>
+                                    <div 
+                                      className="mobile-rec-card"
+                                      style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', cursor: 'pointer' }}
+                                      onClick={() => {
+                                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
+                                        if (ssEv) handleEditRoadmapEvent(ssEv);
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        <span>📅</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ffffff' }}>Delay Social Security</span>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Claiming later increases benefits.</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div 
+                                      className="mobile-rec-card"
+                                      style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                      onClick={() => handleSetBudgetClick(p.id)}
+                                    >
+                                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        <span>💸</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ffffff' }}>Reduce Spending</span>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Improves longevity projection.</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : p.label?.toLowerCase().includes('child') || p.icon === '👶' ? (
+                                  <div 
+                                    className="mobile-rec-card"
+                                    style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                    onClick={() => handleCreateEvent('careerChange')}
+                                  >
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                      <span>💼</span>
+                                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ffffff' }}>Increase Income</span>
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Offset childcare expenses.</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                                    No recommendations for this phase.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="mobile-phase-edit-btn"
+                              style={{ 
+                                width: '100%', 
+                                padding: '0.5rem', 
+                                background: 'rgba(255,255,255,0.04)', 
+                                border: '1px solid rgba(255,255,255,0.08)', 
+                                borderRadius: '8px', 
+                                fontSize: '0.75rem', 
+                                color: 'var(--primary)', 
+                                fontWeight: '600', 
+                                cursor: 'pointer',
+                                marginTop: '0.85rem'
+                              }}
+                              onClick={() => handleSetBudgetClick(p.id)}
+                            >
+                              ⚙️ Edit Budget Configuration
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Floating Action Button */}
@@ -2208,121 +2133,7 @@ export default function MobileFireSimulatorView({
               );
             })()}
 
-            {/* Recommendations stack */}
-            <div className="mobile-card" style={{ textAlign: 'left' }}>
-              <h3 style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                💡 Recommendations
-              </h3>
 
-              <div className="mobile-recs-stack">
-                {!isPlanOnTrack && improvementPlan?.rankedPlan?.length > 0 ? (
-                  <MobileRecommendationsPanel
-                    improvementPlan={improvementPlan}
-                    handleApplyMobileRecommendation={handleApplyMobileRecommendation || handleApplyImprovementScenario}
-                    targetRetirementAge={inputs.targetRetirementAge}
-                    showHeader={false}
-                  />
-                ) : selectedPhaseObj.label?.toLowerCase().includes('retirement') || selectedPhaseObj.icon === '🏖️' || selectedPhaseObj.icon === '🏖' ? (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity' && e.enabled);
-                        if (ssEv) handleEditRoadmapEvent(ssEv);
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">📅</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Delay Social Security</span>
-                          <span className="mobile-rec-desc">Delaying claiming to age 70 increases annual benefits by ~8% per year.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                    
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💸</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Reduce Spending</span>
-                          <span className="mobile-rec-desc">Cutting spending by $200/mo improves portfolio longevity projection.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                ) : selectedPhaseObj.label?.toLowerCase().includes('child') || selectedPhaseObj.icon === '👶' ? (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        handleCreateEvent('careerChange');
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💼</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Increase income</span>
-                          <span className="mobile-rec-desc">+$500/mo extra income could offset childcare costs.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">⚙️</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Adjust savings allocation</span>
-                          <span className="mobile-rec-desc">Optimize pre-tax vs brokerage funding in this high-expense phase.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => handleSetBudgetClick(selectedPhaseObj.id)}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">💰</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Increase savings rate</span>
-                          <span className="mobile-rec-desc">Boost 401(k) allocations by 3% to take advantage of compound growth.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-
-                    <div 
-                      className="mobile-rec-card"
-                      onClick={() => {
-                        setSelectedMobilePhaseId(null);
-                        setActiveTab('Details');
-                      }}
-                    >
-                      <div className="mobile-rec-left">
-                        <div className="mobile-rec-icon-box">📈</div>
-                        <div className="mobile-rec-info">
-                          <span className="mobile-rec-title">Adjust asset allocation</span>
-                          <span className="mobile-rec-desc">Review expected pre-retirement returns for long-term growth.</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="mobile-rec-arrow" />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Sticky CTA Button at Bottom */}
@@ -2394,6 +2205,7 @@ export default function MobileFireSimulatorView({
           setShowImprovementModal={setShowImprovementModal}
         />
       )}
+
       <ChildImpactModal
         childImpactSummary={childImpactSummary}
         inputs={inputs}
@@ -2609,174 +2421,187 @@ export default function MobileFireSimulatorView({
         );
       })()}
 
-      {/* Edit Current Situation Modal */}
-      {isCurrentSituationModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsCurrentSituationModalOpen(false)} style={{ zIndex: 1000 }}>
-          <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                👤 Edit Current Situation
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setIsCurrentSituationModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.15rem' }}
-              >
-                ✖
-              </button>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-              {/* Current Age */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Age</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.currentAge === null ? '' : inputs.currentAge}
-                    placeholder="e.g. 35"
-                    onClick={() => handleStep1Change('currentAge', null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
-                  Your current age today (e.g. 35)
+      {/* Event Options Bottom Sheet */}
+      {activeEventForSheet && (
+        <div 
+          className="modal-backdrop" 
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh', 
+            background: 'rgba(10, 10, 18, 0.6)', 
+            backdropFilter: 'blur(4px)', 
+            zIndex: 2500, 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            justifyContent: 'center',
+            padding: 0
+          }}
+          onClick={() => setActiveEventForSheet(null)}
+        >
+          <div 
+            className="mobile-bottom-sheet"
+            style={{
+              width: '100%',
+              maxWidth: '500px',
+              background: 'var(--bg-secondary)',
+              borderTop: '1px solid var(--border-color)',
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
+              padding: '1.75rem',
+              boxSizing: 'border-box',
+              position: 'relative',
+              textAlign: 'left',
+              boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Slide up drag handle visual decoration */}
+            <div style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 1.25rem auto' }} />
+
+            {/* Close button in top-right */}
+            <button 
+              type="button" 
+              onClick={() => setActiveEventForSheet(null)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1.25rem',
+                background: 'rgba(255,255,255,0.06)',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '1.1rem'
+              }}
+            >
+              ×
+            </button>
+
+            {/* Event Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.25rem' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '50%', 
+                background: 'var(--primary-light)', 
+                border: '1px solid rgba(99, 102, 241, 0.3)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                fontSize: '1.6rem' 
+              }}>
+                {activeEventForSheet.icon}
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                  {activeEventForSheet.label || activeEventForSheet.title}
+                </h3>
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary)', marginTop: '0.15rem', display: 'inline-block' }}>
+                  Age {activeEventForSheet.age}
                 </span>
               </div>
+            </div>
 
-              {/* Annual Income */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
-                    placeholder="e.g. 120000"
+            {/* Description/matters */}
+            {(() => {
+              const details = getRoadmapDetails(activeEventForSheet, formatCurrency, inputs);
+              return details?.whyItMatters ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.45', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                  {details.whyItMatters}
+                </p>
+              ) : null;
+            })()}
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {isEditableEvent(activeEventForSheet) ? (
+                <>
+                  <button
+                    type="button"
                     onClick={() => {
-                      setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
-                      handleStep1Change('simpleIncome', null);
+                      setActiveEventForSheet(null);
+                      handleEditRoadmapEvent(activeEventForSheet);
                     }}
-                    onBlur={() => {
-                      setActiveSavingsRate(null);
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem',
+                      borderRadius: '12px',
+                      background: 'var(--primary)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'background var(--transition-fast)'
                     }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const newIncome = val === '' ? null : (parseFloat(val) || 0);
-                      handleStep1Change('simpleIncome', newIncome);
-                      if (newIncome !== null) {
-                        const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
-                        const newExpenses = Math.round(newIncome * (1 - rate / 100));
-                        handleStep1Change('simpleExpenses', newExpenses);
+                  >
+                    <span>Edit Event Details</span>
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEventForSheet(null);
+                      if (window.confirm("Are you sure you want to delete this event? This will immediately remove it from your roadmap and recalculate your projection.")) {
+                        if (handleDeleteEvent) {
+                          handleDeleteEvent(activeEventForSheet);
+                        } else if (handleDeleteRoadmapEvent) {
+                          handleDeleteRoadmapEvent(activeEventForSheet);
+                        }
                       }
                     }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
-                  Your total yearly gross income (e.g. $120,000)
-                </span>
-              </div>
-
-              {/* Savings Rate */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Pre-Tax Savings Rate (%)</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrentSituationModalOpen(false);
-                        handleSetBudgetClick();
-                      }}
-                      className="list-builder-edit-btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    >
-                      📊 Budget
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="input-number-box"
-                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={savingsRateOverride !== null ? savingsRateOverride : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0)}
-                    placeholder="e.g. 20"
-                    onClick={() => setSavingsRateOverride('')}
-                    onBlur={() => setSavingsRateOverride(null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSavingsRateOverride(val);
-                      if (val === '') {
-                        return;
-                      }
-                      const rate = parseFloat(val) || 0;
-                      const clampedRate = Math.min(100, Math.max(0, rate));
-                      if (lastNonZeroSavingsRateRef && lastNonZeroSavingsRateRef.current !== undefined) {
-                        lastNonZeroSavingsRateRef.current = clampedRate;
-                      }
-                      const income = Number(inputs.simpleIncome) || 0;
-                      const newExpenses = Math.round(income * (1 - clampedRate / 100));
-                      handleStep1Change('simpleExpenses', newExpenses);
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem',
+                      borderRadius: '12px',
+                      background: 'rgba(244, 63, 94, 0.1)',
+                      border: '1px solid rgba(244, 63, 94, 0.2)',
+                      color: 'var(--accent-rose)',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
                     }}
-                  />
+                  >
+                    <span>Delete Event</span>
+                    <span>→</span>
+                  </button>
+                </>
+              ) : (
+                <div style={{ 
+                  fontSize: '0.8rem', 
+                  color: 'var(--text-tertiary)', 
+                  textAlign: 'center', 
+                  padding: '0.75rem 1rem', 
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  fontWeight: '500'
+                }}>
+                  <span>ℹ️</span> This milestone is calculated from your plan.
                 </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
-                  Percent of income saved pre-tax (e.g. 20%)
-                </span>
-              </div>
-
-              {/* Current Savings */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="input-name" style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Current Savings ($)</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrentSituationModalOpen(false);
-                        handleOpenSavingsDetails();
-                      }}
-                      className="list-builder-edit-btn"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '24px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    >
-                      ✏️ Details
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    className="input-number-box"
-                    style={{ width: '120px', textAlign: 'right', fontSize: '1.05rem', padding: '0.45rem 0.65rem' }}
-                    value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
-                    placeholder="e.g. 250000"
-                    onClick={() => handleStep1Change('simpleInvestments', null)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
-                    }}
-                  />
-                </div>
-                <span className="input-desc" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'left' }}>
-                  Your total savings, retirement, and investment accounts combined (e.g. $250,000)
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{ padding: '0.5rem 1.5rem', fontSize: '0.85rem' }}
-                onClick={() => setIsCurrentSituationModalOpen(false)}
-              >
-                Done
-              </button>
+              )}
             </div>
           </div>
         </div>
