@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { isEditableEvent } from './helpers';
+import { isEditableEvent, getEventIcon } from './helpers';
 
 const getShortLabel = (evt) => {
   if (!evt) return '';
@@ -154,6 +154,7 @@ const formatCurrency = (val) => {
 };
 
 const getCircleColorClass = (type) => {
+  if (type === 'today' || type === 'lifeExpectancy') return 'circle-neutral';
   if (type === 'haveChild') return 'circle-blue';
   if (type === 'retire' || type.startsWith('retirementReady')) return 'circle-green';
   if (type === 'socialSecurity' || type === 'career') return 'circle-gold';
@@ -249,9 +250,6 @@ export default function MobileTimeline({
         )}
 
         {resolvedPositions.map((item) => {
-          if (item.event.type === 'today' || item.event.type === 'lifeExpectancy') {
-            return null;
-          }
           const isSelected = selectedEventIndex === item.index;
           const circleColor = getCircleColorClass(item.event.type);
           const shortLabel = getShortLabel(item.event);
@@ -265,6 +263,8 @@ export default function MobileTimeline({
           if (eventCount >= 11) {
             showLabelForThisEvent = isSelected || item.index === 0 || item.index === eventCount - 1;
           }
+
+          const eventIcon = getEventIcon(item.event);
 
           return (
             <button
@@ -314,7 +314,7 @@ export default function MobileTimeline({
                     transition: 'all 0.2s ease-in-out'
                   }}
                 >
-                  <span>{item.event.icon}</span>
+                  <span>{eventIcon}</span>
                 </div>
               </div>
               

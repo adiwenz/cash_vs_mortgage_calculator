@@ -243,7 +243,7 @@ export default function DesktopResults({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                Wealth Journey
+                Projected Net Worth
                 <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
                   <span className="toggle-tooltip-icon">i</span>
                   <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>

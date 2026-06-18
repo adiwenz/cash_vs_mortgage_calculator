@@ -184,12 +184,11 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     const currentRetAgeValue = getStatsCardValue('Comfortable Age');
     expect(currentRetAgeValue).toBe(`Age ${afterRetAge}`);
 
-    // Verify savings allocations inheritance
-    // Select the first budget segment on the timeline (married phase) which opens the budget modal directly
-    const segments = document.querySelectorAll('.budget-segment');
-    fireEvent.click(segments[0]);
+    // Click the Set Budget button to open the budget modal directly
+    const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
+    fireEvent.click(setBudgetBtn);
     
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Expand Savings section
     fireEvent.click(document.querySelector('.budget-card.save'));
@@ -236,19 +235,19 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
 
     // 1. Establish the baseline married budget by opening and saving the budget modal once
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
     
     // Save Budget immediately
     fireEvent.click(screen.getByRole('button', { name: /Save Budget/i }));
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Budget/i, level: 3 })).toBeNull();
     });
 
     const retAgeBeforeBudgetChange = parseInt(getStatsCardValue('Comfortable Age').match(/\d+/)[0], 10);
 
     // 2. Open Update Budget again to increase household spending
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
-    expect(screen.getByRole('heading', { name: /Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Expand Needs section
     fireEvent.click(document.querySelector('.budget-modal-card .budget-card.needs') || screen.getByText('Needs'));
@@ -265,7 +264,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Save Budget
     fireEvent.click(screen.getByRole('button', { name: /Save Budget/i }));
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Budget/i, level: 3 })).toBeNull();
     });
 
     // Verify retirement age recalculates (it should increase since spending is higher)

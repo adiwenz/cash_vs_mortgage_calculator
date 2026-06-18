@@ -529,6 +529,33 @@ export default function FireSimulator() {
   };
 
   const handleApplyImprovementScenario = (scenario) => {
+    if (editingEvent) {
+      let updatedFields = {};
+      if (scenario.type === 'reduceHomePrice' && houseRebalanceSummary) {
+        updatedFields = {
+          homePrice: houseRebalanceSummary.affordablePriceBalanced,
+          downPayment: houseRebalanceSummary.downPaymentBalanced
+        };
+      } else if (scenario.type === 'increaseDownPayment' && houseRebalanceSummary) {
+        updatedFields = {
+          downPayment: houseRebalanceSummary.totalCashNeededBalanced
+        };
+      } else if (scenario.type === 'delayHomePurchase' || scenario.type === 'delayHomePurchaseDownPayment') {
+        const delayYears = Math.max(1, Math.ceil(scenario.value || 1));
+        updatedFields = {
+          purchaseAge: (editingEvent.purchaseAge || 35) + delayYears,
+          age: (editingEvent.purchaseAge || 35) + delayYears
+        };
+      }
+      setEditingEvent(prev => ({
+        ...prev,
+        ...updatedFields,
+        recommendationApplied: true,
+        appliedRecommendationType: scenario.type,
+        appliedRecommendationAt: Date.now()
+      }));
+    }
+
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     let inp = scen.inputs;
     if (scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) {
@@ -838,6 +865,35 @@ export default function FireSimulator() {
 
   const handleApplyRebalanceStrategy = (strategyId) => {
     if (!houseRebalanceSummary) return;
+
+    if (editingEvent) {
+      setEditingEvent(prev => {
+        const affordablePrice = houseRebalanceSummary.selectedAffordablePrice;
+        const currentPrice = Number(prev.homePrice) || 0;
+        let newDownPayment = prev.downPayment || 0;
+        if (strategyId === 'updatePrice' && affordablePrice !== undefined && affordablePrice !== null) {
+          if (currentPrice > 0 && prev.purchaseType !== 'cash') {
+            const ratio = (prev.downPayment || 0) / currentPrice;
+            newDownPayment = Math.round(affordablePrice * ratio);
+          }
+          const finalDownPayment = Math.min(newDownPayment, affordablePrice);
+          return {
+            ...prev,
+            homePrice: affordablePrice,
+            downPayment: finalDownPayment,
+            recommendationApplied: true,
+            appliedRecommendationType: strategyId,
+            appliedRecommendationAt: Date.now()
+          };
+        }
+        return {
+          ...prev,
+          recommendationApplied: true,
+          appliedRecommendationType: strategyId,
+          appliedRecommendationAt: Date.now()
+        };
+      });
+    }
 
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     const newInputs = JSON.parse(JSON.stringify(scen.inputs));
@@ -1548,6 +1604,33 @@ export default function FireSimulator() {
   };
 
   const handleApplyMobileRecommendation = (scenario) => {
+    if (editingEvent) {
+      let updatedFields = {};
+      if (scenario.type === 'reduceHomePrice' && houseRebalanceSummary) {
+        updatedFields = {
+          homePrice: houseRebalanceSummary.affordablePriceBalanced,
+          downPayment: houseRebalanceSummary.downPaymentBalanced
+        };
+      } else if (scenario.type === 'increaseDownPayment' && houseRebalanceSummary) {
+        updatedFields = {
+          downPayment: houseRebalanceSummary.totalCashNeededBalanced
+        };
+      } else if (scenario.type === 'delayHomePurchase' || scenario.type === 'delayHomePurchaseDownPayment') {
+        const delayYears = Math.max(1, Math.ceil(scenario.value || 1));
+        updatedFields = {
+          purchaseAge: (editingEvent.purchaseAge || 35) + delayYears,
+          age: (editingEvent.purchaseAge || 35) + delayYears
+        };
+      }
+      setEditingEvent(prev => ({
+        ...prev,
+        ...updatedFields,
+        recommendationApplied: true,
+        appliedRecommendationType: scenario.type,
+        appliedRecommendationAt: Date.now()
+      }));
+    }
+
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     let newInputs = JSON.parse(JSON.stringify(scen.inputs));
 

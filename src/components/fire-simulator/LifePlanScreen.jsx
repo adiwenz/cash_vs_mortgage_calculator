@@ -9,7 +9,7 @@ import {
   Tooltip,
   ReferenceLine
 } from 'recharts';
-import { formatCurrency, formatYAxis, getOutcomeDetails, isEditableEvent, isFinancialEvent } from './helpers';
+import { formatCurrency, formatYAxis, getOutcomeDetails, isEditableEvent, isFinancialEvent, getEventIcon } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
 import CurrentSituationCard from './CurrentSituationCard';
 import OutcomeHeroCard from './OutcomeHeroCard';
@@ -405,7 +405,7 @@ export default function LifePlanScreen({
   setEditingCondition,
   handleRemoveCurrentCondition
 }) {
-  const [selectedPhaseId, setSelectedPhaseId] = useState(null);
+  const [selectedMilestone, setSelectedMilestone] = useState(null);
   const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
@@ -425,143 +425,17 @@ export default function LifePlanScreen({
     ];
     return list.some(e => !excludedTypes.includes(e.type));
   }, [timelineEvents]);
-
-  const trackRef = useRef(null);
-  const [trackWidth, setTrackWidth] = useState(800);
-
   useEffect(() => {
-    if (!trackRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        setTrackWidth(entry.contentRect.width);
+    if (editingEvent) {
+      const match = timelineEvents?.find(evt => 
+        (evt.originalId && String(evt.originalId) === String(editingEvent.id)) ||
+        (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
+      );
+      if (match) {
+        setSelectedMilestone(match);
       }
-    });
-    observer.observe(trackRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const normalizedPhases = useMemo(() => {
-    return getNormalizedPhases(inputs);
-  }, [inputs]);
-
-  const currentAgePhase = useMemo(() => {
-    return normalizedPhases.find(p => inputs.currentAge >= p.startAge && inputs.currentAge < p.endAge) || normalizedPhases[0] || null;
-  }, [normalizedPhases, inputs.currentAge]);
-
-  const activeSelectedPhaseId = selectedPhaseId || currentAgePhase?.id || null;
-
-  const selectedPhaseObj = useMemo(() => {
-    return normalizedPhases.find(p => p.id === activeSelectedPhaseId) || null;
-  }, [normalizedPhases, activeSelectedPhaseId]);
-
-  const getEventDetails = (idOrType) => {
-    // Try to find in inputs.lifeEvents
-    const le = (inputs.lifeEvents || []).find(e => e.id === idOrType || e.type === idOrType);
-    if (le) {
-      let icon = '❓';
-      if (le.type === 'marriage') icon = '💍';
-      else if (le.type === 'buyHouse') icon = '🏠';
-      else if (le.type === 'haveChild') icon = '👶';
-      else if (le.type === 'careerChange') icon = '💼';
-      else if (le.type === 'socialSecurity') icon = '💰';
-      else if (le.type === 'pension') icon = '📜';
-      else if (le.type === 'rentalIncome') icon = '🏢';
-      else if (le.type === 'annuity') icon = '📈';
-      else if (le.type === 'otherRetirementIncome') icon = '💵';
-      else if (le.type === 'windfall') icon = '💰';
-      else if (le.type === 'college') icon = '🎓';
-      else if (le.type === 'debtPayoff') icon = '💸';
-      else if (le.type === 'retire') icon = '🏖️';
-      
-      return {
-        name: le.name || le.type,
-        icon,
-        type: le.type
-      };
     }
-    
-    // Try to find in inputs.debtList
-    const debt = (inputs.debtList || []).find(d => d.id === idOrType);
-    if (debt) {
-      let icon = '💸';
-      if (debt.type === 'studentLoan') icon = '🎓';
-      else if (debt.type === 'carLoan') icon = '🚗';
-      else if (debt.type === 'creditCard') icon = '💳';
-      return {
-        name: debt.name || 'Debt',
-        icon,
-        type: debt.type
-      };
-    }
-
-    // Try to find in inputs.incomeList
-    const inc = (inputs.incomeList || []).find(i => i.id === idOrType);
-    if (inc) {
-      return {
-        name: inc.name || 'Income',
-        icon: '💼',
-        type: 'income'
-      };
-    }
-
-    // Try to find in inputs.spendingPhases
-    const sp = (inputs.spendingPhases || []).find(s => s.id === idOrType);
-    if (sp) {
-      return {
-        name: sp.name || 'Spending',
-        icon: '📉',
-        type: 'spending'
-      };
-    }
-
-    // Fallback
-    if (idOrType === 'retire') return { name: 'Retirement', icon: '🏖️', type: 'retire' };
-    if (idOrType === 'socialSecurity') return { name: 'Social Security', icon: '💰', type: 'socialSecurity' };
-    
-    return { name: idOrType, icon: '❓', type: idOrType };
-  };
-
-  const getPhaseClassNameAndStyle = (type, isSelected) => {
-    let baseColor = 'rgba(99, 102, 241, 0.1)'; // indigo
-    let borderColor = 'rgba(99, 102, 241, 0.35)';
-    let textColor = 'var(--primary)';
-
-    if (type === 'retire') {
-      baseColor = 'rgba(16, 185, 129, 0.1)'; // emerald
-      borderColor = 'rgba(16, 185, 129, 0.35)';
-      textColor = 'var(--accent-emerald)';
-    } else if (type === 'childcare') {
-      baseColor = 'rgba(245, 158, 11, 0.1)'; // amber/orange
-      borderColor = 'rgba(245, 158, 11, 0.35)';
-      textColor = '#f59e0b';
-    } else if (type?.toLowerCase().includes('loan') || type?.toLowerCase().includes('debt')) {
-      baseColor = 'rgba(139, 92, 246, 0.1)'; // violet
-      borderColor = 'rgba(139, 92, 246, 0.35)';
-      textColor = '#8b5cf6';
-    } else if (type === 'marriage') {
-      baseColor = 'rgba(244, 63, 94, 0.1)'; // rose
-      borderColor = 'rgba(244, 63, 94, 0.35)';
-      textColor = '#f43f5e';
-    } else if (type === 'careerChange') {
-      baseColor = 'rgba(6, 182, 212, 0.1)'; // cyan
-      borderColor = 'rgba(6, 182, 212, 0.35)';
-      textColor = '#06b6d4';
-    } else if (type === 'debtFree') {
-      baseColor = 'rgba(20, 184, 166, 0.1)'; // teal
-      borderColor = 'rgba(20, 184, 166, 0.35)';
-      textColor = '#14b8a6';
-    }
-
-    const style = {
-      backgroundColor: isSelected ? textColor : baseColor,
-      border: `1px solid ${textColor}`,
-      color: isSelected ? 'var(--bg-primary, #0f172a)' : textColor,
-      cursor: 'pointer',
-      boxShadow: isSelected ? `0 0 10px ${textColor}` : 'none'
-    };
-
-    return style;
-  };
+  }, [editingEvent, timelineEvents]);
 
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [showAssets, setShowAssets] = useState(true);
@@ -604,144 +478,10 @@ export default function LifePlanScreen({
     ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
     : 0;
 
-  const getLifePhases = (inputs) => {
-    const curAge = inputs.currentAge || 35;
-    const retAge = inputs.targetRetirementAge || 60;
-    const lifeExp = inputs.lifeExpectancy || 90;
-
-    const childEvent = (inputs.lifeEvents || []).find(e => e.type === 'haveChild' && e.enabled);
-    const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-    
-    let familyStart = null;
-    if (childEvent) {
-      familyStart = Number(childEvent.birthAge || childEvent.age);
-    }
-    if (marriageEvent) {
-      const weddingAge = Number(marriageEvent.weddingAge || marriageEvent.age);
-      if (familyStart === null || weddingAge < familyStart) {
-        familyStart = weddingAge;
-      }
-    }
-
-    const phases = [];
-
-    // Phase 1: Early Career
-    let p1End = retAge;
-    if (familyStart !== null && familyStart > curAge && familyStart < retAge) {
-      p1End = familyStart;
-    } else if (curAge < 45 && retAge > 45) {
-      p1End = 45;
-    }
-
-    if (p1End > curAge) {
-      phases.push({
-        name: curAge < 45 ? "Early Career" : "Family Years",
-        startAge: curAge,
-        endAge: p1End
-      });
-    }
-
-    // Phase 2: Family Years
-    let p2Start = p1End;
-    let p2End = retAge;
-    if (p2End > p2Start) {
-      phases.push({
-        name: "Family Years",
-        startAge: p2Start,
-        endAge: p2End
-      });
-    }
-
-    // Phase 3: Freedom
-    let p3Start = retAge;
-    let p3End = Math.min(lifeExp, Math.max(retAge, 80));
-    if (p3End > p3Start) {
-      phases.push({
-        name: "Freedom",
-        startAge: p3Start,
-        endAge: p3End
-      });
-    }
-
-    // Phase 4: Legacy
-    let p4Start = p3End;
-    let p4End = lifeExp;
-    if (p4End > p4Start) {
-      phases.push({
-        name: "Legacy",
-        startAge: p4Start,
-        endAge: p4End
-      });
-    }
-
-    return phases;
-  };
-
-  const getBudgetPhaseName = (p, inputs) => {
-    const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
-    if (isRetired) {
-      const hasSS = p.activeEvents?.includes('socialSecurity') || p.label?.toLowerCase().includes('social security') || p.icon === '🏖️💰' || p.icon === '💰';
-      return hasSS ? "Social Security" : "Retirement";
-    }
-    
-    const lowerLabel = p.label?.toLowerCase() || '';
-    if (lowerLabel.includes('childcare')) return "Childcare";
-    if (lowerLabel.includes('mortgage')) return "Mortgage";
-    if (lowerLabel.includes('student loan')) return "Student Loan";
-    if (lowerLabel.includes('credit card')) return "Credit Card";
-    if (lowerLabel.includes('auto loan') || lowerLabel.includes('car loan')) return "Auto Loan";
-    if (lowerLabel.includes('debt-free')) return "Debt-Free";
-    if (lowerLabel.includes('sabbatical')) return "Sabbatical";
-    if (lowerLabel.includes('barista fire')) return "Barista FIRE";
-    
-    if (p.childCount > 0) return "Childcare";
-    if (p.activeDebts && p.activeDebts.length > 0) {
-      if (p.activeDebts.some(d => d.type === 'mortgage')) return "Mortgage";
-      return "Debt Payoff";
-    }
-    
-    return "Working";
-  };
-
-  const getBudgetPhaseCostImpact = (p, inputs, displayedResults) => {
-    const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
-    if (isRetired) {
-      const hasSS = p.activeEvents?.includes('socialSecurity') || p.label?.toLowerCase().includes('social security') || p.icon === '🏖️💰' || p.icon === '💰';
-      if (hasSS && displayedResults.socialSecurityDetails?.isEligible) {
-        const ssAnnual = displayedResults.socialSecurityDetails.annualBenefit;
-        return '-$' + Math.round(ssAnnual / 1000) + 'k/yr';
-      }
-      return '';
-    }
-
-    const hasChildcare = p.label?.toLowerCase().includes('childcare') || p.childCount > 0;
-    if (hasChildcare) {
-      let ccCost = 0;
-      if (p.expenses?.childcare) {
-        ccCost = Number(p.expenses.childcare) * 12;
-      } else {
-        ccCost = (p.childCount || 1) * 15000;
-      }
-      return '+$' + Math.round(ccCost / 1000) + 'k/yr';
-    }
-
-    const hasMortgage = p.label?.toLowerCase().includes('mortgage') || (p.activeDebts && p.activeDebts.some(d => d.type === 'mortgage'));
-    if (hasMortgage) {
-      const activeMortgages = (p.activeDebts || []).filter(d => d.type === 'mortgage');
-      const mortgageAnnual = activeMortgages.reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0) * 12;
-      if (mortgageAnnual > 0) {
-        return '+$' + Math.round(mortgageAnnual / 1000) + 'k/yr';
-      }
-    }
-
-    if (p.activeDebts && p.activeDebts.length > 0) {
-      const debtAnnual = (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0) * 12;
-      if (debtAnnual > 0) {
-        return '+$' + Math.round(debtAnnual / 1000) + 'k/yr';
-      }
-    }
-
-    return '';
+  const getPercent = (age) => {
+    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+    if (totalYears <= 0) return 3;
+    return 3 + ((age - inputs.currentAge) / totalYears) * 94;
   };
 
   return (
@@ -888,37 +628,36 @@ export default function LifePlanScreen({
               onViewRecommendations={() => setShowImprovementModal(true)}
             />
 
-            {/* Compact 3-Layer Timeline */}
+            {/* Compact Timeline */}
             {validation.errors.length === 0 && (
               <div className="glass-card timeline-card" style={{ padding: '0.5rem 0.75rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div className="timeline-layout-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
-                    <div className="timeline-grid" style={{ minWidth: '850px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="timeline-grid" style={{ minWidth: '850px' }}>
                       
-                      {/* Layer 1: Events */}
+                      {/* Layer 1: MILESTONES / EVENTS */}
                       {(() => {
                         const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                         if (totalYears <= 0) return null;
-
+    
                         return (
-                          <div className="timeline-row compact-row" style={{ height: '44px', minHeight: '44px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+                          <div className="timeline-row">
                             <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
-                              Events
+                              <span style={{ fontWeight: 700 }}>Events</span>
                             </div>
-                            <div className="timeline-row-content events-row-content" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
-                              <div className="timeline-track-inner" style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
-                                <div className="events-axis-line" style={{ position: 'absolute', left: 0, right: 0, height: '2px', background: 'var(--border-color)', top: '50%', transform: 'translateY(-50%)', margin: 0 }} />
-                                
+                            <div className="timeline-row-content events-row-content">
+                              <div className="timeline-track-inner">
+                                <div className="events-axis-line" />
                                 {timelineEvents.map((evt, idx) => {
                                   const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
                                   const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
                                   const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
-
-                                  const isSelected = !!(editingEvent && (
-                                    (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
-                                    (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
+    
+                                  const isSelected = !!(selectedMilestone && (
+                                    (evt.originalId && String(selectedMilestone.originalId) === String(evt.originalId)) ||
+                                    (!evt.originalId && evt.type === selectedMilestone.type && evt.age === selectedMilestone.age)
                                   ));
-
+    
                                   const displayAge = (() => {
                                     if (isPrimaryDragging) {
                                       return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
@@ -927,6 +666,18 @@ export default function LifePlanScreen({
                                       const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
                                       const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
                                       const linkedEndDisplayAge = draggedDisplayAge + offset;
+    
+                                      console.log('[Child Linked Drag Debug]', {
+                                        childStartAge: draggedDisplayAge,
+                                        childEndAge: evt.age,
+                                        childEndOffset: offset,
+                                        draggedDisplayAge,
+                                        linkedEndDisplayAge
+                                      });
+                                      if (offset !== 0 && linkedEndDisplayAge === draggedDisplayAge) {
+                                        console.error('[Assert Failed] linkedEndDisplayAge is equal to draggedDisplayAge during dragging preview!');
+                                      }
+    
                                       return linkedEndDisplayAge;
                                     }
                                     if (isDraggingThis && evt.type === 'retire') {
@@ -934,25 +685,41 @@ export default function LifePlanScreen({
                                     }
                                     return evt.age;
                                   })();
-                                  const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
+                                  const percent = getPercent(displayAge);
                                   const isFinancial = isFinancialEvent(evt);
+                                  const isNeutral = evt.type === 'today' || evt.type === 'lifeExpectancy';
                                   const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
-
-                                  if (evt.type === 'lifeExpectancy') {
-                                    return null;
-                                  }
-
+    
+                                  const wrapperClass = isNeutral
+                                    ? 'neutral-milestone'
+                                    : isFinancial
+                                      ? 'financial-milestone'
+                                      : (evt.isMilestone || evt.type === 'retire')
+                                        ? 'milestone-event'
+                                        : 'standard-milestone';
+    
+                                  const showAgeLabel = (() => {
+                                    const hasConflict = timelineEvents.some((otherEvt) => {
+                                      if (otherEvt === evt) return false;
+                                      if (otherEvt.stackIndex !== evt.stackIndex) return false;
+                                      const isClose = Math.abs(otherEvt.age - evt.age) < 2.5;
+                                      if (!isClose) return false;
+                                      if (otherEvt.age < evt.age) return true;
+                                      if (otherEvt.age === evt.age && timelineEvents.indexOf(otherEvt) < idx) return true;
+                                      return false;
+                                    });
+                                    return !hasConflict;
+                                  })();
+    
+                                  const eventIcon = getEventIcon(evt);
+    
                                   return (
                                     <div
                                       key={idx}
-                                      className={'financial-milestone-wrapper milestone-circle-wrapper' + (isDraggingThis ? ' dragging' : '') + (isSelected ? ' selected' : '') + (shouldPulse ? ' pulse-highlight-event' : '')}
+                                      className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                                       style={{
-                                        position: 'absolute',
-                                        left: percent + '%',
-                                        top: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        zIndex: isDraggingThis ? 10 : 3,
-                                        cursor: 'grab'
+                                        left: `${percent}%`,
+                                        bottom: `${16 + (evt.stackIndex * 38)}px`
                                       }}
                                       onMouseDown={(e) => handleNodeDragStart(e, evt)}
                                       onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -961,18 +728,25 @@ export default function LifePlanScreen({
                                           e.stopPropagation();
                                           return;
                                         }
-                                        if (isEditableEvent(evt)) {
-                                          handleEditRoadmapEvent(evt);
-                                        }
+                                        setSelectedMilestone(evt);
                                       }}
                                     >
-                                      <div className="financial-milestone-dot milestone-glow-circle" style={{ width: '26px', height: '26px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)', borderRadius: '50%', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
-                                        {evt.icon}
+                                      <div className="milestone-glow-circle">
+                                        {eventIcon}
                                       </div>
-
-                                      <div className={'timeline-tooltip' + (percent < 20 ? ' align-left' : percent > 80 ? ' align-right' : '')}>
+    
+                                      {/* Age indicator beneath marker */}
+                                      {showAgeLabel && (
+                                        <span className="milestone-age-label">
+                                          {Math.floor(displayAge)}
+                                        </span>
+                                      )}
+    
+                                      {/* Tooltip on hover */}
+                                      <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
                                         <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                                          {evt.icon} {evt.title}
+                                          {eventIcon ? `${eventIcon} ` : ''}
+                                          {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
                                         </div>
                                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
                                           <div>Age {Math.floor(displayAge)} • {evt.description}</div>
@@ -987,13 +761,6 @@ export default function LifePlanScreen({
                                                 );
                                               }
                                             }
-                                            if (evt.type === 'childSupportEnds') {
-                                              return (
-                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                                  Support expenses have ended
-                                                </div>
-                                              );
-                                            }
                                             if (evt.type === 'socialSecurity') {
                                               const ss = displayedResults.socialSecurityDetails;
                                               if (ss && ss.isEligible) {
@@ -1004,10 +771,60 @@ export default function LifePlanScreen({
                                                 );
                                               }
                                             }
+                                            if (evt.type === 'medicareEligibility') {
+                                              return (
+                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
+                                                  Pre-Medicare Premium: {formatCurrency(inputs.preMedicarePremium || 10000)}/yr | Medicare Premium: {formatCurrency(inputs.medicarePremium || 4000)}/yr
+                                                </div>
+                                              );
+                                            }
+                                            if (evt.type === 'buyHouse') {
+                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
+                                              if (asset) {
+                                                return (
+                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
+                                                    Price: {formatCurrency(asset.purchasePrice || asset.homePrice || 0)} 
+                                                    {asset.purchaseType !== 'cash' && ` (${asset.mortgageRate || 6.5}% APR)`}
+                                                  </div>
+                                                );
+                                              }
+                                            }
+                                            if (evt.type === 'sellHouse') {
+                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
+                                              if (asset) {
+                                                return (
+                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
+                                                    Property: {asset.name}
+                                                  </div>
+                                                );
+                                              }
+                                            }
+                                            if (evt.type === 'haveChild') {
+                                              const ev = inputs.lifeEvents?.find(e => e.id === evt.originalId);
+                                              if (ev) {
+                                                return (
+                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
+                                                    Support Term: {ev.includeCollege ? 22 : 18} years
+                                                  </div>
+                                                );
+                                              }
+                                            }
+                                            if (evt.type === 'marriage') {
+                                              return (
+                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
+                                                  Spouse Income: {formatCurrency(evt.spouseIncome)}/yr
+                                                </div>
+                                              );
+                                            }
                                             return null;
                                           })()}
                                         </div>
                                       </div>
+    
+                                      {/* Line connector down to axis */}
+                                      {evt.stackIndex > 0 && (
+                                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1016,209 +833,163 @@ export default function LifePlanScreen({
                           </div>
                         );
                       })()}
-
-                      {/* Layer 2: Life Phases */}
+    
+                      {/* Layer 2: DECISION PHASES (MARRIAGE, CHILDCARE, HOMEOWNERSHIP) */}
                       {(() => {
                         const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                         if (totalYears <= 0) return null;
-
-                        const phases = getLifePhases(inputs);
-
-                        return (
-                          <div className="timeline-row compact-row" style={{ height: '30px', minHeight: '30px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
-                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
-                              Life Phases
-                            </div>
-                            <div className="timeline-row-content life-phase-track" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
-                              <div className="timeline-track-inner" style={{ position: 'relative', height: '100%' }}>
-                                {phases.map((p, idx) => {
-                                  const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
-                                  const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
-                                  const widthPct = endPct - startPct;
-                                  if (widthPct <= 0) return null;
-
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="life-phase-span pill-span"
-                                      style={{
-                                        position: 'absolute',
-                                        left: startPct + '%',
-                                        width: widthPct + '%',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        height: '24px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.68rem',
-                                        fontWeight: '700',
-                                        boxSizing: 'border-box',
-                                        background: 'var(--bg-secondary)',
-                                        border: '1px solid var(--border-color)',
-                                        color: 'var(--text-secondary)',
-                                        borderRadius: '12px',
-                                        padding: '0 8px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      {p.name} {p.startAge}–{p.endAge}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Layer 3: Budget Phases */}
-                      {(() => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        if (totalYears <= 0) return null;
-
-                        const getBudgetPhaseThemeClass = (p) => {
-                          const label = p.label || '';
-                          const isRetired = p.startAge >= (inputs.targetRetirementAge || inputs.lifeExpectancy);
-                          const hasSS = p.activeEvents?.includes('socialSecurity') || label.includes('Social Security') || p.icon === '🏖️💰' || p.icon === '💰';
-                          
-                          if (isRetired) {
-                            if (hasSS) return 'theme-retired-ss';
-                            return 'theme-retired';
+    
+                        const activeCommitments = [];
+    
+                        // Homeownership spans
+                        inputs.lifeEvents.forEach(ev => {
+                          if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
+                            const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
+                            const houseName = asset?.name || 'Primary Home';
+                            const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
+                            const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
+                            const sellAge = sellEv ? Number(sellEv.age) : inputs.lifeExpectancy;
+                            activeCommitments.push({
+                              id: `house-${ev.houseId}`,
+                              label: houseName,
+                              emoji: '🏠',
+                              startAge: buyAge,
+                              endAge: sellAge,
+                              className: 'commitment-span home'
+                            });
+                          }
+                        });
+    
+                        // Childcare support
+                        const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+                        if (childEvents.length > 0) {
+                          const activeAges = [];
+                          for (let age = inputs.currentAge; age < inputs.lifeExpectancy; age++) {
+                            if (getActiveChildrenCountAtAge(age, inputs.lifeEvents) > 0) {
+                              activeAges.push(age);
+                            }
                           }
                           
-                          const lowerLabel = label.toLowerCase();
-                          const hasChildcare = lowerLabel.includes('childcare');
-                          const hasStudentLoan = lowerLabel.includes('student loan') || p.activeDebts?.some(d => d.type === 'studentLoan');
-                          const hasHouse = lowerLabel.includes('house') || lowerLabel.includes('mortgage') || p.activeDebts?.some(d => d.type === 'mortgage');
-                          const hasOtherDebt = p.activeDebts && p.activeDebts.length > 0;
-                          
-                          if (hasChildcare) {
-                            if (hasOtherDebt) return 'theme-working-childcare-debt';
-                            return 'theme-working-childcare';
+                          const ccIntervals = [];
+                          if (activeAges.length > 0) {
+                            let start = activeAges[0];
+                            let prev = activeAges[0];
+                            for (let i = 1; i < activeAges.length; i++) {
+                              if (activeAges[i] === prev + 1) {
+                                prev = activeAges[i];
+                              } else {
+                                ccIntervals.push({ start, end: prev + 1 });
+                                start = activeAges[i];
+                                prev = activeAges[i];
+                              }
+                            }
+                            ccIntervals.push({ start, end: prev + 1 });
                           }
-                          if (hasStudentLoan) return 'theme-working-student-loan';
-                          if (hasHouse) return 'theme-working-house';
-                          
-                          return 'theme-working-standard';
-                        };
-
-                        return (
-                          <div className="timeline-row compact-row budget-phases-timeline-row" style={{ height: '30px', minHeight: '30px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
-                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
-                              Budget Phases
-                            </div>
-                            <div className="timeline-row-content budget-phases-track" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
-                              <div ref={trackRef} className="timeline-track-inner" style={{ position: 'relative', height: '100%', display: 'flex' }}>
-                                {normalizedPhases.map((p) => {
-                                  const startPct = Math.max(0, Math.min(100, ((p.startAge - inputs.currentAge) / totalYears) * 100));
-                                  const endPct = Math.max(0, Math.min(100, ((p.endAge - inputs.currentAge) / totalYears) * 100));
-                                  const widthPct = endPct - startPct;
-                                  if (widthPct <= 0) return null;
-
-                                  const isCurrentAge = inputs.currentAge >= p.startAge && inputs.currentAge < p.endAge;
-                                  const themeClass = getBudgetPhaseThemeClass(p);
-                                  
-                                  const phaseName = getBudgetPhaseName(p, inputs);
-                                  const costImpact = getBudgetPhaseCostImpact(p, inputs, displayedResults);
-                                  
-                                  const pillLabelText = costImpact ? (p.icon || '') + ' ' + phaseName + ' ' + costImpact : (p.icon || '') + ' ' + phaseName;
-
-                                  const phaseNeedsTotal = (Number(p.expenses?.housing) || 0) +
-                                                         (Number(p.expenses?.utilities) || 0) +
-                                                         (Number(p.expenses?.food) || 0) +
-                                                         (Number(p.expenses?.transportation) || 0) +
-                                                         (Number(p.expenses?.healthcare) || 0) +
-                                                         (p.isMarried ? (Number(p.expenses?.debt) || 0) : 0) +
-                                                         (Number(p.expenses?.childcare) || 0) +
-                                                         (p.activeDebts || []).reduce((sum, d) => sum + (Number(p.expenses?.['debt_' + d.id]) || d.monthlyPayment || 0), 0);
-
-                                  const phaseWantsTotal = (Number(p.expenses?.leisure) || 0) +
-                                                         (Number(p.expenses?.diningOut) || 0) +
-                                                         (Number(p.expenses?.misc) || 0);
-
-                                  const phaseSavingsTotal = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) +
-                                                           (p.isMarried ? Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
-
-                                  return (
-                                    <div
-                                      key={p.id}
-                                      className={'budget-segment pill-span budget-timeline-lane-segment ' + themeClass + (isCurrentAge ? ' current-age-phase' : '') + (activeSelectedPhaseId === p.id ? ' selected' : '')}
-                                      style={{
-                                        position: 'absolute',
-                                        left: startPct + '%',
-                                        width: widthPct + '%',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        height: '24px',
-                                        borderRadius: '12px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.68rem',
-                                        fontWeight: '700',
-                                        boxSizing: 'border-box',
-                                        padding: '0 8px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        cursor: 'pointer'
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSetBudgetClick(p.id);
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          handleSetBudgetClick(p.id);
-                                        }
-                                      }}
-                                      tabIndex={0}
-                                      aria-label={p.label + ' (Age ' + p.startAge + '–' + p.endAge + ')'}
-                                    >
-                                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                        {pillLabelText}
-                                      </span>
-
-                                      <div className={'timeline-tooltip' + (startPct < 20 ? ' align-left' : startPct > 80 ? ' align-right' : '')}>
-                                        <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                          <span>{p.icon}</span> <span>{p.label}</span>
-                                        </div>
-                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '200px', lineHeight: '1.4', textAlign: 'left' }}>
-                                          <div><strong>Age:</strong> {p.startAge}–{p.endAge}</div>
-                                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '0.25rem', paddingTop: '0.25rem' }}>
-                                            <strong>Active Events:</strong> {p.activeEvents && p.activeEvents.length > 0 ? p.activeEvents.map(evId => getEventDetails(evId)?.name || evId).join(', ') : 'None'}
-                                          </div>
-                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.15rem 0.5rem', marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
-                                            <div>Monthly Income:</div>
-                                            <div style={{ textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatCurrency(p.income || 0)}</div>
-                                            <div>Needs:</div>
-                                            <div style={{ textAlign: 'right' }}>{formatCurrency(phaseNeedsTotal)}</div>
-                                            <div>Wants:</div>
-                                            <div style={{ textAlign: 'right' }}>{formatCurrency(phaseWantsTotal)}</div>
-                                            <div>Save & Invest:</div>
-                                            <div style={{ textAlign: 'right', color: 'var(--accent-blue)' }}>{formatCurrency(phaseSavingsTotal)}</div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+    
+                          ccIntervals.forEach((interval, idx) => {
+                            activeCommitments.push({
+                              id: `childcare-${idx}`,
+                              label: 'Childcare & Support',
+                              emoji: '👶',
+                              startAge: interval.start,
+                              endAge: interval.end,
+                              className: 'commitment-span childcare'
+                            });
+                          });
+                        }
+    
+                        // Marriage
+                        const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+                        const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
+                        const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
+                        if (marriageEvent || hasSpouseInHousehold) {
+                          const start = marriageEvent ? Number(marriageEvent.age) : inputs.currentAge;
+                          const end = divorceEvent ? Number(divorceEvent.age) : inputs.lifeExpectancy;
+                          activeCommitments.push({
+                            id: 'marriage',
+                            label: 'Marriage',
+                            emoji: '💍',
+                            startAge: start,
+                            endAge: end,
+                            className: 'commitment-span marriage'
+                          });
+                        }
+    
+                        // Payoff Plans
+                        (inputs.lifeEvents || []).forEach(ev => {
+                          if (ev.enabled && ev.type === 'payoffPlan') {
+                            const borrowing = (inputs.lifeEvents || []).find(b => b.id === ev.borrowingId);
+                            const borrowingName = borrowing ? borrowing.name : 'Borrowing';
+                            let start = Number(ev.startAge);
+                            let end = Number(ev.payoffAge);
+    
+                            // Apply drag offset in real-time if we are currently dragging this payoff plan or its linked borrowing event
+                            if (draggingInfo) {
+                              if (draggingInfo.type === 'borrowing' && draggingInfo.originalId === ev.borrowingId) {
+                                const shift = draggingInfo.currentAge - draggingInfo.initialAge;
+                                start = draggingInfo.currentAge;
+                                end = ev.payoffAge + shift;
+                              } else if (draggingInfo.type === 'payoffPlanEnd' && draggingInfo.originalId === ev.id) {
+                                const minPossibleEnd = start + 1;
+                                end = Math.max(minPossibleEnd, draggingInfo.currentAge);
+                              }
+                            }
+                            
+                            if (end > start && start < inputs.lifeExpectancy) {
+                              activeCommitments.push({
+                                id: ev.id,
+                                label: `Payoff: ${borrowingName}`,
+                                emoji: '🏁',
+                                startAge: start,
+                                endAge: Math.min(inputs.lifeExpectancy, end),
+                                className: 'commitment-span payoffPlan'
+                              });
+                            }
+                          }
+                        });
+    
+                        return activeCommitments.map(c => {
+                          const startPct = Math.max(0, Math.min(100, getPercent(c.startAge)));
+                          const endPct = Math.max(0, Math.min(100, getPercent(c.endAge)));
+                          const widthPct = endPct - startPct;
+                          if (widthPct <= 0) return null;
+    
+                          const isRowHighlighted = !!(editingEvent && (
+                            (editingEvent.type === 'haveChild' && c.id.startsWith('childcare')) ||
+                            (editingEvent.type === 'marriage' && c.id === 'marriage') ||
+                            ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`) ||
+                            (editingEvent.type === 'payoffPlan' && c.id === editingEvent.id) ||
+                            (editingEvent.type === 'borrowing' && (inputs.lifeEvents || []).some(le => le.type === 'payoffPlan' && le.id === c.id && le.borrowingId === editingEvent.id))
+                          ));
+    
+                          return (
+                            <div className={`timeline-row ${isRowHighlighted ? 'highlighted' : ''}`} key={c.id}>
+                              <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+                                <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
+                              </div>
+                              <div className="timeline-row-content commitment-track">
+                                <div className="timeline-track-inner">
+                                  <div
+                                    className={`${c.className} ${isRowHighlighted ? 'highlighted' : ''}`}
+                                    style={{
+                                      left: `${startPct}%`,
+                                      width: `${widthPct}%`
+                                    }}
+                                  >
+                                    {c.emoji} {c.label} (Age {c.startAge}–{c.endAge === inputs.lifeExpectancy ? `${c.startAge}+` : c.endAge})
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
+                          );
+                        });
                       })()}
-
-                      {/* Chronological Ticks */}
-                      <div className="timeline-row" style={{ height: '20px', minHeight: '20px', position: 'relative' }}>
-                        <div className="timeline-row-label" style={{ opacity: 0, borderRight: 'none', width: '120px', minWidth: '120px' }}>Ages</div>
-                        <div className="timeline-row-content ticks-row-content" style={{ padding: '0 16px', position: 'relative', flexGrow: 1, height: '100%' }}>
-                          <div className="timeline-track-inner" style={{ position: 'relative', height: '100%' }}>
+    
+                      {/* CHRONOLOGICAL AGE TICKS */}
+                      <div className="timeline-row">
+                        <div className="timeline-row-label" style={{ opacity: 0, borderRight: 'none', width: '120px', minWidth: '120px', padding: '0.35rem 0.75rem' }}>Ages</div>
+                        <div className="timeline-row-content ticks-row-content">
+                          <div className="timeline-track-inner">
                             {(() => {
                               const totalYears = inputs.lifeExpectancy - inputs.currentAge;
                               const ticks = [];
@@ -1229,9 +1000,9 @@ export default function LifePlanScreen({
                                 ticks.push(age);
                               }
                               return ticks.map((age, idx) => {
-                                const percent = totalYears > 0 ? ((age - inputs.currentAge) / totalYears) * 100 : 0;
+                                const percent = getPercent(age);
                                 return (
-                                  <div key={idx} className="timeline-tick-new" style={{ left: percent + '%' }}>
+                                  <div key={idx} className="timeline-tick-new" style={{ left: `${percent}%` }}>
                                     <div className="timeline-tick-mark-new" />
                                     <span className="timeline-tick-label-new">{age}</span>
                                   </div>
@@ -1241,10 +1012,71 @@ export default function LifePlanScreen({
                           </div>
                         </div>
                       </div>
-
+    
                     </div>
                   </div>
                 </div>
+                {/* Selected Milestone Detail Card */}
+                {selectedMilestone && (
+                  <div 
+                    className="selected-milestone-card" 
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '0.75rem 1rem',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
+                      animation: 'fadeIn 0.2s ease-in-out'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {(() => {
+                          const icon = getEventIcon(selectedMilestone);
+                          return icon ? <span style={{ fontSize: '1.25rem' }}>{icon}</span> : null;
+                        })()}
+                        <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                          {selectedMilestone.type === 'today' ? 'Today' : selectedMilestone.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedMilestone.title || selectedMilestone.label)}
+                        </span>
+                        <span 
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            color: 'var(--primary)',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(99, 102, 241, 0.2)'
+                          }}
+                        >
+                          Age {Math.floor(selectedMilestone.age)}
+                        </span>
+                      </div>
+                      {isEditableEvent(selectedMilestone) && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.75rem',
+                            height: '28px',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                        >
+                          ✏️ Edit Decision
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {selectedMilestone.description}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

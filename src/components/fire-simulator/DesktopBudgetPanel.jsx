@@ -197,6 +197,7 @@ export default function DesktopBudgetPanel({
         </div>
 
         {/* Tabs for Budget Phases */}
+        <h4 className="budget-phases-heading">Budget Phases</h4>
         <div className="budget-modal-tabs">
           {normalizedPhases.map((p) => {
             const isActive = p.id === activeBudgetPhase;
