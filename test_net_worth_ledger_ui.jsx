@@ -14,7 +14,8 @@ vi.mock('recharts', () => {
     YAxis: () => <div data-testid="YAxis" />,
     CartesianGrid: () => <div data-testid="CartesianGrid" />,
     Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />
+    ReferenceLine: () => <div data-testid="ReferenceLine" />,
+    ReferenceDot: () => <div data-testid="ReferenceDot" />
   };
 });
 

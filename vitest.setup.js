@@ -14,3 +14,18 @@ process.exit = (code) => {
     throw new Error(`process.exit called with non-zero code: ${code}`);
   }
 };
+
+// Mock ResizeObserver globally for JSDOM environments
+if (typeof globalThis !== 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+// Mock window.scrollTo to suppress JSDOM environment warnings
+if (typeof window !== 'undefined') {
+  window.scrollTo = () => {};
+}
+

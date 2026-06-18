@@ -16,7 +16,8 @@ vi.mock('recharts', () => {
     YAxis: () => <div data-testid="YAxis" />,
     CartesianGrid: () => <div data-testid="CartesianGrid" />,
     Tooltip: () => <div data-testid="Tooltip" />,
-    ReferenceLine: () => <div data-testid="ReferenceLine" />
+    ReferenceLine: ({ x }) => <div data-testid="ReferenceLine" data-x={x} />,
+    ReferenceDot: ({ x, y }) => <div data-testid="ReferenceDot" data-x={x} data-y={y} />
   };
 });
 
@@ -26,6 +27,8 @@ globalThis.ResizeObserver = class ResizeObserver {
   unobserve() {}
   disconnect() {}
 };
+
+import MobileTimeline from './src/components/fire-simulator/MobileTimeline';
 
 describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
   beforeEach(() => {
@@ -63,7 +66,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     
     // Should display Roadmap section titles
     expect(screen.getByText('Interactive Roadmap')).toBeDefined();
-    expect(screen.getByText('Life Events')).toBeDefined();
+    expect(screen.getByText('Your Life Journey ✨')).toBeDefined();
     expect(screen.getByText('Budget Phases')).toBeDefined();
   });
 
@@ -90,7 +93,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(screen.getByText(/Starting Account Balances/i)).toBeDefined();
   });
 
-  test('Tapping a phase opens full-screen phase detail screen', () => {
+  test('Tapping a phase expands phase inline details', () => {
     // We can test MobileFireSimulator props directly
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
     const activeRes = runFireSimulation(inputs);
@@ -133,18 +136,20 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     const workSavePhaseBtn = screen.getByText('Working', { selector: '.mobile-phase-card-title' });
     fireEvent.click(workSavePhaseBtn);
 
-    // Overlay phase detail screen should open
-    expect(screen.getByText('Why this phase exists')).toBeDefined();
-    expect(screen.getByText('Budget')).toBeDefined();
-    expect(screen.getByText('Savings Allocation')).toBeDefined();
-    expect(screen.getByText('Impact of This Phase')).toBeDefined();
+    // Accordion details should expand inline
+    expect(screen.getByText('💵 Income')).toBeDefined();
+    expect(screen.getByText('💸 Expenses')).toBeDefined();
+    expect(screen.getByText('💰 Savings')).toBeDefined();
+    expect(screen.getByText('🏠 Housing Cost')).toBeDefined();
 
-    // Verify back button works to close the overlay
-    const backBtn = screen.getByRole('button', { name: /Back to Roadmap/i });
-    fireEvent.click(backBtn);
-    
-    // Detail screen elements should be closed/hidden
-    expect(screen.queryByText('Why this phase exists')).toBeNull();
+    // Verify edit button triggers handleSetBudgetClick
+    const editBtn = screen.getByText('⚙️ Edit Budget Configuration');
+    fireEvent.click(editBtn);
+    expect(handleSetBudgetClick).toHaveBeenCalled();
+
+    // Collapse again
+    fireEvent.click(workSavePhaseBtn);
+    expect(screen.queryByText('💵 Income')).toBeNull();
   });
 
   test('Roadmap tab milestones rendering and interaction', () => {
@@ -218,29 +223,27 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(screen.getByText('Retire', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
     expect(screen.getByText('Social Sec.', { selector: '.mobile-roadmap-label-text' })).toBeDefined();
 
-    // Verify long sentences / descriptions are NOT rendered directly in the scroller
-    const scroller = document.querySelector('.mobile-roadmap-scroll-container');
+    // Verify long sentences / descriptions are NOT rendered directly in the track
+    const scroller = document.querySelector('.mobile-roadmap-track');
     expect(scroller.textContent).not.toContain('Eligible for Medicare. Premium drops from $10,000/yr to $4,000/yr.');
 
-    // 2. The first event (Medicare) should be selected by default and display details card
-    expect(screen.getByText('Why it matters')).toBeDefined();
-    expect(screen.getByText('Starts at Age 65')).toBeDefined();
-    expect(screen.getByText('Healthcare Premium Impact')).toBeDefined();
+    // 2. The first event (Medicare) is selected by default. Since it's not editable, clicking it again does not edit.
+    const medicareMilestoneBtn = screen.getByText('Medicare').closest('button');
+    fireEvent.click(medicareMilestoneBtn);
+    expect(handleEditRoadmapEvent).not.toHaveBeenCalled();
 
-    // 3. Click the Social Security milestone
+    // 3. Click the Social Security milestone to select it
     const ssMilestoneBtn = screen.getByText('Social Sec.').closest('button');
     fireEvent.click(ssMilestoneBtn);
 
-    // 4. Verify Social Security details card is displayed
-    expect(screen.getByText('Estimated Benefit')).toBeDefined();
-    expect(screen.getByText('$24,000/year ($2,000/month)')).toBeDefined();
+    // 4. Click the Social Security milestone again (since it is selected and editable, it should trigger handleEditRoadmapEvent)
+    fireEvent.click(ssMilestoneBtn);
+    expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[2]);
 
-    // 5. Verify Target Retirement detail and edit event callback
+    // 5. Verify Target Retirement edit event callback
     const retireMilestoneBtn = screen.getByText('Retire').closest('button');
-    fireEvent.click(retireMilestoneBtn);
-
-    const editBtn = screen.getByRole('button', { name: /Edit Event/i });
-    fireEvent.click(editBtn);
+    fireEvent.click(retireMilestoneBtn); // select it
+    fireEvent.click(retireMilestoneBtn); // edit it
     expect(handleEditRoadmapEvent).toHaveBeenCalledWith(timelineEvents[1]);
   });
 
@@ -379,4 +382,155 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     // It should NOT render "Delay Social Security" or "Reduce Spending" which are mockup recommendations
     expect(screen.queryByText('Delay Social Security')).toBeNull();
   });
+
+  test('Dense cluster even spacing logic', () => {
+    const inputs = { currentAge: 35, lifeExpectancy: 85 };
+    const timelineEvents = [
+      { age: 63, title: 'Coast FIRE', label: 'Coast FIRE', icon: '⛵', type: 'coastFire' },
+      { age: 65, title: 'Medicare', label: 'Medicare', icon: '🏥', type: 'medicareEligibility' },
+      { age: 65, title: 'Retire', label: 'Retire', icon: '🏖️', type: 'retire' },
+      { age: 67, title: 'SS Claim', label: 'SS Claim', icon: '💰', type: 'socialSecurity' }
+    ];
+
+    const { container } = render(
+      <MobileTimeline
+        inputs={inputs}
+        timelineEvents={timelineEvents}
+        selectedEventIndex={0}
+        setSelectedEventIndex={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    const buttons = container.querySelectorAll('.mobile-roadmap-milestone');
+    expect(buttons.length).toBe(4);
+    
+    // Extract positions
+    const positions = Array.from(buttons).map(btn => parseFloat(btn.style.left));
+    
+    // Total usable width = W - 72. Positions must increase linearly:
+    const diff1 = positions[1] - positions[0];
+    const diff2 = positions[2] - positions[1];
+    const diff3 = positions[3] - positions[2];
+    
+    expect(diff1).toBeCloseTo(diff2, 1);
+    expect(diff2).toBeCloseTo(diff3, 1);
+    expect(positions[0]).toBe(36); // Pinned left
+  });
+
+  test('Many events (10+) density visibility rules', () => {
+    const inputs = { currentAge: 35, lifeExpectancy: 85 };
+    const timelineEvents = Array.from({ length: 11 }, (_, i) => ({
+      age: 35 + i * 4,
+      title: `Event ${i + 1}`,
+      label: `Ev ${i + 1}`,
+      icon: '📅',
+      type: 'lifestyle'
+    }));
+
+    const { container } = render(
+      <MobileTimeline
+        inputs={inputs}
+        timelineEvents={timelineEvents}
+        selectedEventIndex={0}
+        setSelectedEventIndex={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    // With 11 events, showAge (<=12) should be true, showTitle (<=8) should be false.
+    // Check that age elements exist but title labels do not.
+    const ageElements = container.querySelectorAll('.mobile-roadmap-age');
+    expect(ageElements.length).toBe(11);
+
+    const titleElements = container.querySelectorAll('.mobile-roadmap-label-text');
+    expect(titleElements.length).toBe(0);
+  });
+
+  test('Consistent static marker sizes (48px base, 60px selected)', () => {
+    const inputs = { currentAge: 35, lifeExpectancy: 85 };
+    const timelineEvents = [
+      { age: 35, title: 'Today', label: 'Today', icon: '👤', type: 'career' },
+      { age: 50, title: 'Midlife', label: 'Midlife', icon: '📈', type: 'lifestyle' }
+    ];
+
+    const { container } = render(
+      <MobileTimeline
+        inputs={inputs}
+        timelineEvents={timelineEvents}
+        selectedEventIndex={1} // Select the second one
+        setSelectedEventIndex={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    const circles = container.querySelectorAll('.mobile-roadmap-circle');
+    
+    // First circle is base (48px)
+    expect(circles[0].style.width).toBe('48px');
+    expect(circles[0].style.height).toBe('48px');
+
+    // Second circle is selected (60px)
+    expect(circles[1].style.width).toBe('60px');
+    expect(circles[1].style.height).toBe('60px');
+  });
+
+  test('Net Worth graph highlights selected milestone age correctly', () => {
+    const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    const activeRes = runFireSimulation(inputs);
+    const displayedRes = {
+      ...activeRes,
+      phases: activeRes.phases || []
+    };
+
+    const timelineEvents = [
+      { age: 40, title: 'Buy Home', label: 'Buy Home', icon: '🏠', type: 'buyHouse' },
+      { age: 65, title: 'Retire', label: 'Retire', icon: '🏖️', type: 'retire' }
+    ];
+
+    const chartData = [
+      { age: 35, netWorth: 10000, income: 50000, expenses: 40000 },
+      { age: 40, netWorth: 25000, income: 55000, expenses: 42000 },
+      { age: 65, netWorth: 500000, income: 0, expenses: 60000 }
+    ];
+
+    const { container } = render(
+      <MobileFireSimulator
+        inputs={inputs}
+        updateInput={vi.fn()}
+        displayMode="deflated"
+        setDisplayMode={vi.fn()}
+        activeResults={activeRes}
+        displayedResults={displayedRes}
+        selectedYear={35}
+        setSelectedYear={vi.fn()}
+        chartData={chartData}
+        validation={{}}
+        handleCreateEvent={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+        handleSetBudgetClick={vi.fn()}
+        handleOpenSavingsDetails={vi.fn()}
+        isMobile={true}
+        totalNetWorth={5000}
+        activeStep={2}
+        setActiveStep={vi.fn()}
+        timelineEvents={timelineEvents}
+        editingEvent={null}
+        displayedBaselineResults={displayedRes}
+        baselineResults={activeRes}
+      />
+    );
+
+    // Select the first milestone (Buy Home at Age 40). By default, index 0 is selected.
+    // Verify ReferenceLine and ReferenceDot are rendered with target x = 40.
+    const refLine = container.querySelector('[data-testid="ReferenceLine"]');
+    const refDot = container.querySelector('[data-testid="ReferenceDot"]');
+
+    expect(refLine).not.toBeNull();
+    expect(refLine.getAttribute('data-x')).toBe('40');
+
+    expect(refDot).not.toBeNull();
+    expect(refDot.getAttribute('data-x')).toBe('40');
+  });
 });
+
