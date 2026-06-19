@@ -16,24 +16,53 @@ export function getSocialSecurityFactor(claimingAge) {
   }
 }
 
+export function normalizeSocialSecurityEvent(event, inputs) {
+  if (!event || event.type !== 'socialSecurity') return event;
+
+  const currentAge = inputs ? (Number(inputs.currentAge) || 35) : 35;
+
+  let ageStartedWorking = event.ageStartedWorking;
+  if (
+    ageStartedWorking === "" ||
+    ageStartedWorking == null ||
+    Number.isNaN(Number(ageStartedWorking))
+  ) {
+    if (event.yearStartedWorking !== undefined && event.yearStartedWorking !== null && event.yearStartedWorking !== '') {
+      const currentYear = new Date().getFullYear();
+      const yearsWorked = currentYear - Number(event.yearStartedWorking);
+      ageStartedWorking = Math.max(0, currentAge - yearsWorked);
+    } else {
+      ageStartedWorking = 22;
+    }
+  } else {
+    ageStartedWorking = Number(ageStartedWorking);
+  }
+
+  const claimingAge = Number(event.claimingAge ?? event.claimAge ?? 67);
+
+  return {
+    ...event,
+    claimingAge,
+    age: claimingAge,
+    startAge: claimingAge,
+    ageStartedWorking
+  };
+}
+
 export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPhases = false) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
   
   // Find Social Security event to get start working age info
-  const ssEv = overrideEvent && overrideEvent.type === 'socialSecurity'
+  const ssEvRaw = overrideEvent && overrideEvent.type === 'socialSecurity'
     ? overrideEvent
     : (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity' && e.enabled);
   
+  const ssEv = normalizeSocialSecurityEvent(ssEvRaw, inputs);
+
   let startWorkingAge = currentAge;
   if (ssEv) {
-    if (ssEv.ageStartedWorking !== undefined && ssEv.ageStartedWorking !== null && ssEv.ageStartedWorking !== '') {
-      startWorkingAge = Math.min(currentAge, Number(ssEv.ageStartedWorking));
-    } else if (ssEv.yearStartedWorking !== undefined && ssEv.yearStartedWorking !== null && ssEv.yearStartedWorking !== '') {
-      const currentYear = new Date().getFullYear();
-      const yearsWorked = currentYear - Number(ssEv.yearStartedWorking);
-      startWorkingAge = Math.max(0, currentAge - yearsWorked);
-    }
+    startWorkingAge = Math.min(currentAge, ssEv.ageStartedWorking);
   }
 
   let startingIncomeAnnual = Number(inputs.simpleIncome) || 50000;

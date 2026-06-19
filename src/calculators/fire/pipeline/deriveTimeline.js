@@ -3,7 +3,8 @@ import {
   getSocialSecurityFactor,
   getIncomeHistory,
   calculateSocialSecurityBenefit,
-  calculateClaimingAgeMultiplier
+  calculateClaimingAgeMultiplier,
+  normalizeSocialSecurityEvent
 } from '../socialSecurity.js';
 
 export function deriveTimelineStage(normalizedInputs) {
@@ -12,7 +13,8 @@ export function deriveTimelineStage(normalizedInputs) {
   const enabledEvents = lifeEvents.filter(e => e.enabled);
   const targetRetirementAge = normalizedInputs.targetRetirementAge;
 
-  const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
+  const ssEventRaw = enabledEvents.find(e => e.type === 'socialSecurity');
+  const ssEvent = ssEventRaw ? normalizeSocialSecurityEvent(ssEventRaw, normalizedInputs) : null;
   let socialSecurityDetails = {
     claimAge: 67,
     workingYears: 0,
@@ -29,7 +31,7 @@ export function deriveTimelineStage(normalizedInputs) {
   };
 
   if (ssEvent) {
-    const claimAge = Number(ssEvent.claimingAge !== undefined ? ssEvent.claimingAge : (ssEvent.startAge !== undefined ? ssEvent.startAge : ssEvent.age)) || 67;
+    const claimAge = ssEvent.claimingAge;
     if (claimAge < 62) {
       socialSecurityDetails = {
         claimAge,

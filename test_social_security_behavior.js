@@ -202,9 +202,9 @@ try {
   ssEvCalc.useEarnings = true;
 
   const resultsCalc = runFireSimulation(inputsCalculated);
-  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(22665.94, 0);
+  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
   const age67Calc = resultsCalc.deflatedData.find(d => d.age === 67);
-  expect(age67Calc.income).toBeCloseTo(22665.94, -1);
+  expect(age67Calc.income).toBeCloseTo(24951.84, -1);
 
   // 6c. Increasing income increases AIME and Social Security benefit
   const inputsHigherIncome = getMappedDefaultInputs();
@@ -216,11 +216,11 @@ try {
   ssEvHigher.useEarnings = true;
   
   const resultsHigher = runFireSimulation(inputsHigherIncome);
-  // AIME = (30 * 100,000) / 420 = $7,142.86
-  // PIA = 1286 * 0.90 + (7142.86 - 1286) * 0.32 = 1157.4 + 1874.19 = $3031.59/mo
-  // Annual benefit = 3031.59 * 12 = $36,379.14
+  // AIME = (35 * 99,996) / 420 = $8,333.00
+  // PIA = 1286 * 0.90 + (7749 - 1286) * 0.32 + (8333 - 7749) * 0.15 = 1157.4 + 2068.16 + 87.60 = $3313.16/mo
+  // Annual benefit = 3313.16 * 12 = $39,757.92
   expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeGreaterThan(resultsCalc.socialSecurityDetails.annualBenefit);
-  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(36378.03, 0);
+  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(39757.92, 0);
 
   // 6d. Decreasing working years below 10 makes SS disappear
   const inputsFewYears = getMappedDefaultInputs();
@@ -231,6 +231,7 @@ try {
   ssEvFew.enabled = true;
   ssEvFew.claimingAge = 67;
   ssEvFew.useEarnings = true;
+  ssEvFew.ageStartedWorking = inputsFewYears.currentAge; // Set age started working to current age so they have 0 past working years
 
   const resultsFew = runFireSimulation(inputsFewYears);
   expect(resultsFew.socialSecurityDetails.isEligible).toBe(false);

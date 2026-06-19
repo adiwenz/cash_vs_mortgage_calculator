@@ -10,7 +10,8 @@ import {
   calculatePIA,
   calculateClaimingAgeMultiplier,
   calculateTop35AverageIncome,
-  validateSocialSecurityClaimAge
+  validateSocialSecurityClaimAge,
+  normalizeSocialSecurityEvent
 } from './socialSecurity.js';
 
 import {
@@ -55,6 +56,7 @@ export {
   calculateClaimingAgeMultiplier,
   calculateTop35AverageIncome,
   validateSocialSecurityClaimAge,
+  normalizeSocialSecurityEvent,
   getProfileFromInputs,
   getEventsFromInputs,
   validateFireInputs,

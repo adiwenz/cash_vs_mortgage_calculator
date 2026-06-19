@@ -5,7 +5,8 @@ import {
   getIncomeHistory,
   calculateTop35AverageIncome,
   calculateSocialSecurityBenefit,
-  calculateClaimingAgeMultiplier
+  calculateClaimingAgeMultiplier,
+  normalizeSocialSecurityEvent
 } from '../../../fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
 
@@ -137,10 +138,11 @@ export function useSimulationResults(inputs, scenarios, editingEvent) {
   const tempSocialSecurityDetails = useMemo(() => {
     if (!editingEvent || editingEvent.type !== 'socialSecurity') return null;
 
-    const claimAge = Number(editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : 67);
-    const useEarnings = editingEvent.useEarnings === true;
+    const normalizedSS = normalizeSocialSecurityEvent(editingEvent, inputs);
+    const claimAge = normalizedSS.claimingAge;
+    const useEarnings = normalizedSS.useEarnings === true;
 
-    const incomeHistory = getIncomeHistory(inputs, editingEvent);
+    const incomeHistory = getIncomeHistory(inputs, normalizedSS);
     const { workingYears, isEligible } = calculateTop35AverageIncome(incomeHistory);
 
     if (useEarnings) {
@@ -153,7 +155,7 @@ export function useSimulationResults(inputs, scenarios, editingEvent) {
         indexingMode: "simple"
       });
     } else {
-      const fixedAnnual = (Number(editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 2000) || 0) * 12;
+      const fixedAnnual = (Number(normalizedSS.monthlyBenefit !== undefined ? normalizedSS.monthlyBenefit : 2000) || 0) * 12;
       const claimingMultiplierDetails = calculateClaimingAgeMultiplier({ claimAge, fullRetirementAge: 67 });
       let annualBenefit = fixedAnnual * claimingMultiplierDetails.multiplier;
       let adjustmentType = claimingMultiplierDetails.adjustmentType;
