@@ -475,6 +475,7 @@ export default function MobileEventWizard({
           eventTypes={eventTypes}
           selectEventType={selectEventType}
           filteredEventTypes={filteredEventTypes}
+          inputs={inputs}
         />
       )}
 

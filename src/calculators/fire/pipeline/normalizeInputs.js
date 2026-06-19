@@ -4,7 +4,16 @@ import { getPartitionedPhases } from '../phases.js';
 export function normalizeInputsStage(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
-  const lifeEvents = inputs.lifeEvents ? inputs.lifeEvents.map(e => ({ ...e })) : [];
+  const lifeEvents = inputs.lifeEvents ? inputs.lifeEvents.map(e => {
+    if (e.type === 'socialSecurity') {
+      return {
+        ...e,
+        ageStartedWorking: Number(e.ageStartedWorking ?? 22),
+        claimingAge: Number(e.claimingAge ?? e.claimAge ?? 67)
+      };
+    }
+    return { ...e };
+  }) : [];
   const enabledEvents = lifeEvents.filter(e => e.enabled);
   const retireEvent = enabledEvents.find(e => e.type === 'retire');
   const targetRetirementAge = retireEvent 
@@ -241,6 +250,19 @@ export function normalizeInputsStage(inputs) {
       });
   }
 
+  const socialSecurity = inputs.socialSecurity ? {
+    ...inputs.socialSecurity,
+    ageStartedWorking: Number(inputs.socialSecurity.ageStartedWorking ?? 22),
+    claimingAge: Number(inputs.socialSecurity.claimingAge ?? inputs.socialSecurity.claimAge ?? 67)
+  } : {
+    claimingAge: 67,
+    monthlyBenefit: 2000,
+    inflationAdjusted: true,
+    name: 'Social Security',
+    ageStartedWorking: 22,
+    enabled: true
+  };
+
   return {
     ...inputs,
     currentAge,
@@ -251,6 +273,7 @@ export function normalizeInputsStage(inputs) {
     maxLifeExpectancy,
     incomeList,
     spendingPhases,
-    lifeEvents
+    lifeEvents,
+    socialSecurity
   };
 }

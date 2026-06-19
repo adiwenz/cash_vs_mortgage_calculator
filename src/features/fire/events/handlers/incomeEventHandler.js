@@ -128,14 +128,29 @@ export const incomeEventHandler = {
         newInputs.incomeList = updated;
       }
     } else {
-      if (newInputs.lifeEvents) {
-        newInputs.lifeEvents = newInputs.lifeEvents.filter(e => {
-          if (e.id === matchEvent.id || e.id === matchEvent.originalId) {
-            deletedEvents.push(e);
-            return false;
-          }
-          return true;
-        });
+      if (matchEvent.type === 'socialSecurity') {
+        newInputs.includeSocialSecurity = false;
+        if (newInputs.socialSecurity) {
+          newInputs.socialSecurity.enabled = false;
+        }
+        if (newInputs.lifeEvents) {
+          newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
+            if (e.type === 'socialSecurity') {
+              return { ...e, enabled: false };
+            }
+            return e;
+          });
+        }
+      } else {
+        if (newInputs.lifeEvents) {
+          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => {
+            if (e.id === matchEvent.id || e.id === matchEvent.originalId) {
+              deletedEvents.push(e);
+              return false;
+            }
+            return true;
+          });
+        }
       }
     }
 

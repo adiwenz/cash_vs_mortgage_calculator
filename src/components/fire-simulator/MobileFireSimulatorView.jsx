@@ -1483,22 +1483,82 @@ export default function MobileFireSimulatorView({
                           </span>
                         </div>
                       </div>
-                      {isEditableEvent(selectedEvent) && (
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{
-                            padding: '0.25rem 0.6rem',
-                            fontSize: '0.75rem',
-                            height: '28px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            margin: 0
-                          }}
-                          onClick={() => setActiveEventForSheet(selectedEvent)}
-                        >
-                          ✏️ Edit Event Details
-                        </button>
+                      {selectedEvent.type === 'socialSecurity' ? (
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.75rem',
+                              height: '28px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => {
+                              if (scenario.setScenarios) {
+                                scenario.setScenarios(prev => prev.map(scen => {
+                                  if (scen.id !== scenario.currentScenarioId) return scen;
+                                  const nextEvents = (scen.inputs.lifeEvents || []).map(e => 
+                                    e.type === 'socialSecurity' ? { ...e, enabled: false } : e
+                                  );
+                                  const updatedInputs = {
+                                    ...scen.inputs,
+                                    includeSocialSecurity: false,
+                                    lifeEvents: nextEvents
+                                  };
+                                  if (updatedInputs.socialSecurity) {
+                                    updatedInputs.socialSecurity = {
+                                      ...updatedInputs.socialSecurity,
+                                      enabled: false
+                                    };
+                                  }
+                                  return {
+                                    ...scen,
+                                    inputs: updatedInputs
+                                  };
+                                }));
+                              }
+                              setSelectedEventIndex(0);
+                            }}
+                          >
+                            ❌ Remove Social Security
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.75rem',
+                              height: '28px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => handleEditRoadmapEvent(selectedEvent)}
+                          >
+                            ✏️ Edit Social Security
+                          </button>
+                        </div>
+                      ) : (
+                        isEditableEvent(selectedEvent) && (
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.75rem',
+                              height: '28px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => setActiveEventForSheet(selectedEvent)}
+                          >
+                            ✏️ Edit Event Details
+                          </button>
+                        )
                       )}
                     </div>
                     
@@ -1515,8 +1575,8 @@ export default function MobileFireSimulatorView({
                         </div>
                         <input
                           type="range"
-                          min={inputs.currentAge}
-                          max={inputs.lifeExpectancy}
+                          min={selectedEvent.type === 'socialSecurity' ? 62 : inputs.currentAge}
+                          max={selectedEvent.type === 'socialSecurity' ? 70 : inputs.lifeExpectancy}
                           value={Math.floor(selectedEvent.age)}
                           onChange={(e) => {
                             const newAge = Number(e.target.value);
@@ -1558,9 +1618,36 @@ export default function MobileFireSimulatorView({
                         details.push({ label: 'Savings Rate', value: `${selectedEvent.savingsRate || 0}%` });
                       } else if (selectedEvent.type === 'socialSecurity') {
                         const ss = displayedResults.socialSecurityDetails;
-                        if (ss && ss.isEligible) {
-                          details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity') || inputs.socialSecurity;
+                        const isCalculated = ssEv ? ssEv.useEarnings === true : false;
+
+                        details.push({ label: 'Claiming Age', value: `${ss ? ss.claimAge : (ssEv?.claimingAge || 67)}` });
+                        if (ss) {
+                          if (ss.isEligible) {
+                            details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                            details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
+                          } else {
+                            details.push({ label: 'Monthly Benefit', value: '$0 (Not Eligible)' });
+                            details.push({ label: 'Annual Benefit', value: '$0 (Not Eligible)' });
+                          }
                         }
+                        details.push({ 
+                          label: 'Filing Status', 
+                          value: inputs.filingStatus === 'married' ? 'Married Filing Jointly' : 'Single' 
+                        });
+                        if (inputs.filingStatus === 'married') {
+                          const spouseMember = inputs.householdMembers?.find(m => m.id === 'spouse');
+                          const spouseClaimAge = spouseMember?.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67;
+                          const spouseSS = displayedResults.spouseSocialSecurityDetails;
+                          details.push({ label: 'Spouse Claim Age', value: `${spouseClaimAge}` });
+                          if (spouseSS) {
+                            details.push({ label: 'Spouse Benefit', value: `${formatCurrency(spouseSS.monthlyBenefit)}/mo` });
+                          }
+                        }
+                        details.push({ 
+                          label: 'Calculation Type', 
+                          value: isCalculated ? 'Calculated (AIME)' : 'User-entered (Fixed)' 
+                        });
                       }
 
                       if (details.length === 0) return null;

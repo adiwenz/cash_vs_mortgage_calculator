@@ -402,6 +402,7 @@ export const getDefaultValuesForType = (type, currentAge) => {
 
 export const isEditableEvent = (evt) => {
   if (!evt) return false;
+  if (evt.type === 'socialSecurity') return true;
   const calculatedTypes = [
     'medicareEligibility',
     'socialSecurity',

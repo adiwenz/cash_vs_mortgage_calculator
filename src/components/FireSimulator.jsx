@@ -132,6 +132,9 @@ export default function FireSimulator() {
     inputs: simulationController.inputs,
     updateInput: simulationController.updateInput,
     updateAsset: simulationController.updateAsset,
+    scenarios: simulationController.scenarios,
+    setScenarios: simulationController.setScenarios,
+    currentScenarioId: simulationController.currentScenarioId,
     handleStep1Change: (key, value) => {
       if (key === 'simpleInvestments') {
         simulationController.updateAsset('brokerage', value);

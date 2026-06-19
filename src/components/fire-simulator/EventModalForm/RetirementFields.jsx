@@ -58,9 +58,48 @@ export default function RetirementFields({
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65)}
-              onChange={(e) => setEditingEvent({ ...editingEvent, claimingAge: parseInt(e.target.value) || 62, startAge: parseInt(e.target.value) || 62, age: parseInt(e.target.value) || 62 })}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 0;
+                let nextVal = val;
+                if (type === 'socialSecurity') {
+                  if (val > 70) {
+                    nextVal = 70;
+                  } else if (val >= 10 && val < 62) {
+                    nextVal = 62;
+                  }
+                }
+                setEditingEvent({
+                  ...editingEvent,
+                  claimingAge: nextVal,
+                  startAge: nextVal,
+                  age: nextVal
+                });
+              }}
+              onBlur={(e) => {
+                if (type === 'socialSecurity') {
+                  const val = parseInt(e.target.value) || 67;
+                  const clamped = Math.max(62, Math.min(70, val));
+                  setEditingEvent({
+                    ...editingEvent,
+                    claimingAge: clamped,
+                    startAge: clamped,
+                    age: clamped
+                  });
+                }
+              }}
             />
           </div>
+          {type === 'socialSecurity' && (() => {
+            const claimAge = editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65);
+            if (claimAge < 62 || claimAge > 70) {
+              return (
+                <div className="warning-box" style={{ gridColumn: 'span 2', background: 'rgba(244, 63, 94, 0.08)', color: 'var(--accent-rose, #f43f5e)', padding: '0.65rem', borderRadius: '4px', borderLeft: '3px solid var(--accent-rose, #f43f5e)', fontWeight: '500', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                  ⚠️ <strong>Validation Error:</strong> Social Security can only be taken between 62-70.
+                </div>
+              );
+            }
+            return null;
+          })()}
           {type === 'socialSecurity' && editingEvent.useEarnings === true && (
             <div className="input-wrapper">
               <span className="input-name">Age Started Working</span>

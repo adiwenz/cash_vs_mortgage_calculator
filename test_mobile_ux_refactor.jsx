@@ -219,10 +219,10 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(screen.queryByText('Edit Event Details')).toBeNull();
     expect(handleEditRoadmapEvent).not.toHaveBeenCalled();
 
-    // 3. Click the Social Security milestone to select it. It is calculated, so no edit details button exists in sheet.
+    // 3. Click the Social Security milestone to select it. It is now editable, so edit details button exists in sheet.
     const ssMilestoneBtn = screen.getByText('Social Sec.').closest('button');
     fireEvent.click(ssMilestoneBtn);
-    expect(screen.queryByText('Edit Event Details')).toBeNull();
+    expect(screen.queryByText('Edit Event Details')).not.toBeNull();
 
     // 4. Click the Target Retirement milestone (which is editable)
     const retireMilestoneBtn = screen.getByText('Stop Working').closest('button');

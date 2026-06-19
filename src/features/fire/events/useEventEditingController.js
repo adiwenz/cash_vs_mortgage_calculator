@@ -38,6 +38,71 @@ export function useEventEditingController({
     if (type === 'retire' && (inputs.lifeEvents || []).some(e => e.type === 'retire')) {
       return;
     }
+
+    if (type === 'socialSecurity') {
+      const currentScen = scenarios.find(s => s.id === currentScenarioId);
+      const inputsObj = currentScen ? currentScen.inputs : inputs;
+      const newInputs = { ...inputsObj };
+      newInputs.includeSocialSecurity = true;
+
+      let existingEvent = (newInputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
+      let existingSS = newInputs.socialSecurity;
+      let targetEvent = null;
+
+      if (existingEvent) {
+        newInputs.lifeEvents = newInputs.lifeEvents.map(e =>
+          e.type === 'socialSecurity' ? { ...e, enabled: true } : e
+        );
+        targetEvent = { ...existingEvent, enabled: true };
+      }
+
+      if (existingSS) {
+        newInputs.socialSecurity = {
+          ...existingSS,
+          enabled: true
+        };
+        if (!targetEvent) {
+          targetEvent = {
+            ...existingSS,
+            id: existingSS.id || 'ss-1',
+            type: 'socialSecurity',
+            enabled: true
+          };
+        }
+      }
+
+      if (!existingEvent && !existingSS) {
+        const defaults = getDefaultEvent('socialSecurity', { inputs: newInputs, isMobile });
+        newInputs.socialSecurity = {
+          ...defaults,
+          enabled: true
+        };
+        if (!newInputs.lifeEvents) {
+          newInputs.lifeEvents = [];
+        }
+        const defaultLifeEvent = {
+          ...defaults,
+          id: 'ss-1',
+          enabled: true
+        };
+        newInputs.lifeEvents.push(defaultLifeEvent);
+        targetEvent = defaultLifeEvent;
+      }
+
+      setScenarios(prev => prev.map(scen => {
+        if (scen.id !== currentScenarioId) return scen;
+        return {
+          ...scen,
+          inputs: newInputs
+        };
+      }));
+
+      setIsFullPartnerProfileOpen(false);
+      setIsZeroSpendingConfirmed(false);
+      setEditingEvent(targetEvent);
+      return;
+    }
+
     const defaults = getDefaultEvent(type, { inputs, isMobile: false });
     
     setIsFullPartnerProfileOpen(false);

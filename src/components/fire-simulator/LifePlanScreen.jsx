@@ -593,7 +593,9 @@ export default function LifePlanScreen({
                   <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
                     🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
                   </option>
-                  <option value="socialSecurity">💰 Social Security</option>
+                  <option value="socialSecurity" disabled={inputs.includeSocialSecurity !== false}>
+                    💰 Social Security{inputs.includeSocialSecurity !== false ? ' (Already Added)' : ''}
+                  </option>
                   <option value="pension">📜 Pension</option>
                   <option value="rentalIncome">🏢 Rental Income</option>
                   <option value="annuity">📈 Annuity</option>
@@ -763,22 +765,82 @@ export default function LifePlanScreen({
                           </span>
                         </div>
                       </div>
-                      {isEditableEvent(selectedMilestone) && (
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{
-                            padding: '0.3rem 0.8rem',
-                            fontSize: '0.75rem',
-                            height: '30px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            margin: 0
-                          }}
-                          onClick={() => handleEditRoadmapEvent(selectedMilestone)}
-                        >
-                          ✏️ Edit Decision
-                        </button>
+                      {selectedMilestone.type === 'socialSecurity' ? (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            style={{
+                              padding: '0.3rem 0.8rem',
+                              fontSize: '0.75rem',
+                              height: '30px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => {
+                              if (setScenarios) {
+                                setScenarios(prev => prev.map(scen => {
+                                  if (scen.id !== currentScenarioId) return scen;
+                                  const nextEvents = (scen.inputs.lifeEvents || []).map(e => 
+                                    e.type === 'socialSecurity' ? { ...e, enabled: false } : e
+                                  );
+                                  const updatedInputs = {
+                                    ...scen.inputs,
+                                    includeSocialSecurity: false,
+                                    lifeEvents: nextEvents
+                                  };
+                                  if (updatedInputs.socialSecurity) {
+                                    updatedInputs.socialSecurity = {
+                                      ...updatedInputs.socialSecurity,
+                                      enabled: false
+                                    };
+                                  }
+                                  return {
+                                    ...scen,
+                                    inputs: updatedInputs
+                                  };
+                                }));
+                              }
+                              setSelectedMilestone(null);
+                            }}
+                          >
+                            ❌ Remove Social Security
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{
+                              padding: '0.3rem 0.8rem',
+                              fontSize: '0.75rem',
+                              height: '30px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                          >
+                            ✏️ Edit Social Security
+                          </button>
+                        </div>
+                      ) : (
+                        isEditableEvent(selectedMilestone) && (
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{
+                              padding: '0.3rem 0.8rem',
+                              fontSize: '0.75rem',
+                              height: '30px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                          >
+                            ✏️ Edit Decision
+                          </button>
+                        )
                       )}
                     </div>
                     
@@ -820,10 +882,45 @@ export default function LifePlanScreen({
                         }
                       } else if (selectedMilestone.type === 'socialSecurity') {
                         const ss = displayedResults.socialSecurityDetails;
-                        if (ss && ss.isEligible) {
-                          details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
-                          details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
+                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity') || inputs.socialSecurity;
+                        const isCalculated = ssEv ? ssEv.useEarnings === true : false;
+                        
+                        details.push({ label: 'Claiming Age', value: `${ss ? ss.claimAge : (ssEv?.claimingAge || 67)}` });
+                        if (ss) {
+                          if (ss.isEligible) {
+                            details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                            details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
+                          } else {
+                            details.push({ label: 'Monthly Benefit', value: '$0 (Not Eligible)' });
+                            details.push({ label: 'Annual Benefit', value: '$0 (Not Eligible)' });
+                          }
                         }
+                        
+                        details.push({ 
+                          label: 'Filing Status', 
+                          value: inputs.filingStatus === 'married' ? 'Married Filing Jointly' : 'Single' 
+                        });
+                        
+                        if (inputs.filingStatus === 'married') {
+                          const spouseMember = inputs.householdMembers?.find(m => m.id === 'spouse');
+                          const spouseClaimAge = spouseMember?.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67;
+                          const spouseSS = displayedResults.spouseSocialSecurityDetails;
+                          details.push({
+                            label: 'Spouse Claim Age',
+                            value: `${spouseClaimAge}`
+                          });
+                          if (spouseSS) {
+                            details.push({
+                              label: 'Spouse Benefit',
+                              value: `${formatCurrency(spouseSS.monthlyBenefit)}/mo`
+                            });
+                          }
+                        }
+
+                        details.push({ 
+                          label: 'Calculation Type', 
+                          value: isCalculated ? 'Calculated (AIME)' : 'User-entered (Fixed)' 
+                        });
                       } else if (selectedMilestone.type === 'sabbatical') {
                         const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
                         if (ev) {

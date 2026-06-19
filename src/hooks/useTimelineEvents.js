@@ -231,6 +231,9 @@ export function useTimelineEvents(inputs, displayedResults) {
               description: `Taking a sabbatical until age ${ev.endAge} (income reduced by ${ev.incomeReduction}%).`
             });
           } else if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
+            if (ev.type === 'socialSecurity' && inp.includeSocialSecurity === false) {
+              return;
+            }
             let icon = '💰';
             let label = 'Social Security';
             if (ev.type === 'pension') { icon = '📜'; label = ev.name || 'Pension'; }
@@ -368,17 +371,19 @@ export function useTimelineEvents(inputs, displayedResults) {
     });
 
     // Ensure Social Security event is always present
-    const hasSS = events.some(e => e.type === 'socialSecurity');
-    if (!hasSS) {
-      events.push({
-        originalId: 'ss-1',
-        age: 67,
-        title: 'Social Security',
-        label: 'Social Security',
-        icon: '💰',
-        type: 'socialSecurity',
-        description: `Receiving Social Security benefits (default claiming age 67).`
-      });
+    if (inp.includeSocialSecurity !== false) {
+      const hasSS = events.some(e => e.type === 'socialSecurity');
+      if (!hasSS) {
+        events.push({
+          originalId: 'ss-1',
+          age: 67,
+          title: 'Social Security',
+          label: 'Social Security',
+          icon: '💰',
+          type: 'socialSecurity',
+          description: `Receiving Social Security benefits (default claiming age 67).`
+        });
+      }
     }
 
     // Ensure Stop Working Event is always present

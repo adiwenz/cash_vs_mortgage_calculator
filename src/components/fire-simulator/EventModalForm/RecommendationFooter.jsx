@@ -18,7 +18,13 @@ export default function RecommendationFooter({
   handleSaveEvent,
   setEditingEvent
 }) {
-  const isSaveDisabled = type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge;
+  const claimAge = editingEvent?.claimingAge !== undefined 
+    ? Number(editingEvent.claimingAge) 
+    : (editingEvent?.startAge !== undefined ? Number(editingEvent.startAge) : 65);
+
+  const isSaveDisabled = 
+    (type === 'borrowing' && editingEvent.timing === 'future' && Number(editingEvent.startAge) <= inputs.currentAge) ||
+    (type === 'socialSecurity' && (claimAge < 62 || claimAge > 70));
 
   return (
     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: (editingEvent.id && type !== 'retire' && type !== 'socialSecurity') ? 'space-between' : 'flex-end' }}>

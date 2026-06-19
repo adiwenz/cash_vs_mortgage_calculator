@@ -33,6 +33,8 @@ export function getIncomeHistory(inputs, overrideEvent = null, skipNormalizedPha
       const currentYear = new Date().getFullYear();
       const yearsWorked = currentYear - Number(ssEv.yearStartedWorking);
       startWorkingAge = Math.max(0, currentAge - yearsWorked);
+    } else {
+      startWorkingAge = Math.min(currentAge, 22);
     }
   }
 

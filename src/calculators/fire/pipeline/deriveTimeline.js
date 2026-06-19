@@ -12,7 +12,12 @@ export function deriveTimelineStage(normalizedInputs) {
   const enabledEvents = lifeEvents.filter(e => e.enabled);
   const targetRetirementAge = normalizedInputs.targetRetirementAge;
 
-  const ssEvent = enabledEvents.find(e => e.type === 'socialSecurity');
+  const includeSS = normalizedInputs.includeSocialSecurity !== false;
+  let ssEvent = includeSS ? enabledEvents.find(e => e.type === 'socialSecurity') : null;
+  if (!ssEvent && includeSS && normalizedInputs.socialSecurity && normalizedInputs.socialSecurity.enabled !== false) {
+    ssEvent = normalizedInputs.socialSecurity;
+  }
+
   let socialSecurityDetails = {
     claimAge: 67,
     workingYears: 0,

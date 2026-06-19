@@ -86,7 +86,23 @@ export function useScenarioState() {
 
       const newInputs = { ...scen.inputs };
 
-      if (evt.type === 'retire') {
+      if (evt.type === 'socialSecurity') {
+        const finalAge = Math.max(62, Math.min(70, newAge));
+        newInputs.lifeEvents = (newInputs.lifeEvents || []).map(e => {
+          if (e.type === 'socialSecurity') {
+            return { ...e, claimingAge: finalAge, startAge: finalAge, age: finalAge };
+          }
+          return e;
+        });
+        if (newInputs.socialSecurity) {
+          newInputs.socialSecurity = {
+            ...newInputs.socialSecurity,
+            claimingAge: finalAge,
+            startAge: finalAge,
+            age: finalAge
+          };
+        }
+      } else if (evt.type === 'retire') {
         newInputs.targetRetirementAge = newAge;
         newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
           if (e.type === 'retire') {
