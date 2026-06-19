@@ -1,154 +1,118 @@
 import React from 'react';
-import { formatCurrency } from './helpers';
-
-const formatCompactCurrency = (val) => {
-  if (val === null || val === undefined) return 'N/A';
-  if (val >= 1e6) {
-    return `$${(val / 1e6).toFixed(2)}M`;
-  }
-  if (val >= 1e3) {
-    return `$${(val / 1e3).toFixed(0)}K`;
-  }
-  return `$${val}`;
-};
 
 export default function OutcomeHeroCard({
   readyAge,
   targetRetirementAge,
-  freedomNumber,
   planStatus,
-  onViewRecommendations
+  runOutAge,
+  onViewRecommendations,
+  hasRecommendations = false
 }) {
-  const isPlanOnTrack = planStatus === 'comfortable' || planStatus === 'sustainable';
   const displayAge = readyAge || targetRetirementAge || 65;
 
-  let comparisonText = '';
-  if (displayAge < 65) {
-    comparisonText = `${65 - displayAge} years earlier than traditional retirement age 65`;
-  } else if (displayAge === 65) {
-    comparisonText = 'At traditional retirement age 65';
+  let statusIcon = '⚪';
+  let statusText = 'Needs Adjustment';
+  let accentColor = 'var(--text-secondary)'; // Gray default
+  let bgStyle = 'linear-gradient(135deg, rgba(100, 116, 139, 0.08) 0%, rgba(100, 116, 139, 0.02) 100%)';
+  let borderStyle = '1px solid rgba(100, 116, 139, 0.2)';
+  let headline = 'Work Optional Not Yet Achievable';
+
+  if (planStatus === 'comfortable') {
+    statusIcon = '🟢';
+    statusText = 'Comfortable';
+    accentColor = 'var(--accent-emerald)';
+    bgStyle = 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%)';
+    borderStyle = '1px solid rgba(16, 185, 129, 0.2)';
+    headline = `Work Optional at Age ${displayAge}`;
+  } else if (planStatus === 'sustainable') {
+    statusIcon = '🟠';
+    statusText = 'Sustainable';
+    accentColor = 'var(--accent-amber)';
+    bgStyle = 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%)';
+    borderStyle = '1px solid rgba(245, 158, 11, 0.2)';
+    headline = `Work Optional at Age ${displayAge}`;
   } else {
-    comparisonText = `${displayAge - 65} years later than traditional retirement age 65`;
+    // Needs Adjustment
+    if (runOutAge) {
+      headline = `Assets Run Out at Age ${runOutAge}`;
+    }
   }
 
   return (
     <div className="glass-card outcome-hero-card" style={{
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '1rem 1.5rem',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      padding: '1.25rem 1.5rem',
       marginBottom: '0.75rem',
-      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, rgba(99, 102, 241, 0.02) 100%)',
-      border: '1px solid var(--border-color)',
+      background: bgStyle,
+      border: borderStyle,
       borderRadius: '12px',
-      gap: '1.5rem',
-      flexWrap: 'wrap'
+      gap: '0.75rem',
+      width: '100%',
+      boxSizing: 'border-box',
+      transition: 'all var(--transition-normal)'
     }}>
-      {/* Age Metric (Left/Center Piece) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 auto' }}>
-        <div className="outcome-hero-icon-wrapper" style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          background: isPlanOnTrack ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.5rem'
-        }}>
-          {isPlanOnTrack ? '⛳' : '⚠️'}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 style={{
-            fontSize: '1.6rem',
-            fontWeight: '800',
-            margin: 0,
-            color: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)',
-            lineHeight: '1.2'
-          }}>
-            Can Stop Working at {displayAge}
-          </h2>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-            {comparisonText}
-          </span>
-        </div>
-      </div>
-
-      {/* Metrics Row (Right) */}
+      {/* Top Row: Status Badge & Recommendations Link */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '2rem',
+        justifyContent: 'space-between',
+        width: '100%',
         flexWrap: 'wrap',
-        flex: '0 1 auto'
+        gap: '0.5rem'
       }}>
-        {/* Freedom Number */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-            Freedom Number
-          </span>
-          <strong style={{ fontSize: '1.3rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-            {formatCompactCurrency(freedomNumber)}
-          </strong>
-        </div>
-
-        {/* Plan Status */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>
-            Plan Status
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: isPlanOnTrack ? 'var(--accent-emerald)' : 'var(--accent-orange, #f59e0b)'
-            }} />
-            <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: '800' }}>
-              {isPlanOnTrack ? 'On Track' : 'Needs Adjust'}
-            </strong>
-          </div>
-        </div>
-
-        {/* Recommendations CTA */}
-        <button
-          type="button"
-          className="btn-primary"
-          style={{
-            padding: '0.5rem 1rem',
-            fontSize: '0.8rem',
-            borderRadius: '8px',
+        {/* Status Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <span style={{ fontSize: '1rem', display: 'flex', alignItems: 'center' }}>{statusIcon}</span>
+          <span style={{
+            fontSize: '0.85rem',
             fontWeight: '700',
-            cursor: 'pointer',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
-            boxShadow: '0 2px 8px rgba(99, 102, 241, 0.15)',
-            color: '#fff'
-          }}
-          onClick={onViewRecommendations}
-        >
-          View Recommendations &rarr;
-        </button>
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            color: accentColor
+          }}>
+            {statusText}
+          </span>
+        </div>
+
+        {/* Small text link for recommendations if they exist */}
+        {hasRecommendations && (
+          <button
+            type="button"
+            onClick={onViewRecommendations}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: 'var(--primary)',
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.2rem',
+              transition: 'color var(--transition-fast)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
+          >
+            See ways to retire sooner &rarr;
+          </button>
+        )}
       </div>
 
-      {/* Hidden elements for compatibility with test assertions */}
-      <div style={{ display: 'none' }}>
-        <div>
-          <span>Comfortable Age</span>
-          <strong>{readyAge ? `Age ${readyAge}` : 'Plan Needs Adjustment'}</strong>
-        </div>
-        <div>
-          <span>Sustainable Age</span>
-          <strong>{readyAge ? `Age ${readyAge}` : 'Plan Needs Adjustment'}</strong>
-        </div>
-        <div>
-          <span>Indefinite Age</span>
-          <strong>{readyAge ? `Age ${readyAge}` : 'Plan Needs Adjustment'}</strong>
-        </div>
-      </div>
+      {/* Outcome Headline */}
+      <h2 style={{
+        fontSize: '1.6rem',
+        fontWeight: '800',
+        margin: 0,
+        color: accentColor,
+        lineHeight: '1.2'
+      }}>
+        {headline}
+      </h2>
     </div>
   );
 }

@@ -660,13 +660,13 @@ export default function LifePlanScreen({
           {/* Right Column */}
           <div className="desktop-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
             
-            {/* Outcome Hero Card */}
             <OutcomeHeroCard
               readyAge={displayedResults.retirementReadyAge}
               targetRetirementAge={displayedResults.targetRetirementAge}
-              freedomNumber={displayedResults.freedomNumber}
-              planStatus={displayedResults.planStatus}
+              planStatus={displayedResults.retirementOutcome}
+              runOutAge={displayedResults.runOutAge}
               onViewRecommendations={() => setShowImprovementModal(true)}
+              hasRecommendations={improvementPlan?.rankedPlan?.length > 0}
             />
 
 
