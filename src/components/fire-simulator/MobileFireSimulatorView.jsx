@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Home, 
   Map, 
@@ -617,6 +617,31 @@ export default function MobileFireSimulatorView({
   const [isCurrentSituationExpanded, setIsCurrentSituationExpanded] = useState(true);
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(true);
   const [isOutcomePreviewExpanded, setIsOutcomePreviewExpanded] = useState(true);
+
+  const chartContainerRef = useRef(null);
+  const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
+
+  const tooltipPos = useMemo(() => {
+    if (!activeTooltipCoord || !chartContainerRef.current) return undefined;
+
+    const anchorX = activeTooltipCoord.x;
+    const anchorY = activeTooltipCoord.y;
+
+    const markerRadius = 13.5;
+    const glowBlurRadius = 3;
+    const EVENT_CLEARANCE = 24;
+
+    const VISUAL_MARKER_RADIUS = markerRadius + glowBlurRadius;
+    let tooltipX = anchorX + VISUAL_MARKER_RADIUS + EVENT_CLEARANCE;
+
+    const chartWidth = chartContainerRef.current.clientWidth;
+    const tooltipWidth = 150;
+    tooltipX = Math.min(tooltipX, chartWidth - tooltipWidth - 12);
+
+    const tooltipY = anchorY - 50;
+
+    return { x: tooltipX, y: tooltipY };
+  }, [activeTooltipCoord]);
 
   const hasUserEvents = useMemo(() => {
     const list = timelineEvents || [];
@@ -1314,9 +1339,25 @@ export default function MobileFireSimulatorView({
                       </div>
                     </div>
 
-                    <div style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
+                    <div ref={chartContainerRef} style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                        <LineChart
+                          data={chartData}
+                          margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                          onMouseMove={(e) => {
+                            if (e && e.activeCoordinate) {
+                              setActiveTooltipCoord({
+                                x: e.activeCoordinate.x,
+                                y: e.activeCoordinate.y
+                              });
+                            } else {
+                              setActiveTooltipCoord(null);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setActiveTooltipCoord(null);
+                          }}
+                        >
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
                           <XAxis
                             dataKey="age"
@@ -1330,6 +1371,7 @@ export default function MobileFireSimulatorView({
                             tickFormatter={formatYAxis}
                           />
                           <Tooltip
+                            position={tooltipPos}
                             content={({ active, payload, label }) => {
                               if (active && payload && payload.length) {
                                 return (
