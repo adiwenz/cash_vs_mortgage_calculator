@@ -20,6 +20,7 @@ import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
 import MobileWorkOptionalHero from './MobileWorkOptionalHero';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
+import ChildPlanningModal from './ChildPlanningModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
@@ -660,7 +661,41 @@ export default function MobileFireSimulatorView({
   }, [timelineEvents]);
   const [whyPhaseExistsOpen, setWhyPhaseExistsOpen] = useState(true);
   const [activeChart, setActiveChart] = useState('netWorth'); // 'netWorth' | 'assetsDebt' | 'progress' | 'incomeSpending'
-  const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const selectedEventId = eventController?.selectedEventId;
+  const setSelectedEventId = eventController?.setSelectedEventId;
+
+  const selectedEvent = useMemo(() => {
+    if (!selectedEventId) return timelineEvents[0] || null;
+    const match = timelineEvents?.find(evt => 
+      (evt.originalId && String(evt.originalId) === String(selectedEventId)) ||
+      (!evt.originalId && evt.id && String(evt.id) === String(selectedEventId)) ||
+      (!evt.originalId && evt.type === 'retire' && selectedEventId === 'retire')
+    );
+    if (match && match.originalId) {
+      const exists = inputs.lifeEvents?.some(e => String(e.id) === String(match.originalId));
+      if (!exists) return timelineEvents[0] || null;
+    }
+    return match || timelineEvents[0] || null;
+  }, [selectedEventId, timelineEvents, inputs.lifeEvents]);
+
+  const selectedEventIndex = useMemo(() => {
+    if (!selectedEvent) return 0;
+    const idx = timelineEvents.findIndex(evt => evt === selectedEvent);
+    return idx >= 0 ? idx : 0;
+  }, [selectedEvent, timelineEvents]);
+
+  const setSelectedEventIndex = (idx) => {
+    const evt = timelineEvents[idx];
+    if (evt) {
+      const id = evt.originalId || evt.id || (evt.type === 'retire' ? 'retire' : null);
+      setSelectedEventId?.(id);
+      eventController?.setSelectedEvent?.(evt);
+    } else {
+      setSelectedEventId?.(null);
+      eventController?.setSelectedEvent?.(null);
+    }
+  };
+
   const [activeEventForSheet, setActiveEventForSheet] = useState(null);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
@@ -2814,8 +2849,15 @@ export default function MobileFireSimulatorView({
         </nav>
       )}
 
-      {/* Overlays / Modals */}
-      {editingEvent && (
+      {editingEvent && editingEvent.type === 'haveChild' ? (
+        <ChildPlanningModal
+          scenario={scenario}
+          eventController={eventController}
+          simulation={simulation}
+          uiState={uiState}
+          onClose={() => setEditingEvent(null)}
+        />
+      ) : editingEvent && (
         <MobileEventWizard
           scenario={scenario}
           eventController={eventController}

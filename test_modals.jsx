@@ -117,7 +117,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
   });
 
-  test('2. Child Event Modal & Child Welcome Modal - Full flow', async () => {
+  test('2. Child Event Modal - Full flow', async () => {
     navigateToStep2();
     
     // Open Add Decision dropdown
@@ -125,45 +125,34 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
     
     // Verify Child Event modal opens
-    expect(screen.getByRole('heading', { name: /Have a Child/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Add Child/i })).toBeDefined();
     
     // Verify default fields
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     expect(childNameInput.value).toBe('');
     
-    const parentAgeInput = getInputByWrapperText(/Parent's Age when Born/i);
+    const parentAgeInput = getInputByWrapperText(/Age Child Arrives/i);
     expect(parentAgeInput.value).toBe('35');
-    
-    // Test college cost checkbox triggers correct support details text
-    const collegeCheckbox = document.getElementById('include-college');
-    expect(collegeCheckbox).toBeDefined();
-    expect(collegeCheckbox.checked).toBe(false);
-    expect(screen.getByText(/Adds an additional/i)).toBeDefined();
     
     // Input child name
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
     expect(childNameInput.value).toBe('Liam');
     
-    // Save child event
-    const saveBtn = screen.getByRole('button', { name: /Save Event/i });
-    fireEvent.click(saveBtn);
+    // Continue to step 2
+    const continueBtn = screen.getByRole('button', { name: /Continue/i });
+    fireEvent.click(continueBtn);
     
-    // Verify Event Modal closes and Welcoming Modal opens
+    // Save child event anyway
+    const saveAnywayBtn = screen.getByRole('button', { name: /Save Child Event Anyway/i });
+    fireEvent.click(saveAnywayBtn);
+    
+    // Verify Modal closes
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Have a Child/i })).toBeNull();
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
     
-    // Welcome Modal buttons: Adjust Plan, Refine Child Costs, Done
-    expect(screen.getByRole('button', { name: /Adjust Plan/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /Refine Child Costs/i })).toBeDefined();
-    
-    // Click Done to close the welcome modal
-    clickDoneOnWelcomeModal('Liam');
-    
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
-    });
+    // Verify child event is saved to the timeline
+    expect(screen.getByText('👶 Have Child: Liam')).toBeDefined();
   });
 
   test('3. Debt Payoff Modal - Opens, updates state, and saves', async () => {
@@ -340,25 +329,33 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+    
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
     
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
-    clickDoneOnWelcomeModal('Liam');
     
     // Add child 2: Emma, born at 40
     fireEvent.change(select, { target: { value: 'haveChild' } });
     const childNameInput2 = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput2, { target: { value: 'Emma' } });
-    const parentAgeInput = getInputByWrapperText(/Parent's Age when Born/i);
+    const parentAgeInput = getInputByWrapperText(/Age Child Arrives/i);
     fireEvent.change(parentAgeInput, { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+    
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
     
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Emma!/i })).toBeDefined();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
-    clickDoneOnWelcomeModal('Emma');
 
     // Open Budget Modal via Set Budget button
     const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
@@ -390,7 +387,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(cancelBtnBudget);
   });
 
-  test('7. Edit child to include college and verify milestone updates', async () => {
+  test('7. Edit child details and verify updates', async () => {
     navigateToStep2();
     
     // Add Liam
@@ -398,12 +395,15 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
     
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
-    clickDoneOnWelcomeModal('Liam');
     
     // Click the timeline node for Liam
     const liamTooltipText = screen.getAllByText(/Have Child: Liam/i)[0];
@@ -414,22 +414,28 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
     fireEvent.click(editBtn);
     
-    // Verify college cost text is visible
-    expect(screen.getByText(/Adds an additional/i)).toBeDefined();
+    // Verify Edit Child Details modal opens
+    expect(screen.getByRole('heading', { name: /Edit Child Details/i })).toBeDefined();
     
-    // Check college checkbox
-    const collegeCheckbox = document.getElementById('include-college');
-    fireEvent.click(collegeCheckbox);
-    expect(collegeCheckbox.checked).toBe(true);
+    // Edit fields
+    const childNameInputEdit = screen.getByPlaceholderText(/e.g. Liam/i);
+    fireEvent.change(childNameInputEdit, { target: { value: 'Liam Edited' } });
+    const parentAgeInput = getInputByWrapperText(/Age Child Arrives/i);
+    fireEvent.change(parentAgeInput, { target: { value: '36' } });
     
-    // Save
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
-    
-    // Welcome modal should appear again
+    // Continue & Save
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
     });
-    clickDoneOnWelcomeModal('Liam');
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Edit Child Details/i })).toBeNull();
+    });
+    
+    // Verify edited info is saved on the timeline
+    expect(screen.getByText('👶 Have Child: Liam Edited')).toBeDefined();
   });
 
   test('8. Marriage Flow - Budget Modal Savings Fields are present and editable', async () => {
@@ -523,23 +529,21 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
 
     // Assert haveChild modal opens
-    expect(screen.getByRole('heading', { name: /Have a Child/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Add Child/i })).toBeDefined();
 
     // Enter child name
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
 
     // Save
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
-
-    // Done on welcome modal
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
     });
-    clickDoneOnWelcomeModal('Liam');
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
 
     // Find the child start element
@@ -553,16 +557,16 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
     fireEvent.click(editBtn);
 
-    // Verify Delete Event button is present in the dialog
-    let deleteBtn = screen.getByRole('button', { name: /Delete Event/i });
+    // Verify Delete Child button is present in the dialog
+    let deleteBtn = screen.getByRole('button', { name: /Delete Child/i });
     expect(deleteBtn).toBeDefined();
 
-    // Click Delete Event
+    // Click Delete Child
     fireEvent.click(deleteBtn);
 
     // Verify modal is closed and child event is deleted from timeline
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Have a Child/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Edit Child Details/i })).toBeNull();
       expect(screen.queryByText('👶 Have Child: Liam')).toBeNull();
     });
 
@@ -731,12 +735,15 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
     
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
-    clickDoneOnWelcomeModal('Liam');
 
     // Open Budget Modal via Set Budget button
     const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
@@ -753,7 +760,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(childcareRow).not.toBeNull();
     expect(childcareRow.textContent).toContain('Childcare');
     expect(childcareRow.textContent).toContain('🔒');
-    expect(childcareRow.textContent).toContain('$1,250');
+    expect(childcareRow.textContent).toContain('$1,500');
 
     // Verify that even if we click "Edit Needs", the childcare row remains locked (does not contain an input box)
     const editNeedsBtn = screen.getByRole('button', { name: /Edit Needs/i });
@@ -765,5 +772,62 @@ describe('FireSimulator Modals and Decision Wizards', () => {
 
     const updatedChildcareRow = document.querySelector('.childcare-locked-glow');
     expect(updatedChildcareRow.querySelector('input')).toBeNull();
+  });
+
+  test('13. Deleting a child event clears selected detail card', async () => {
+    navigateToStep2();
+
+    // Create a child event
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'haveChild' } });
+
+    // Assert haveChild modal opens
+    expect(screen.getByRole('heading', { name: /Add Child/i })).toBeDefined();
+
+    // Enter child name
+    const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
+    fireEvent.change(childNameInput, { target: { value: 'Liam' } });
+
+    // Save
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
+    });
+
+    // Find the child start element on the timeline/chart
+    const birthTextNode = screen.getByText('👶 Have Child: Liam');
+    const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    expect(birthNode).not.toBeNull();
+
+    // Click to select
+    fireEvent.click(birthNode);
+
+    // Confirm “Have Child” detail card appears (which contains the edit button)
+    const detailCard = document.querySelector('.selected-event-details-card');
+    expect(detailCard).not.toBeNull();
+    expect(detailCard.textContent).toContain('Have Child: Liam');
+
+    // Click Edit Decision to open the edit modal
+    const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
+    fireEvent.click(editBtn);
+
+    // Verify Delete Child button is present in the dialog
+    const deleteBtn = screen.getByRole('button', { name: /Delete Child/i });
+    expect(deleteBtn).toBeDefined();
+
+    // Click Delete Child
+    fireEvent.click(deleteBtn);
+
+    // Verify modal is closed, child event is deleted from timeline, and the detail card disappears
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Edit Child Details/i })).toBeNull();
+      expect(screen.queryByText('👶 Have Child: Liam')).toBeNull();
+      expect(document.querySelector('.selected-event-details-card')).toBeNull();
+    });
   });
 });

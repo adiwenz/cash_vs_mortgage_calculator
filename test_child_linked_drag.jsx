@@ -45,26 +45,21 @@ describe('Child Event Linked Dragging Regression Test', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
 
     // Assert haveChild modal opens
-    expect(screen.getByRole('heading', { name: /Have a Child/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Add Child/i })).toBeDefined();
 
     // Enter child name
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
 
-    // Keep parent's age when born at 35 (default)
     // Save
-    fireEvent.click(screen.getByRole('button', { name: /Save Event/i }));
-
-    // Done on welcome modal
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Welcome, Liam!/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
     });
-    const doneButtons = screen.getAllByRole('button', { name: /Done/i });
-    const doneBtn = doneButtons.find(btn => btn.classList.contains('btn-primary')) || doneButtons[0];
-    fireEvent.click(doneBtn);
+    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Welcome, Liam!/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
 
     // Verify initial positions of markers

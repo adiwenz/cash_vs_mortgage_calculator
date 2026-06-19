@@ -28,6 +28,9 @@ export function useEventEditingController({
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [notification, setNotification] = useState(null);
   
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  
   const [isFullPartnerProfileOpen, setIsFullPartnerProfileOpen] = useState(false);
   const [isZeroSpendingConfirmed, setIsZeroSpendingConfirmed] = useState(false);
   const [isPartnerZeroSpendingConfirmed, setIsPartnerZeroSpendingConfirmed] = useState(false);
@@ -150,7 +153,8 @@ export function useEventEditingController({
     // Handle side effects
     if (result.sideEffects.impactSummary) {
       if (eventToSave.type === 'haveChild') {
-        setChildImpactSummary(result.sideEffects.impactSummary);
+        // Bypassed: ChildPlanningModal handles affordability check inline
+        setChildImpactSummary(null);
       } else if (eventToSave.type === 'buyHouse') {
         setHouseImpactSummary(result.sideEffects.impactSummary);
       }
@@ -202,7 +206,19 @@ export function useEventEditingController({
       type: eventToDelete.type
     };
     handleDeleteRoadmapEvent(proxyEvent);
-    setEditingEvent(null);
+
+    const deletedEventId = eventToDelete.id || eventToDelete.originalId;
+    if (deletedEventId && String(deletedEventId) === String(selectedEventId)) {
+      setSelectedEventId(null);
+      setSelectedEvent(null);
+    }
+
+    if (deletedEventId && String(deletedEventId) === String(editingEvent?.id)) {
+      setEditingEvent(null);
+    } else {
+      setEditingEvent(null);
+    }
+
     setIsFullPartnerProfileOpen(false);
     setIsZeroSpendingConfirmed(false);
     setIsPartnerZeroSpendingConfirmed(false);
@@ -360,6 +376,10 @@ export function useEventEditingController({
     setDraggingInfo,
     notification,
     setNotification,
+    selectedEventId,
+    setSelectedEventId,
+    selectedEvent,
+    setSelectedEvent,
     isFullPartnerProfileOpen,
     setIsFullPartnerProfileOpen,
     isZeroSpendingConfirmed,

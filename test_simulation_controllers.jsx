@@ -99,4 +99,51 @@ describe('useEventEditingController tests', () => {
     });
     expect(mockUpdateInput).toHaveBeenCalledWith('currentConditions', expect.any(Array));
   });
+
+  test('deleting a child event clears selectedEventId, selectedEvent, and editingEvent', () => {
+    const mockSetScenarios = vi.fn();
+    const mockUpdateInput = vi.fn();
+    const mockCommitEventAgeChange = vi.fn();
+
+    const initialInputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      lifeEvents: [
+        { id: 'child-1', type: 'haveChild', childName: 'Liam', birthAge: 35 }
+      ]
+    };
+
+    const { result } = renderHook(() => useEventEditingController({
+      scenarios: [{ id: 'scen-1', inputs: initialInputs }],
+      setScenarios: mockSetScenarios,
+      currentScenarioId: 'scen-1',
+      inputs: initialInputs,
+      updateInput: mockUpdateInput,
+      activeResults: {},
+      timelineEvents: [],
+      handleSetBudgetClick: vi.fn(),
+      setIsBudgetOpenFromMarriageWizard: vi.fn(),
+      isMobile: false,
+      setShowImprovementModal: vi.fn(),
+      commitEventAgeChange: mockCommitEventAgeChange
+    }));
+
+    act(() => {
+      result.current.setSelectedEventId('child-1');
+      result.current.setSelectedEvent(initialInputs.lifeEvents[0]);
+      result.current.setEditingEvent(initialInputs.lifeEvents[0]);
+    });
+
+    expect(result.current.selectedEventId).toBe('child-1');
+    expect(result.current.selectedEvent).toEqual(initialInputs.lifeEvents[0]);
+    expect(result.current.editingEvent).toEqual(initialInputs.lifeEvents[0]);
+
+    act(() => {
+      result.current.handleDeleteEvent(initialInputs.lifeEvents[0]);
+    });
+
+    expect(mockSetScenarios).toHaveBeenCalled();
+    expect(result.current.selectedEventId).toBeNull();
+    expect(result.current.selectedEvent).toBeNull();
+    expect(result.current.editingEvent).toBeNull();
+  });
 });

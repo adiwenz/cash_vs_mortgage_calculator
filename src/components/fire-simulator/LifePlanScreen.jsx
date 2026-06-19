@@ -446,7 +446,44 @@ export default function LifePlanScreen({
 
   const improvementPlan = recommendationController?.improvementPlan ?? legacyImprovementPlan;
   const setShowImprovementModal = recommendationController?.setShowImprovementModal ?? legacySetShowImprovementModal;
-  const [selectedMilestone, setSelectedMilestone] = useState(null);
+  const selectedEventId = eventController?.selectedEventId;
+  const setSelectedEventId = eventController?.setSelectedEventId;
+
+  const selectedMilestone = useMemo(() => {
+    if (!selectedEventId) return null;
+    
+    // Find the corresponding milestone from timelineEvents
+    const match = timelineEvents?.find(evt => 
+      (evt.originalId && String(evt.originalId) === String(selectedEventId)) ||
+      (!evt.originalId && evt.id && String(evt.id) === String(selectedEventId)) ||
+      (!evt.originalId && evt.type === 'retire' && selectedEventId === 'retire')
+    );
+    
+    if (!match) return null;
+    
+    // Defensive check: if it is a user-editable event in lifeEvents, check if it still exists in lifeEvents
+    const hasOriginal = match.originalId;
+    if (hasOriginal) {
+      const existsInLifeEvents = inputs.lifeEvents?.some(e => String(e.id) === String(match.originalId));
+      if (!existsInLifeEvents) {
+        return null;
+      }
+    }
+    
+    return match;
+  }, [selectedEventId, timelineEvents, inputs.lifeEvents]);
+
+  const handleSelectMilestone = (milestone) => {
+    if (milestone) {
+      const id = milestone.originalId || milestone.id || (milestone.type === 'retire' ? 'retire' : null);
+      setSelectedEventId?.(id);
+      eventController?.setSelectedEvent?.(milestone);
+    } else {
+      setSelectedEventId?.(null);
+      eventController?.setSelectedEvent?.(null);
+    }
+  };
+
   const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
@@ -466,6 +503,7 @@ export default function LifePlanScreen({
     ];
     return list.some(e => !excludedTypes.includes(e.type));
   }, [timelineEvents]);
+
   useEffect(() => {
     if (editingEvent) {
       const match = timelineEvents?.find(evt => 
@@ -473,10 +511,12 @@ export default function LifePlanScreen({
         (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
       );
       if (match) {
-        setSelectedMilestone(match);
+        const id = match.originalId || match.id || (match.type === 'retire' ? 'retire' : null);
+        setSelectedEventId?.(id);
+        eventController?.setSelectedEvent?.(match);
       }
     }
-  }, [editingEvent, timelineEvents]);
+  }, [editingEvent, timelineEvents, setSelectedEventId, eventController]);
 
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [showAssets, setShowAssets] = useState(true);
@@ -730,7 +770,7 @@ export default function LifePlanScreen({
                   setSelectedYear={setSelectedYear}
                   timelineEvents={timelineEvents}
                   selectedMilestone={selectedMilestone}
-                  onSelectMilestone={setSelectedMilestone}
+                  onSelectMilestone={handleSelectMilestone}
                   handleNodeDragStart={handleNodeDragStart}
                   dragOccurredRef={dragOccurredRef}
                   isMobile={false}
@@ -802,7 +842,7 @@ export default function LifePlanScreen({
                                   };
                                 }));
                               }
-                              setSelectedMilestone(null);
+                              handleSelectMilestone(null);
                             }}
                           >
                             ❌ Remove Social Security

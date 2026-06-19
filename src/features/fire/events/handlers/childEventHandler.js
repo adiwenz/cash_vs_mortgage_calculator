@@ -90,38 +90,49 @@ export const childEventHandler = {
     }
     newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== childEventId && e.id !== editingEvent.id);
 
-    // Update or insert linked promotion in income list
-    if (!newInputs.incomeList) {
-      newInputs.incomeList = [];
-    }
-    const hasPromo = newInputs.incomeList.some(inc => inc.id === linkedPromoId || inc.parentEventId === childEventId);
-    if (hasPromo) {
-      newInputs.incomeList = newInputs.incomeList.map(inc => {
-        if (inc.id === linkedPromoId || inc.parentEventId === childEventId) {
-          return {
-            ...inc,
-            startAge: newPromoStartAgeVal,
-            salaryIncrease: peakCostVal,
-            name: editingEvent.childName ? `Promotion (${editingEvent.childName})` : 'Get a Promotion'
-          };
-        }
-        return inc;
-      });
+    // Update, insert, or delete linked Income Goal in income list
+    const hasPromo = newInputs.incomeList && newInputs.incomeList.some(inc => inc.id === linkedPromoId || inc.parentEventId === childEventId);
+    
+    if (editingEvent.noPromo) {
+      if (newInputs.incomeList) {
+        newInputs.incomeList = newInputs.incomeList.filter(inc => inc.id !== linkedPromoId && inc.parentEventId !== childEventId);
+      }
     } else {
-      newInputs.incomeList.push({
-        id: linkedPromoId,
-        name: editingEvent.childName ? `Promotion (${editingEvent.childName})` : 'Get a Promotion',
-        amount: 0,
-        frequency: 'yearly',
-        startAge: newPromoStartAgeVal,
-        endAge: newInputs.targetRetirementAge || 65,
-        growthRate: 0.03,
-        isTaxable: true,
-        incomeChangeType: 'increaseByAmount',
-        salaryIncrease: peakCostVal,
-        permanent: false,
-        parentEventId: childEventId
-      });
+      if (!newInputs.incomeList) {
+        newInputs.incomeList = [];
+      }
+      const promoAmount = editingEvent.customPromoAmount !== undefined ? editingEvent.customPromoAmount : peakCostVal;
+      const promoName = editingEvent.childName ? `Income Goal (${editingEvent.childName})` : 'Income Goal';
+
+      if (hasPromo) {
+        newInputs.incomeList = newInputs.incomeList.map(inc => {
+          if (inc.id === linkedPromoId || inc.parentEventId === childEventId) {
+            return {
+              ...inc,
+              startAge: newPromoStartAgeVal,
+              salaryIncrease: promoAmount,
+              amount: promoAmount,
+              name: promoName
+            };
+          }
+          return inc;
+        });
+      } else {
+        newInputs.incomeList.push({
+          id: linkedPromoId,
+          name: promoName,
+          amount: promoAmount,
+          frequency: 'yearly',
+          startAge: newPromoStartAgeVal,
+          endAge: newInputs.targetRetirementAge || 65,
+          growthRate: 0.03,
+          isTaxable: true,
+          incomeChangeType: 'increaseByAmount',
+          salaryIncrease: promoAmount,
+          permanent: true,
+          parentEventId: childEventId
+        });
+      }
     }
 
     newInputs.lifeEvents.push(savedEventObj);

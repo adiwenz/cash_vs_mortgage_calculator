@@ -188,6 +188,13 @@ export default function MobileEventWizard({
 
   // Initialize event with defaults
   const selectEventType = (type) => {
+    if (type === 'haveChild') {
+      const baseDefaults = getDefaultEvent('haveChild', { inputs, isMobile: true });
+      setEditingEvent({ ...baseDefaults, isNew: true });
+      if (onClose) onClose();
+      return;
+    }
+
     const preserveFields = draftEvent && (
       draftEvent.type === type || 
       (draftEvent.type === 'borrowing' && draftEvent.borrowingType === type)

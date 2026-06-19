@@ -2,6 +2,7 @@ import { useState } from 'react';
 import TodayScreen from './TodayScreen';
 import LifePlanScreen from './LifePlanScreen';
 import EventModalForm from './EventModalForm/EventModalForm';
+import ChildPlanningModal from './ChildPlanningModal';
 import ChildImpactModal from './ChildImpactModal';
 import HouseImpactModal from './HouseImpactModal';
 import HouseRebalanceModal from './HouseRebalanceModal';
@@ -199,7 +200,15 @@ export default function DesktopFireSimulatorView({
       />
 
       {/* Overlays / Modals */}
-      {editingEvent && (
+      {editingEvent && editingEvent.type === 'haveChild' ? (
+        <ChildPlanningModal
+          scenario={scenario}
+          eventController={eventController}
+          simulation={simulation}
+          uiState={uiState}
+          onClose={() => eventController.setEditingEvent(null)}
+        />
+      ) : editingEvent && (
         <EventModalForm
           simulation={simulation}
           scenario={scenario}

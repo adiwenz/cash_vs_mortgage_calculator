@@ -159,6 +159,10 @@ export default function FireSimulator() {
   const eventControllerModel = useMemo(() => ({
     editingEvent,
     setEditingEvent,
+    selectedEventId: eventController.selectedEventId,
+    setSelectedEventId: eventController.setSelectedEventId,
+    selectedEvent: eventController.selectedEvent,
+    setSelectedEvent: eventController.setSelectedEvent,
     handleCreateEvent: eventController.handleCreateEvent,
     handleEditRoadmapEvent: eventController.handleEditRoadmapEvent,
     handleSaveEvent: eventController.handleSaveEvent,
