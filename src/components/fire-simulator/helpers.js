@@ -473,3 +473,22 @@ export const getEventIcon = (evt) => {
   }
   return evt.icon || '';
 };
+
+export function getEventMarkerPosition(event, chartData, xScale, yScale, displayAge) {
+  if (!chartData || chartData.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  const eventAge = Number(displayAge !== undefined ? displayAge : event.age);
+  const closestPoint = chartData.reduce((best, point) =>
+    Math.abs(point.age - eventAge) < Math.abs(best.age - eventAge)
+      ? point
+      : best
+  , chartData[0]);
+
+  const xVal = xScale(eventAge) !== undefined ? xScale(eventAge) : xScale(closestPoint.age);
+  return {
+    x: xVal,
+    y: yScale(closestPoint.netWorth ?? 0)
+  };
+}
+

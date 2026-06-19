@@ -669,457 +669,7 @@ export default function LifePlanScreen({
               onViewRecommendations={() => setShowImprovementModal(true)}
             />
 
-            {/* Compact Timeline */}
-            {validation.errors.length === 0 && (
-              <div className="glass-card timeline-card" style={{ padding: '0.5rem 0.75rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div className="timeline-layout-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
-                    <div className="timeline-grid" style={{ minWidth: '850px' }}>
-                      
-                      {/* Layer 1: MILESTONES / EVENTS */}
-                      {(() => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        if (totalYears <= 0) return null;
-    
-                        return (
-                          <div className="timeline-row">
-                            <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
-                              <span style={{ fontWeight: 700 }}>Events</span>
-                            </div>
-                            <div className="timeline-row-content events-row-content">
-                              <div className="timeline-track-inner">
-                                <div className="events-axis-line" />
-                                {timelineEvents.map((evt, idx) => {
-                                  const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
-                                  const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
-                                  const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
-    
-                                  const isSelected = !!(selectedMilestone && (
-                                    (evt.originalId && String(selectedMilestone.originalId) === String(evt.originalId)) ||
-                                    (!evt.originalId && evt.type === selectedMilestone.type && evt.age === selectedMilestone.age)
-                                  ));
-    
-                                  const displayAge = (() => {
-                                    if (isPrimaryDragging) {
-                                      return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-                                    }
-                                    if (isLinkedDragging) {
-                                      const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
-                                      const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
-                                      const linkedEndDisplayAge = draggedDisplayAge + offset;
-    
-                                      console.log('[Child Linked Drag Debug]', {
-                                        childStartAge: draggedDisplayAge,
-                                        childEndAge: evt.age,
-                                        childEndOffset: offset,
-                                        draggedDisplayAge,
-                                        linkedEndDisplayAge
-                                      });
-                                      if (offset !== 0 && linkedEndDisplayAge === draggedDisplayAge) {
-                                        console.error('[Assert Failed] linkedEndDisplayAge is equal to draggedDisplayAge during dragging preview!');
-                                      }
-    
-                                      return linkedEndDisplayAge;
-                                    }
-                                    if (isDraggingThis && evt.type === 'retire') {
-                                      return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-                                    }
-                                    return evt.age;
-                                  })();
-                                  const percent = getPercent(displayAge);
-                                  const isFinancial = isFinancialEvent(evt);
-                                  const isNeutral = evt.type === 'today' || evt.type === 'lifeExpectancy';
-                                  const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
-    
-                                  const wrapperClass = isNeutral
-                                    ? 'neutral-milestone'
-                                    : isFinancial
-                                      ? 'financial-milestone'
-                                      : (evt.isMilestone || evt.type === 'retire')
-                                        ? 'milestone-event'
-                                        : 'standard-milestone';
-    
-                                  const showAgeLabel = (() => {
-                                    const hasConflict = timelineEvents.some((otherEvt) => {
-                                      if (otherEvt === evt) return false;
-                                      if (otherEvt.stackIndex !== evt.stackIndex) return false;
-                                      const isClose = Math.abs(otherEvt.age - evt.age) < 2.5;
-                                      if (!isClose) return false;
-                                      if (otherEvt.age < evt.age) return true;
-                                      if (otherEvt.age === evt.age && timelineEvents.indexOf(otherEvt) < idx) return true;
-                                      return false;
-                                    });
-                                    return !hasConflict;
-                                  })();
-    
-                                  const eventIcon = getEventIcon(evt);
-    
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
-                                      style={{
-                                        left: `${percent}%`,
-                                        bottom: `${16 + (evt.stackIndex * 38)}px`
-                                      }}
-                                      onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                                      onTouchStart={(e) => handleNodeDragStart(e, evt)}
-                                      onClick={(e) => {
-                                        if (dragOccurredRef.current) {
-                                          e.stopPropagation();
-                                          return;
-                                        }
-                                        setSelectedMilestone(evt);
-                                      }}
-                                    >
-                                      <div className="milestone-glow-circle">
-                                        {eventIcon}
-                                      </div>
-    
-                                      {/* Age indicator beneath marker */}
-                                      {showAgeLabel && (
-                                        <span className="milestone-age-label">
-                                          {Math.floor(displayAge)}
-                                        </span>
-                                      )}
-    
-                                      {/* Tooltip on hover */}
-                                      <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
-                                        <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                                          {eventIcon ? `${eventIcon} ` : ''}
-                                          {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
-                                        </div>
-                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
-                                          <div>Age {Math.floor(displayAge)} • {evt.description}</div>
-                                          {(() => {
-                                            if (evt.type === 'mortgageOff') {
-                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                              if (asset) {
-                                                return (
-                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                    P&I Savings: {formatCurrency(propPIAmount(asset))}/yr
-                                                  </div>
-                                                );
-                                              }
-                                            }
-                                            if (evt.type === 'socialSecurity') {
-                                              const ss = displayedResults.socialSecurityDetails;
-                                              if (ss && ss.isEligible) {
-                                                return (
-                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                    Benefit: {formatCurrency(ss.monthlyBenefit)}/mo ({formatCurrency(ss.annualBenefit)}/yr)
-                                                  </div>
-                                                );
-                                              }
-                                            }
-                                            if (evt.type === 'medicareEligibility') {
-                                              return (
-                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                  Pre-Medicare Premium: {formatCurrency(inputs.preMedicarePremium || 10000)}/yr | Medicare Premium: {formatCurrency(inputs.medicarePremium || 4000)}/yr
-                                                </div>
-                                              );
-                                            }
-                                            if (evt.type === 'buyHouse') {
-                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                              if (asset) {
-                                                return (
-                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                    Price: {formatCurrency(asset.purchasePrice || asset.homePrice || 0)} 
-                                                    {asset.purchaseType !== 'cash' && ` (${asset.mortgageRate || 6.5}% APR)`}
-                                                  </div>
-                                                );
-                                              }
-                                            }
-                                            if (evt.type === 'sellHouse') {
-                                              const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                              if (asset) {
-                                                return (
-                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                                    Property: {asset.name}
-                                                  </div>
-                                                );
-                                              }
-                                            }
-                                            if (evt.type === 'haveChild') {
-                                              const ev = inputs.lifeEvents?.find(e => e.id === evt.originalId);
-                                              if (ev) {
-                                                return (
-                                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                                    Support Term: {ev.includeCollege ? 22 : 18} years
-                                                  </div>
-                                                );
-                                              }
-                                            }
-                                            if (evt.type === 'marriage') {
-                                              return (
-                                                <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
-                                                  Spouse Income: {formatCurrency(evt.spouseIncome)}/yr
-                                                </div>
-                                              );
-                                            }
-                                            return null;
-                                          })()}
-                                        </div>
-                                      </div>
-    
-                                      {/* Line connector down to axis */}
-                                      {evt.stackIndex > 0 && (
-                                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-    
-                      {/* Layer 2: DECISION PHASES (MARRIAGE, CHILDCARE, HOMEOWNERSHIP) */}
-                      {(() => {
-                        const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                        if (totalYears <= 0) return null;
-    
-                        const activeCommitments = [];
-    
-                        // Homeownership spans
-                        inputs.lifeEvents.forEach(ev => {
-                          if (ev.enabled && ev.type === 'buyHouse' && ev.houseId) {
-                            const asset = inputs.houseAssets?.find(h => h.id === ev.houseId);
-                            const houseName = asset?.name || 'Primary Home';
-                            const buyAge = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-                            const sellEv = inputs.lifeEvents.find(e => e.type === 'sellHouse' && e.houseId === ev.houseId && e.enabled);
-                            const sellAge = sellEv ? Number(sellEv.age) : inputs.lifeExpectancy;
-                            activeCommitments.push({
-                              id: `house-${ev.houseId}`,
-                              label: houseName,
-                              emoji: '🏠',
-                              startAge: buyAge,
-                              endAge: sellAge,
-                              className: 'commitment-span home'
-                            });
-                          }
-                        });
-    
-                        // Childcare support
-                        const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
-                        if (childEvents.length > 0) {
-                          const activeAges = [];
-                          for (let age = inputs.currentAge; age < inputs.lifeExpectancy; age++) {
-                            if (getActiveChildrenCountAtAge(age, inputs.lifeEvents) > 0) {
-                              activeAges.push(age);
-                            }
-                          }
-                          
-                          const ccIntervals = [];
-                          if (activeAges.length > 0) {
-                            let start = activeAges[0];
-                            let prev = activeAges[0];
-                            for (let i = 1; i < activeAges.length; i++) {
-                              if (activeAges[i] === prev + 1) {
-                                prev = activeAges[i];
-                              } else {
-                                ccIntervals.push({ start, end: prev + 1 });
-                                start = activeAges[i];
-                                prev = activeAges[i];
-                              }
-                            }
-                            ccIntervals.push({ start, end: prev + 1 });
-                          }
-    
-                          ccIntervals.forEach((interval, idx) => {
-                            activeCommitments.push({
-                              id: `childcare-${idx}`,
-                              label: 'Childcare & Support',
-                              emoji: '👶',
-                              startAge: interval.start,
-                              endAge: interval.end,
-                              className: 'commitment-span childcare'
-                            });
-                          });
-                        }
-    
-                        // Marriage
-                        const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
-                        const divorceEvent = (inputs.lifeEvents || []).find(e => e.type === 'divorce' && e.enabled);
-                        const hasSpouseInHousehold = (inputs.householdMembers || []).some(m => m.id === 'spouse');
-                        if (marriageEvent || hasSpouseInHousehold) {
-                          const start = marriageEvent ? Number(marriageEvent.age) : inputs.currentAge;
-                          const end = divorceEvent ? Number(divorceEvent.age) : inputs.lifeExpectancy;
-                          activeCommitments.push({
-                            id: 'marriage',
-                            label: 'Marriage',
-                            emoji: '💍',
-                            startAge: start,
-                            endAge: end,
-                            className: 'commitment-span marriage'
-                          });
-                        }
-    
-                        // Payoff Plans
-                        (inputs.lifeEvents || []).forEach(ev => {
-                          if (ev.enabled && ev.type === 'payoffPlan') {
-                            const borrowing = (inputs.lifeEvents || []).find(b => b.id === ev.borrowingId);
-                            const borrowingName = borrowing ? borrowing.name : 'Borrowing';
-                            let start = Number(ev.startAge);
-                            let end = Number(ev.payoffAge);
-    
-                            // Apply drag offset in real-time if we are currently dragging this payoff plan or its linked borrowing event
-                            if (draggingInfo) {
-                              if (draggingInfo.type === 'borrowing' && draggingInfo.originalId === ev.borrowingId) {
-                                const shift = draggingInfo.currentAge - draggingInfo.initialAge;
-                                start = draggingInfo.currentAge;
-                                end = ev.payoffAge + shift;
-                              } else if (draggingInfo.type === 'payoffPlanEnd' && draggingInfo.originalId === ev.id) {
-                                const minPossibleEnd = start + 1;
-                                end = Math.max(minPossibleEnd, draggingInfo.currentAge);
-                              }
-                            }
-                            
-                            if (end > start && start < inputs.lifeExpectancy) {
-                              activeCommitments.push({
-                                id: ev.id,
-                                label: `Payoff: ${borrowingName}`,
-                                emoji: '🏁',
-                                startAge: start,
-                                endAge: Math.min(inputs.lifeExpectancy, end),
-                                className: 'commitment-span payoffPlan'
-                              });
-                            }
-                          }
-                        });
-    
-                        return activeCommitments.map(c => {
-                          const startPct = Math.max(0, Math.min(100, getPercent(c.startAge)));
-                          const endPct = Math.max(0, Math.min(100, getPercent(c.endAge)));
-                          const widthPct = endPct - startPct;
-                          if (widthPct <= 0) return null;
-    
-                          const isRowHighlighted = !!(editingEvent && (
-                            (editingEvent.type === 'haveChild' && c.id.startsWith('childcare')) ||
-                            (editingEvent.type === 'marriage' && c.id === 'marriage') ||
-                            ((editingEvent.type === 'buyHouse' || editingEvent.type === 'sellHouse') && c.id === `house-${editingEvent.houseId}`) ||
-                            (editingEvent.type === 'payoffPlan' && c.id === editingEvent.id) ||
-                            (editingEvent.type === 'borrowing' && (inputs.lifeEvents || []).some(le => le.type === 'payoffPlan' && le.id === c.id && le.borrowingId === editingEvent.id))
-                          ));
-    
-                          return (
-                            <div className={`timeline-row ${isRowHighlighted ? 'highlighted' : ''}`} key={c.id}>
-                              <div className="timeline-row-label" style={{ padding: '0.35rem 0.75rem', fontSize: '0.65rem', width: '120px', minWidth: '120px', display: 'flex', alignItems: 'center', fontWeight: 700 }}>
-                                <span style={{ marginRight: '0.25rem' }}>{c.emoji}</span> {c.label}
-                              </div>
-                              <div className="timeline-row-content commitment-track">
-                                <div className="timeline-track-inner">
-                                  <div
-                                    className={`${c.className} ${isRowHighlighted ? 'highlighted' : ''}`}
-                                    style={{
-                                      left: `${startPct}%`,
-                                      width: `${widthPct}%`
-                                    }}
-                                  >
-                                    {c.emoji} {c.label} (Age {c.startAge}–{c.endAge === inputs.lifeExpectancy ? `${c.startAge}+` : c.endAge})
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-    
-                      {/* CHRONOLOGICAL AGE TICKS */}
-                      <div className="timeline-row">
-                        <div className="timeline-row-label" style={{ opacity: 0, borderRight: 'none', width: '120px', minWidth: '120px', padding: '0.35rem 0.75rem' }}>Ages</div>
-                        <div className="timeline-row-content ticks-row-content">
-                          <div className="timeline-track-inner">
-                            {(() => {
-                              const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-                              const ticks = [];
-                              const tickInterval = 5;
-                              const startTick = Math.ceil(inputs.currentAge / tickInterval) * tickInterval;
-                              const endTick = Math.floor(inputs.lifeExpectancy / tickInterval) * tickInterval;
-                              for (let age = startTick; age <= endTick; age += tickInterval) {
-                                ticks.push(age);
-                              }
-                              return ticks.map((age, idx) => {
-                                const percent = getPercent(age);
-                                return (
-                                  <div key={idx} className="timeline-tick-new" style={{ left: `${percent}%` }}>
-                                    <div className="timeline-tick-mark-new" />
-                                    <span className="timeline-tick-label-new">{age}</span>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-    
-                    </div>
-                  </div>
-                </div>
-                {/* Selected Milestone Detail Card */}
-                {selectedMilestone && (
-                  <div 
-                    className="selected-milestone-card" 
-                    style={{
-                      marginTop: '0.75rem',
-                      padding: '0.75rem 1rem',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.4rem',
-                      animation: 'fadeIn 0.2s ease-in-out'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {(() => {
-                          const icon = getEventIcon(selectedMilestone);
-                          return icon ? <span style={{ fontSize: '1.25rem' }}>{icon}</span> : null;
-                        })()}
-                        <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                          {selectedMilestone.type === 'today' ? 'Today' : selectedMilestone.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedMilestone.title || selectedMilestone.label)}
-                        </span>
-                        <span 
-                          style={{
-                            fontSize: '0.7rem',
-                            fontWeight: '700',
-                            color: 'var(--primary)',
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(99, 102, 241, 0.2)'
-                          }}
-                        >
-                          Age {Math.floor(selectedMilestone.age)}
-                        </span>
-                      </div>
-                      {isEditableEvent(selectedMilestone) && (
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{
-                            padding: '0.25rem 0.75rem',
-                            fontSize: '0.75rem',
-                            height: '28px',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => handleEditRoadmapEvent(selectedMilestone)}
-                        >
-                          ✏️ Edit Decision
-                        </button>
-                      )}
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      {selectedMilestone.description}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+
 
             {/* Projection Graph */}
             {validation.errors.length === 0 && (
@@ -1176,7 +726,149 @@ export default function LifePlanScreen({
                   showDebt={showDebt}
                   showNetWorth={showNetWorth}
                   setSelectedYear={setSelectedYear}
+                  timelineEvents={timelineEvents}
+                  selectedMilestone={selectedMilestone}
+                  onSelectMilestone={setSelectedMilestone}
+                  handleNodeDragStart={handleNodeDragStart}
+                  dragOccurredRef={dragOccurredRef}
+                  isMobile={false}
+                  draggingInfo={draggingInfo}
                 />
+
+                {/* Selected Event details card */}
+                {selectedMilestone && (
+                  <div 
+                    className="selected-event-details-card" 
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem 1.25rem',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      animation: 'fadeIn 0.2s ease-in-out'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontSize: '1.4rem' }}>{getEventIcon(selectedMilestone)}</span>
+                        <div>
+                          <div style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                            {selectedMilestone.type === 'today' ? 'Today' : selectedMilestone.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedMilestone.title || selectedMilestone.label)}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--primary-light, #a5b4fc)' }}>
+                            Age {Math.floor(selectedMilestone.age)}
+                          </span>
+                        </div>
+                      </div>
+                      {isEditableEvent(selectedMilestone) && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{
+                            padding: '0.3rem 0.8rem',
+                            fontSize: '0.75rem',
+                            height: '30px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            margin: 0
+                          }}
+                          onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                        >
+                          ✏️ Edit Decision
+                        </button>
+                      )}
+                    </div>
+                    
+                    <p style={{ margin: '0.25rem 0', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {selectedMilestone.description}
+                    </p>
+
+                    {(() => {
+                      const details = [];
+                      if (selectedMilestone.type === 'buyHouse') {
+                        const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
+                        if (asset) {
+                          details.push({ label: 'Purchase Price', value: formatCurrency(asset.purchasePrice || asset.homePrice || 0) });
+                          details.push({ label: 'Down Payment', value: formatCurrency(asset.downPayment || 0) });
+                          if (asset.purchaseType !== 'cash') {
+                            const annualPI = propPIAmount(asset);
+                            details.push({ label: 'Monthly Payment (P&I)', value: formatCurrency(annualPI / 12) });
+                            details.push({ label: 'Mortgage Rate', value: `${asset.mortgageRate || 6.5}%` });
+                          }
+                        }
+                      } else if (selectedMilestone.type === 'sellHouse') {
+                        const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
+                        if (asset) {
+                          details.push({ label: 'Property Name', value: asset.name });
+                          details.push({ label: 'Appreciation Rate', value: `${asset.appreciationRate || 3.0}%` });
+                        }
+                      } else if (selectedMilestone.type === 'haveChild') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                        if (ev) {
+                          details.push({ label: 'Child Name', value: ev.childName || 'Child' });
+                          details.push({ label: 'Support Term', value: `${ev.includeCollege ? 22 : 18} years` });
+                          details.push({ label: 'College Funding', value: ev.includeCollege ? 'Yes' : 'No' });
+                        }
+                      } else if (selectedMilestone.type === 'marriage') {
+                        details.push({ label: 'Spouse Income', value: `${formatCurrency(selectedMilestone.spouseIncome)}/yr` });
+                        details.push({ label: 'Savings Rate', value: `${selectedMilestone.savingsRate || 0}%` });
+                        if (selectedMilestone.includeWeddingCost) {
+                          details.push({ label: 'Wedding Cost', value: formatCurrency(selectedMilestone.weddingCost) });
+                        }
+                      } else if (selectedMilestone.type === 'socialSecurity') {
+                        const ss = displayedResults.socialSecurityDetails;
+                        if (ss && ss.isEligible) {
+                          details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                          details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
+                        }
+                      } else if (selectedMilestone.type === 'sabbatical') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                        if (ev) {
+                          details.push({ label: 'End Age', value: `Age ${ev.endAge}` });
+                          details.push({ label: 'Income Reduction', value: `${ev.incomeReduction}%` });
+                        }
+                      } else if (selectedMilestone.type === 'college') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                        if (ev) {
+                          details.push({ label: 'Tuition Cost', value: `${formatCurrency(ev.tuitionCost)}/yr` });
+                          details.push({ label: 'Duration', value: `${ev.duration || 4} years` });
+                        }
+                      } else if (selectedMilestone.type === 'windfall') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                        if (ev) {
+                          details.push({ label: 'Amount', value: formatCurrency(ev.amount) });
+                        }
+                      } else if (selectedMilestone.type === 'borrowing') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                        if (ev) {
+                          details.push({ label: 'Initial Balance', value: formatCurrency(ev.balance) });
+                          details.push({ label: 'Interest Rate', value: `${ev.interestRate}%` });
+                          details.push({ label: 'Min Monthly Payment', value: `${formatCurrency(ev.minPayment)}/mo` });
+                        }
+                      }
+
+                      if (details.length === 0) return null;
+
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                          {details.map((d, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {d.label}
+                              </span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700', marginTop: '0.1rem' }}>
+                                {d.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {displayedResults.yearsWithLimitsReached > 0 && (
                   <div style={{

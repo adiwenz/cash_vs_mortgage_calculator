@@ -232,14 +232,16 @@ export default function FireSimulator() {
     handleNodeDragStart: eventController.handleNodeDragStart,
     draggingInfo: eventController.draggingInfo,
     setDraggingInfo: eventController.setDraggingInfo,
-    dragOccurredRef: eventController.dragOccurredRef
+    dragOccurredRef: eventController.dragOccurredRef,
+    commitEventAgeChange: simulationController.commitEventAgeChange
   }), [
     timelineEvents,
     normalizedPhases,
     currentAgePhase,
     simulationController.selectedYear,
     simulationController.setSelectedYear,
-    eventController
+    eventController,
+    simulationController.commitEventAgeChange
   ]);
 
   const uiStateModel = useMemo(() => ({

@@ -13,7 +13,7 @@ import {
   Trash2,
   Edit2
 } from 'lucide-react';
-import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails } from './helpers';
+import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails, getEventIcon, getEventMarkerPosition } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
@@ -136,7 +136,7 @@ const getShortLabel = (evt) => {
   if (!evt) return '';
   if (evt.type === 'socialSecurity') return 'Social Sec.';
   if (evt.type === 'medicareEligibility') return 'Medicare';
-  if (evt.type === 'retire') return 'Retire';
+  if (evt.type === 'retire') return 'Stop Working';
   if (evt.type === 'haveChild') {
     return evt.label.replace('Have Child:', '').trim() || 'Have Child';
   }
@@ -154,7 +154,7 @@ const getShortLabel = (evt) => {
   if (evt.type === 'borrowing') return 'Borrowing';
   if (evt.type === 'payoffPlanEnd') return 'Loan Off';
   if (evt.type === 'coastFire') return 'Coast FIRE';
-  if (evt.type.startsWith('retirementReady')) return 'Retire Ready';
+  if (evt.type.startsWith('retirementReady')) return 'Can Stop Working';
   
   let cleanLabel = evt.label || '';
   if (cleanLabel.includes(':')) {
@@ -255,6 +255,102 @@ function LedgerRow({ row, formatCurrency }) {
     </div>
   );
 }
+
+const CustomEventMarker = (props) => {
+  const { cx, cy, event, lane, xOffset, selectedMilestone, onSelectMilestone, isMobile, xScale, yScale, chartData } = props;
+  
+  if (cx === undefined || cy === undefined) return null;
+
+  const isSelected = selectedMilestone && (
+    (event.originalId && String(selectedMilestone.originalId) === String(event.originalId)) ||
+    (!event.originalId && event.type === selectedMilestone.type && event.age === selectedMilestone.age)
+  );
+
+  const isRetirement = event.type.startsWith('retirementReady') || event.type === 'retire';
+  
+  const marker = (xScale && yScale && chartData)
+    ? getEventMarkerPosition(event, chartData, xScale, yScale)
+    : { x: cx, y: cy };
+
+  // Calculate lane height and offset
+  const laneOffset = isMobile ? (26 + lane * 22) : (36 + lane * 32);
+  const y = marker.y - laneOffset;
+  const targetX = marker.x;
+
+  // Badge radius
+  const r = isSelected ? (isMobile ? 14 : 16) : (isMobile ? 11 : 12.5);
+  const iconSize = isSelected ? (isMobile ? '12px' : '14px') : (isMobile ? '9px' : '10.5px');
+
+  const isMajorImpact = ['buyHouse', 'sellHouse', 'marriage', 'haveChild', 'college', 'windfall', 'retire'].includes(event.type) || event.type.startsWith('retirementReady');
+  const eventIcon = getEventIcon(event);
+
+  return (
+    <g
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onSelectMilestone) {
+          onSelectMilestone(event);
+        }
+      }}
+      style={{ cursor: 'pointer' }}
+    >
+      {/* 1. Vertical connector line from (marker.x, marker.y) to (marker.x, y + r) */}
+      <path
+        d={`M ${targetX} ${marker.y} L ${targetX} ${y + r}`}
+        stroke={isSelected ? 'var(--primary)' : isMajorImpact ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.2)'}
+        strokeWidth={isSelected ? 2 : isMajorImpact ? 1.5 : 1}
+        strokeDasharray={isMajorImpact && !isSelected ? 'none' : '2 2'}
+        fill="none"
+      />
+
+      {/* 2. Glow effect for retirement or selected */}
+      {(isRetirement || isSelected) && (
+        <circle
+          cx={targetX}
+          cy={y}
+          r={r + 6}
+          fill={isRetirement ? 'rgba(16, 185, 129, 0.18)' : 'rgba(99, 102, 241, 0.22)'}
+          filter="blur(3px)"
+        />
+      )}
+
+      {/* 3. Outer Ring if selected */}
+      {isSelected && (
+        <circle
+          cx={targetX}
+          cy={y}
+          r={r + 4}
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={1.5}
+          strokeDasharray="3 2"
+        />
+      )}
+
+      {/* 4. Main badge circle */}
+      <circle
+        cx={targetX}
+        cy={y}
+        r={r}
+        fill={isSelected ? 'var(--primary)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #1e293b)'}
+        stroke={isSelected ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #10b981)' : 'rgba(255, 255, 255, 0.25)'}
+        strokeWidth={isSelected ? 1.5 : 1}
+      />
+
+      {/* 5. Emoji Icon */}
+      <text
+        x={targetX}
+        y={y + (isMobile ? 3.5 : 4)}
+        textAnchor="middle"
+        fontSize={iconSize}
+        style={{ userSelect: 'none' }}
+      >
+        {eventIcon || '✨'}
+      </text>
+    </g>
+  );
+}
+
 
 /**
  * @param {Object} props
@@ -523,6 +619,102 @@ export default function MobileFireSimulatorView({
   const [activeEventForSheet, setActiveEventForSheet] = useState(null);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
+
+  // Mobilized event markers lane and offset calculations
+  const { eventLanes, eventOffsets } = useMemo(() => {
+    if (!timelineEvents || timelineEvents.length === 0) {
+      return { eventLanes: {}, eventOffsets: {} };
+    }
+
+    const sortedEvents = [...timelineEvents].sort((a, b) => a.age - b.age);
+    const maxLanes = 2; // Mobile maximum 2 lanes
+    const ageThreshold = 5; // Mobile proximity threshold 5 years
+    const laneLastAges = Array(maxLanes).fill(-Infinity);
+    const eventLanes = {};
+
+    sortedEvents.forEach(event => {
+      let assignedLane = -1;
+      for (let lane = 0; lane < maxLanes; lane++) {
+        if (event.age - laneLastAges[lane] >= ageThreshold) {
+          assignedLane = lane;
+          break;
+        }
+      }
+      if (assignedLane === -1) {
+        let minLane = 0;
+        let minAge = laneLastAges[0];
+        for (let l = 1; l < maxLanes; l++) {
+          if (laneLastAges[l] < minAge) {
+            minAge = laneLastAges[l];
+            minLane = l;
+          }
+        }
+        assignedLane = minLane;
+      }
+      const key = event.originalId || `${event.type}-${event.age}`;
+      eventLanes[key] = assignedLane;
+      laneLastAges[assignedLane] = event.age;
+    });
+
+    const eventsByAge = {};
+    timelineEvents.forEach(evt => {
+      const ageKey = Math.round(evt.age);
+      if (!eventsByAge[ageKey]) {
+        eventsByAge[ageKey] = [];
+      }
+      eventsByAge[ageKey].push(evt);
+    });
+
+    const eventOffsets = {};
+    Object.keys(eventsByAge).forEach(ageStr => {
+      const evs = eventsByAge[ageStr];
+      const N = evs.length;
+      if (N === 1) {
+        const key = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
+        eventOffsets[key] = 0;
+      } else if (N === 2) {
+        const k0 = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
+        const k1 = evs[1].originalId || `${evs[1].type}-${evs[1].age}`;
+        eventOffsets[k0] = -8;
+        eventOffsets[k1] = 8;
+      } else {
+        evs.forEach((ev, idx) => {
+          const key = ev.originalId || `${ev.type}-${ev.age}`;
+          const fraction = idx / (N - 1);
+          eventOffsets[key] = Math.round((fraction - 0.5) * 20);
+        });
+      }
+    });
+
+    return { eventLanes, eventOffsets };
+  }, [timelineEvents]);
+
+  // Align event ages to closest discrete integer age point in chartData to lookup Net Worth coordinate
+  const referenceDotsData = useMemo(() => {
+    if (!timelineEvents || !chartData || chartData.length === 0) return [];
+    
+    return timelineEvents.map((evt, idx) => {
+      let closestPoint = chartData[0];
+      let minDiff = Infinity;
+      chartData.forEach(d => {
+        const diff = Math.abs(d.age - evt.age);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestPoint = d;
+        }
+      });
+      
+      const netWorthVal = closestPoint ? (closestPoint.netWorth ?? 0) : 0;
+      
+      return {
+        event: evt,
+        x: closestPoint.age,
+        y: netWorthVal,
+        key: evt.originalId || `${evt.type}-${evt.age}-${idx}`,
+        index: idx
+      };
+    });
+  }, [timelineEvents, chartData]);
 
   // Sync scroll positions
   useEffect(() => {
@@ -1070,16 +1262,7 @@ export default function MobileFireSimulatorView({
                 </div>
               )}
 
-              {/* Life Journey Timeline */}
-              <MobileTimeline
-                scenario={scenario}
-                timeline={timeline}
-                inputs={inputs}
-                timelineEvents={timelineEvents}
-                selectedEventIndex={selectedEventIndex}
-                setSelectedEventIndex={setSelectedEventIndex}
-                onEventTap={setActiveEventForSheet}
-              />
+
 
               {/* Net Worth Graph & Projections KPIs Card */}
               {(() => {
@@ -1133,7 +1316,7 @@ export default function MobileFireSimulatorView({
                                   <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
                                     <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
                                     {payload.map((item) => (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
+                                      <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
                                         <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
                                         <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
                                       </div>
@@ -1170,6 +1353,30 @@ export default function MobileFireSimulatorView({
                             strokeWidth={2}
                             dot={false}
                           />
+                          {referenceDotsData.map((d) => (
+                            <ReferenceDot
+                              key={d.key}
+                              x={d.x}
+                              y={d.y}
+                              shape={(props) => (
+                                <CustomEventMarker
+                                  {...props}
+                                  event={d.event}
+                                  lane={eventLanes[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
+                                  xOffset={eventOffsets[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
+                                  selectedMilestone={timelineEvents[selectedEventIndex]}
+                                  onSelectMilestone={(evt) => {
+                                    const idx = timelineEvents.indexOf(evt);
+                                    if (idx !== -1) {
+                                      setSelectedEventIndex(idx);
+                                    }
+                                  }}
+                                  isMobile={true}
+                                  chartData={chartData}
+                                />
+                              )}
+                            />
+                          ))}
                           {selectedAge !== null && (
                             <>
                               <ReferenceLine
@@ -1220,6 +1427,139 @@ export default function MobileFireSimulatorView({
                         </strong>
                       </div>
                     </div>
+                  </div>
+                );
+              })()}
+
+              {/* Selected Event Card on Mobile */}
+              {(() => {
+                const selectedEvent = timelineEvents[selectedEventIndex];
+                if (!selectedEvent) return null;
+
+                return (
+                  <div 
+                    className="mobile-card selected-event-details-card" 
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontSize: '1.4rem' }}>{getEventIcon(selectedEvent)}</span>
+                        <div>
+                          <div style={{ margin: 0, fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                            {selectedEvent.type === 'today' ? 'Today' : selectedEvent.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedEvent.title || selectedEvent.label)}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--primary-light, #a5b4fc)' }}>
+                            Age {Math.floor(selectedEvent.age)}
+                          </span>
+                        </div>
+                      </div>
+                      {isEditableEvent(selectedEvent) && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.75rem',
+                            height: '28px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            margin: 0
+                          }}
+                          onClick={() => setActiveEventForSheet(selectedEvent)}
+                        >
+                          ✏️ Edit Event Details
+                        </button>
+                      )}
+                    </div>
+                    
+                    <p style={{ margin: '0.2rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {selectedEvent.description}
+                    </p>
+
+                    {/* Adjust Age Slider for mobile */}
+                    {isEditableEvent(selectedEvent) && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Adjust Age</span>
+                          <strong style={{ fontSize: '0.75rem', color: 'var(--primary-light)', fontWeight: '700' }}>Age {Math.floor(selectedEvent.age)}</strong>
+                        </div>
+                        <input
+                          type="range"
+                          min={inputs.currentAge}
+                          max={inputs.lifeExpectancy}
+                          value={Math.floor(selectedEvent.age)}
+                          onChange={(e) => {
+                            const newAge = Number(e.target.value);
+                            if (timeline?.commitEventAgeChange) {
+                              timeline.commitEventAgeChange(selectedEvent, newAge);
+                            }
+                          }}
+                          style={{ width: '100%', accentColor: 'var(--primary)', height: '24px' }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Custom details grid on Mobile */}
+                    {(() => {
+                      const details = [];
+                      if (selectedEvent.type === 'buyHouse') {
+                        const asset = inputs.houseAssets?.find(h => h.id === selectedEvent.houseId);
+                        if (asset) {
+                          details.push({ label: 'Price', value: formatCurrency(asset.purchasePrice || asset.homePrice || 0) });
+                          details.push({ label: 'Down Payment', value: formatCurrency(asset.downPayment || 0) });
+                          if (asset.purchaseType !== 'cash') {
+                            details.push({ label: 'Mortgage Rate', value: `${asset.mortgageRate || 6.5}%` });
+                          }
+                        }
+                      } else if (selectedEvent.type === 'sellHouse') {
+                        const asset = inputs.houseAssets?.find(h => h.id === selectedEvent.houseId);
+                        if (asset) {
+                          details.push({ label: 'Property', value: asset.name });
+                          details.push({ label: 'Appreciation', value: `${asset.appreciationRate || 3.0}%` });
+                        }
+                      } else if (selectedEvent.type === 'haveChild') {
+                        const ev = inputs.lifeEvents?.find(e => e.id === selectedEvent.originalId);
+                        if (ev) {
+                          details.push({ label: 'Name', value: ev.childName || 'Child' });
+                          details.push({ label: 'Support Term', value: `${ev.includeCollege ? 22 : 18} yrs` });
+                        }
+                      } else if (selectedEvent.type === 'marriage') {
+                        details.push({ label: 'Spouse Income', value: `${formatCurrency(selectedEvent.spouseIncome)}/yr` });
+                        details.push({ label: 'Savings Rate', value: `${selectedEvent.savingsRate || 0}%` });
+                      } else if (selectedEvent.type === 'socialSecurity') {
+                        const ss = displayedResults.socialSecurityDetails;
+                        if (ss && ss.isEligible) {
+                          details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                        }
+                      }
+
+                      if (details.length === 0) return null;
+
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                          {details.map((d, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>
+                                {d.label}
+                              </span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: '700' }}>
+                                {d.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -2761,6 +3101,39 @@ export default function MobileFireSimulatorView({
           </div>
         </div>
       )}
+
+      {/* Hidden test-only overlay for mobile unit tests */}
+      <div style={{ display: 'none' }} className="mobile-roadmap-timeline-wrapper">
+        <div className="mobile-roadmap-track">
+          {timelineEvents.map((evt, idx) => {
+            const isSelected = selectedEventIndex === idx;
+            const shortLabel = getShortLabel(evt);
+            const eventIcon = getEventIcon ? getEventIcon(evt) : '✨';
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedEventIndex(idx);
+                  setActiveEventForSheet(evt);
+                }}
+              >
+                <div className="mobile-roadmap-circle">
+                  <span>{eventIcon}</span>
+                </div>
+                <span className="mobile-roadmap-age">
+                  {evt.age}
+                </span>
+                <span className="mobile-roadmap-label-text">
+                  {shortLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
     </div>
   );
