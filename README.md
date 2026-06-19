@@ -25,11 +25,10 @@ A premium, interactive web application comparing long-term net worth trajectorie
 
 ## Project Structure
 
-* **[src/calculations.js](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/src/calculations.js)**: Amortization logic, stock compounding, tax calculations, and the `validateInputs()` utility.
-* **[src/App.jsx](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/src/App.jsx)**: Main entry coordinating inputs, theme (dark/light), active views, and warning sections.
-* **[src/components/AssumptionsPanel.jsx](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/src/components/AssumptionsPanel.jsx)**: Handles string states for precise input boxes, clamps percent ranges, and displays tooltip helpers.
-* **[src/components/ComparisonChart.jsx](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/src/components/ComparisonChart.jsx)**: High-performance Recharts line chart with zoom boundaries and error lock sheets.
-* **[src/components/ComparisonTable.jsx](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/src/components/ComparisonTable.jsx)**: Tabular year-by-year logs supporting exports to CSV.
+This project follows a strict boundary-driven structure separating pure mathematical simulation pipelines, domain hooks, decoupled handlers, and presentational UI components.
+
+For a detailed walkthrough of the pipeline stages, domain boundaries, state handler hooks, and extension guides, please refer to the **[Architecture Documentation (ARCHITECTURE.md)](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/ARCHITECTURE.md)**.
+
 
 ---
 
