@@ -277,9 +277,25 @@ const CustomEventMarker = (props) => {
   const y = marker.y - laneOffset;
   const targetX = marker.x;
 
-  // Badge radius
-  const r = isSelected ? (isMobile ? 14 : 16) : (isMobile ? 11 : 12.5);
-  const iconSize = isSelected ? (isMobile ? '12px' : '14px') : (isMobile ? '9px' : '10.5px');
+  // Base radius and coordinates
+  const baseR = isRetirement
+    ? (isMobile ? 13.5 : 15) // larger icon for Work Optional
+    : (isMobile ? 11 : 12.5); // standard size
+
+  const r = isSelected ? baseR + 1.5 : baseR;
+
+  const baseIconSize = isRetirement
+    ? (isMobile ? '11px' : '13px')
+    : (isMobile ? '9px' : '10.5px');
+
+  const iconSize = isSelected
+    ? `${parseFloat(baseIconSize) * 1.15}px`
+    : baseIconSize;
+
+  const textOffset = isRetirement
+    ? (isMobile ? 4.5 : 5)
+    : (isMobile ? 3.5 : 4);
+  const currentTextOffset = isSelected ? textOffset * 1.15 : textOffset;
 
   const isMajorImpact = ['buyHouse', 'sellHouse', 'marriage', 'haveChild', 'college', 'windfall', 'retire'].includes(event.type) || event.type.startsWith('retirementReady');
   const eventIcon = getEventIcon(event);
@@ -309,7 +325,11 @@ const CustomEventMarker = (props) => {
           cx={targetX}
           cy={y}
           r={r + 6}
-          fill={isRetirement ? 'rgba(16, 185, 129, 0.18)' : 'rgba(99, 102, 241, 0.22)'}
+          fill={
+            isSelected
+              ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
+              : 'rgba(16, 185, 129, 0.18)'
+          }
           filter="blur(3px)"
         />
       )}
@@ -340,7 +360,7 @@ const CustomEventMarker = (props) => {
       {/* 5. Emoji Icon */}
       <text
         x={targetX}
-        y={y + (isMobile ? 3.5 : 4)}
+        y={y + currentTextOffset}
         textAnchor="middle"
         fontSize={iconSize}
         style={{ userSelect: 'none' }}

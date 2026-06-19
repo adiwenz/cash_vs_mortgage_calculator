@@ -43,11 +43,26 @@ const CustomEventMarker = (props) => {
   const targetX = marker.x;
 
   // Base radius and floated coordinates on hover/selection
-  const r = isSelected ? (isMobile ? 14 : 16) : (isMobile ? 11 : 12.5);
+  const baseR = isRetirement
+    ? (isMobile ? 13.5 : 15) // larger icon for Work Optional
+    : (isMobile ? 11 : 12.5); // standard size
+
+  const r = isSelected ? baseR + 2.5 : baseR;
   const currentY = isHovered ? y - 3 : y;
   const currentR = isHovered ? r * 1.15 : r;
 
-  const iconSize = (isSelected || isHovered) ? (isMobile ? '12px' : '14px') : (isMobile ? '9px' : '10.5px');
+  const baseIconSize = isRetirement
+    ? (isMobile ? '11px' : '13px')
+    : (isMobile ? '9px' : '10.5px');
+
+  const iconSize = (isSelected || isHovered)
+    ? `${parseFloat(baseIconSize) * 1.2}px`
+    : baseIconSize;
+
+  const textOffset = isRetirement
+    ? (isMobile ? 4.5 : 5)
+    : (isMobile ? 3.5 : 4);
+  const currentTextOffset = (isSelected || isHovered) ? textOffset * 1.15 : textOffset;
 
   const transitionStyle = {
     transition: 'all 180ms ease'
@@ -145,7 +160,13 @@ const CustomEventMarker = (props) => {
           cx={targetX}
           cy={currentY}
           r={currentR + (isHovered ? 8 : 6)}
-          fill={isHovered ? 'rgba(34, 197, 94, 0.35)' : isRetirement ? 'rgba(16, 185, 129, 0.18)' : 'rgba(99, 102, 241, 0.22)'}
+          fill={
+            isHovered
+              ? (isRetirement ? 'rgba(16, 185, 129, 0.4)' : 'rgba(99, 102, 241, 0.4)')
+              : isSelected
+                ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
+                : 'rgba(16, 185, 129, 0.18)'
+          }
           filter="blur(3px)"
           style={transitionStyle}
         />
@@ -179,39 +200,13 @@ const CustomEventMarker = (props) => {
       {/* 5. Emoji Icon */}
       <text
         x={targetX}
-        y={currentY + (isMobile ? 3.5 : 4) * (isHovered ? 1.15 : 1)}
+        y={currentY + currentTextOffset}
         textAnchor="middle"
-        fontSize={isHovered ? `${parseFloat(iconSize) * 1.15}px` : iconSize}
+        fontSize={iconSize}
         style={{ ...transitionStyle, userSelect: 'none' }}
       >
         {eventIcon || '✨'}
       </text>
-
-      {/* 6. Special label for Work Optional / target retirement ready age */}
-      {event.type.startsWith('retirementReady') && !isMobile && (
-        <g style={transitionStyle}>
-          <rect
-            x={targetX - 45}
-            y={currentY - currentR - 18}
-            width={90}
-            height={14}
-            rx={4}
-            fill="rgba(16, 185, 129, 0.85)"
-            stroke="var(--accent-emerald)"
-            strokeWidth={0.5}
-          />
-          <text
-            x={targetX}
-            y={currentY - currentR - 8}
-            textAnchor="middle"
-            fontSize="7.5px"
-            fill="#ffffff"
-            fontWeight="700"
-          >
-            Work Optional ✨
-          </text>
-        </g>
-      )}
     </g>
   );
 };
@@ -458,39 +453,7 @@ export default function ProjectionGraph({
             />
           ))}
 
-          {/* 1. Can Stop Working Age */}
-          {displayedResults.targetRetirementAge && (
-            <ReferenceLine
-              x={displayedResults.targetRetirementAge}
-              stroke="#a855f7"
-              strokeDasharray="3 3"
-              strokeWidth={1.5}
-              label={{
-                value: `Work Optional: Age ${displayedResults.targetRetirementAge}`,
-                position: 'insideTopRight',
-                fill: 'var(--text-primary)',
-                fontSize: 9,
-                dy: 10
-              }}
-            />
-          )}
 
-          {/* 2. Retirement Ready Age */}
-          {displayedResults.retirementReadyAge && (
-            <ReferenceLine
-              x={displayedResults.retirementReadyAge}
-              stroke="#10b981"
-              strokeDasharray="4 4"
-              strokeWidth={1.5}
-              label={{
-                value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${displayedResults.retirementReadyAge}`,
-                position: 'insideTopRight',
-                fill: 'var(--text-primary)',
-                fontSize: 9,
-                dy: 25
-              }}
-            />
-          )}
 
           {/* 3. Assets Depleted Age */}
           {displayedResults.runOutAge && (
