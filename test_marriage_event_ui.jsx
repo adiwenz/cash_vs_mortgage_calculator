@@ -180,9 +180,8 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     const timelineLabel = screen.getAllByText(/Get Married/i);
     expect(timelineLabel.length).toBeGreaterThanOrEqual(2);
 
-    // Verify new retirement age is displayed in the stats section
-    const currentRetAgeValue = getStatsCardValue('Comfortable Age');
-    expect(currentRetAgeValue).toBe(`Age ${afterRetAge}`);
+    // Verify new retirement age is displayed in the outcome hero
+    expect(screen.getByText(new RegExp(`Work Optional at Age ${afterRetAge}`, 'i'))).toBeDefined();
 
     // Click the Set Budget button to open the budget modal directly
     const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
@@ -243,7 +242,14 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
       expect(screen.queryByRole('heading', { name: /Budget/i, level: 3 })).toBeNull();
     });
 
-    const retAgeBeforeBudgetChange = parseInt(getStatsCardValue('Comfortable Age').match(/\d+/)[0], 10);
+    const getWorkOptionalAge = () => {
+      const heroText = screen.getByText(/Work Optional at Age/i).textContent;
+      const match = heroText.match(/Age\s+(\d+)/i);
+      if (!match) throw new Error(`Could not find age in text: ${heroText}`);
+      return parseInt(match[1], 10);
+    };
+
+    const retAgeBeforeBudgetChange = getWorkOptionalAge();
 
     // 2. Open Update Budget again to increase household spending
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
@@ -268,7 +274,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     });
 
     // Verify retirement age recalculates (it should increase since spending is higher)
-    const retAgeAfterBudgetChange = parseInt(getStatsCardValue('Comfortable Age').match(/\d+/)[0], 10);
+    const retAgeAfterBudgetChange = getWorkOptionalAge();
     expect(retAgeAfterBudgetChange).toBeGreaterThan(retAgeBeforeBudgetChange);
 
     // Verify timeline phase and milestone remain intact

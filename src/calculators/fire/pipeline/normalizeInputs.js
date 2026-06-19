@@ -1,19 +1,11 @@
 import { getActiveChildrenCountAtAge } from '../../../simulatorMathUtils.js';
 import { getPartitionedPhases } from '../phases.js';
+import { normalizeSocialSecurityEvent } from '../socialSecurity.js';
 
 export function normalizeInputsStage(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
-  const lifeEvents = inputs.lifeEvents ? inputs.lifeEvents.map(e => {
-    if (e.type === 'socialSecurity') {
-      return {
-        ...e,
-        ageStartedWorking: Number(e.ageStartedWorking ?? 22),
-        claimingAge: Number(e.claimingAge ?? e.claimAge ?? 67)
-      };
-    }
-    return { ...e };
-  }) : [];
+  const lifeEvents = inputs.lifeEvents ? inputs.lifeEvents.map(e => e.type === 'socialSecurity' ? normalizeSocialSecurityEvent(e, inputs) : { ...e }) : [];
   const enabledEvents = lifeEvents.filter(e => e.enabled);
   const retireEvent = enabledEvents.find(e => e.type === 'retire');
   const targetRetirementAge = retireEvent 

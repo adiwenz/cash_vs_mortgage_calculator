@@ -1,3 +1,5 @@
+import { normalizeSocialSecurityEvent } from './socialSecurity.js';
+
 const parseNum = (val, defaultVal) => {
   if (val === undefined || val === null || val === '') return defaultVal;
   const num = Number(val);
@@ -49,7 +51,7 @@ export function getProfileFromInputs(inputs) {
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],
     isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1),
-    lifeEvents: inputs.lifeEvents || []
+    lifeEvents: (inputs.lifeEvents || []).map(e => e.type === 'socialSecurity' ? normalizeSocialSecurityEvent(e, inputs) : { ...e })
   };
 }
 
@@ -59,7 +61,11 @@ export function getEventsFromInputs(inputs) {
   // 1. Standard lifeEvents
   if (inputs.lifeEvents) {
     inputs.lifeEvents.forEach(e => {
-      events.push({ ...e });
+      if (e.type === 'socialSecurity') {
+        events.push(normalizeSocialSecurityEvent(e, inputs));
+      } else {
+        events.push({ ...e });
+      }
     });
   }
 

@@ -121,7 +121,8 @@ export const DEFAULT_FIRE_INPUTS = {
       enabled: true,
       claimingAge: 67,
       monthlyBenefit: 2000,
-      inflationAdjusted: true
+      inflationAdjusted: true,
+      ageStartedWorking: 22
     },
     {
       id: 'retire-1',

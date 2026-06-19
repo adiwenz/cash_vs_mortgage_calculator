@@ -4,10 +4,15 @@ import {
   normalizeEventAge, 
   normalizeCurrency 
 } from './eventHandlerUtils.js';
+import { normalizeSocialSecurityEvent } from '../../../../calculators/fire/socialSecurity.js';
 
 export const incomeEventHandler = {
   edit(baseEvent, inputs) {
     if (!baseEvent) return null;
+
+    if (baseEvent.type === 'socialSecurity') {
+      return normalizeSocialSecurityEvent(baseEvent, inputs);
+    }
 
     const isFromIncomeList = inputs.incomeList?.some(i => i.id === baseEvent.id);
     if (isFromIncomeList || baseEvent.type === 'careerChange') {
@@ -79,6 +84,11 @@ export const incomeEventHandler = {
           claimingAge = Math.max(62, Math.min(70, claimingAge));
         }
 
+        let normalizedSS = null;
+        if (type === 'socialSecurity') {
+          normalizedSS = normalizeSocialSecurityEvent({ ...editingEvent, claimingAge }, inputs);
+        }
+
         const newEventObj = {
           id: editingEvent.id && !['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(editingEvent.id)
             ? editingEvent.id
@@ -92,7 +102,7 @@ export const incomeEventHandler = {
           monthlyBenefit: normalizeCurrency(editingEvent.monthlyBenefit, 1000),
           inflationAdjusted: editingEvent.inflationAdjusted !== false,
           useEarnings: editingEvent.useEarnings === true,
-          ageStartedWorking: editingEvent.ageStartedWorking !== undefined ? Number(editingEvent.ageStartedWorking) : 22
+          ageStartedWorking: normalizedSS ? normalizedSS.ageStartedWorking : (editingEvent.ageStartedWorking !== undefined ? Number(editingEvent.ageStartedWorking) : 22)
         };
 
         if (!newInputs.lifeEvents) {
