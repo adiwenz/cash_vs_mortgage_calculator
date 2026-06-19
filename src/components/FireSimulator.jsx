@@ -27,6 +27,133 @@ import { calculateUSTaxForModal } from '../simulatorMathUtils';
 import { applyChildRecommendation } from '../domain/events/child/childRecommendations';
 import './FireSimulator.css';
 
+/**
+ * @typedef {Object} SimulationViewModel
+ * @property {Object} activeResults
+ * @property {Object} baselineResults
+ * @property {Object} displayedResults
+ * @property {Object} displayedBaselineResults
+ * @property {Array} chartData
+ * @property {Array} baselineChartData
+ * @property {Object} validation
+ * @property {number} totalNetWorth
+ * @property {number} todayAssets
+ * @property {number} todayDebt
+ * @property {number} todayNetWorth
+ * @property {Object} tempSocialSecurityDetails
+ */
+
+/**
+ * @typedef {Object} ScenarioModel
+ * @property {Object} inputs
+ * @property {Function} updateInput
+ * @property {Function} updateAsset
+ * @property {Function} handleStep1Change
+ * @property {Function} getInputsWithEvent
+ */
+
+/**
+ * @typedef {Object} EventController
+ * @property {Object|null} editingEvent
+ * @property {Function} setEditingEvent
+ * @property {Function} handleCreateEvent
+ * @property {Function} handleEditRoadmapEvent
+ * @property {Function} handleSaveEvent
+ * @property {Function} handleDeleteEvent
+ * @property {Function} handleDeleteRoadmapEvent
+ * @property {Object|null} childImpactSummary
+ * @property {Function} setChildImpactSummary
+ * @property {Object|null} houseImpactSummary
+ * @property {Function} setHouseImpactSummary
+ * @property {Object|null} houseRebalanceSummary
+ * @property {Function} setHouseRebalanceSummary
+ * @property {boolean} isFullPartnerProfileOpen
+ * @property {Function} setIsFullPartnerProfileOpen
+ * @property {boolean} isZeroSpendingConfirmed
+ * @property {Function} setIsZeroSpendingConfirmed
+ * @property {boolean} isPartnerZeroSpendingConfirmed
+ * @property {Function} setIsPartnerZeroSpendingConfirmed
+ * @property {Object} dragOccurredRef
+ */
+
+/**
+ * @typedef {Object} BudgetController
+ * @property {boolean} isBudgetModalOpen
+ * @property {Function} setIsBudgetModalOpen
+ * @property {string|null} activeBudgetPhase
+ * @property {Function} handleSwitchBudgetPhase
+ * @property {string} savingsAllocMode
+ * @property {Function} handleToggleSavingsAllocMode
+ * @property {string} budgetScalingMode
+ * @property {Function} handleToggleBudgetScalingMode
+ * @property {Object} budgetSavings
+ * @property {Function} setBudgetSavings
+ * @property {Object} budgetPartnerSavings
+ * @property {Function} setBudgetPartnerSavings
+ * @property {Object} budgetExpenses
+ * @property {Function} setBudgetExpenses
+ * @property {number} budgetMonthlyIncome
+ * @property {Function} setBudgetMonthlyIncome
+ * @property {number} budgetMonthlySpending
+ * @property {Function} setBudgetMonthlySpending
+ * @property {number} budgetMonthlySavings
+ * @property {Function} setBudgetMonthlySavings
+ * @property {Object|null} pendingImprovement
+ * @property {Function} setPendingImprovement
+ * @property {Object} budgetDiffs
+ * @property {Function} setBudgetDiffs
+ * @property {Function} handleSetBudgetClick
+ * @property {Function} handleCloseBudgetModal
+ * @property {Function} handleSaveBudget
+ * @property {boolean} isBudgetOpenFromMarriageWizard
+ * @property {Function} setIsBudgetOpenFromMarriageWizard
+ * @property {boolean} isSavingsDetailsOpen
+ * @property {Function} setIsSavingsDetailsOpen
+ * @property {Object} savingsDetails
+ * @property {Function} setSavingsDetails
+ * @property {Function} handleOpenSavingsDetails
+ * @property {Function} handleSaveSavingsDetails
+ * @property {Object} lastNonZeroSavingsRateRef
+ */
+
+/**
+ * @typedef {Object} RecommendationController
+ * @property {Object|null} improvementPlan
+ * @property {boolean} showImprovementModal
+ * @property {Function} setShowImprovementModal
+ * @property {Function} handleApplyImprovementScenario
+ * @property {Function} handleApplyRebalanceStrategy
+ * @property {Function} handleApplyMobileRecommendation
+ */
+
+/**
+ * @typedef {Object} TimelineViewModel
+ * @property {Array} timelineEvents
+ * @property {Array} normalizedPhases
+ * @property {Object} currentAgePhase
+ * @property {number|null} selectedYear
+ * @property {Function} setSelectedYear
+ * @property {Function} handleNodeDragStart
+ * @property {Object|null} draggingInfo
+ * @property {Function} setDraggingInfo
+ * @property {Object} dragOccurredRef
+ */
+
+/**
+ * @typedef {Object} UiState
+ * @property {number} activeStep
+ * @property {Function} setActiveStep
+ * @property {string} displayMode
+ * @property {Function} setDisplayMode
+ * @property {Object|null} editingCondition
+ * @property {Function} setEditingCondition
+ * @property {Function} handleSaveCurrentCondition
+ * @property {Function} handleRemoveCurrentCondition
+ * @property {string|null} notification
+ * @property {Function} setNotification
+ * @property {boolean} isMobile
+ */
+
 export default function FireSimulator() {
   const [activeStep, setActiveStep] = useState(1);
   const [isBudgetOpenFromMarriageWizard, setIsBudgetOpenFromMarriageWizard] = useState(false);
@@ -180,7 +307,7 @@ export default function FireSimulator() {
   } = budgetState;
 
   // 3.5. useRecommendationController hook
-  const recommendationController = useRecommendationController({
+  const recommendationControllerHook = useRecommendationController({
     setScenarios,
     currentScenarioId,
     inputs,
@@ -383,11 +510,11 @@ export default function FireSimulator() {
   };
 
   const handleApplyImprovementScenario = (scenario) => {
-    recommendationController.applyRecommendationAction(scenario);
+    recommendationControllerHook.applyRecommendationAction(scenario);
   };
 
   const handleApplyRebalanceStrategy = (strategyId) => {
-    recommendationController.applyRecommendationAction({ type: strategyId });
+    recommendationControllerHook.applyRecommendationAction({ type: strategyId });
   };
 
   // Track last non-zero savings rate to preserve it during empty/zero income editing states
@@ -415,7 +542,7 @@ export default function FireSimulator() {
   const syncChildcarePhasesAndRules = () => {};
 
   const handleApplyMobileRecommendation = (scenario) => {
-    recommendationController.applyRecommendationAction(scenario);
+    recommendationControllerHook.applyRecommendationAction(scenario);
   };
 
   const getInputsWithEvent = (baseInputs, event) => {
@@ -426,11 +553,38 @@ export default function FireSimulator() {
     };
   };
 
-  const sharedProps = {
-    activeStep,
-    setActiveStep,
+  const simulation = useMemo(() => ({
+    activeResults,
+    baselineResults,
+    displayedResults,
+    displayedBaselineResults,
+    chartData,
+    baselineChartData,
+    validation,
+    totalNetWorth,
+    todayAssets,
+    todayDebt,
+    todayNetWorth,
+    tempSocialSecurityDetails: fireSim.tempSocialSecurityDetails
+  }), [
+    activeResults,
+    baselineResults,
+    displayedResults,
+    displayedBaselineResults,
+    chartData,
+    baselineChartData,
+    validation,
+    totalNetWorth,
+    todayAssets,
+    todayDebt,
+    todayNetWorth,
+    fireSim.tempSocialSecurityDetails
+  ]);
+
+  const scenario = useMemo(() => ({
     inputs,
     updateInput,
+    updateAsset,
     handleStep1Change: (key, value) => {
       if (key === 'simpleInvestments') {
         updateAsset('brokerage', value);
@@ -438,47 +592,57 @@ export default function FireSimulator() {
         updateInput(key, value);
       }
     },
+    getInputsWithEvent
+  }), [
+    inputs,
+    updateInput,
     updateAsset,
-    displayMode,
-    setDisplayMode,
-    selectedYear,
-    setSelectedYear,
-    chartData,
-    baselineChartData,
-    validation,
-    baselineResults,
-    activeResults,
-    displayedResults,
-    displayedBaselineResults,
-    
+    getInputsWithEvent
+  ]);
+
+  const eventController = useMemo(() => ({
     editingEvent,
     setEditingEvent,
+    handleCreateEvent,
+    handleEditRoadmapEvent,
+    handleSaveEvent,
+    handleDeleteEvent,
+    handleDeleteRoadmapEvent,
     childImpactSummary,
     setChildImpactSummary,
     houseImpactSummary,
     setHouseImpactSummary,
     houseRebalanceSummary,
     setHouseRebalanceSummary,
-    handleApplyRebalanceStrategy,
-    editingCondition,
-    setEditingCondition,
-    draggingInfo,
-    setDraggingInfo,
-    notification,
-    setNotification,
     isFullPartnerProfileOpen,
     setIsFullPartnerProfileOpen,
     isZeroSpendingConfirmed,
     setIsZeroSpendingConfirmed,
     isPartnerZeroSpendingConfirmed,
-    setIsPartnerZeroSpendingConfirmed,
-    dragOccurredRef,
+    setIsPartnerZeroSpendingConfirmed
+  }), [
+    editingEvent,
+    setEditingEvent,
     handleCreateEvent,
     handleEditRoadmapEvent,
     handleSaveEvent,
     handleDeleteEvent,
     handleDeleteRoadmapEvent,
-    
+    childImpactSummary,
+    setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
+    isFullPartnerProfileOpen,
+    setIsFullPartnerProfileOpen,
+    isZeroSpendingConfirmed,
+    setIsZeroSpendingConfirmed,
+    isPartnerZeroSpendingConfirmed,
+    setIsPartnerZeroSpendingConfirmed
+  ]);
+
+  const budgetController = useMemo(() => ({
     isBudgetModalOpen,
     setIsBudgetModalOpen,
     activeBudgetPhase,
@@ -493,8 +657,6 @@ export default function FireSimulator() {
     setBudgetPartnerSavings,
     budgetExpenses,
     setBudgetExpenses,
-    activeBudgetTab,
-    setActiveBudgetTab,
     budgetMonthlyIncome,
     setBudgetMonthlyIncome,
     budgetMonthlySpending,
@@ -508,7 +670,6 @@ export default function FireSimulator() {
     handleSetBudgetClick,
     handleCloseBudgetModal,
     handleSaveBudget,
-    
     isBudgetOpenFromMarriageWizard,
     setIsBudgetOpenFromMarriageWizard,
     isSavingsDetailsOpen,
@@ -517,31 +678,129 @@ export default function FireSimulator() {
     setSavingsDetails,
     handleOpenSavingsDetails,
     handleSaveSavingsDetails,
-    
-    timelineEvents,
-    normalizedPhases,
-    currentAgePhase,
+    lastNonZeroSavingsRateRef
+  }), [
+    isBudgetModalOpen,
+    setIsBudgetModalOpen,
+    activeBudgetPhase,
+    handleSwitchBudgetPhase,
+    savingsAllocMode,
+    handleToggleSavingsAllocMode,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode,
+    budgetSavings,
+    setBudgetSavings,
+    budgetPartnerSavings,
+    setBudgetPartnerSavings,
+    budgetExpenses,
+    setBudgetExpenses,
+    budgetMonthlyIncome,
+    setBudgetMonthlyIncome,
+    budgetMonthlySpending,
+    setBudgetMonthlySpending,
+    budgetMonthlySavings,
+    setBudgetMonthlySavings,
+    pendingImprovement,
+    setPendingImprovement,
+    budgetDiffs,
+    setBudgetDiffs,
+    handleSetBudgetClick,
+    handleCloseBudgetModal,
+    handleSaveBudget,
+    isBudgetOpenFromMarriageWizard,
+    setIsBudgetOpenFromMarriageWizard,
+    isSavingsDetailsOpen,
+    setIsSavingsDetailsOpen,
+    savingsDetails,
+    setSavingsDetails,
+    handleOpenSavingsDetails,
+    handleSaveSavingsDetails,
+    lastNonZeroSavingsRateRef
+  ]);
+
+  const recommendationController = useMemo(() => ({
     improvementPlan,
     showImprovementModal,
     setShowImprovementModal,
     handleApplyImprovementScenario,
+    handleApplyRebalanceStrategy,
+    handleApplyMobileRecommendation
+  }), [
+    improvementPlan,
+    showImprovementModal,
+    setShowImprovementModal,
+    handleApplyImprovementScenario,
+    handleApplyRebalanceStrategy,
+    handleApplyMobileRecommendation
+  ]);
+
+  const timeline = useMemo(() => ({
+    timelineEvents,
+    normalizedPhases,
+    currentAgePhase,
+    selectedYear,
+    setSelectedYear,
+    handleNodeDragStart,
+    draggingInfo,
+    setDraggingInfo,
+    dragOccurredRef
+  }), [
+    timelineEvents,
+    normalizedPhases,
+    currentAgePhase,
+    selectedYear,
+    setSelectedYear,
+    handleNodeDragStart,
+    draggingInfo,
+    setDraggingInfo,
+    dragOccurredRef
+  ]);
+
+  const uiState = useMemo(() => ({
+    activeStep,
+    setActiveStep,
+    displayMode,
+    setDisplayMode,
+    editingCondition,
+    setEditingCondition,
     handleSaveCurrentCondition,
     handleRemoveCurrentCondition,
-    handleNodeDragStart,
-    isMobile,
-    totalNetWorth,
-    todayAssets,
-    todayDebt,
-    todayNetWorth,
-    tempSocialSecurityDetails: fireSim.tempSocialSecurityDetails,
-    lastNonZeroSavingsRateRef,
-    getInputsWithEvent,
-    handleApplyMobileRecommendation
-  };
+    notification,
+    setNotification,
+    isMobile
+  }), [
+    activeStep,
+    setActiveStep,
+    displayMode,
+    setDisplayMode,
+    editingCondition,
+    setEditingCondition,
+    handleSaveCurrentCondition,
+    handleRemoveCurrentCondition,
+    notification,
+    setNotification,
+    isMobile
+  ]);
 
   return isMobile ? (
-    <MobileFireSimulatorView {...sharedProps} />
+    <MobileFireSimulatorView
+      simulation={simulation}
+      scenario={scenario}
+      eventController={eventController}
+      budgetController={budgetController}
+      recommendationController={recommendationController}
+      timeline={timeline}
+      uiState={uiState}
+    />
   ) : (
-    <DesktopFireSimulatorView {...sharedProps} />
+    <DesktopFireSimulatorView
+      simulation={simulation}
+      scenario={scenario}
+      eventController={eventController}
+      budgetController={budgetController}
+      recommendationController={recommendationController}
+      timeline={timeline}
+      uiState={uiState}
+    />
   );
 }

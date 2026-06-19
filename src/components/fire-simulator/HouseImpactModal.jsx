@@ -1,9 +1,14 @@
 import { formatCurrency } from './helpers';
 
 export default function HouseImpactModal({
-  houseImpactSummary,
-  setHouseImpactSummary
+  eventController,
+  
+  // Legacy:
+  houseImpactSummary: legacyHouseImpactSummary,
+  setHouseImpactSummary: legacySetHouseImpactSummary
 }) {
+  const houseImpactSummary = eventController?.houseImpactSummary ?? legacyHouseImpactSummary;
+  const setHouseImpactSummary = eventController?.setHouseImpactSummary ?? legacySetHouseImpactSummary;
   if (!houseImpactSummary) return null;
   
   const { 

@@ -20,7 +20,7 @@ import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
 import MobileWorkOptionalHero from './MobileWorkOptionalHero';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
-import EventModalForm from './EventModalForm';
+import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
 import SavingsDetailsModal from './SavingsDetailsModal';
@@ -256,97 +256,243 @@ function LedgerRow({ row, formatCurrency }) {
   );
 }
 
+/**
+ * @param {Object} props
+ * @param {import('../FireSimulator').SimulationViewModel} props.simulation
+ * @param {import('../FireSimulator').ScenarioModel} props.scenario
+ * @param {import('../FireSimulator').EventController} props.eventController
+ * @param {import('../FireSimulator').BudgetController} props.budgetController
+ * @param {import('../FireSimulator').RecommendationController} props.recommendationController
+ * @param {import('../FireSimulator').TimelineViewModel} props.timeline
+ * @param {import('../FireSimulator').UiState} props.uiState
+ */
 export default function MobileFireSimulatorView({
-  inputs,
-  updateInput,
-  handleStep1Change,
-  handleOpenSavingsDetails,
-  lastNonZeroSavingsRateRef,
-  todayAssets,
-  todayDebt,
-  todayNetWorth,
-  displayMode,
-  setDisplayMode,
-  activeResults,
-  displayedResults,
-  selectedYear,
-  setSelectedYear,
-  chartData,
-  validation,
-  handleCreateEvent,
-  handleEditRoadmapEvent,
-  handleDeleteRoadmapEvent,
-  handleSetBudgetClick,
-  isMobile,
-  totalNetWorth,
-  activeStep,
-  setActiveStep,
-  timelineEvents,
-  editingEvent,
-  setEditingEvent,
-  dragOccurredRef,
-  isFullPartnerProfileOpen,
-  setIsFullPartnerProfileOpen,
-  isZeroSpendingConfirmed,
-  setIsZeroSpendingConfirmed,
-  isPartnerZeroSpendingConfirmed,
-  setIsPartnerZeroSpendingConfirmed,
-  handleDeleteEvent,
-  handleSaveEvent,
-  getInputsWithEvent,
-  handleApplyMobileRecommendation,
-  setIsBudgetOpenFromMarriageWizard,
-  isBudgetOpenFromMarriageWizard,
-  tempSocialSecurityDetails,
-  childImpactSummary,
-  setChildImpactSummary,
-  houseImpactSummary,
-  setHouseImpactSummary,
-  houseRebalanceSummary,
-  setHouseRebalanceSummary,
-  handleApplyRebalanceStrategy,
-  isBudgetModalOpen,
-  handleCloseBudgetModal,
-  budgetMonthlyIncome,
-  setBudgetMonthlyIncome,
-  budgetExpenses,
-  setBudgetExpenses,
-  budgetSavings,
-  setBudgetSavings,
-  budgetPartnerSavings,
-  setBudgetPartnerSavings,
-  activeBudgetPhase,
-  handleSwitchBudgetPhase,
-  savingsAllocMode,
-  handleToggleSavingsAllocMode,
-  budgetHsaCoverage,
-  setBudgetHsaCoverage,
-  budgetFilingStatus,
-  setBudgetFilingStatus,
-  budgetMonthlySpending,
-  setBudgetMonthlySpending,
-  budgetMonthlySavings,
-  setBudgetMonthlySavings,
-  pendingImprovement,
-  handleSaveBudget,
-  budgetScalingMode,
-  handleToggleBudgetScalingMode,
-  isSavingsDetailsOpen,
-  savingsDetails,
-  setSavingsDetails,
-  setIsSavingsDetailsOpen,
-  handleSaveSavingsDetails,
-  editingCondition,
-  handleSaveCurrentCondition,
-  setEditingCondition,
-  notification,
-  displayedBaselineResults,
-  baselineResults,
-  handleApplyImprovementScenario,
-  improvementPlan,
-  showImprovementModal,
-  setShowImprovementModal
+  simulation,
+  scenario,
+  eventController,
+  budgetController,
+  recommendationController,
+  timeline,
+  uiState,
+  
+  // Legacy support for direct mounts in unit/UI tests:
+  activeResults: legacyActiveResults,
+  baselineResults: legacyBaselineResults,
+  displayedResults: legacyDisplayedResults,
+  displayedBaselineResults: legacyDisplayedBaselineResults,
+  chartData: legacyChartData,
+  baselineChartData: legacyBaselineChartData,
+  validation: legacyValidation,
+  totalNetWorth: legacyTotalNetWorth,
+  todayAssets: legacyTodayAssets,
+  todayDebt: legacyTodayDebt,
+  todayNetWorth: legacyTodayNetWorth,
+  tempSocialSecurityDetails: legacyTempSS,
+
+  inputs: legacyInputs,
+  updateInput: legacyUpdateInput,
+  updateAsset: legacyUpdateAsset,
+  handleStep1Change: legacyHandleStep1Change,
+  getInputsWithEvent: legacyGetInputsWithEvent,
+
+  editingEvent: legacyEditingEvent,
+  setEditingEvent: legacySetEditingEvent,
+  handleCreateEvent: legacyHandleCreateEvent,
+  handleEditRoadmapEvent: legacyHandleEditRoadmapEvent,
+  handleSaveEvent: legacySaveEvent,
+  handleDeleteEvent: legacyDeleteEvent,
+  handleDeleteRoadmapEvent: legacyHandleDeleteRoadmapEvent,
+  childImpactSummary: legacyChildImpactSummary,
+  setChildImpactSummary: legacySetChildImpactSummary,
+  houseImpactSummary: legacyHouseImpactSummary,
+  setHouseImpactSummary: legacySetHouseImpactSummary,
+  houseRebalanceSummary: legacyHouseRebalanceSummary,
+  setHouseRebalanceSummary: legacySetHouseRebalanceSummary,
+  isFullPartnerProfileOpen: legacyIsFullPartnerOpen,
+  setIsFullPartnerProfileOpen: legacySetIsFullPartnerOpen,
+  isZeroSpendingConfirmed: legacyIsZeroSpending,
+  setIsZeroSpendingConfirmed: legacySetIsZeroSpending,
+  isPartnerZeroSpendingConfirmed: legacyIsPartnerZeroSpending,
+  setIsPartnerZeroSpendingConfirmed: legacySetIsPartnerZeroSpending,
+
+  isBudgetModalOpen: legacyIsBudgetModalOpen,
+  setIsBudgetModalOpen: legacySetIsBudgetModalOpen,
+  activeBudgetPhase: legacyActiveBudgetPhase,
+  handleSwitchBudgetPhase: legacyHandleSwitchBudgetPhase,
+  savingsAllocMode: legacySavingsAllocMode,
+  handleToggleSavingsAllocMode: legacyHandleToggleSavingsAllocMode,
+  budgetScalingMode: legacyBudgetScalingMode,
+  handleToggleBudgetScalingMode: legacyHandleToggleBudgetScalingMode,
+  budgetSavings: legacyBudgetSavings,
+  setBudgetSavings: legacySetBudgetSavings,
+  budgetPartnerSavings: legacyBudgetPartnerSavings,
+  setBudgetPartnerSavings: legacySetBudgetPartnerSavings,
+  budgetExpenses: legacyBudgetExpenses,
+  setBudgetExpenses: legacySetBudgetExpenses,
+  budgetMonthlyIncome: legacyBudgetMonthlyIncome,
+  setBudgetMonthlyIncome: legacySetBudgetMonthlyIncome,
+  budgetMonthlySpending: legacyBudgetMonthlySpending,
+  setBudgetMonthlySpending: legacySetBudgetMonthlySpending,
+  budgetMonthlySavings: legacyBudgetMonthlySavings,
+  setBudgetMonthlySavings: legacySetBudgetMonthlySavings,
+  pendingImprovement: legacyPendingImprovement,
+  setPendingImprovement: legacySetPendingImprovement,
+  budgetDiffs: legacyBudgetDiffs,
+  setBudgetDiffs: legacySetBudgetDiffs,
+  handleSetBudgetClick: legacyHandleSetBudgetClick,
+  handleCloseBudgetModal: legacyHandleCloseBudgetModal,
+  handleSaveBudget: legacyHandleSaveBudget,
+  isBudgetOpenFromMarriageWizard: legacyIsBudgetOpenFromMarriageWizard,
+  setIsBudgetOpenFromMarriageWizard: legacySetIsBudgetOpenFromMarriageWizard,
+  isSavingsDetailsOpen: legacyIsSavingsDetailsOpen,
+  setIsSavingsDetailsOpen: legacySetIsSavingsDetailsOpen,
+  savingsDetails: legacySavingsDetails,
+  setSavingsDetails: legacySetSavingsDetails,
+  handleOpenSavingsDetails: legacyHandleOpenSavingsDetails,
+  handleSaveSavingsDetails: legacyHandleSaveSavingsDetails,
+  lastNonZeroSavingsRateRef: legacyLastNonZeroSavingsRateRef,
+  budgetHsaCoverage: legacyBudgetHsaCoverage,
+  setBudgetHsaCoverage: legacySetBudgetHsaCoverage,
+  budgetFilingStatus: legacyBudgetFilingStatus,
+  setBudgetFilingStatus: legacySetBudgetFilingStatus,
+
+  improvementPlan: legacyImprovementPlan,
+  showImprovementModal: legacyShowImprovementModal,
+  setShowImprovementModal: legacySetShowImprovementModal,
+  handleApplyImprovementScenario: legacyHandleApplyImprovementScenario,
+  handleApplyRebalanceStrategy: legacyHandleApplyRebalanceStrategy,
+  handleApplyMobileRecommendation: legacyHandleApplyMobileRecommendation,
+
+  timelineEvents: legacyTimelineEvents,
+  normalizedPhases: legacyNormalizedPhases,
+  currentAgePhase: legacyCurrentAgePhase,
+  selectedYear: legacySelectedYear,
+  setSelectedYear: legacySetSelectedYear,
+  handleNodeDragStart: legacyHandleNodeDragStart,
+  draggingInfo: legacyDraggingInfo,
+  setDraggingInfo: legacySetDraggingInfo,
+  dragOccurredRef: legacyDragOccurredRef,
+
+  activeStep: legacyActiveStep,
+  setActiveStep: legacySetActiveStep,
+  displayMode: legacyDisplayMode,
+  setDisplayMode: legacySetDisplayMode,
+  editingCondition: legacyEditingCondition,
+  setEditingCondition: legacySetEditingCondition,
+  handleSaveCurrentCondition: legacyHandleSaveCurrentCondition,
+  handleRemoveCurrentCondition: legacyHandleRemoveCurrentCondition,
+  notification: legacyNotification,
+  setNotification: legacySetNotification,
+  isMobile: legacyIsMobile
 }) {
+  const activeResults = simulation?.activeResults ?? legacyActiveResults;
+  const baselineResults = simulation?.baselineResults ?? legacyBaselineResults;
+  const displayedResults = simulation?.displayedResults ?? legacyDisplayedResults;
+  const displayedBaselineResults = simulation?.displayedBaselineResults ?? legacyDisplayedBaselineResults;
+  const chartData = simulation?.chartData ?? legacyChartData;
+  const baselineChartData = simulation?.baselineChartData ?? legacyBaselineChartData;
+  const validation = simulation?.validation ?? legacyValidation;
+  const totalNetWorth = simulation?.totalNetWorth ?? legacyTotalNetWorth;
+  const todayAssets = simulation?.todayAssets ?? legacyTodayAssets;
+  const todayDebt = simulation?.todayDebt ?? legacyTodayDebt;
+  const todayNetWorth = simulation?.todayNetWorth ?? legacyTodayNetWorth;
+  const tempSocialSecurityDetails = simulation?.tempSocialSecurityDetails ?? legacyTempSS;
+
+  const inputs = scenario?.inputs ?? legacyInputs;
+  const updateInput = scenario?.updateInput ?? legacyUpdateInput;
+  const updateAsset = scenario?.updateAsset ?? legacyUpdateAsset;
+  const handleStep1Change = scenario?.handleStep1Change ?? legacyHandleStep1Change;
+  const getInputsWithEvent = scenario?.getInputsWithEvent ?? legacyGetInputsWithEvent;
+
+  const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
+  const setEditingEvent = eventController?.setEditingEvent ?? legacySetEditingEvent;
+  const handleCreateEvent = eventController?.handleCreateEvent ?? legacyHandleCreateEvent;
+  const handleEditRoadmapEvent = eventController?.handleEditRoadmapEvent ?? legacyHandleEditRoadmapEvent;
+  const handleSaveEvent = eventController?.handleSaveEvent ?? legacySaveEvent;
+  const handleDeleteEvent = eventController?.handleDeleteEvent ?? legacyDeleteEvent;
+  const handleDeleteRoadmapEvent = eventController?.handleDeleteRoadmapEvent ?? legacyHandleDeleteRoadmapEvent;
+  const childImpactSummary = eventController?.childImpactSummary ?? legacyChildImpactSummary;
+  const setChildImpactSummary = eventController?.setChildImpactSummary ?? legacySetChildImpactSummary;
+  const houseImpactSummary = eventController?.houseImpactSummary ?? legacyHouseImpactSummary;
+  const setHouseImpactSummary = eventController?.setHouseImpactSummary ?? legacySetHouseImpactSummary;
+  const houseRebalanceSummary = eventController?.houseRebalanceSummary ?? legacyHouseRebalanceSummary;
+  const setHouseRebalanceSummary = eventController?.setHouseRebalanceSummary ?? legacySetHouseRebalanceSummary;
+  const isFullPartnerProfileOpen = eventController?.isFullPartnerProfileOpen ?? legacyIsFullPartnerOpen;
+  const setIsFullPartnerProfileOpen = eventController?.setIsFullPartnerProfileOpen ?? legacySetIsFullPartnerOpen;
+  const isZeroSpendingConfirmed = eventController?.isZeroSpendingConfirmed ?? legacyIsZeroSpending;
+  const setIsZeroSpendingConfirmed = eventController?.setIsZeroSpendingConfirmed ?? legacySetIsZeroSpending;
+  const isPartnerZeroSpendingConfirmed = eventController?.isPartnerZeroSpendingConfirmed ?? legacyIsPartnerZeroSpending;
+  const setIsPartnerZeroSpendingConfirmed = eventController?.setIsPartnerZeroSpendingConfirmed ?? legacySetIsPartnerZeroSpending;
+
+  const isBudgetModalOpen = budgetController?.isBudgetModalOpen ?? legacyIsBudgetModalOpen;
+  const setIsBudgetModalOpen = budgetController?.setIsBudgetModalOpen ?? legacySetIsBudgetModalOpen;
+  const activeBudgetPhase = budgetController?.activeBudgetPhase ?? legacyActiveBudgetPhase;
+  const handleSwitchBudgetPhase = budgetController?.handleSwitchBudgetPhase ?? legacyHandleSwitchBudgetPhase;
+  const savingsAllocMode = budgetController?.savingsAllocMode ?? legacySavingsAllocMode;
+  const handleToggleSavingsAllocMode = budgetController?.handleToggleSavingsAllocMode ?? legacyHandleToggleSavingsAllocMode;
+  const budgetScalingMode = budgetController?.budgetScalingMode ?? legacyBudgetScalingMode;
+  const handleToggleBudgetScalingMode = budgetController?.handleToggleBudgetScalingMode ?? legacyHandleToggleBudgetScalingMode;
+  const budgetSavings = budgetController?.budgetSavings ?? legacyBudgetSavings;
+  const setBudgetSavings = budgetController?.setBudgetSavings ?? legacySetBudgetSavings;
+  const budgetPartnerSavings = budgetController?.budgetPartnerSavings ?? legacyBudgetPartnerSavings;
+  const setBudgetPartnerSavings = budgetController?.setBudgetPartnerSavings ?? legacySetBudgetPartnerSavings;
+  const budgetExpenses = budgetController?.budgetExpenses ?? legacyBudgetExpenses;
+  const setBudgetExpenses = budgetController?.setBudgetExpenses ?? legacySetBudgetExpenses;
+  const budgetMonthlyIncome = budgetController?.budgetMonthlyIncome ?? legacyBudgetMonthlyIncome;
+  const setBudgetMonthlyIncome = budgetController?.setBudgetMonthlyIncome ?? legacySetBudgetMonthlyIncome;
+  const budgetMonthlySpending = budgetController?.budgetMonthlySpending ?? legacyBudgetMonthlySpending;
+  const setBudgetMonthlySpending = budgetController?.setBudgetMonthlySpending ?? legacySetBudgetMonthlySpending;
+  const budgetMonthlySavings = budgetController?.budgetMonthlySavings ?? legacyBudgetMonthlySavings;
+  const setBudgetMonthlySavings = budgetController?.setBudgetMonthlySavings ?? legacySetBudgetMonthlySavings;
+  const pendingImprovement = budgetController?.pendingImprovement ?? legacyPendingImprovement;
+  const setPendingImprovement = budgetController?.setPendingImprovement ?? legacySetPendingImprovement;
+  const budgetDiffs = budgetController?.budgetDiffs ?? legacyBudgetDiffs;
+  const setBudgetDiffs = budgetController?.setBudgetDiffs ?? legacySetBudgetDiffs;
+  const handleSetBudgetClick = budgetController?.handleSetBudgetClick ?? legacyHandleSetBudgetClick;
+  const handleCloseBudgetModal = budgetController?.handleCloseBudgetModal ?? legacyHandleCloseBudgetModal;
+  const handleSaveBudget = budgetController?.handleSaveBudget ?? legacyHandleSaveBudget;
+  const isBudgetOpenFromMarriageWizard = budgetController?.isBudgetOpenFromMarriageWizard ?? legacyIsBudgetOpenFromMarriageWizard;
+  const setIsBudgetOpenFromMarriageWizard = budgetController?.setIsBudgetOpenFromMarriageWizard ?? legacySetIsBudgetOpenFromMarriageWizard;
+  const isSavingsDetailsOpen = budgetController?.isSavingsDetailsOpen ?? legacyIsSavingsDetailsOpen;
+  const setIsSavingsDetailsOpen = budgetController?.setIsSavingsDetailsOpen ?? legacySetIsSavingsDetailsOpen;
+  const savingsDetails = budgetController?.savingsDetails ?? legacySavingsDetails;
+  const setSavingsDetails = budgetController?.setSavingsDetails ?? legacySetSavingsDetails;
+  const handleOpenSavingsDetails = budgetController?.handleOpenSavingsDetails ?? legacyHandleOpenSavingsDetails;
+  const handleSaveSavingsDetails = budgetController?.handleSaveSavingsDetails ?? legacyHandleSaveSavingsDetails;
+  const lastNonZeroSavingsRateRef = budgetController?.lastNonZeroSavingsRateRef ?? legacyLastNonZeroSavingsRateRef;
+  const budgetHsaCoverage = budgetController?.budgetHsaCoverage ?? legacyBudgetHsaCoverage;
+  const setBudgetHsaCoverage = budgetController?.setBudgetHsaCoverage ?? legacySetBudgetHsaCoverage;
+  const budgetFilingStatus = budgetController?.budgetFilingStatus ?? legacyBudgetFilingStatus;
+  const setBudgetFilingStatus = budgetController?.setBudgetFilingStatus ?? legacySetBudgetFilingStatus;
+
+  const improvementPlan = recommendationController?.improvementPlan ?? legacyImprovementPlan;
+  const showImprovementModal = recommendationController?.showImprovementModal ?? legacyShowImprovementModal;
+  const setShowImprovementModal = recommendationController?.setShowImprovementModal ?? legacySetShowImprovementModal;
+  const handleApplyImprovementScenario = recommendationController?.handleApplyImprovementScenario ?? legacyHandleApplyImprovementScenario;
+  const handleApplyRebalanceStrategy = recommendationController?.handleApplyRebalanceStrategy ?? legacyHandleApplyRebalanceStrategy;
+  const handleApplyMobileRecommendation = recommendationController?.handleApplyMobileRecommendation ?? legacyHandleApplyMobileRecommendation;
+
+  const timelineEvents = timeline?.timelineEvents ?? legacyTimelineEvents;
+  const normalizedPhases = timeline?.normalizedPhases ?? legacyNormalizedPhases ?? (inputs ? getNormalizedPhases(inputs) : []);
+  const currentAgePhase = timeline?.currentAgePhase ?? legacyCurrentAgePhase ?? (inputs && normalizedPhases.length > 0 ? (normalizedPhases.find(p => (inputs.currentAge || 35) >= p.startAge && (inputs.currentAge || 35) < p.endAge) || normalizedPhases[0] || null) : null);
+  const selectedYear = timeline?.selectedYear ?? legacySelectedYear;
+  const setSelectedYear = timeline?.setSelectedYear ?? legacySetSelectedYear;
+  const handleNodeDragStart = timeline?.handleNodeDragStart ?? legacyHandleNodeDragStart;
+  const draggingInfo = timeline?.draggingInfo ?? legacyDraggingInfo;
+  const setDraggingInfo = timeline?.setDraggingInfo ?? legacySetDraggingInfo;
+  const dragOccurredRef = timeline?.dragOccurredRef ?? legacyDragOccurredRef;
+
+  const activeStep = uiState?.activeStep ?? legacyActiveStep;
+  const setActiveStep = uiState?.setActiveStep ?? legacySetActiveStep;
+  const displayMode = uiState?.displayMode ?? legacyDisplayMode;
+  const setDisplayMode = uiState?.setDisplayMode ?? legacySetDisplayMode;
+  const editingCondition = uiState?.editingCondition ?? legacyEditingCondition;
+  const setEditingCondition = uiState?.setEditingCondition ?? legacySetEditingCondition;
+  const handleSaveCurrentCondition = uiState?.handleSaveCurrentCondition ?? legacyHandleSaveCurrentCondition;
+  const handleRemoveCurrentCondition = uiState?.handleRemoveCurrentCondition ?? legacyHandleRemoveCurrentCondition;
+  const notification = uiState?.notification ?? legacyNotification;
+  const setNotification = uiState?.setNotification ?? legacySetNotification;
+  const isMobile = uiState?.isMobile ?? legacyIsMobile;
   const [activeTab, setActiveTab] = useState('Plan'); // 'Plan' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
 
@@ -383,16 +529,7 @@ export default function MobileFireSimulatorView({
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab, selectedMobilePhaseId]);
 
-  // Derive Normalized Phases
-  const normalizedPhases = useMemo(() => {
-    return getNormalizedPhases(inputs);
-  }, [inputs]);
 
-  // Current Phase for Overview
-  const currentAgePhase = useMemo(() => {
-    const curAge = inputs.currentAge || 35;
-    return normalizedPhases.find(p => curAge >= p.startAge && curAge < p.endAge) || normalizedPhases[0] || null;
-  }, [normalizedPhases, inputs.currentAge]);
 
   // Selected Phase Object for detail screen
   const selectedPhaseObj = useMemo(() => {
@@ -935,6 +1072,8 @@ export default function MobileFireSimulatorView({
 
               {/* Life Journey Timeline */}
               <MobileTimeline
+                scenario={scenario}
+                timeline={timeline}
                 inputs={inputs}
                 timelineEvents={timelineEvents}
                 selectedEventIndex={selectedEventIndex}
@@ -1324,12 +1463,14 @@ export default function MobileFireSimulatorView({
 
             {/* Active Chart Box */}
             <MobileResults
+              simulation={simulation}
+              timeline={timeline}
               chartData={chartData}
               activeResults={activeResults}
-              activeChart={activeChart}
-              setActiveChart={setActiveChart}
               selectedYear={selectedYear}
               setSelectedYear={setSelectedYear}
+              activeChart={activeChart}
+              setActiveChart={setActiveChart}
             />
 
             {/* Financial Snapshot Card */}
@@ -2187,12 +2328,15 @@ export default function MobileFireSimulatorView({
       {/* Overlays / Modals */}
       {editingEvent && (
         <MobileEventWizard
+          scenario={scenario}
+          eventController={eventController}
+          simulation={simulation}
+          recommendationController={recommendationController}
           inputs={inputs}
           editingEvent={editingEvent}
           setEditingEvent={setEditingEvent}
           handleSaveEvent={handleSaveEvent}
           handleDeleteEvent={handleDeleteEvent}
-          onClose={() => setEditingEvent(null)}
           getInputsWithEvent={getInputsWithEvent}
           baselineResults={baselineResults}
           handleApplyMobileRecommendation={handleApplyMobileRecommendation}
@@ -2203,10 +2347,14 @@ export default function MobileFireSimulatorView({
           setHouseRebalanceSummary={setHouseRebalanceSummary}
           handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
           setShowImprovementModal={setShowImprovementModal}
+          onClose={() => setEditingEvent(null)}
         />
       )}
 
       <ChildImpactModal
+        eventController={eventController}
+        scenario={scenario}
+        recommendationController={recommendationController}
         childImpactSummary={childImpactSummary}
         inputs={inputs}
         setChildImpactSummary={setChildImpactSummary}
@@ -2215,6 +2363,10 @@ export default function MobileFireSimulatorView({
       />
       {isBudgetModalOpen && (
         <BudgetModal
+          scenario={scenario}
+          budgetController={budgetController}
+          uiState={uiState}
+          eventController={eventController}
           inputs={inputs}
           isBudgetOpenFromMarriageWizard={isBudgetOpenFromMarriageWizard}
           editingEvent={editingEvent}
@@ -2248,6 +2400,7 @@ export default function MobileFireSimulatorView({
       )}
       {isSavingsDetailsOpen && (
         <SavingsDetailsModal
+          budgetController={budgetController}
           savingsDetails={savingsDetails}
           setSavingsDetails={setSavingsDetails}
           setIsSavingsDetailsOpen={setIsSavingsDetailsOpen}
@@ -2255,6 +2408,8 @@ export default function MobileFireSimulatorView({
         />
       )}
       <CurrentConditionModal
+        uiState={uiState}
+        scenario={scenario}
         editingCondition={editingCondition}
         inputs={inputs}
         setEditingCondition={setEditingCondition}

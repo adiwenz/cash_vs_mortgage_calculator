@@ -370,41 +370,82 @@ function LedgerRow({ row, formatCurrency }) {
 }
 
 export default function LifePlanScreen({
-  inputs,
-  updateInput,
-  displayMode,
-  setDisplayMode,
-  activeResults,
-  displayedResults,
-  selectedYear,
-  setSelectedYear,
-  chartData,
-  validation,
-  handleCreateEvent,
-  handleEditRoadmapEvent,
-  improvementPlan,
-  setShowImprovementModal,
-  handleSetBudgetClick,
-  activeStep,
-
-  // Drag-and-drop
-  handleNodeDragStart,
-  draggingInfo,
-
-  timelineEvents,
-  editingEvent,
-  dragOccurredRef,
-
-  setEditingEvent,
-  handleStep1Change,
-  handleOpenSavingsDetails,
-  lastNonZeroSavingsRateRef,
-  todayAssets,
-  todayDebt,
-  todayNetWorth,
-  setEditingCondition,
-  handleRemoveCurrentCondition
+  simulation,
+  scenario,
+  eventController,
+  budgetController,
+  recommendationController,
+  timeline,
+  uiState,
+  
+  // Legacy support for direct mounts in unit/UI tests:
+  inputs: legacyInputs,
+  updateInput: legacyUpdateInput,
+  displayMode: legacyDisplayMode,
+  setDisplayMode: legacySetDisplayMode,
+  activeResults: legacyActiveResults,
+  displayedResults: legacyDisplayedResults,
+  selectedYear: legacySelectedYear,
+  setSelectedYear: legacySetSelectedYear,
+  chartData: legacyChartData,
+  validation: legacyValidation,
+  handleCreateEvent: legacyHandleCreateEvent,
+  handleEditRoadmapEvent: legacyHandleEditRoadmapEvent,
+  improvementPlan: legacyImprovementPlan,
+  setShowImprovementModal: legacySetShowImprovementModal,
+  handleSetBudgetClick: legacySetBudgetClick,
+  activeStep: legacyActiveStep,
+  handleNodeDragStart: legacyHandleNodeDragStart,
+  draggingInfo: legacyDraggingInfo,
+  timelineEvents: legacyTimelineEvents,
+  editingEvent: legacyEditingEvent,
+  dragOccurredRef: legacyDragOccurredRef,
+  setEditingEvent: legacySetEditingEvent,
+  handleStep1Change: legacyHandleStep1Change,
+  handleOpenSavingsDetails: legacyHandleOpenSavingsDetails,
+  lastNonZeroSavingsRateRef: legacyLastNonZeroSavingsRateRef,
+  todayAssets: legacyTodayAssets,
+  todayDebt: legacyTodayDebt,
+  todayNetWorth: legacyTodayNetWorth,
+  setEditingCondition: legacySetEditingCondition,
+  handleRemoveCurrentCondition: legacyHandleRemoveCurrentCondition
 }) {
+  const inputs = scenario?.inputs ?? legacyInputs;
+  const updateInput = scenario?.updateInput ?? legacyUpdateInput;
+  const handleStep1Change = scenario?.handleStep1Change ?? legacyHandleStep1Change;
+
+  const displayMode = uiState?.displayMode ?? legacyDisplayMode;
+  const setDisplayMode = uiState?.setDisplayMode ?? legacySetDisplayMode;
+  const activeStep = uiState?.activeStep ?? legacyActiveStep;
+  const setEditingCondition = uiState?.setEditingCondition ?? legacySetEditingCondition;
+  const handleRemoveCurrentCondition = uiState?.handleRemoveCurrentCondition ?? legacyHandleRemoveCurrentCondition;
+
+  const activeResults = simulation?.activeResults ?? legacyActiveResults;
+  const displayedResults = simulation?.displayedResults ?? legacyDisplayedResults;
+  const chartData = simulation?.chartData ?? legacyChartData;
+  const validation = simulation?.validation ?? legacyValidation;
+  const todayAssets = simulation?.todayAssets ?? legacyTodayAssets;
+  const todayDebt = simulation?.todayDebt ?? legacyTodayDebt;
+  const todayNetWorth = simulation?.todayNetWorth ?? legacyTodayNetWorth;
+
+  const selectedYear = timeline?.selectedYear ?? legacySelectedYear;
+  const setSelectedYear = timeline?.setSelectedYear ?? legacySetSelectedYear;
+  const timelineEvents = timeline?.timelineEvents ?? legacyTimelineEvents;
+  const handleNodeDragStart = timeline?.handleNodeDragStart ?? legacyHandleNodeDragStart;
+  const draggingInfo = timeline?.draggingInfo ?? legacyDraggingInfo;
+  const dragOccurredRef = timeline?.dragOccurredRef ?? legacyDragOccurredRef;
+
+  const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
+  const setEditingEvent = eventController?.setEditingEvent ?? legacySetEditingEvent;
+  const handleCreateEvent = eventController?.handleCreateEvent ?? legacyHandleCreateEvent;
+  const handleEditRoadmapEvent = eventController?.handleEditRoadmapEvent ?? legacyHandleEditRoadmapEvent;
+
+  const handleSetBudgetClick = budgetController?.handleSetBudgetClick ?? legacySetBudgetClick;
+  const handleOpenSavingsDetails = budgetController?.handleOpenSavingsDetails ?? legacyHandleOpenSavingsDetails;
+  const lastNonZeroSavingsRateRef = budgetController?.lastNonZeroSavingsRateRef ?? legacyLastNonZeroSavingsRateRef;
+
+  const improvementPlan = recommendationController?.improvementPlan ?? legacyImprovementPlan;
+  const setShowImprovementModal = recommendationController?.setShowImprovementModal ?? legacySetShowImprovementModal;
   const [selectedMilestone, setSelectedMilestone] = useState(null);
   const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);

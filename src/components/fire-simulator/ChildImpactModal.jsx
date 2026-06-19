@@ -1,12 +1,22 @@
 import { formatCurrency } from './helpers';
 
 export default function ChildImpactModal({
-  childImpactSummary,
-  inputs,
-  setChildImpactSummary,
-  setEditingEvent,
-  setShowImprovementModal
+  eventController,
+  scenario,
+  recommendationController,
+  
+  // Legacy:
+  childImpactSummary: legacyChildImpactSummary,
+  inputs: legacyInputs,
+  setChildImpactSummary: legacySetChildImpactSummary,
+  setEditingEvent: legacySetEditingEvent,
+  setShowImprovementModal: legacySetShowImprovementModal
 }) {
+  const childImpactSummary = eventController?.childImpactSummary ?? legacyChildImpactSummary;
+  const inputs = scenario?.inputs ?? legacyInputs;
+  const setChildImpactSummary = eventController?.setChildImpactSummary ?? legacySetChildImpactSummary;
+  const setEditingEvent = eventController?.setEditingEvent ?? legacySetEditingEvent;
+  const setShowImprovementModal = recommendationController?.setShowImprovementModal ?? legacySetShowImprovementModal;
   if (!childImpactSummary) return null;
   const { beforeAge, afterAge, diffYears, annualSpending, event } = childImpactSummary;
 

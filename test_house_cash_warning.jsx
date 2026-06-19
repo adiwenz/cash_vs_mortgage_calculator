@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import EventModalForm from './src/components/fire-simulator/EventModalForm';
+import EventModalForm from './src/components/fire-simulator/EventModalForm/EventModalForm';
 import MobileEventWizard from './src/components/fire-simulator/MobileEventWizard';
 
 // Mock ResizeObserver

@@ -114,11 +114,19 @@ export default function CurrentConditionsPanel({
 }
 
 export function CurrentConditionModal({
-  editingCondition,
-  inputs,
-  setEditingCondition,
-  handleSaveCurrentCondition
+  uiState,
+  scenario,
+  
+  // Legacy:
+  editingCondition: legacyEditingCondition,
+  inputs: legacyInputs,
+  setEditingCondition: legacySetEditingCondition,
+  handleSaveCurrentCondition: legacyHandleSaveCurrentCondition
 }) {
+  const editingCondition = uiState?.editingCondition ?? legacyEditingCondition;
+  const setEditingCondition = uiState?.setEditingCondition ?? legacySetEditingCondition;
+  const handleSaveCurrentCondition = uiState?.handleSaveCurrentCondition ?? legacyHandleSaveCurrentCondition;
+  const inputs = scenario?.inputs ?? legacyInputs;
   if (!editingCondition) return null;
   const type = editingCondition.type;
   

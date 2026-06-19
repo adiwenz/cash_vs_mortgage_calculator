@@ -2,13 +2,21 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { formatCurrency, formatYAxis } from './helpers';
 
 export default function MobileResults({
-  chartData,
-  activeResults,
+  simulation,
+  timeline,
   activeChart,
   setActiveChart,
-  selectedYear,
-  setSelectedYear
+  
+  // Legacy:
+  chartData: legacyChartData,
+  activeResults: legacyActiveResults,
+  selectedYear: legacySelectedYear,
+  setSelectedYear: legacySetSelectedYear
 }) {
+  const chartData = simulation?.chartData ?? legacyChartData;
+  const activeResults = simulation?.activeResults ?? legacyActiveResults;
+  const selectedYear = timeline?.selectedYear ?? legacySelectedYear;
+  const setSelectedYear = timeline?.setSelectedYear ?? legacySetSelectedYear;
   return (
     <div className="mobile-chart-card-wrapper" style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
       

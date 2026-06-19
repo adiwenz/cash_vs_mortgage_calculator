@@ -2,10 +2,17 @@ import { useState } from 'react';
 import { formatCurrency } from './helpers';
 
 export default function HouseRebalanceModal({
-  houseRebalanceSummary,
-  setHouseRebalanceSummary,
-  handleApplyRebalanceStrategy
+  eventController,
+  recommendationController,
+  
+  // Legacy:
+  houseRebalanceSummary: legacyHouseRebalanceSummary,
+  setHouseRebalanceSummary: legacySetHouseRebalanceSummary,
+  handleApplyRebalanceStrategy: legacyHandleApplyRebalanceStrategy
 }) {
+  const houseRebalanceSummary = eventController?.houseRebalanceSummary ?? legacyHouseRebalanceSummary;
+  const setHouseRebalanceSummary = eventController?.setHouseRebalanceSummary ?? legacySetHouseRebalanceSummary;
+  const handleApplyRebalanceStrategy = recommendationController?.handleApplyRebalanceStrategy ?? legacyHandleApplyRebalanceStrategy;
   if (!houseRebalanceSummary) return null;
   const { 
     deficit, 

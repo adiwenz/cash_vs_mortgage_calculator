@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import TodayScreen from './TodayScreen';
 import LifePlanScreen from './LifePlanScreen';
-import EventModalForm from './EventModalForm';
+import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import HouseImpactModal from './HouseImpactModal';
 import HouseRebalanceModal from './HouseRebalanceModal';
@@ -31,97 +31,149 @@ const getPaceBadgeStyles = (pace) => {
   };
 };
 
+/**
+ * @param {Object} props
+ * @param {import('../FireSimulator').SimulationViewModel} props.simulation
+ * @param {import('../FireSimulator').ScenarioModel} props.scenario
+ * @param {import('../FireSimulator').EventController} props.eventController
+ * @param {import('../FireSimulator').BudgetController} props.budgetController
+ * @param {import('../FireSimulator').RecommendationController} props.recommendationController
+ * @param {import('../FireSimulator').TimelineViewModel} props.timeline
+ * @param {import('../FireSimulator').UiState} props.uiState
+ */
 export default function DesktopFireSimulatorView({
-  activeStep,
-  setActiveStep,
-  inputs,
-  handleStep1Change,
-  handleSetBudgetClick,
-  handleOpenSavingsDetails,
-  lastNonZeroSavingsRateRef,
-  todayAssets,
-  todayDebt,
-  todayNetWorth,
-  displayedResults,
-  updateInput,
-  displayMode,
-  setDisplayMode,
-  activeResults,
-  selectedYear,
-  setSelectedYear,
-  chartData,
-  validation,
-  handleCreateEvent,
-  handleEditRoadmapEvent,
-  handleApplyImprovementScenario,
-  improvementPlan,
-  showImprovementModal,
-  setShowImprovementModal,
-  handleRemoveCurrentCondition,
-  setEditingCondition,
-  isMobile,
-  totalNetWorth,
-  handleNodeDragStart,
-  draggingInfo,
-  timelineEvents,
-  editingEvent,
-  setEditingEvent,
-  dragOccurredRef,
-  isFullPartnerProfileOpen,
-  setIsFullPartnerProfileOpen,
-  isZeroSpendingConfirmed,
-  setIsZeroSpendingConfirmed,
-  isPartnerZeroSpendingConfirmed,
-  setIsPartnerZeroSpendingConfirmed,
-  handleDeleteEvent,
-  handleSaveEvent,
-  setIsBudgetOpenFromMarriageWizard,
-  isBudgetOpenFromMarriageWizard,
-  tempSocialSecurityDetails,
-  childImpactSummary,
-  setChildImpactSummary,
-  houseImpactSummary,
-  setHouseImpactSummary,
-  houseRebalanceSummary,
-  setHouseRebalanceSummary,
-  handleApplyRebalanceStrategy,
-  isBudgetModalOpen,
-  handleCloseBudgetModal,
-  budgetMonthlyIncome,
-  setBudgetMonthlyIncome,
-  budgetExpenses,
-  setBudgetExpenses,
-  budgetSavings,
-  setBudgetSavings,
-  budgetPartnerSavings,
-  setBudgetPartnerSavings,
-  activeBudgetPhase,
-  handleSwitchBudgetPhase,
-  savingsAllocMode,
-  handleToggleSavingsAllocMode,
-  budgetHsaCoverage,
-  setBudgetHsaCoverage,
-  budgetFilingStatus,
-  setBudgetFilingStatus,
-  budgetMonthlySpending,
-  setBudgetMonthlySpending,
-  budgetMonthlySavings,
-  setBudgetMonthlySavings,
-  pendingImprovement,
-  handleSaveBudget,
-  budgetScalingMode,
-  handleToggleBudgetScalingMode,
-  isSavingsDetailsOpen,
-  savingsDetails,
-  setSavingsDetails,
-  setIsSavingsDetailsOpen,
-  handleSaveSavingsDetails,
-  editingCondition,
-  handleSaveCurrentCondition,
-  notification,
-  displayedBaselineResults,
-  baselineResults
+  simulation,
+  scenario,
+  eventController,
+  budgetController,
+  recommendationController,
+  timeline,
+  uiState
 }) {
+  // TODO: split partner wizard UI state, zero-spending confirmations, and modal open/closed state from eventController
+  const {
+    activeResults,
+    baselineResults,
+    displayedResults,
+    displayedBaselineResults,
+    chartData,
+    baselineChartData,
+    validation,
+    totalNetWorth,
+    todayAssets,
+    todayDebt,
+    todayNetWorth,
+    tempSocialSecurityDetails
+  } = simulation;
+
+  const {
+    inputs,
+    updateInput,
+    updateAsset,
+    handleStep1Change,
+    getInputsWithEvent
+  } = scenario;
+
+  const {
+    editingEvent,
+    setEditingEvent,
+    handleCreateEvent,
+    handleEditRoadmapEvent,
+    handleSaveEvent,
+    handleDeleteEvent,
+    handleDeleteRoadmapEvent,
+    childImpactSummary,
+    setChildImpactSummary,
+    houseImpactSummary,
+    setHouseImpactSummary,
+    houseRebalanceSummary,
+    setHouseRebalanceSummary,
+    isFullPartnerProfileOpen,
+    setIsFullPartnerProfileOpen,
+    isZeroSpendingConfirmed,
+    setIsZeroSpendingConfirmed,
+    isPartnerZeroSpendingConfirmed,
+    setIsPartnerZeroSpendingConfirmed
+  } = eventController;
+
+  const {
+    isBudgetModalOpen,
+    setIsBudgetModalOpen,
+    activeBudgetPhase,
+    handleSwitchBudgetPhase,
+    savingsAllocMode,
+    handleToggleSavingsAllocMode,
+    budgetScalingMode,
+    handleToggleBudgetScalingMode,
+    budgetSavings,
+    setBudgetSavings,
+    budgetPartnerSavings,
+    setBudgetPartnerSavings,
+    budgetExpenses,
+    setBudgetExpenses,
+    budgetMonthlyIncome,
+    setBudgetMonthlyIncome,
+    budgetMonthlySpending,
+    setBudgetMonthlySpending,
+    budgetMonthlySavings,
+    setBudgetMonthlySavings,
+    pendingImprovement,
+    setPendingImprovement,
+    budgetDiffs,
+    setBudgetDiffs,
+    handleSetBudgetClick,
+    handleCloseBudgetModal,
+    handleSaveBudget,
+    isBudgetOpenFromMarriageWizard,
+    setIsBudgetOpenFromMarriageWizard,
+    isSavingsDetailsOpen,
+    setIsSavingsDetailsOpen,
+    savingsDetails,
+    setSavingsDetails,
+    handleOpenSavingsDetails,
+    handleSaveSavingsDetails,
+    lastNonZeroSavingsRateRef,
+    budgetHsaCoverage,
+    setBudgetHsaCoverage,
+    budgetFilingStatus,
+    setBudgetFilingStatus
+  } = budgetController;
+
+  const {
+    improvementPlan,
+    showImprovementModal,
+    setShowImprovementModal,
+    handleApplyImprovementScenario,
+    handleApplyRebalanceStrategy,
+    handleApplyMobileRecommendation
+  } = recommendationController;
+
+  const {
+    timelineEvents,
+    normalizedPhases,
+    currentAgePhase,
+    selectedYear,
+    setSelectedYear,
+    handleNodeDragStart,
+    draggingInfo,
+    setDraggingInfo,
+    dragOccurredRef
+  } = timeline;
+
+  const {
+    activeStep,
+    setActiveStep,
+    displayMode,
+    setDisplayMode,
+    editingCondition,
+    setEditingCondition,
+    handleSaveCurrentCondition,
+    handleRemoveCurrentCondition,
+    notification,
+    setNotification,
+    isMobile
+  } = uiState;
+
   const [optionsExpanded, setOptionsExpanded] = useState(false);
 
   return (
@@ -137,128 +189,53 @@ export default function DesktopFireSimulatorView({
 
       {/* Plan Screen */}
       <LifePlanScreen
-        inputs={inputs}
-        updateInput={updateInput}
-        displayMode={displayMode}
-        setDisplayMode={setDisplayMode}
-        activeResults={activeResults}
-        displayedResults={displayedResults}
-        selectedYear={selectedYear}
-        setSelectedYear={setSelectedYear}
-        chartData={chartData}
-        validation={validation}
-        handleCreateEvent={handleCreateEvent}
-        handleEditRoadmapEvent={handleEditRoadmapEvent}
-        handleApplyImprovementScenario={handleApplyImprovementScenario}
-        improvementPlan={improvementPlan}
-        showImprovementModal={showImprovementModal}
-        setShowImprovementModal={setShowImprovementModal}
-        handleSetBudgetClick={handleSetBudgetClick}
-        handleRemoveCurrentCondition={handleRemoveCurrentCondition}
-        setEditingCondition={setEditingCondition}
-        isMobile={isMobile}
-        totalNetWorth={totalNetWorth}
-        activeStep={activeStep}
-        setActiveStep={setActiveStep}
-        handleNodeDragStart={handleNodeDragStart}
-        draggingInfo={draggingInfo}
-        timelineEvents={timelineEvents}
-        editingEvent={editingEvent}
-        dragOccurredRef={dragOccurredRef}
-        displayedBaselineResults={displayedBaselineResults}
-        baselineResults={baselineResults}
-        handleStep1Change={handleStep1Change}
-        handleOpenSavingsDetails={handleOpenSavingsDetails}
-        lastNonZeroSavingsRateRef={lastNonZeroSavingsRateRef}
-        todayAssets={todayAssets}
-        todayDebt={todayDebt}
-        todayNetWorth={todayNetWorth}
+        simulation={simulation}
+        scenario={scenario}
+        eventController={eventController}
+        budgetController={budgetController}
+        recommendationController={recommendationController}
+        timeline={timeline}
+        uiState={uiState}
       />
 
       {/* Overlays / Modals */}
       {editingEvent && (
         <EventModalForm
-          inputs={inputs}
-          editingEvent={editingEvent}
-          setEditingEvent={setEditingEvent}
-          isFullPartnerProfileOpen={isFullPartnerProfileOpen}
-          setIsFullPartnerProfileOpen={setIsFullPartnerProfileOpen}
-          isZeroSpendingConfirmed={isZeroSpendingConfirmed}
-          setIsZeroSpendingConfirmed={setIsZeroSpendingConfirmed}
-          isPartnerZeroSpendingConfirmed={isPartnerZeroSpendingConfirmed}
-          setIsPartnerZeroSpendingConfirmed={setIsPartnerZeroSpendingConfirmed}
-          handleDeleteEvent={handleDeleteEvent}
-          handleSaveEvent={handleSaveEvent}
-          handleSetBudgetClick={handleSetBudgetClick}
-          setIsBudgetOpenFromMarriageWizard={setIsBudgetOpenFromMarriageWizard}
-          tempSocialSecurityDetails={tempSocialSecurityDetails}
-          activeResults={activeResults}
-          baselineResults={baselineResults}
-          setShowImprovementModal={setShowImprovementModal}
+          simulation={simulation}
+          scenario={scenario}
+          eventController={eventController}
+          budgetController={budgetController}
+          recommendationController={recommendationController}
         />
       )}
       <ChildImpactModal
-        childImpactSummary={childImpactSummary}
-        inputs={inputs}
-        setChildImpactSummary={setChildImpactSummary}
-        setEditingEvent={setEditingEvent}
-        setShowImprovementModal={setShowImprovementModal}
+        eventController={eventController}
+        scenario={scenario}
+        recommendationController={recommendationController}
       />
       <HouseImpactModal
-        houseImpactSummary={houseImpactSummary}
-        setHouseImpactSummary={setHouseImpactSummary}
+        eventController={eventController}
       />
       <HouseRebalanceModal
-        houseRebalanceSummary={houseRebalanceSummary}
-        setHouseRebalanceSummary={setHouseRebalanceSummary}
-        handleApplyRebalanceStrategy={handleApplyRebalanceStrategy}
+        eventController={eventController}
+        recommendationController={recommendationController}
       />
       {isBudgetModalOpen && (
         <BudgetModal
-          inputs={inputs}
-          isBudgetOpenFromMarriageWizard={isBudgetOpenFromMarriageWizard}
-          editingEvent={editingEvent}
-          budgetMonthlyIncome={budgetMonthlyIncome}
-          setBudgetMonthlyIncome={setBudgetMonthlyIncome}
-          budgetExpenses={budgetExpenses}
-          setBudgetExpenses={setBudgetExpenses}
-          budgetSavings={budgetSavings}
-          setBudgetSavings={setBudgetSavings}
-          budgetPartnerSavings={budgetPartnerSavings}
-          setBudgetPartnerSavings={setBudgetPartnerSavings}
-          activeBudgetPhase={activeBudgetPhase}
-          handleSwitchBudgetPhase={handleSwitchBudgetPhase}
-          savingsAllocMode={savingsAllocMode}
-          handleToggleSavingsAllocMode={handleToggleSavingsAllocMode}
-          budgetScalingMode={budgetScalingMode}
-          handleToggleBudgetScalingMode={handleToggleBudgetScalingMode}
-          budgetHsaCoverage={budgetHsaCoverage}
-          setBudgetHsaCoverage={setBudgetHsaCoverage}
-          budgetFilingStatus={budgetFilingStatus}
-          setBudgetFilingStatus={setBudgetFilingStatus}
-          budgetMonthlySpending={budgetMonthlySpending}
-          setBudgetMonthlySpending={setBudgetMonthlySpending}
-          budgetMonthlySavings={budgetMonthlySavings}
-          setBudgetMonthlySavings={setBudgetMonthlySavings}
-          pendingImprovement={pendingImprovement}
-          handleCloseBudgetModal={handleCloseBudgetModal}
-          handleSaveBudget={handleSaveBudget}
-          isMobile={isMobile}
+          scenario={scenario}
+          eventController={eventController}
+          budgetController={budgetController}
+          uiState={uiState}
         />
       )}
       {isSavingsDetailsOpen && (
         <SavingsDetailsModal
-          savingsDetails={savingsDetails}
-          setSavingsDetails={setSavingsDetails}
-          setIsSavingsDetailsOpen={setIsSavingsDetailsOpen}
-          handleSaveSavingsDetails={handleSaveSavingsDetails}
+          budgetController={budgetController}
         />
       )}
       <CurrentConditionModal
-        editingCondition={editingCondition}
-        inputs={inputs}
-        setEditingCondition={setEditingCondition}
-        handleSaveCurrentCondition={handleSaveCurrentCondition}
+        uiState={uiState}
+        scenario={scenario}
       />
 
       {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (() => {

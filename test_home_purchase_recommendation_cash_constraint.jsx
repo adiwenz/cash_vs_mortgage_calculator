@@ -5,7 +5,7 @@ import { runFireSimulation } from './src/fireCalculations.js';
 import { getRebalanceStrategies } from './src/calculators/fire/rebalance.js';
 import { calculateTotalCashRequired, isCashAffordable } from './src/components/fire-simulator/houseAffordabilityUtils.js';
 import HouseRebalanceModal from './src/components/fire-simulator/HouseRebalanceModal.jsx';
-import EventModalForm from './src/components/fire-simulator/EventModalForm.jsx';
+import EventModalForm from './src/components/fire-simulator/EventModalForm/EventModalForm.jsx';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
 
 // Mock ResizeObserver

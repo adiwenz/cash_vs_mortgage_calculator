@@ -1,11 +1,14 @@
 import { formatCurrency } from './helpers';
 
 export default function SavingsDetailsModal({
-  savingsDetails,
-  setSavingsDetails,
-  setIsSavingsDetailsOpen,
-  handleSaveSavingsDetails
+  budgetController
 }) {
+  const {
+    savingsDetails,
+    setSavingsDetails,
+    setIsSavingsDetailsOpen,
+    handleSaveSavingsDetails
+  } = budgetController;
   const totalDetails = Object.values(savingsDetails).reduce((sum, val) => sum + val, 0);
 
   return (

@@ -7,35 +7,70 @@ import DesktopBudgetPanel from './DesktopBudgetPanel';
 import MobileBudgetPanel from './MobileBudgetPanel';
 
 export default function BudgetModal({
-  inputs,
-  isBudgetOpenFromMarriageWizard,
-  editingEvent,
-  budgetMonthlyIncome,
-  setBudgetMonthlyIncome,
-  budgetExpenses,
-  setBudgetExpenses,
-  budgetSavings,
-  setBudgetSavings,
-  budgetPartnerSavings,
-  setBudgetPartnerSavings,
-  activeBudgetPhase,
-  handleSwitchBudgetPhase,
-  savingsAllocMode,
-  handleToggleSavingsAllocMode,
-  budgetScalingMode,
-  handleToggleBudgetScalingMode,
-  budgetHsaCoverage,
-  setBudgetHsaCoverage,
-  budgetFilingStatus,
-  setBudgetFilingStatus,
-  budgetMonthlySpending,
-  setBudgetMonthlySpending,
-  setBudgetMonthlySavings,
-  pendingImprovement,
-  handleCloseBudgetModal,
-  handleSaveBudget,
-  isMobile
+  scenario,
+  budgetController,
+  uiState,
+  eventController,
+  
+  // Legacy support for direct mounts in unit/UI tests:
+  inputs: legacyInputs,
+  isMobile: legacyIsMobile,
+  editingEvent: legacyEditingEvent,
+  isBudgetOpenFromMarriageWizard: legacyIsBudgetOpenFromMarriageWizard,
+  budgetMonthlyIncome: legacyBudgetMonthlyIncome,
+  setBudgetMonthlyIncome: legacySetBudgetMonthlyIncome,
+  budgetExpenses: legacyBudgetExpenses,
+  setBudgetExpenses: legacySetBudgetExpenses,
+  budgetSavings: legacyBudgetSavings,
+  setBudgetSavings: legacySetBudgetSavings,
+  budgetPartnerSavings: legacyBudgetPartnerSavings,
+  setBudgetPartnerSavings: legacySetBudgetPartnerSavings,
+  activeBudgetPhase: legacyActiveBudgetPhase,
+  handleSwitchBudgetPhase: legacyHandleSwitchBudgetPhase,
+  savingsAllocMode: legacySavingsAllocMode,
+  handleToggleSavingsAllocMode: legacyHandleToggleSavingsAllocMode,
+  budgetScalingMode: legacyBudgetScalingMode,
+  handleToggleBudgetScalingMode: legacyHandleToggleBudgetScalingMode,
+  budgetHsaCoverage: legacyBudgetHsaCoverage,
+  setBudgetHsaCoverage: legacySetBudgetHsaCoverage,
+  budgetFilingStatus: legacyBudgetFilingStatus,
+  setBudgetFilingStatus: legacySetFilingStatus,
+  budgetMonthlySpending: legacyBudgetMonthlySpending,
+  setBudgetMonthlySpending: legacySetBudgetMonthlySpending,
+  setBudgetMonthlySavings: legacySetBudgetMonthlySavings,
+  pendingImprovement: legacyPendingImprovement,
+  handleCloseBudgetModal: legacyHandleCloseBudgetModal,
+  handleSaveBudget: legacyHandleSaveBudget
 }) {
+  const inputs = scenario?.inputs ?? legacyInputs;
+  const isMobile = uiState?.isMobile ?? legacyIsMobile;
+  const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
+
+  const isBudgetOpenFromMarriageWizard = budgetController?.isBudgetOpenFromMarriageWizard ?? legacyIsBudgetOpenFromMarriageWizard;
+  const budgetMonthlyIncome = budgetController?.budgetMonthlyIncome ?? legacyBudgetMonthlyIncome;
+  const setBudgetMonthlyIncome = budgetController?.setBudgetMonthlyIncome ?? legacySetBudgetMonthlyIncome;
+  const budgetExpenses = budgetController?.budgetExpenses ?? legacyBudgetExpenses;
+  const setBudgetExpenses = budgetController?.setBudgetExpenses ?? legacySetBudgetExpenses;
+  const budgetSavings = budgetController?.budgetSavings ?? legacyBudgetSavings;
+  const setBudgetSavings = budgetController?.setBudgetSavings ?? legacySetBudgetSavings;
+  const budgetPartnerSavings = budgetController?.budgetPartnerSavings ?? legacyBudgetPartnerSavings;
+  const setBudgetPartnerSavings = budgetController?.setBudgetPartnerSavings ?? legacySetBudgetPartnerSavings;
+  const activeBudgetPhase = budgetController?.activeBudgetPhase ?? legacyActiveBudgetPhase;
+  const handleSwitchBudgetPhase = budgetController?.handleSwitchBudgetPhase ?? legacyHandleSwitchBudgetPhase;
+  const savingsAllocMode = budgetController?.savingsAllocMode ?? legacySavingsAllocMode;
+  const handleToggleSavingsAllocMode = budgetController?.handleToggleSavingsAllocMode ?? legacyHandleToggleSavingsAllocMode;
+  const budgetScalingMode = budgetController?.budgetScalingMode ?? legacyBudgetScalingMode;
+  const handleToggleBudgetScalingMode = budgetController?.handleToggleBudgetScalingMode ?? legacyHandleToggleBudgetScalingMode;
+  const budgetHsaCoverage = budgetController?.budgetHsaCoverage ?? legacyBudgetHsaCoverage;
+  const setBudgetHsaCoverage = budgetController?.setBudgetHsaCoverage ?? legacySetBudgetHsaCoverage;
+  const budgetFilingStatus = budgetController?.budgetFilingStatus ?? legacyBudgetFilingStatus;
+  const setBudgetFilingStatus = budgetController?.setBudgetFilingStatus ?? legacySetFilingStatus;
+  const budgetMonthlySpending = budgetController?.budgetMonthlySpending ?? legacyBudgetMonthlySpending;
+  const setBudgetMonthlySpending = budgetController?.setBudgetMonthlySpending ?? legacySetBudgetMonthlySpending;
+  const setBudgetMonthlySavings = budgetController?.setBudgetMonthlySavings ?? legacySetBudgetMonthlySavings;
+  const pendingImprovement = budgetController?.pendingImprovement ?? legacyPendingImprovement;
+  const handleCloseBudgetModal = budgetController?.handleCloseBudgetModal ?? legacyHandleCloseBudgetModal;
+  const handleSaveBudget = budgetController?.handleSaveBudget ?? legacyHandleSaveBudget;
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [activeBreakdownTab, setActiveBreakdownTab] = useState('needs');
   const [isEditingNeeds, setIsEditingNeeds] = useState(false);

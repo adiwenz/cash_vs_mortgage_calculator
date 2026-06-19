@@ -168,12 +168,17 @@ const getEmojiFontSize = (isSelected) => {
 };
 
 export default function MobileTimeline({
-  inputs,
-  timelineEvents,
+  scenario,
+  timeline,
   selectedEventIndex,
   setSelectedEventIndex,
-  onEventTap
+  onEventTap,
+  
+  // Legacy:
+  inputs: legacyInputs,
+  timelineEvents: legacyTimelineEvents
 }) {
+  const timelineEvents = timeline?.timelineEvents ?? legacyTimelineEvents;
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(350);
 

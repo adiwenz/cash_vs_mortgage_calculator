@@ -220,20 +220,34 @@ function LedgerRow({ row, formatCurrency }) {
 }
 
 export default function DesktopResults({
-  inputs,
-  displayedResults,
-  chartData,
-  validation,
-  selectedYear,
-  setSelectedYear,
+  simulation,
+  scenario,
+  timeline,
+  eventController,
+  
+  // Legacy:
+  inputs: legacyInputs,
+  displayedResults: legacyDisplayedResults,
+  chartData: legacyChartData,
+  validation: legacyValidation,
+  selectedYear: legacySelectedYear,
+  setSelectedYear: legacySetSelectedYear,
+  handleEditRoadmapEvent: legacyHandleEditRoadmapEvent,
+  
   showAssets,
   setShowAssets,
   showDebt,
   setShowDebt,
   showNetWorth,
-  setShowNetWorth,
-  handleEditRoadmapEvent
+  setShowNetWorth
 }) {
+  const inputs = scenario?.inputs ?? legacyInputs;
+  const displayedResults = simulation?.displayedResults ?? legacyDisplayedResults;
+  const chartData = simulation?.chartData ?? legacyChartData;
+  const validation = simulation?.validation ?? legacyValidation;
+  const selectedYear = timeline?.selectedYear ?? legacySelectedYear;
+  const setSelectedYear = timeline?.setSelectedYear ?? legacySetSelectedYear;
+  const handleEditRoadmapEvent = eventController?.handleEditRoadmapEvent ?? legacyHandleEditRoadmapEvent;
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
   return (
     <>
