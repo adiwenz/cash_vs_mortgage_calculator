@@ -112,6 +112,8 @@ export function calculateEarnMoreRecommendation(shortfall, rateOfReturn, yearsUn
   return netSavingsRequired / (1 - marginalTaxRate);
 }
 
+import { calculateChildcareCostPhaseImpact } from './domain/events/child/childEventImpact.js';
+
 export function getChildCostOffsetRecommendations(inputs) {
   const childEvents = (inputs.lifeEvents || []).filter(
     e => e.type === 'haveChild' && e.enabled
@@ -129,35 +131,15 @@ export function getChildCostOffsetRecommendations(inputs) {
       return null;
     }
 
-    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
-    const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
-    const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
-    const maxAge = includeCollege ? 22 : 18;
-    
-    // Determine the cost in each age bracket
-    const ages0to4 = ev.costMethod === 'custom' ? (ev.customAges0to4 !== undefined ? Number(ev.customAges0to4) : 15000) : (inputs.childCosts?.ages0to4 !== undefined ? Number(inputs.childCosts.ages0to4) : 15000);
-    const ages5to12 = ev.costMethod === 'custom' ? (ev.customAges5to12 !== undefined ? Number(ev.customAges5to12) : 15000) : (inputs.childCosts?.ages5to12 !== undefined ? Number(inputs.childCosts.ages5to12) : 15000);
-    const ages13to18 = ev.costMethod === 'custom' ? (ev.customAges13to18 !== undefined ? Number(ev.customAges13to18) : 15000) : (inputs.childCosts?.ages13to18 !== undefined ? Number(inputs.childCosts.ages13to18) : 15000);
-    const ages19to22 = ev.costMethod === 'custom' ? (ev.customAges19to22 !== undefined ? Number(ev.customAges19to22) : 15000) : (inputs.childCosts?.ages19to22 !== undefined ? Number(inputs.childCosts.ages19to22) : 15000);
-    
-    const peakCost = Math.max(
-      ages0to4,
-      ages5to12,
-      ages13to18,
-      includeCollege ? ages19to22 : 0
-    );
-    
-    const parentStartAge = birthAge + childStartAge;
-    const parentEndAge = birthAge + maxAge;
-    const duration = maxAge - childStartAge;
+    const rec = calculateChildcareCostPhaseImpact(ev, inputs);
     
     return {
       childEventId: ev.id,
       childName: ev.childName || '',
-      peakCost,
-      duration,
-      parentStartAge,
-      parentEndAge
+      peakCost: rec.peakCost,
+      duration: rec.duration,
+      parentStartAge: rec.parentStartAge,
+      parentEndAge: rec.parentEndAge
     };
   }).filter(Boolean);
 }

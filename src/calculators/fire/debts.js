@@ -1,18 +1,6 @@
-export function calculateAmortizedLoanPayoffAge(balance, annualRate, monthlyPayment, startAge) {
-  if (balance <= 0) return startAge;
-  if (monthlyPayment <= 0) return Infinity;
-  
-  const r = (annualRate / 100) / 12;
-  if (monthlyPayment <= balance * r) return Infinity; // grows forever / interest trap
-  
-  if (r === 0) {
-    const months = balance / monthlyPayment;
-    return startAge + months / 12;
-  }
-  
-  const months = Math.log(monthlyPayment / (monthlyPayment - r * balance)) / Math.log(1 + r);
-  return startAge + months / 12;
-}
+import { calculateAmortizedLoanPayoffAge as domainCalculateAmortizedLoanPayoffAge } from '../../domain/debt/debtProjection.js';
+
+export const calculateAmortizedLoanPayoffAge = domainCalculateAmortizedLoanPayoffAge;
 
 export function getActiveDebtsForAge(profile, events, age) {
   const currentAge = Number(profile.currentAge) || 35;

@@ -461,9 +461,9 @@ describe('Mobile Event Wizard & Flow', () => {
     expect(screen.getByText('👶 Child Added to Timeline!')).toBeDefined();
     expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
     expect(screen.getByText('Earn More')).toBeDefined();
-    expect(screen.getByText('Apply Adjustment')).toBeDefined();
+    expect(screen.getAllByText('Apply Adjustment')[0]).toBeDefined();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Apply Adjustment' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Apply Adjustment' })[0]);
     expect(handleApplyMobileRecommendation).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });

@@ -6,6 +6,7 @@ import {
   calculateEarnMoreRecommendation,
   getChildCostOffsetRecommendations
 } from '../recommendations';
+import { generateChildRecommendations } from '../domain/events/child/childRecommendations';
 import { getActiveDebtsForAge } from '../calculators/fire/debts';
 import {
   getActiveChildrenCountAtAge,
@@ -274,48 +275,8 @@ export function useRecommendations(inputs, activeResults) {
     });
 
     // 4. Get a Promotion Recommendation
-    const childRecommendations = getChildCostOffsetRecommendations(inputs);
-    childRecommendations.forEach(rec => {
-      const clonedInputs = JSON.parse(JSON.stringify(inputs));
-      
-      const promoEvent = {
-        id: `promo-${rec.childEventId}`,
-        type: 'careerChange',
-        name: rec.childName ? `Promotion (${rec.childName})` : 'Get a Promotion',
-        startAge: rec.parentStartAge,
-        endAge: inputs.targetRetirementAge,
-        growthRate: 0.03, // Saved as decimal for simulation (displayed as 3.0% in edit form)
-        isTaxable: true,
-        amount: rec.peakCost,
-        salaryIncrease: rec.peakCost,
-        incomeChangeType: 'increaseByAmount',
-        permanent: true,
-        parentEventId: rec.childEventId
-      };
-
-      clonedInputs.incomeList = [...(clonedInputs.incomeList || []), promoEvent];
-      
-      const boostResults = runFireSimulation(clonedInputs);
-      const readyAge = boostResults.retirementReadyAge;
-      const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
-      
-      list.push({
-        type: `childPromotion-${rec.childEventId}`,
-        icon: '🟦',
-        title: 'Get a Promotion',
-        details: `Increase your income by ${formatCurrency(rec.peakCost)}/year permanently.`,
-        bulletPoints: [
-          `This offsets childcare costs today and helps you build additional savings after childcare expenses end.`,
-          `A promotion or career advancement that offsets childcare costs and keeps your plan on track. After childcare ends, the additional income becomes available for savings.`
-        ],
-        readyAge: readyAge || targetRetirementAge,
-        yearsImprovement: yearsImprovement,
-        value: rec.peakCost,
-        promoEvent: promoEvent,
-        savingsFocus: 'Earn More',
-        savingsEffortScore: 2
-      });
-    });
+    const childRecommendations = generateChildRecommendations(inputs, currentReadyAge);
+    list.push(...childRecommendations);
 
     // 5. Homeownership tip
     const buyHouseEvs = (inputs.lifeEvents || []).filter(e => e.type === 'buyHouse' && e.enabled);

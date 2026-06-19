@@ -12,6 +12,7 @@ import DesktopFireSimulatorView from './fire-simulator/DesktopFireSimulatorView'
 import MobileFireSimulatorView from './fire-simulator/MobileFireSimulatorView';
 
 import { isEditableEvent, calculateMarriageEstimates } from './fire-simulator/helpers';
+import { createMarriageEventObject, createSpouseRecord } from '../domain/events/marriage/marriageEventFactory';
 import { 
   validateSocialSecurityClaimAge, 
   getIncomeHistory, 
@@ -21,6 +22,7 @@ import {
   getNormalizedPhases
 } from '../fireCalculations';
 import { calculateUSTaxForModal } from '../simulatorMathUtils';
+import { applyChildRecommendation } from '../domain/events/child/childRecommendations';
 import './FireSimulator.css';
 
 export default function FireSimulator() {
@@ -558,32 +560,31 @@ export default function FireSimulator() {
 
     const scen = scenarios.find(s => s.id === currentScenarioId) || scenarios[0];
     let inp = scen.inputs;
-    if (scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) {
-      if (scenario.promoEvent) {
-        inp = JSON.parse(JSON.stringify(scen.inputs));
-        const remainingIncomes = (inp.incomeList || []).filter(i => i.id !== scenario.promoEvent.id);
-        inp.incomeList = [...remainingIncomes, scenario.promoEvent];
-        
-        inp.lifeEvents = (inp.lifeEvents || []).map(ev => {
-          if (ev.id === scenario.promoEvent.parentEventId) {
-            return { ...ev, linkedEventId: scenario.promoEvent.id };
-          }
-          return ev;
-        });
+    if (scenario.type.startsWith('childPromotion') || 
+        scenario.type.startsWith('childOffset') || 
+        scenario.type.startsWith('childBudgetRebalance') || 
+        scenario.type.startsWith('childSaveMore')) {
+      inp = applyChildRecommendation(scen.inputs, scenario);
+      
+      setScenarios(prev => prev.map(s => {
+        if (s.id !== currentScenarioId) return s;
+        return { ...s, inputs: inp };
+      }));
 
-        setScenarios(prev => prev.map(s => {
-          if (s.id !== currentScenarioId) return s;
-          return { ...s, inputs: inp };
-        }));
-
-        setNotification(
-          `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent.salaryIncrease.toLocaleString()}/year income\nRetirement plan updated`
-        );
-        setTimeout(() => setNotification(null), 4000);
-
-        setShowImprovementModal(false);
-        return;
+      let notificationMsg = '';
+      if (scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) {
+        notificationMsg = `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent?.salaryIncrease?.toLocaleString() || ''}/year income\nRetirement plan updated`;
+      } else if (scenario.type.startsWith('childBudgetRebalance')) {
+        notificationMsg = `✓ Budget rebalanced during childcare years\nRetirement plan updated`;
+      } else if (scenario.type.startsWith('childSaveMore')) {
+        notificationMsg = `✓ Savings increased starting now\nRetirement plan updated`;
       }
+
+      setNotification(notificationMsg);
+      setTimeout(() => setNotification(null), 4000);
+
+      setShowImprovementModal(false);
+      return;
     }
     const currentAgeVal = Number(inp.currentAge) || 30;
     const targetRetAgeVal = Number(inp.targetRetirementAge) || 65;
@@ -1505,93 +1506,18 @@ export default function FireSimulator() {
       newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
       savedEvent = newEventObj;
     } else if (type === 'marriage') {
-      const spouseIncome = Number(event.spouseIncome) || 0;
-      const savingsRate = Number(event.savingsRate) || 0;
-      const partnerSavings = spouseIncome * (savingsRate / 100);
-      
-      // Calculate Estimates
-      const estimates = calculateMarriageEstimates(event, newInputs);
-      let combinedSpendingVal = estimates ? estimates.combinedSpendingVal : 0;
-      let spouseRetSpendingVal = estimates ? estimates.spouseRetSpendingVal : 0;
-      let housingCostAmount = estimates ? estimates.housingCostAmount : 0;
-      let lifestyleAdjustmentAmount = estimates ? estimates.lifestyleAdjustmentAmount : 0;
+      const newEventObj = createMarriageEventObject(event, newInputs);
+      const spouseRecord = createSpouseRecord(event, newInputs);
 
-      let newEventObj = {
-        id: event.id && event.id !== 'marriage' ? event.id : `marriage-${Date.now()}`,
-        type: 'marriage',
-        enabled: true,
-        name: 'Marriage',
-        age: Number(event.age),
-        spouseIncome,
-        incomeGrowthRate: Number(event.incomeGrowthRate || 3),
-        cash: Number(event.cash || 0),
-        investments: Number(event.investments || 0),
-        retirement: Number(event.retirement || 0),
-        debtStudent: Number(event.debtStudent || 0),
-        debtCredit: Number(event.debtCredit || 0),
-        debtOther: Number(event.debtOther || 0),
-        savingsRate,
-        housingOption: event.housingOption || 'move',
-        housingSavings: Number(event.housingSavings || 0),
-        housingCost: Number(event.housingCost || 0),
-        lifestyleOption: event.lifestyleOption || 'same',
-        lifestyleAdjustment: Number(event.lifestyleAdjustment || 0),
-        includeWeddingCost: !!event.includeWeddingCost,
-        weddingCost: Number(event.weddingCost || 0),
-        weddingFundingMethod: event.weddingFundingMethod || 'savings',
-        weddingAge: Number(event.weddingAge || event.age),
-        filingStatus: event.filingStatus || 'jointly',
-        spouseCurrentAge: event.spouseCurrentAge !== undefined && event.spouseCurrentAge !== '' ? Number(event.spouseCurrentAge) : Number(event.age),
-        spouseLifeExpectancy: event.spouseLifeExpectancy !== undefined && event.spouseLifeExpectancy !== '' ? Number(event.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
-        spouseSocialSecurityAge: event.spouseSocialSecurityAge !== undefined && event.spouseSocialSecurityAge !== '' ? Number(event.spouseSocialSecurityAge) : 67,
-        spouseEstimatedSocialSecurityBenefit: event.spouseEstimatedSocialSecurityBenefit !== undefined && event.spouseEstimatedSocialSecurityBenefit !== '' ? Number(event.spouseEstimatedSocialSecurityBenefit) : 0,
-        spouseDesiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
-        desiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
-        partnerRetiresWithUser: true,
-        retirementSpendingNeed: spouseRetSpendingVal,
-        combinedSpendingAfterMarriage: combinedSpendingVal
-      };
-      
       let nextHouseholdMembers = [...(newInputs.householdMembers || [])];
       const spouseIdx = nextHouseholdMembers.findIndex(m => m.id === 'spouse');
-      const spouseRecord = {
-        id: 'spouse',
-        name: 'Spouse',
-        activeFromDate: Number(event.age),
-        activeUntilDate: null,
-        income: Number(event.spouseIncome),
-        incomeGrowthRate: Number(event.incomeGrowthRate || 3) / 100,
-        assets: {
-          cash: Number(event.cash || 0),
-          investments: Number(event.investments || 0),
-          retirement: Number(event.retirement || 0)
-        },
-        debts: {
-          student: Number(event.debtStudent || 0),
-          credit: Number(event.debtCredit || 0),
-          other: Number(event.debtOther || 0)
-        },
-        savingsRate: Number(event.savingsRate),
-        currentAge: event.spouseCurrentAge !== undefined && event.spouseCurrentAge !== '' ? Number(event.spouseCurrentAge) : Number(event.age),
-        lifeExpectancy: event.spouseLifeExpectancy !== undefined && event.spouseLifeExpectancy !== '' ? Number(event.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
-        spouseSocialSecurityAge: event.spouseSocialSecurityAge !== undefined && event.spouseSocialSecurityAge !== '' ? Number(event.spouseSocialSecurityAge) : 67,
-        spouseEstimatedSocialSecurityBenefit: event.spouseEstimatedSocialSecurityBenefit !== undefined && event.spouseEstimatedSocialSecurityBenefit !== '' ? Number(event.spouseEstimatedSocialSecurityBenefit) : 0,
-        spouseDesiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
-        desiredRetirementAge: event.spouseDesiredRetirementAge !== undefined && event.spouseDesiredRetirementAge !== '' && event.spouseDesiredRetirementAge !== null ? Number(event.spouseDesiredRetirementAge) : null,
-        partnerRetiresWithUser: true,
-        retirementSpendingNeed: spouseRetSpendingVal,
-        growthRate: Number(event.incomeGrowthRate || 3),
-        combinedSpendingAfterMarriage: combinedSpendingVal,
-        housingCost: housingCostAmount,
-        lifestyleAdjustment: lifestyleAdjustmentAmount
-      };
       if (spouseIdx !== -1) {
         nextHouseholdMembers[spouseIdx] = spouseRecord;
       } else {
         nextHouseholdMembers.push(spouseRecord);
       }
       newInputs.householdMembers = nextHouseholdMembers;
-      
+
       savedEvent = newEventObj;
       newInputs.lifeEvents = [...newInputs.lifeEvents, newEventObj];
     }
@@ -1637,21 +1563,23 @@ export default function FireSimulator() {
     const currentAgeVal = Number(newInputs.currentAge) || 30;
     const targetRetAgeVal = Number(newInputs.targetRetirementAge) || 65;
 
-    // 1. If child offset / promotion, add the career change event and link it
-    if ((scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) && scenario.promoEvent) {
-      const remainingIncomes = (newInputs.incomeList || []).filter(i => i.id !== scenario.promoEvent.id);
-      newInputs.incomeList = [...remainingIncomes, scenario.promoEvent];
+    // 1. If child offset / promotion / budget rebalance / save more, apply it via domain
+    if (scenario.type.startsWith('childPromotion') || 
+        scenario.type.startsWith('childOffset') || 
+        scenario.type.startsWith('childBudgetRebalance') || 
+        scenario.type.startsWith('childSaveMore')) {
+      newInputs = applyChildRecommendation(newInputs, scenario);
       
-      newInputs.lifeEvents = (newInputs.lifeEvents || []).map(ev => {
-        if (ev.id === scenario.promoEvent.parentEventId) {
-          return { ...ev, linkedEventId: scenario.promoEvent.id };
-        }
-        return ev;
-      });
+      let notificationMsg = '';
+      if (scenario.type.startsWith('childPromotion') || scenario.type.startsWith('childOffset')) {
+        notificationMsg = `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent?.salaryIncrease?.toLocaleString() || ''}/year income\nRetirement plan updated`;
+      } else if (scenario.type.startsWith('childBudgetRebalance')) {
+        notificationMsg = `✓ Budget rebalanced during childcare years\nRetirement plan updated`;
+      } else if (scenario.type.startsWith('childSaveMore')) {
+        notificationMsg = `✓ Savings increased starting now\nRetirement plan updated`;
+      }
 
-      setNotification(
-        `✓ Promotion event added to your timeline\n+ $${scenario.promoEvent.salaryIncrease.toLocaleString()}/year income\nRetirement plan updated`
-      );
+      setNotification(notificationMsg);
       setTimeout(() => setNotification(null), 4000);
     }
 

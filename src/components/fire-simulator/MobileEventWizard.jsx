@@ -20,6 +20,8 @@ import {
 } from './houseAffordabilityUtils';
 import { runFireSimulation } from '../../fireCalculations';
 import { getChildCostOffsetRecommendations } from '../../recommendations';
+import { generateChildRecommendations } from '../../domain/events/child/childRecommendations';
+import { getDefaultEvent } from '../../features/fire/events/eventDefaults';
 
 export default function MobileEventWizard({
   inputs,
@@ -229,196 +231,12 @@ export default function MobileEventWizard({
     if (preserveFields) {
       defaults = { ...draftEvent, type: draftEvent.type, isNew: !draftEvent.id };
     } else {
-      defaults = { type, isNew: true };
-      const curAge = inputs.currentAge || 35;
-      
-      if (type === 'buyHouse') {
-        defaults = {
-          ...defaults,
-          purchaseAge: Math.min(85, curAge + 5),
-          homePrice: 500000,
-          downPayment: 100000,
-          purchaseType: 'mortgage',
-          mortgageRate: 6.5,
-          loanTerm: 30,
-          points: 0,
-          pmi: 0.5,
-          closingCosts: 3,
-          propertyTax: 1.1,
-          insurance: 0.35,
-          hoa: 0,
-          maintenance: 1,
-          utilitiesIncrease: 0,
-          appreciationRate: 3,
-          sellingCost: 6,
-          currentRent: 0,
-          rentGrowth: 3,
-          renterInsurance: 0,
-          investmentReturn: 7,
-          inflation: 3
-        };
-      } else if (type === 'haveChild') {
-        defaults = {
-          ...defaults,
-          childName: 'Child',
-          childStartAge: 0,
-          birthAge: curAge,
-          costMethod: 'default',
-          customAges0to4: 15000,
-          customAges5to12: 9000,
-          customAges13to18: 12000,
-          customAges19to22: 20000,
-          includeCollege: false
-        };
-      } else if (type === 'careerChange') {
-      defaults = { 
-        ...defaults, 
-        name: 'Senior Role', 
-        startAge: Math.min(85, curAge + 3), 
-        amount: 150000, 
-        growthRate: 3.5 
-      };
-    } else if (type === 'sabbatical') {
-      defaults = {
-        ...defaults,
-        name: 'Sabbatical',
-        startAge: Math.min(85, curAge + 5),
-        endAge: Math.min(85, curAge + 6),
-        incomeReduction: 100,
-        spendingAdjustment: 0
-      };
-    } else if (type === 'move') {
-      defaults = { 
-        ...defaults, 
-        location: 'New City', 
-        moveAge: Math.min(85, curAge + 5), 
-        newSpending: 40000,
-        movingCost: 0
-      };
-    } else if (type === 'retire') {
-      defaults = { 
-        ...defaults, 
-        age: 55, 
-        spendingPercent: 70 
-      };
-    } else if (type === 'windfall') {
-      defaults = { 
-        ...defaults, 
-        ageReceived: Math.min(85, curAge + 10), 
-        amount: 100000, 
-        taxRate: 15 
-      };
-    } else if (type === 'college') {
-      defaults = { 
-        ...defaults, 
-        startAge: Math.min(85, curAge + 13), 
-        tuitionCost: 30000, 
-        duration: 4 
-      };
-    } else if (type === 'debtPayoff') {
-      defaults = { 
-        ...defaults, 
-        payoffAge: Math.min(85, curAge + 3), 
-        amount: 5000 
-      };
-    } else if (type === 'custom') {
-      defaults = { 
-        ...defaults, 
-        name: 'Custom Goal', 
-        age: Math.min(85, curAge + 5), 
-        amount: -15000 
-      };
-    } else if (type === 'socialSecurity') {
-      defaults = { 
-        ...defaults, 
-        claimingAge: 67, 
-        monthlyBenefit: 2000, 
-        inflationAdjusted: true, 
-        name: 'Social Security', 
-        ageStartedWorking: 22 
-      };
-    } else if (['pension', 'rentalIncome'].includes(type)) {
-      defaults = { 
-        ...defaults, 
-        claimingAge: 60, 
-        monthlyBenefit: 1500, 
-        inflationAdjusted: true, 
-        name: type === 'pension' ? 'Pension' : 'Rental Income' 
-      };
-    } else if (type === 'marriage') {
-      const userIncome = Number(inputs.simpleIncome) || 50000;
-      const userSavingsRate = Number(inputs.preTaxSavingsRate) || 15;
-      defaults = {
-        ...defaults,
-        age: curAge,
-        spouseIncome: userIncome,
-        incomeGrowthRate: 3,
-        cash: 0,
-        investments: 0,
-        retirement: 0,
-        debtStudent: 0,
-        debtCredit: 0,
-        debtOther: 0,
-        savingsRate: userSavingsRate,
-        housingOption: 'move',
-        housingSavings: 0,
-        housingCost: 0,
-        lifestyleOption: 'same',
-        lifestyleAdjustment: 0,
-        includeWeddingCost: false,
-        weddingCost: 20000,
-        weddingFundingMethod: 'savings',
-        weddingAge: curAge,
-        filingStatus: 'jointly',
-        spouseCurrentAge: curAge,
-        spouseLifeExpectancy: inputs.lifeExpectancy || 85,
-        spouseSocialSecurityAge: 67,
-        spouseEstimatedSocialSecurityBenefit: 0,
-        spouseDesiredRetirementAge: '',
-        retirementSpendingNeed: '',
-        partnerRetiresWithUser: true
-      };
-    } else if (['studentLoan', 'carLoan', 'personalLoan', 'creditCard'].includes(type)) {
-      defaults = {
-        ...defaults,
-        type: 'borrowing',
-        borrowingType: type,
-        startAge: curAge,
-        isExisting: true,
-        timing: 'current',
-        payoffPlanEnabled: true,
-        notes: ''
-      };
-      
-      if (type === 'studentLoan') {
-        defaults.name = 'Student Loan';
-        defaults.balance = 30000;
-        defaults.interestRate = 5.0;
-        defaults.minPayment = 318.20;
-      } else if (type === 'carLoan') {
-        defaults.name = 'Car Loan';
-        defaults.balance = 20000;
-        defaults.interestRate = 6.0;
-        defaults.isExisting = false;
-        defaults.timing = 'future';
-        defaults.startAge = curAge + 1;
-        defaults.minPayment = 386.66;
-      } else if (type === 'personalLoan') {
-        defaults.name = 'Personal Loan';
-        defaults.balance = 10000;
-        defaults.interestRate = 8.0;
-        defaults.minPayment = 313.36;
-      } else if (type === 'creditCard') {
-        defaults.name = 'Credit Card';
-        defaults.balance = 5000;
-        defaults.interestRate = 22.0;
-        defaults.minPayment = 100;
-      }
+      const baseDefaults = getDefaultEvent(type, { inputs, isMobile: true });
+      defaults = { ...baseDefaults, isNew: true };
     }
-  }
 
-  setDraftEvent(defaults);
-  setStep(3); // Advance to Timing screen
+    setDraftEvent(defaults);
+    setStep(3); // Advance to Timing screen
   };
 
   // Run temp simulation and compile impact metrics
@@ -2389,48 +2207,8 @@ export default function MobileEventWizard({
             // Calculate child-specific recommendations locally to bypass parent state updates lag
             let localRankedPlan = [];
             if (isChildFlow) {
-              const childRecs = getChildCostOffsetRecommendations(newInputs);
-              const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
               const currentReadyAge = typeof afterAge === 'number' ? afterAge : null;
-              childRecs.forEach(rec => {
-                const clonedInputs = JSON.parse(JSON.stringify(newInputs));
-                const promoEvent = {
-                  id: `promo-${rec.childEventId}`,
-                  type: 'careerChange',
-                  name: rec.childName ? `Promotion (${rec.childName})` : 'Get a Promotion',
-                  startAge: rec.parentStartAge,
-                  endAge: inputs.targetRetirementAge,
-                  growthRate: 0.03, // Saved as decimal for simulation (displayed as 3.0% in edit form)
-                  isTaxable: true,
-                  amount: rec.peakCost,
-                  salaryIncrease: rec.peakCost,
-                  incomeChangeType: 'increaseByAmount',
-                  permanent: true,
-                  parentEventId: rec.childEventId
-                };
-
-                clonedInputs.incomeList = [...(clonedInputs.incomeList || []), promoEvent];
-                const boostResults = runFireSimulation(clonedInputs);
-                const readyAge = boostResults.retirementReadyAge;
-                const yearsImprovement = currentReadyAge ? Math.max(0, currentReadyAge - (readyAge || currentReadyAge)) : null;
-                
-                localRankedPlan.push({
-                  type: `childPromotion-${rec.childEventId}`,
-                  icon: '🟦',
-                  title: 'Get a Promotion',
-                  details: `Increase your income by ${formatCurrency(rec.peakCost)}/year permanently.`,
-                  bulletPoints: [
-                    `This offsets childcare costs today and helps you build additional savings after childcare expenses end.`,
-                    `A promotion or career advancement that offsets childcare costs and keeps your retirement plan on track. After childcare ends, the additional income becomes available for savings.`
-                  ],
-                  readyAge: readyAge || targetRetirementAge,
-                  yearsImprovement,
-                  value: rec.peakCost,
-                  promoEvent: promoEvent,
-                  savingsFocus: 'Earn More',
-                  savingsEffortScore: 2
-                });
-              });
+              localRankedPlan = generateChildRecommendations(newInputs, currentReadyAge);
             }
 
             const displayRankedPlan = [...localRankedPlan];

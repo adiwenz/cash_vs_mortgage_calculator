@@ -7,9 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
 *.local
 
 # Editor directories and files
@@ -17,6 +17,7 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+__MACOSX/
 *.suo
 *.ntvs*
 *.njsproj
@@ -27,7 +28,7 @@ dist-ssr
 scratch/
 
 # Playwright
-/test-results/
+test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/

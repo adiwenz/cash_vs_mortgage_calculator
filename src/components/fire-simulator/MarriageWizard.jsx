@@ -1,6 +1,9 @@
 import { Wallet, TrendingUp, Home, Target, User } from 'lucide-react';
 import { runFireSimulation } from '../../fireCalculations';
-import { formatCurrency, calculateMarriageEstimates } from './helpers';
+import { formatCurrency } from './helpers';
+import { calculateCombinedIncome, calculateMarriageEstimates } from '../../domain/events/marriage/marriageImpact';
+import { validateWeddingCostFunding } from '../../domain/events/marriage/marriageValidation';
+import { createMarriageEventObject, createSpouseRecord } from '../../domain/events/marriage/marriageEventFactory';
 
 export default function MarriageWizard({
   inputs,
@@ -36,31 +39,20 @@ export default function MarriageWizard({
   const userIncome = Number(inputs.simpleIncome) || 50000;
   const userSavingsRate = Number(inputs.preTaxSavingsRate) || 15;
   const spouseIncome = Number(editingEvent.spouseIncome) || 0;
-  const combinedIncome = userIncome + spouseIncome;
+  const combinedIncome = calculateCombinedIncome(userIncome, spouseIncome);
 
-  const userAssets = Number(inputs.assets?.cash || 0) +
-                     Number(inputs.assets?.brokerage || 0) +
-                     Number(inputs.assets?.trad401k || 0) +
-                     Number(inputs.assets?.tradIra || 0) +
-                     Number(inputs.assets?.rothIra || 0) +
-                     Number(inputs.assets?.hsa || 0) +
-                     Number(inputs.assets?.other || 0);
-  const spouseAssets = Number(editingEvent.cash || 0) +
-                       Number(editingEvent.investments || 0) +
-                       Number(editingEvent.retirement || 0);
-  const combinedAssets = userAssets + spouseAssets;
-
-  const userDebt = Number(inputs.assets?.debts || 0) +
-                   (inputs.debtList || []).reduce((sum, d) => sum + Number(d.balance || 0), 0);
-  const spouseDebt = Number(editingEvent.debtStudent || 0) +
-                     Number(editingEvent.debtCredit || 0) +
-                     Number(editingEvent.debtOther || 0);
-  const combinedDebt = userDebt + spouseDebt;
-  
-  const isSavingsDisabled = Number(editingEvent.weddingCost || 0) > combinedAssets;
-  const postWeddingFinancedDebt = (editingEvent.weddingFundingMethod === 'debt') ? Math.max(0, Number(editingEvent.weddingCost || 0) - combinedAssets) : 0;
-  const postWeddingNetWorth = combinedAssets - combinedDebt - postWeddingFinancedDebt;
-  const isNetWorthBelowZero = postWeddingNetWorth < 0;
+  const {
+    userAssets,
+    spouseAssets,
+    combinedAssets,
+    userDebt,
+    spouseDebt,
+    combinedDebt,
+    isSavingsDisabled,
+    postWeddingFinancedDebt,
+    postWeddingNetWorth,
+    isNetWorthBelowZero
+  } = validateWeddingCostFunding(editingEvent, inputs);
 
   // Calculate user spending baseline pre-retirement
   let userSpendingPreRetirement = Number(inputs.simpleExpenses) || 42500;
@@ -112,45 +104,15 @@ export default function MarriageWizard({
       lifeEvents: [
         ...(inputs.lifeEvents || []).filter(e => e.type !== 'marriage'),
         {
-          ...editingEvent,
-          enabled: true,
-          retirementSpendingNeed: spouseRetSpendingVal,
-          combinedSpendingAfterMarriage: combinedSpendingVal,
-          housingCost: housingCostAmount,
-          partnerRetiresWithUser: true
+          ...createMarriageEventObject(editingEvent, inputs),
+          enabled: true
         }
       ],
       householdMembers: [
         ...(inputs.householdMembers || []).filter(m => m.id !== 'spouse'),
         {
-          id: 'spouse',
-          name: 'Spouse',
-          activeFromDate: Number(editingEvent.age),
-          activeUntilDate: null,
-          income: Number(editingEvent.spouseIncome),
-          incomeGrowthRate: Number(editingEvent.incomeGrowthRate) / 100,
-          assets: {
-            cash: Number(editingEvent.cash),
-            investments: Number(editingEvent.investments),
-            retirement: Number(editingEvent.retirement)
-          },
-          debts: {
-            student: Number(editingEvent.debtStudent),
-            credit: Number(editingEvent.debtCredit),
-            other: Number(editingEvent.debtOther)
-          },
-          savingsRate: Number(editingEvent.savingsRate),
-          currentAge: editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? Number(editingEvent.spouseCurrentAge) : Number(editingEvent.age),
-          lifeExpectancy: editingEvent.spouseLifeExpectancy !== undefined && editingEvent.spouseLifeExpectancy !== '' ? Number(editingEvent.spouseLifeExpectancy) : (inputs.lifeExpectancy || 85),
-          spouseSocialSecurityAge: editingEvent.spouseSocialSecurityAge !== undefined && editingEvent.spouseSocialSecurityAge !== '' ? Number(editingEvent.spouseSocialSecurityAge) : 67,
-          spouseEstimatedSocialSecurityBenefit: editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? Number(editingEvent.spouseEstimatedSocialSecurityBenefit) : 0,
-          desiredRetirementAge: null, // Forces spouse to retire at same age as user
-          retirementSpendingNeed: spouseRetSpendingVal,
-          growthRate: Number(editingEvent.incomeGrowthRate),
-          combinedSpendingAfterMarriage: combinedSpendingVal,
-          housingCost: housingCostAmount,
-          lifestyleAdjustment: lifestyleAdjustmentAmount,
-          partnerRetiresWithUser: true
+          ...createSpouseRecord(editingEvent, inputs),
+          desiredRetirementAge: null // Forces spouse to retire at same age as user in preview
         }
       ]
     };
