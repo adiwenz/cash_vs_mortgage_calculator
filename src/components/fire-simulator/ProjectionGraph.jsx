@@ -227,6 +227,30 @@ export default function ProjectionGraph({
   isMobile = false,
   draggingInfo = null
 }) {
+  const chartContainerRef = useRef(null);
+  const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
+
+  const tooltipPos = useMemo(() => {
+    if (!activeTooltipCoord || !chartContainerRef.current) return undefined;
+
+    const anchorX = activeTooltipCoord.x;
+    const anchorY = activeTooltipCoord.y;
+
+    const markerRadius = isMobile ? 13.5 : 15;
+    const glowBlurRadius = 3;
+    const EVENT_CLEARANCE = 24;
+
+    const VISUAL_MARKER_RADIUS = markerRadius + glowBlurRadius;
+    let tooltipX = anchorX + VISUAL_MARKER_RADIUS + EVENT_CLEARANCE;
+
+    const chartWidth = chartContainerRef.current.clientWidth;
+    const tooltipWidth = isMobile ? 150 : 190;
+    tooltipX = Math.min(tooltipX, chartWidth - tooltipWidth - 12);
+
+    const tooltipY = anchorY - 50;
+
+    return { x: tooltipX, y: tooltipY };
+  }, [activeTooltipCoord, isMobile]);
 
   // Sort events by age and assign lanes (to resolve overlaps)
   const { eventLanes, eventOffsets } = useMemo(() => {
@@ -355,11 +379,24 @@ export default function ProjectionGraph({
   const topMargin = isMobile ? 55 : 85;
 
   return (
-    <div className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '300px', cursor: 'crosshair', width: '100%', position: 'relative' }}>
+    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '300px', cursor: 'crosshair', width: '100%', position: 'relative' }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
           margin={{ top: topMargin, right: 10, left: 10, bottom: 5 }}
+          onMouseMove={(e) => {
+            if (e && e.activeCoordinate) {
+              setActiveTooltipCoord({
+                x: e.activeCoordinate.x,
+                y: e.activeCoordinate.y
+              });
+            } else {
+              setActiveTooltipCoord(null);
+            }
+          }}
+          onMouseLeave={() => {
+            setActiveTooltipCoord(null);
+          }}
           onClick={(data) => {
             if (data && data.activeLabel) {
               setSelectedYear(Number(data.activeLabel));
@@ -380,6 +417,7 @@ export default function ProjectionGraph({
             tickFormatter={formatYAxis}
           />
           <Tooltip
+            position={tooltipPos}
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 return (
