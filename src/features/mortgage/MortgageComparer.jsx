@@ -19,7 +19,7 @@ import {
   getNumParam,
   encodeScenarios,
   decodeScenarios
-} from '../calculations';
+} from '../../calculations';
 
 // Premium Scenario Colors
 const SCENARIO_COLORS = [

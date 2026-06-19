@@ -106,4 +106,84 @@ describe('Simulation Pipeline Golden Tests', () => {
 
     expect(JSON.stringify(inputs)).toBe(originalInputsStr);
   });
+
+  test('5. Regression: Scenario A (Default) matches golden snapshot', () => {
+    const inputs = getMappedDefaultInputs();
+    const results = runFireSimulation(inputs);
+    expect(results.retirementReadyAge).toBe(64);
+    expect(results.fiNumber).toBeCloseTo(296985.84, 1);
+    expect(results.retirementOutcome).toBe('comfortable');
+    const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
+    expect(age65Nw).toBeCloseTo(307338.90, 1);
+  });
+
+  test('6. Regression: Scenario B (Home Purchase) matches golden snapshot', () => {
+    const inputs = getMappedDefaultInputs();
+    inputs.lifeEvents = [
+      ...(inputs.lifeEvents || []),
+      {
+        id: 'house-evt',
+        type: 'buyHouse',
+        enabled: true,
+        age: 40,
+        purchaseAge: 40,
+        homePrice: 400000,
+        downPaymentPercent: 20,
+        interestRate: 6.5,
+        mortgageTerm: 30,
+        propertyTaxRate: 1.2,
+        insuranceRate: 0.5,
+        maintenanceRate: 1.0,
+        rebalanceStrategy: 'balanced'
+      }
+    ];
+    const results = runFireSimulation(inputs);
+    expect(results.retirementReadyAge).toBe(75);
+    expect(results.retirementOutcome).toBe('retirementGap');
+    const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
+    expect(age65Nw).toBeCloseTo(141144.22, 1);
+  });
+
+  test('7. Regression: Scenario C (Marriage) matches golden snapshot', () => {
+    const inputs = getMappedDefaultInputs();
+    inputs.lifeEvents = [
+      ...(inputs.lifeEvents || []),
+      {
+        id: 'marriage-evt',
+        type: 'marriage',
+        enabled: true,
+        age: 35,
+        spouseCurrentAge: 35,
+        spouseIncome: 45000,
+        spouseEstimatedSocialSecurityBenefit: 1500,
+        spouseLifeExpectancy: 85
+      }
+    ];
+    const results = runFireSimulation(inputs);
+    expect(results.retirementReadyAge).toBe(78);
+    expect(results.retirementOutcome).toBe('retirementGap');
+    const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
+    expect(age65Nw).toBeCloseTo(231192.58, 1);
+  });
+
+  test('8. Regression: Scenario D (Debt) matches golden snapshot', () => {
+    const inputs = getMappedDefaultInputs();
+    inputs.debtList = [
+      {
+        id: 'debt-1',
+        name: 'Credit Card',
+        type: 'creditCard',
+        balance: 5000,
+        rate: 18,
+        minimumPaymentPercent: 3,
+        startAge: 30,
+        enabled: true
+      }
+    ];
+    const results = runFireSimulation(inputs);
+    expect(results.retirementReadyAge).toBe(64);
+    expect(results.retirementOutcome).toBe('comfortable');
+    const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
+    expect(age65Nw).toBeCloseTo(305278.97, 1);
+  });
 });

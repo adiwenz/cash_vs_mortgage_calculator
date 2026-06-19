@@ -3,7 +3,7 @@ import { describe, test, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useScenarioState } from './src/features/fire/state/useScenarioState.js';
 import { useSimulationResults } from './src/features/fire/state/useSimulationResults.js';
-import { useFireSimulation } from './src/hooks/useFireSimulation.js';
+import { useSimulationController } from './src/features/fire/state/useSimulationController.js';
 import {
   getActiveScenario,
   getInputsForScenario,
@@ -272,7 +272,7 @@ describe('Scenario & Simulation State Refactoring Tests', () => {
 
   describe('6. Backwards Compatibility', () => {
     test('useFireSimulation hook exports the exact expected API shape', () => {
-      const { result } = renderHook(() => useFireSimulation());
+      const { result } = renderHook(() => useSimulationController());
 
       // Ensure all major properties are exported and fully functional
       expect(result.current.scenarios).toBeDefined();

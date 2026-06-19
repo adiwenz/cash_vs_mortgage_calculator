@@ -15,7 +15,7 @@ import {
   validateSimpleInputs,
   getNumParam,
   getStrParam
-} from '../calculations';
+} from '../../calculations';
 
 const DEFAULT_INPUTS = {
   homePrice: 500000,

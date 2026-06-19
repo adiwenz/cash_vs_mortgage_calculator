@@ -47,8 +47,11 @@ files.forEach(file => {
       if (importSource === 'react' || importSource.startsWith('react/')) {
         errors.push(`[React in Domain] ${relativePath} imports React: "${line.trim()}"`);
       }
-      if (importSource.includes('/components/') || importSource.includes('../components')) {
-        errors.push(`[Components in Domain] ${relativePath} imports components: "${line.trim()}"`);
+      if (
+        importSource.includes('/components/') || importSource.includes('../components') ||
+        importSource.includes('/features/') || importSource.includes('../features')
+      ) {
+        errors.push(`[Components/Features in Domain] ${relativePath} imports components/features: "${line.trim()}"`);
       }
     }
     
@@ -74,7 +77,12 @@ files.forEach(file => {
     }
     
     // Rule 5: UI components do not import from deep calculator internals
-    if (relativePath.startsWith('src/components/')) {
+    if (
+      relativePath.startsWith('src/components/') ||
+      relativePath.startsWith('src/features/mortgage/') ||
+      relativePath.startsWith('src/features/calculator/') ||
+      relativePath.startsWith('src/features/debt/')
+    ) {
       const deepInternalsPattern = /\/calculators\/fire\/(yearlySimulation|phases|socialSecurity|retirementReadiness|normalizeInputs|debug|children|marriage|assetsAndWithdrawals)\.js/;
       if (deepInternalsPattern.test(importSource)) {
         errors.push(`[Deep Calculator Import] UI Component ${relativePath} imports deep calculator internals: "${line.trim()}" (Use fireCalculations.js or rebalance.js instead)`);

@@ -5,7 +5,7 @@ import { houseEventHandler } from './src/features/fire/events/handlers/houseEven
 import { childEventHandler } from './src/features/fire/events/handlers/childEventHandler.js';
 import { debtEventHandler } from './src/features/fire/events/handlers/debtEventHandler.js';
 import { genericEventHandler } from './src/features/fire/events/handlers/genericEventHandler.js';
-import { useEventActions } from './src/hooks/useEventActions.js';
+import { useEventEditingController } from './src/features/fire/events/useEventEditingController.js';
 import { renderHook } from '@testing-library/react';
 
 describe('Event Actions Refactoring - Saving & Deleting Events', () => {
@@ -213,17 +213,20 @@ describe('Event Actions Refactoring - Saving & Deleting Events', () => {
       const updateInput = vi.fn();
       const setShowImprovementModal = vi.fn();
 
-      const { result } = renderHook(() => useEventActions(
+      const { result } = renderHook(() => useEventEditingController({
         scenarios,
         setScenarios,
-        'scen-1',
-        baseInputs,
+        currentScenarioId: 'scen-1',
+        inputs: baseInputs,
         updateInput,
-        vi.fn(),
-        vi.fn(),
-        false,
-        setShowImprovementModal
-      ));
+        activeResults: {},
+        timelineEvents: [],
+        handleSetBudgetClick: vi.fn(),
+        setIsBudgetOpenFromMarriageWizard: vi.fn(),
+        isMobile: false,
+        setShowImprovementModal,
+        commitEventAgeChange: vi.fn()
+      }));
 
       expect(result.current.handleCreateEvent).toBeDefined();
       expect(result.current.handleSaveEvent).toBeDefined();

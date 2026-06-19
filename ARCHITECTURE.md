@@ -39,9 +39,17 @@ We maintain a strict boundary-driven structure to separate pure math from React 
 - **Rules**: Must contain **only pure JavaScript functions**. Imports of React, hooks, DOM APIs, or UI styles are strictly forbidden.
 - **Input safety**: Must treat input objects as **immutable** (validated via deep-freezing in tests).
 
-### Feature Layer (`src/features/fire/`)
-- Contains controller hooks (e.g. `useEventController.js`, `useRecommendationController.js`) that coordinate React states, toasts, modals, and dispatch updates to domain engines.
-- Couples the domain math to React state.
+### Feature Layer (`src/features/`)
+Couples the domain math to React state and manages specific application flows:
+- **`src/features/fire/`**:
+  - `useSimulationController.js`: Owns scenario CRUD (scenarios, active scenario, duplication, deletion) and coordinates simulation execution.
+  - `useEventEditingController.js`: Manages editing workflows for timeline events and current conditions, including timeline drag-and-drop tracking and coord translation.
+  - `useBudgetState.js`: Centralizes budget configuration, modal overlays, savings details, and pre/post-retirement income allocation tracking.
+  - `useRecommendationController.js`: Coordinates recommendation applications and controls improvement modal overlays.
+  - `useResponsiveFireView.js`: Small hook managing reactive mobile width detection and resize listeners.
+- **`src/features/mortgage/`**: Contains components/styles for the Mortgage Comparer tool.
+- **`src/features/calculator/`**: Contains components for the Simple Calculator tool.
+- **`src/features/debt/`**: Contains components/styles for Credit Card Behavior tracking.
 
 ### Presentational Primitives (`src/features/fire/components/`)
 - Shared components used by both desktop and mobile views:

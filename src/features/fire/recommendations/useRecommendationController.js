@@ -15,7 +15,6 @@ export function useRecommendationController({
   houseRebalanceSummary,
   setNotification,
   setIsBudgetModalOpen,
-  setShowImprovementModal,
   setBudgetDiffs,
   setBudgetGrossIncome,
   setBudgetFilingStatus,
@@ -31,6 +30,7 @@ export function useRecommendationController({
   setSavingsAllocMode,
   setPendingImprovement
 }) {
+  const [showImprovementModal, setShowImprovementModal] = useState(false);
   const [selectedRecommendation, setSelectedRecommendation] = useState(null);
 
   const applyRecommendationAction = useCallback((scenario) => {
@@ -126,7 +126,6 @@ export function useRecommendationController({
     setEditingEvent,
     setNotification,
     setIsBudgetModalOpen,
-    setShowImprovementModal,
     setBudgetDiffs,
     setBudgetGrossIncome,
     setBudgetFilingStatus,
@@ -146,6 +145,8 @@ export function useRecommendationController({
   return {
     selectedRecommendation,
     setSelectedRecommendation,
-    applyRecommendationAction
+    applyRecommendationAction,
+    showImprovementModal,
+    setShowImprovementModal
   };
 }

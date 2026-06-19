@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useScenarioState } from '../features/fire/state/useScenarioState.js';
-import { useSelectedScenario } from '../features/fire/state/useSelectedScenario.js';
-import { useSimulationResults } from '../features/fire/state/useSimulationResults.js';
+import { useScenarioState } from './useScenarioState.js';
+import { useSelectedScenario } from './useSelectedScenario.js';
+import { useSimulationResults } from './useSimulationResults.js';
 
-export function useFireSimulation() {
-  const [editingEvent, setEditingEvent] = useState(null);
+/**
+ * Controller hook for fire simulation state and calculations.
+ * Coordinates scenario CRUD, updates inputs, and retrieves simulation outputs.
+ * 
+ * @param {Object} [props] optional props
+ * @param {Object} [props.editingEvent] the event currently being edited (for SS preview details)
+ * @returns {Object} scenario/simulation state properties and action handlers
+ */
+export function useSimulationController({ editingEvent } = {}) {
   const scenarioState = useScenarioState();
-  
   const selectedScenario = useSelectedScenario(scenarioState.scenarios);
   
   const simulationResults = useSimulationResults(
@@ -14,17 +19,6 @@ export function useFireSimulation() {
     scenarioState.scenarios,
     editingEvent
   );
-
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const handleDuplicateScenarioWrapper = () => {
     const newId = scenarioState.handleDuplicateScenario(selectedScenario.activeScenario);
@@ -66,7 +60,6 @@ export function useFireSimulation() {
     setDisplayMode: simulationResults.setDisplayMode,
     selectedYear: simulationResults.selectedYear,
     setSelectedYear: simulationResults.setSelectedYear,
-    isMobile,
     baselineResults: simulationResults.baselineResults,
     activeResults: simulationResults.activeResults,
     displayedResults: simulationResults.displayedResults,
@@ -75,12 +68,10 @@ export function useFireSimulation() {
     baselineChartData: simulationResults.baselineChartData,
     validation: simulationResults.validation,
     tempSocialSecurityDetails: simulationResults.tempSocialSecurityDetails,
-    editingEvent,
-    setEditingEvent,
     handleDuplicateScenario: handleDuplicateScenarioWrapper,
     handleDeleteScenario: handleDeleteScenarioWrapper,
     commitEventAgeChange: commitEventAgeChangeWrapper
   };
 }
 
-export default useFireSimulation;
+export default useSimulationController;

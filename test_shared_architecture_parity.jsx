@@ -3,7 +3,8 @@ import { render, screen, cleanup, renderHook, fireEvent } from '@testing-library
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import FireSimulator from './src/components/FireSimulator';
-import { useFireSimulation } from './src/hooks/useFireSimulation';
+import { useSimulationController } from './src/features/fire/state/useSimulationController';
+import { useResponsiveFireView } from './src/features/fire/state/useResponsiveFireView';
 import { useTimelineEvents } from './src/hooks/useTimelineEvents';
 import { useBudgetPhases } from './src/hooks/useBudgetPhases';
 
@@ -29,15 +30,17 @@ describe('Shared Simulator Architecture - Desktop & Mobile Parity', () => {
   test('Calculation parity - useFireSimulation hook returns identical results in desktop vs mobile width', () => {
     // 1. Run hook in desktop context
     globalThis.innerWidth = 1024;
-    const { result: desktopResult } = renderHook(() => useFireSimulation());
+    const { result: desktopResult } = renderHook(() => useSimulationController());
+    const { result: desktopResp } = renderHook(() => useResponsiveFireView());
     
     // 2. Run hook in mobile context
     globalThis.innerWidth = 375;
-    const { result: mobileResult } = renderHook(() => useFireSimulation());
+    const { result: mobileResult } = renderHook(() => useSimulationController());
+    const { result: mobileResp } = renderHook(() => useResponsiveFireView());
 
     // 3. Verify parity of calculation properties
-    expect(desktopResult.current.isMobile).toBe(false);
-    expect(mobileResult.current.isMobile).toBe(true);
+    expect(desktopResp.current.isMobile).toBe(false);
+    expect(mobileResp.current.isMobile).toBe(true);
 
     expect(desktopResult.current.activeResults.retirementReadyAge).toEqual(mobileResult.current.activeResults.retirementReadyAge);
     expect(desktopResult.current.activeResults.runOutAge).toEqual(mobileResult.current.activeResults.runOutAge);
@@ -54,7 +57,7 @@ describe('Shared Simulator Architecture - Desktop & Mobile Parity', () => {
   test('Timeline and budget phases parity - identical inputs yield identical list of events and budget phases', () => {
     // 1. Get simulation hook data
     globalThis.innerWidth = 1024;
-    const { result: fireSimHook } = renderHook(() => useFireSimulation());
+    const { result: fireSimHook } = renderHook(() => useSimulationController());
     
     const inputs = fireSimHook.current.inputs;
     const displayedResults = fireSimHook.current.displayedResults;
@@ -76,7 +79,7 @@ describe('Shared Simulator Architecture - Desktop & Mobile Parity', () => {
 
   test('UI parity - verifying both layouts render the identical retirement outcome age', () => {
     // Determine the calculated age programmatically
-    const { result } = renderHook(() => useFireSimulation());
+    const { result } = renderHook(() => useSimulationController());
     const expectedAge = String(result.current.activeResults.retirementReadyAge || 63);
     cleanup();
 

@@ -14,7 +14,6 @@ import {
   Cell,
   LabelList
 } from 'recharts';
-import { simulateDebt } from '../debtSimulationEngine';
 import './CreditCardBehavior.css';
 
 import { 
@@ -23,22 +22,30 @@ import {
   EDUCATIONAL_EXPLANATIONS,
   EDUCATIONAL_TAKEAWAYS,
   BEHAVIOR_KEYS
-} from '../domain/debt/debtConstants.js';
+} from '../../domain/debt/debtConstants.js';
 import { 
   classifyBehavior, 
   getBehaviorDefaults 
-} from '../domain/debt/creditCardStates.js';
+} from '../../domain/debt/creditCardStates.js';
 import { 
   calculateAmortizedPayment,
   calculatePayoffTimeline,
   getYAxisBoundsAt36
-} from '../domain/debt/debtProjection.js';
+} from '../../domain/debt/debtProjection.js';
 import { 
   formatPayoffText,
   formatPayoffSummary as formatPayoffSummaryDomain,
   getScenarioStatus as getScenarioStatusDomain,
   getEducationalInsights
-} from '../domain/debt/debtRecommendations.js';
+} from '../../domain/debt/debtRecommendations.js';
+
+// Utility to retrieve numerical URL params safely
+function getNumParam(params, key, fallback) {
+  const val = params.get(key);
+  if (val === null || val === '') return fallback;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? fallback : parsed;
+}
 
 // Formats number to currency USD
 const formatCurrency = (val) => {
@@ -124,13 +131,7 @@ export default function CreditCardBehavior() {
     window.history.replaceState(null, '', `?${params.toString()}`);
   }, [inputs, activeBehavior, compareMode]);
 
-  // Utility to retrieve numerical URL params safely
-  function getNumParam(params, key, fallback) {
-    const val = params.get(key);
-    if (val === null || val === '') return fallback;
-    const parsed = parseFloat(val);
-    return isNaN(parsed) ? fallback : parsed;
-  }
+
 
   // Handle local state text input editing to allow typing decimals without immediate jumping
   const [localValues, setLocalValues] = useState({});

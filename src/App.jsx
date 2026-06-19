@@ -4,12 +4,12 @@ import AssumptionsPanel from './components/AssumptionsPanel';
 import ComparisonChart from './components/ComparisonChart';
 import ComparisonTable from './components/ComparisonTable';
 import EducationHub from './components/EducationHub';
-import MortgageComparer from './components/MortgageComparer';
-import SimpleCalculator from './components/SimpleCalculator';
+import MortgageComparer from './features/mortgage/MortgageComparer';
+import SimpleCalculator from './features/calculator/SimpleCalculator';
 import CapitalGainsBreakdownCard from './components/CapitalGainsBreakdownCard';
 import FireSimulator from './components/FireSimulator';
 import SavingsAllocator from './components/SavingsAllocator';
-import CreditCardBehavior from './components/CreditCardBehavior';
+import CreditCardBehavior from './features/debt/CreditCardBehavior';
 import logoImg from './assets/logo.png';
 
 // Initial default inputs

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases } from '../fireCalculations';
-import { calculateUSTaxForModal } from '../simulatorMathUtils';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
 
 export function useBudgetState(
@@ -11,10 +10,54 @@ export function useBudgetState(
   updateInput,
   activeResults,
   editingEvent,
-  setEditingEvent,
-  isBudgetOpenFromMarriageWizard,
-  setIsBudgetOpenFromMarriageWizard
+  setEditingEvent
 ) {
+  const [isBudgetOpenFromMarriageWizard, setIsBudgetOpenFromMarriageWizard] = useState(false);
+  const [isSavingsDetailsOpen, setIsSavingsDetailsOpen] = useState(false);
+  const [savingsDetails, setSavingsDetails] = useState({
+    cash: 0,
+    emergencyFund: 0,
+    brokerage: 0,
+    trad401k: 0,
+    tradIra: 0,
+    rothIra: 0,
+    hsa: 0,
+    other: 0
+  });
+
+  const lastNonZeroSavingsRateRef = useRef(15); // default to 15% pre-tax savings rate
+
+  // Track last non-zero savings rate to preserve it during empty/zero income editing states
+  useEffect(() => {
+    const income = Number(inputs.simpleIncome) || 0;
+    const expenses = Number(inputs.simpleExpenses) || 0;
+    if (income > 0) {
+      const rate = Math.round(((income - expenses) / income) * 100);
+      lastNonZeroSavingsRateRef.current = rate;
+    }
+  }, [inputs.simpleIncome, inputs.simpleExpenses]);
+
+  const handleOpenSavingsDetails = () => {
+    setSavingsDetails({
+      cash: Number(inputs.assets?.cash) || 0,
+      emergencyFund: Number(inputs.assets?.emergencyFund) || 0,
+      brokerage: Number(inputs.assets?.brokerage) || 0,
+      trad401k: Number(inputs.assets?.trad401k) || 0,
+      tradIra: Number(inputs.assets?.tradIra) || 0,
+      rothIra: Number(inputs.assets?.rothIra) || 0,
+      hsa: Number(inputs.assets?.hsa) || 0,
+      other: Number(inputs.assets?.other) || 0
+    });
+    setIsSavingsDetailsOpen(true);
+  };
+
+  const handleSaveSavingsDetails = (newDetails) => {
+    updateInput('assets', newDetails);
+    const total = Object.values(newDetails).reduce((sum, val) => sum + val, 0);
+    updateInput('simpleInvestments', total);
+    setIsSavingsDetailsOpen(false);
+  };
+
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [activeBudgetPhase, setActiveBudgetPhase] = useState('workSave');
   const [editedPhases, setEditedPhases] = useState({});
@@ -306,13 +349,9 @@ export function useBudgetState(
         const userSavingsSum = Object.values(p.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
         const partnerSavingsSum = Object.values(p.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
 
-        let totalSavingsMonthly = 0;
-        if (p.savingsAllocMode === 'percentSurplus') {
-          const initialSurplus = Math.max(0, resolvedIncome - totalExpensesMonthly);
-          totalSavingsMonthly = initialSurplus * ((userSavingsSum + partnerSavingsSum) / 100);
-        } else {
-          totalSavingsMonthly = userSavingsSum + partnerSavingsSum;
-        }
+        const totalSavingsMonthly = p.savingsAllocMode === 'percentSurplus'
+          ? Math.max(0, resolvedIncome - totalExpensesMonthly) * ((userSavingsSum + partnerSavingsSum) / 100)
+          : userSavingsSum + partnerSavingsSum;
 
         const expenseRatio = resolvedIncome > 0 ? (totalExpensesMonthly / resolvedIncome) : 0;
         const savingsRatio = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) : 0;
@@ -544,6 +583,15 @@ export function useBudgetState(
     handleToggleSavingsAllocMode,
     handleSaveBudget,
     budgetScalingMode,
-    handleToggleBudgetScalingMode
+    handleToggleBudgetScalingMode,
+    isBudgetOpenFromMarriageWizard,
+    setIsBudgetOpenFromMarriageWizard,
+    isSavingsDetailsOpen,
+    setIsSavingsDetailsOpen,
+    savingsDetails,
+    setSavingsDetails,
+    handleOpenSavingsDetails,
+    handleSaveSavingsDetails,
+    lastNonZeroSavingsRateRef
   };
 }

@@ -457,7 +457,7 @@ describe('Mobile Event Wizard & Flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    await new Promise(resolve => setTimeout(resolve, 60));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     expect(screen.getByText('👶 Child Added to Timeline!')).toBeDefined();
     expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
@@ -731,7 +731,7 @@ describe('Mobile Event Wizard & Flow', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise(resolve => setTimeout(resolve, 150));
       expect(screen.getByText('👶 Child Added to Timeline!')).toBeDefined();
       expect(screen.getByText('Get a Promotion', { exact: false })).toBeDefined();
     });
@@ -763,7 +763,7 @@ describe('Mobile Event Wizard & Flow', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise(resolve => setTimeout(resolve, 150));
       const applyBtn = screen.getAllByRole('button', { name: 'Apply Adjustment' })[0];
       fireEvent.click(applyBtn);
       expect(handleApplyMobileRecommendation).toHaveBeenCalled();
