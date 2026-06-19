@@ -6,7 +6,7 @@ import { incomeEventHandler } from './handlers/incomeEventHandler.js';
 import { retirementEventHandler } from './handlers/retirementEventHandler.js';
 import { genericEventHandler } from './handlers/genericEventHandler.js';
 
-import { findMatchingEvent } from './handlers/eventHandlerUtils.js';
+import { findMatchingEvent, stripTransientRecommendationMetadata } from './handlers/eventHandlerUtils.js';
 
 function getHandlerForType(type, inputs, eventId) {
   if (['buyHouse', 'sellHouse'].includes(type)) {
@@ -48,8 +48,9 @@ export const eventSaveRouter = {
 
   routeSave(editingEvent, inputs, scenarios, currentScenarioId, options) {
     if (!editingEvent) return null;
-    const handler = getHandlerForType(editingEvent.type, inputs, editingEvent.id);
-    return handler.save(editingEvent, inputs, scenarios, currentScenarioId, options);
+    const cleanEvent = stripTransientRecommendationMetadata(editingEvent);
+    const handler = getHandlerForType(cleanEvent.type, inputs, cleanEvent.id);
+    return handler.save(cleanEvent, inputs, scenarios, currentScenarioId, options);
   },
 
   routeDelete(matchEvent, inputs) {

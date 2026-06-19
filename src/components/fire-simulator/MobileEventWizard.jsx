@@ -18,6 +18,8 @@ import {
   calculateCashShortfall,
   getSimulatedRetirementAge
 } from './houseAffordabilityUtils';
+import { hasResolvedRecommendationTradeoffs } from '../../features/fire/recommendations/recommendationUtils.js';
+
 import { runFireSimulation } from '../../fireCalculations';
 import { getChildCostOffsetRecommendations } from '../../recommendations';
 import { generateChildRecommendations } from '../../domain/events/child/childRecommendations';
@@ -1505,9 +1507,10 @@ export default function MobileEventWizard({
                   let onPrimaryClick = onSave;
 
                   if (draftEvent.type === 'buyHouse') {
+                    const needsReviewOptions = !hasResolvedRecommendationTradeoffs(draftEvent, inputs, baselineResults);
+
                     const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
-                    const simulationResults = baselineResults;
-                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, baselineResults);
                     const totalCashRequired = calculateTotalCashRequired(draftEvent);
                     const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
                     const hasCashShortfall = cashShortfall > 0;
@@ -1518,14 +1521,17 @@ export default function MobileEventWizard({
                     const hasRetirementDelay = retirementDelayYears > 0;
 
                     if (hasCashShortfall) {
-                      primaryCta = 'Review Options';
+                      if (draftEvent.recommendationApplied) {
+                        primaryCta = 'Save Home Purchase';
+                      } else {
+                        primaryCta = 'Review Options';
+                      }
                     } else if (hasRetirementDelay) {
                       primaryCta = 'Save & Adjust Retirement';
                     } else {
                       primaryCta = 'Save Home Purchase';
                     }
 
-                    const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !draftEvent.recommendationApplied);
                     if (needsReviewOptions) {
                       onPrimaryClick = () => {
                         onSave();
@@ -1645,9 +1651,10 @@ export default function MobileEventWizard({
                   let onPrimaryClick = onSave;
 
                   if (draftEvent.type === 'buyHouse') {
+                    const needsReviewOptions = !hasResolvedRecommendationTradeoffs(draftEvent, inputs, baselineResults);
+
                     const purchaseAge = draftEvent.purchaseAge !== undefined ? draftEvent.purchaseAge : (draftEvent.age || 35);
-                    const simulationResults = baselineResults;
-                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+                    const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, baselineResults);
                     const totalCashRequired = calculateTotalCashRequired(draftEvent);
                     const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
                     const hasCashShortfall = cashShortfall > 0;
@@ -1658,14 +1665,17 @@ export default function MobileEventWizard({
                     const hasRetirementDelay = retirementDelayYears > 0;
 
                     if (hasCashShortfall) {
-                      primaryCta = 'Review Options';
+                      if (draftEvent.recommendationApplied) {
+                        primaryCta = 'Save Home Purchase';
+                      } else {
+                        primaryCta = 'Review Options';
+                      }
                     } else if (hasRetirementDelay) {
                       primaryCta = 'Save & Adjust Retirement';
                     } else {
                       primaryCta = 'Save Home Purchase';
                     }
 
-                    const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !draftEvent.recommendationApplied);
                     if (needsReviewOptions) {
                       onPrimaryClick = () => {
                         onSave();

@@ -7,6 +7,7 @@ import {
   calculateCashShortfall,
   getSimulatedRetirementAge
 } from './houseAffordabilityUtils';
+import { hasResolvedRecommendationTradeoffs } from '../../features/fire/recommendations/recommendationUtils.js';
 
 export default function EventModalForm({
   inputs,
@@ -1758,8 +1759,10 @@ export default function EventModalForm({
               let onPrimaryClick = handleSaveEvent;
 
               if (type === 'buyHouse') {
-                const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
                 const simulationResults = activeResults || baselineResults;
+                const needsReviewOptions = !hasResolvedRecommendationTradeoffs(editingEvent, inputs, simulationResults);
+
+                const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
                 const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
                 const totalCashRequired = calculateTotalCashRequired(editingEvent);
                 const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
@@ -1771,14 +1774,17 @@ export default function EventModalForm({
                 const hasRetirementDelay = retirementDelayYears > 0;
 
                 if (hasCashShortfall) {
-                  primaryCta = 'Review Options';
+                  if (editingEvent.recommendationApplied) {
+                    primaryCta = 'Save Home Purchase';
+                  } else {
+                    primaryCta = 'Review Options';
+                  }
                 } else if (hasRetirementDelay) {
                   primaryCta = 'Save & Adjust Retirement';
                 } else {
                   primaryCta = 'Save Home Purchase';
                 }
 
-                const needsReviewOptions = hasCashShortfall || (hasRetirementDelay && !editingEvent.recommendationApplied);
                 if (needsReviewOptions) {
                   onPrimaryClick = () => {
                     if (setShowImprovementModal) {
