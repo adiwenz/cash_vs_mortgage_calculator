@@ -440,11 +440,13 @@ export default function LifePlanScreen({
     
     if (!match) return null;
     
-    // Defensive check: if it is a user-editable event in lifeEvents, check if it still exists in lifeEvents
+    // Defensive check: if it is a user-editable event, check if it still exists in lifeEvents, spendingPhases, or incomeList
     const hasOriginal = match.originalId;
     if (hasOriginal) {
       const existsInLifeEvents = inputs.lifeEvents?.some(e => String(e.id) === String(match.originalId));
-      if (!existsInLifeEvents) {
+      const existsInSpendingPhases = inputs.spendingPhases?.some(p => String(p.id) === String(match.originalId));
+      const existsInIncomeList = inputs.incomeList?.some(i => String(i.id) === String(match.originalId));
+      if (!existsInLifeEvents && !existsInSpendingPhases && !existsInIncomeList) {
         return null;
       }
     }

@@ -120,7 +120,7 @@ describe('Scenario & Simulation State Refactoring Tests', () => {
   });
 
   describe('4. Event Age Change Cascades', () => {
-    test('child birthAge change cascades to linked promotion in income list', () => {
+    test('child birthAge change does NOT cascade to linked promotion in income list', () => {
       const { result } = renderHook(() => useScenarioState());
       const childEventId = 'child-1';
       const promoEventId = 'promo-1';
@@ -168,8 +168,8 @@ describe('Scenario & Simulation State Refactoring Tests', () => {
       expect(updatedInputs.lifeEvents[0].birthAge).toBe(40);
       expect(updatedInputs.lifeEvents[0].age).toBe(40);
       
-      // Linked promotion start age should shift: new birth age (40) + childStartAge (2) = 42
-      expect(updatedInputs.incomeList[0].startAge).toBe(42);
+      // Linked promotion start age should NOT shift: should remain 38
+      expect(updatedInputs.incomeList[0].startAge).toBe(38);
     });
 
     test('borrowing start age change cascades to linked payoff plan details', () => {

@@ -672,8 +672,10 @@ export default function MobileFireSimulatorView({
       (!evt.originalId && evt.type === 'retire' && selectedEventId === 'retire')
     );
     if (match && match.originalId) {
-      const exists = inputs.lifeEvents?.some(e => String(e.id) === String(match.originalId));
-      if (!exists) return timelineEvents[0] || null;
+      const existsInLifeEvents = inputs.lifeEvents?.some(e => String(e.id) === String(match.originalId));
+      const existsInSpendingPhases = inputs.spendingPhases?.some(p => String(p.id) === String(match.originalId));
+      const existsInIncomeList = inputs.incomeList?.some(i => String(i.id) === String(match.originalId));
+      if (!existsInLifeEvents && !existsInSpendingPhases && !existsInIncomeList) return timelineEvents[0] || null;
     }
     return match || timelineEvents[0] || null;
   }, [selectedEventId, timelineEvents, inputs.lifeEvents]);

@@ -151,6 +151,11 @@ export function useEventEditingController({
     }));
 
     // Handle side effects
+    if (result.sideEffects.notificationMsg) {
+      setNotification(result.sideEffects.notificationMsg);
+      setTimeout(() => setNotification(null), 4000);
+    }
+
     if (result.sideEffects.impactSummary) {
       if (eventToSave.type === 'haveChild') {
         // Bypassed: ChildPlanningModal handles affordability check inline

@@ -185,21 +185,6 @@ export function useScenarioState() {
           }
           return i;
         });
-        const draggedCareer = newInputs.incomeList.find(i => i.id === evt.originalId);
-        if (draggedCareer && draggedCareer.parentEventId) {
-          newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
-            if (e.id === draggedCareer.parentEventId) {
-              const childStartAge = Number(e.childStartAge !== undefined ? e.childStartAge : 0);
-              const newBirthAge = newAge - childStartAge;
-              return {
-                ...e,
-                birthAge: newBirthAge,
-                age: newBirthAge
-              };
-            }
-            return e;
-          });
-        }
       } else {
         newInputs.lifeEvents = newInputs.lifeEvents.map(e => {
           if (e.id === evt.originalId) {
@@ -212,15 +197,6 @@ export function useScenarioState() {
             } else if (e.type === 'haveChild') {
               updated.birthAge = newAge;
               updated.age = newAge;
-              newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-                if (inc.id === e.linkedEventId || inc.parentEventId === e.id) {
-                  return {
-                    ...inc,
-                    startAge: newAge + (e.childStartAge || 0)
-                  };
-                }
-                return inc;
-              });
             } else if (e.type === 'college') {
               updated.startAge = newAge;
             } else if (e.type === 'sabbatical') {

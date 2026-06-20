@@ -74,7 +74,7 @@ describe('Event Actions Refactoring - Saving & Deleting Events', () => {
   });
 
   describe('3. Linked Event Cleanup', () => {
-    test('deleting a child removes the linked promotion in income list', () => {
+    test('deleting a child keeps the promotion in income list', () => {
       let inputs = JSON.parse(JSON.stringify(baseInputs));
       
       // Save child
@@ -98,7 +98,7 @@ describe('Event Actions Refactoring - Saving & Deleting Events', () => {
       const cleanedInputs = deleteResult.updatedInputs;
 
       expect(cleanedInputs.lifeEvents.length).toBe(0);
-      expect(cleanedInputs.incomeList.length).toBe(1); // promotion removed
+      expect(cleanedInputs.incomeList.length).toBe(2); // promotion kept
     });
 
     test('deleting buyHouse removes matching sellHouse and house asset', () => {
