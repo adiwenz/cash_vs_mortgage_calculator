@@ -11,6 +11,7 @@ const CustomEventMarker = (props) => {
     xOffset,
     selectedMilestone,
     onSelectMilestone,
+    onSelectCluster,
     handleNodeDragStart,
     dragOccurredRef,
     isMobile,
@@ -53,6 +54,8 @@ const CustomEventMarker = (props) => {
   const topEvent = stackEvents.length > 0 ? stackEvents[topEventIndex] : event;
   const topR = getEventRadius(topEvent);
   const stackGoesOver = stackCount > 1 && (topY - topR < 0);
+
+  const isCollapsedCluster = stackGoesOver && stackIndex === 0 && stackEvents?.length > 1;
 
   if (stackGoesOver && stackIndex > 0) {
     return null;
@@ -136,8 +139,14 @@ const CustomEventMarker = (props) => {
       onClick={(e) => {
         e.stopPropagation();
         if (dragOccurredRef?.current) return;
-        if (onSelectMilestone) {
-          onSelectMilestone(event);
+        if (isCollapsedCluster) {
+          if (onSelectCluster) {
+            onSelectCluster(stackEvents, targetX, currentY, currentR);
+          }
+        } else {
+          if (onSelectMilestone) {
+            onSelectMilestone(event);
+          }
         }
       }}
       onMouseDown={(e) => {
@@ -305,6 +314,7 @@ export default function ProjectionGraph({
   timelineEvents = [],
   selectedMilestone = null,
   onSelectMilestone,
+  handleEditRoadmapEvent,
   handleNodeDragStart,
   dragOccurredRef,
   isMobile = false,
@@ -312,6 +322,7 @@ export default function ProjectionGraph({
 }) {
   const chartContainerRef = useRef(null);
   const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
+  const [expandedCluster, setExpandedCluster] = useState(null);
 
   const tooltipPos = useMemo(() => {
     if (!activeTooltipCoord || !chartContainerRef.current) return undefined;
@@ -508,6 +519,7 @@ export default function ProjectionGraph({
                     event={d.event}
                     selectedMilestone={selectedMilestone}
                     onSelectMilestone={onSelectMilestone}
+                    onSelectCluster={(events, x, y, r) => setExpandedCluster({ events, x, y, r })}
                     handleNodeDragStart={handleNodeDragStart}
                     dragOccurredRef={dragOccurredRef}
                     isMobile={isMobile}
@@ -612,6 +624,148 @@ export default function ProjectionGraph({
           );
         })}
       </div>
+
+      {expandedCluster && (
+        <>
+          <div 
+            className="cluster-backdrop"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 999,
+              cursor: 'default'
+            }}
+            onClick={() => setExpandedCluster(null)}
+          />
+          {(() => {
+            const panelWidth = 260;
+            const containerWidth = chartContainerRef.current ? chartContainerRef.current.clientWidth : 800;
+            let leftPos = expandedCluster.x;
+            let caretLeft = '50%';
+
+            if (leftPos - panelWidth / 2 < 10) {
+              leftPos = panelWidth / 2 + 10;
+              caretLeft = `${((expandedCluster.x - 10) / panelWidth) * 100}%`;
+            } else if (leftPos + panelWidth / 2 > containerWidth - 10) {
+              leftPos = containerWidth - panelWidth / 2 - 10;
+              const offsetInPanel = expandedCluster.x - (containerWidth - panelWidth - 10);
+              caretLeft = `${(offsetInPanel / panelWidth) * 100}%`;
+            }
+
+            return (
+              <div
+                className="cluster-popover-panel"
+                style={{
+                  position: 'absolute',
+                  left: `${leftPos}px`,
+                  top: `${expandedCluster.y + expandedCluster.r + 10}px`,
+                  width: `${panelWidth}px`,
+                  transform: 'translateX(-50%)',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md, 14px)',
+                  boxShadow: 'var(--shadow-md)',
+                  zIndex: 1000,
+                  padding: '0.5rem 0',
+                  animation: 'fadeInScale 0.15s ease-out forwards',
+                  transformOrigin: `${caretLeft} top`,
+                }}
+              >
+                <style>{`
+                  @keyframes fadeInScale {
+                    from {
+                      opacity: 0;
+                      transform: translateX(-50%) scale(0.95);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateX(-50%) scale(1);
+                    }
+                  }
+                `}</style>
+                <svg 
+                  style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    left: caretLeft,
+                    transform: 'translateX(-50%)',
+                    width: '16px',
+                    height: '8px',
+                  }}
+                  viewBox="0 0 16 8"
+                >
+                  <path d="M0 8 L8 0 L16 8 Z" fill="var(--bg-secondary)" stroke="var(--border)" strokeWidth="1" />
+                  <path d="M0 8 L16 8" stroke="var(--bg-secondary)" strokeWidth="1.5" />
+                </svg>
+
+                <div style={{ padding: '0.4rem 1rem 0.2rem 1rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Hidden Events
+                </div>
+
+                {expandedCluster.events.map((evt, idx) => (
+                  <div
+                    key={evt.originalId || `${evt.type}-${evt.age}-${idx}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      height: '46px',
+                      padding: '0 1rem',
+                      borderBottom: idx < expandedCluster.events.length - 1 ? '1px solid var(--border)' : 'none',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'default'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{getEventIcon(evt) || '✨'}</span>
+                      <span 
+                        style={{ 
+                          fontSize: '0.9rem', 
+                          fontWeight: '500', 
+                          color: 'var(--text-primary)', 
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedCluster(null);
+                        if (handleEditRoadmapEvent) {
+                          handleEditRoadmapEvent(evt);
+                        }
+                      }}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        background: 'var(--primary-light)',
+                        color: 'var(--primary)',
+                        border: 'none',
+                        fontWeight: '600',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </>
+      )}
     </div>
   );
 }

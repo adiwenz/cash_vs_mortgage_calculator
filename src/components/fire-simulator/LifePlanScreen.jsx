@@ -973,6 +973,7 @@ export default function LifePlanScreen({
                   timelineEvents={timelineEvents}
                   selectedMilestone={selectedMilestone}
                   onSelectMilestone={handleSelectMilestone}
+                  handleEditRoadmapEvent={handleEditRoadmapEvent}
                   handleNodeDragStart={handleNodeDragStart}
                   dragOccurredRef={dragOccurredRef}
                   isMobile={false}
