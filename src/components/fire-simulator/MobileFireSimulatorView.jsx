@@ -21,6 +21,7 @@ import OutcomeHeroCard from './OutcomeHeroCard';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import ChildPlanningModal from './ChildPlanningModal';
+import HousePlanningModal from './HousePlanningModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
@@ -2856,6 +2857,14 @@ export default function MobileFireSimulatorView({
 
       {editingEvent && editingEvent.type === 'haveChild' ? (
         <ChildPlanningModal
+          scenario={scenario}
+          eventController={eventController}
+          simulation={simulation}
+          uiState={uiState}
+          onClose={() => setEditingEvent(null)}
+        />
+      ) : editingEvent && editingEvent.type === 'buyHouse' ? (
+        <HousePlanningModal
           scenario={scenario}
           eventController={eventController}
           simulation={simulation}

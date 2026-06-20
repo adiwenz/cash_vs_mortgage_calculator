@@ -13,6 +13,7 @@ import {
   normalizeCurrency, 
   normalizePercent 
 } from './eventHandlerUtils.js';
+import { grossUpIncome } from '../../../../domain/housing/houseAffordability.js';
 
 export const houseEventHandler = {
   edit(baseEvent, inputs) {
@@ -196,9 +197,83 @@ export const houseEventHandler = {
 
       const liquidAssets = calculateLiquidAssetsAtPurchaseAge(newInputs, purchaseAge, beforeRes);
       const totalCashRequired = calculateTotalCashRequired(editingEvent);
+
+      if (editingEvent.optionBSelected) {
+        const shortfall = editingEvent.shortfallAmount !== undefined
+          ? Number(editingEvent.shortfallAmount)
+          : (totalCashRequired > liquidAssets ? totalCashRequired - liquidAssets : 0);
+
+        const needWindfall = shortfall > 0;
+        if (needWindfall) {
+          const windfallId = `windfall-house-${Date.now()}`;
+          const windfallEvent = {
+            id: windfallId,
+            type: 'windfall',
+            enabled: true,
+            name: 'Down Payment Windfall',
+            ageReceived: purchaseAge,
+            amount: shortfall,
+            taxRate: 0
+          };
+          if (!newInputs.lifeEvents) {
+            newInputs.lifeEvents = [];
+          }
+          newInputs.lifeEvents = newInputs.lifeEvents.filter(e => e.id !== windfallId);
+          newInputs.lifeEvents.push(windfallEvent);
+        }
+
+        const netRaiseNeed = (newHousingCost - oldHousingCost) * 12;
+        let calculatedRaise = netRaiseNeed > 0 ? Math.round(netRaiseNeed) : 0;
+        if (calculatedRaise > 0 && newInputs.includeTaxes) {
+          const currentGross = newInputs.incomeList?.[0]?.amount || 100000;
+          calculatedRaise = grossUpIncome(netRaiseNeed, currentGross, newInputs.filingStatus || 'single');
+        }
+
+        const raise = editingEvent.raiseAmount !== undefined
+          ? Number(editingEvent.raiseAmount)
+          : calculatedRaise;
+
+        const needRaise = raise > 0;
+        if (needRaise) {
+          const promoId = `inc-house-${Date.now()}`;
+          const currentIncomeAmount = newInputs.incomeList?.[0]?.amount || 100000;
+          const newIncomeAmount = currentIncomeAmount + raise;
+
+          const promotionIncome = {
+            id: promoId,
+            name: 'Promotion',
+            amount: newIncomeAmount,
+            frequency: 'yearly',
+            startAge: purchaseAge,
+            endAge: normalizeEventAge(newInputs.targetRetirementAge || 65, 65),
+            growthRate: 0.035,
+            isTaxable: true,
+            incomeChangeType: 'newIncomeLevel',
+            permanent: true,
+            parentEventId: null
+          };
+          if (!newInputs.incomeList) {
+            newInputs.incomeList = [];
+          }
+          newInputs.incomeList = newInputs.incomeList.filter(i => i.id !== promoId);
+          newInputs.incomeList.push(promotionIncome);
+
+          const promoLifeEvent = {
+            id: promoId,
+            type: 'careerChange',
+            enabled: true,
+            name: 'Promotion',
+            startAge: purchaseAge,
+            amount: newIncomeAmount,
+            growthRate: 3.5
+          };
+          newInputs.lifeEvents.push(promoLifeEvent);
+        }
+      }
+
       const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
       const hasCashShortfall = cashShortfall > 0;
-      const bypassIntercept = isRecommendationApplied && !hasCashShortfall;
+      const bypassIntercept = true;
 
       const targetRetAge = Number(newInputs.targetRetirementAge) || 65;
       const afterRes = runFireSimulation(newInputs);
