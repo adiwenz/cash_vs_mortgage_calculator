@@ -562,6 +562,11 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
+.recharts-yAxis .recharts-cartesian-axis-tick-value {
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
 .custom-chart-tooltip {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);

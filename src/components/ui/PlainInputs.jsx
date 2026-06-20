@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import formatCompactCurrency from '../../utils/formatCompactCurrency';
 
 // Helper to format currency
@@ -50,13 +50,20 @@ export function CurrencyInput({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState('');
+  const [prevValue, setPrevValue] = useState(value);
 
-  // Sync with value prop if not editing
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (!isEditing) {
       setLocalValue(value === null || value === undefined ? '' : String(value));
+    } else {
+      const parsedLocal = parseFloat(parseRawString(localValue));
+      const parsedValue = parseFloat(value);
+      if (!isNaN(parsedValue) && parsedValue !== parsedLocal) {
+        setLocalValue(value === null || value === undefined ? '' : String(value));
+      }
     }
-  }, [value, isEditing]);
+  }
 
   const handleFocus = (e) => {
     setIsEditing(true);
@@ -127,12 +134,20 @@ export function PercentInput({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState('');
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (!isEditing) {
       setLocalValue(value === null || value === undefined ? '' : String(value));
+    } else {
+      const parsedLocal = parseFloat(parseRawString(localValue));
+      const parsedValue = parseFloat(value);
+      if (!isNaN(parsedValue) && parsedValue !== parsedLocal) {
+        setLocalValue(value === null || value === undefined ? '' : String(value));
+      }
     }
-  }, [value, isEditing]);
+  }
 
   const handleFocus = (e) => {
     setIsEditing(true);
@@ -200,12 +215,20 @@ export function NumberInput({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState('');
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (!isEditing) {
       setLocalValue(value === null || value === undefined ? '' : String(value));
+    } else {
+      const parsedLocal = parseFloat(parseRawString(localValue));
+      const parsedValue = parseFloat(value);
+      if (!isNaN(parsedValue) && parsedValue !== parsedLocal) {
+        setLocalValue(value === null || value === undefined ? '' : String(value));
+      }
     }
-  }, [value, isEditing]);
+  }
 
   const handleFocus = (e) => {
     setIsEditing(true);

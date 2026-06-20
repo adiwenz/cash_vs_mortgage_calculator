@@ -24,11 +24,11 @@ export function getProfileFromInputs(inputs) {
     lifeExpectancy,
     targetRetirementAge,
     hasCustomizedSavingsAllocation,
-    expectedReturn: parseNum(inputs.expectedReturn, 7) / 100,
-    postRetirementReturn: inputs.postRetirementReturn !== undefined
+    expectedReturn: Math.min(0.25, Math.max(0, parseNum(inputs.expectedReturn, 7) / 100)),
+    postRetirementReturn: Math.min(0.15, Math.max(0, inputs.postRetirementReturn !== undefined
       ? parseNum(inputs.postRetirementReturn, 0) / 100
-      : parseNum(inputs.expectedReturn, 7) / 100,
-    inflationRate: parseNum(inputs.inflationRate, 3) / 100,
+      : parseNum(inputs.expectedReturn, 7) / 100)),
+    inflationRate: Math.min(0.20, Math.max(0, parseNum(inputs.inflationRate, 3) / 100)),
     cashReturnRate: parseNum(inputs.cashReturnRate, 2) / 100,
     lifestyleUpgrades: parseNum(inputs.lifestyleUpgrades, 0) / 100,
     swr: parseNum(inputs.swr, 4) / 100,
@@ -50,7 +50,13 @@ export function getProfileFromInputs(inputs) {
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],
     isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1),
-    lifeEvents: (inputs.lifeEvents || []).map(e => e.type === 'socialSecurity' ? normalizeSocialSecurityEvent(e, inputs) : { ...e })
+    lifeEvents: (inputs.lifeEvents || []).map(e => {
+      const cloned = e.type === 'socialSecurity' ? normalizeSocialSecurityEvent(e, inputs) : { ...e };
+      if (cloned.growthRate !== undefined) {
+        cloned.growthRate = Math.min(0.25, Math.max(0, Number(cloned.growthRate) || 0));
+      }
+      return cloned;
+    })
   };
 }
 

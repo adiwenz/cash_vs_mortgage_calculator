@@ -1,7 +1,6 @@
-import { calculateUSTaxForModal } from '../../simulatorMathUtils';
-import formatCompactCurrency from '../../utils/formatCompactCurrency';
+import formatCompactCurrency, { formatCompactFinancial } from '../../utils/formatCompactCurrency';
 
-export { formatCompactCurrency };
+export { formatCompactCurrency, formatCompactFinancial };
 
 export const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {

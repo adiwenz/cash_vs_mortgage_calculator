@@ -36,7 +36,7 @@ export const incomeEventHandler = {
     if (type === 'careerChange') {
       const startAge = normalizeEventAge(editingEvent.startAge, newInputs.currentAge);
       const amount = normalizeCurrency(editingEvent.amount, 50000);
-      const growthRateVal = (editingEvent.growthRate !== undefined ? Number(editingEvent.growthRate) : 3.0) / 100;
+      const growthRateVal = Math.min(25, Math.max(0, (editingEvent.growthRate !== undefined ? Number(editingEvent.growthRate) : 3.0))) / 100;
 
       const newInc = {
         id: editingEvent.id && editingEvent.id !== 'careerChange' ? editingEvent.id : `inc-${Date.now()}`,

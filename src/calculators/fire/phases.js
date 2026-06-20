@@ -628,6 +628,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
           : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
         if (spouseIncomeGrowthRate > 0.5) spouseIncomeGrowthRate /= 100;
+        spouseIncomeGrowthRate = Math.min(0.25, Math.max(0, spouseIncomeGrowthRate));
 
         spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (Number(marriageEvent.savingsRate) || 0);
         spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (Number(marriageEvent.cash) || 0);

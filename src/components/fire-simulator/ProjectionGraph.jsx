@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
-import { formatCurrency, formatYAxis, getEventIcon, isFinancialEvent, getEventMarkerPosition, isEditableEvent } from './helpers';
+import { formatCurrency, formatCompactFinancial, getEventIcon, isFinancialEvent, getEventMarkerPosition, isEditableEvent } from './helpers';
 
 const CustomEventMarker = (props) => {
   const {
@@ -289,6 +289,21 @@ export default function ProjectionGraph({
   const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
   const [expandedCluster, setExpandedCluster] = useState(null);
 
+  const maxNetWorth = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 0;
+    return Math.max(...chartData.map(d => Math.max(
+      Math.abs(d.netWorth ?? 0),
+      Math.abs(d.assets ?? 0),
+      Math.abs(d.debt ?? 0)
+    )));
+  }, [chartData]);
+
+  const yAxisWidth =
+    maxNetWorth >= 1e15 ? 95 :
+    maxNetWorth >= 1e12 ? 90 :
+    maxNetWorth >= 1e9 ? 75 :
+    65;
+
   useEffect(() => {
     if (onClusterExpandedChange) {
       onClusterExpandedChange(!!expandedCluster);
@@ -404,7 +419,8 @@ export default function ProjectionGraph({
             stroke="var(--text-tertiary)"
             fontFamily="var(--font-body)"
             fontSize={10}
-            tickFormatter={formatYAxis}
+            tickFormatter={formatCompactFinancial}
+            width={yAxisWidth}
           />
           <Tooltip
             position={tooltipPos}
@@ -418,7 +434,7 @@ export default function ProjectionGraph({
                     {payload.map((item) => (
                       <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '0.2rem 0' }}>
                         <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                        <span style={{ fontWeight: '700' }}>{formatCompactFinancial(item.value)}</span>
                       </div>
                     ))}
                   </div>

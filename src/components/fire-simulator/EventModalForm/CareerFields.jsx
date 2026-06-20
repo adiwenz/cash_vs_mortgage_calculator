@@ -71,8 +71,29 @@ export default function CareerFields({
           className="input-number-box"
           style={{ width: '100%' }}
           value={editingEvent.growthRate}
-          onChange={(e) => setEditingEvent({ ...editingEvent, growthRate: parseFloat(e.target.value) || 0 })}
+          onChange={(e) => {
+            const valStr = e.target.value;
+            const val = parseFloat(valStr);
+            if (!isNaN(val) && val > 25) {
+              setEditingEvent({ ...editingEvent, growthRate: 25 });
+            } else {
+              setEditingEvent({ ...editingEvent, growthRate: valStr });
+            }
+          }}
+          onBlur={() => {
+            let val = parseFloat(editingEvent.growthRate);
+            if (isNaN(val) || val < 0) {
+              setEditingEvent({ ...editingEvent, growthRate: 0 });
+            } else if (val > 25) {
+              setEditingEvent({ ...editingEvent, growthRate: 25 });
+            }
+          }}
         />
+        {parseFloat(editingEvent.growthRate) >= 25 && (
+          <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem', lineHeight: '1.25' }}>
+            Return rates above 25% create unrealistic projections. We capped this at 25%.
+          </div>
+        )}
       </div>
 
       <div className="input-wrapper" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export default function AdvancedSettingsModal({ scenario, onClose }) {
   const inputs = scenario?.inputs || {};
@@ -46,10 +46,10 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
             ...scen,
             inputs: {
               ...scen.inputs,
-              expectedReturn: parseFloat(expectedReturn) || 0,
-              postRetirementReturn: parseFloat(postRetirementReturn) || 0,
+              expectedReturn: Math.min(25, Math.max(0, parseFloat(expectedReturn) || 0)),
+              postRetirementReturn: Math.min(15, Math.max(0, parseFloat(postRetirementReturn) || 0)),
               cashReturnRate: parseFloat(cashReturnRate) || 0,
-              inflationRate: parseFloat(inflationRate) || 0,
+              inflationRate: Math.min(20, Math.max(0, parseFloat(inflationRate) || 0)),
               lifestyleUpgrades: parseFloat(lifestyleUpgrades) || 0,
               swr: parseFloat(swr) || 0,
               includeTaxes: !!includeTaxes,
@@ -71,7 +71,7 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
       <div
         className="event-form-overlay-card modal-content"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '600px', width: '90%' }}
+        style={{ maxWidth: '720px', width: '95%', padding: '1.25rem' }}
       >
         {/* Modal Header */}
         <div
@@ -79,16 +79,16 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '0.5rem',
+            marginBottom: '0.35rem',
             borderBottom: '1px solid var(--border-color)',
-            paddingBottom: '0.75rem',
+            paddingBottom: '0.5rem',
           }}
         >
           <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0, color: 'var(--primary)' }}>
               ⚙️ Projection Assumptions
             </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>
               These settings control how your future projections are calculated.
             </p>
           </div>
@@ -109,9 +109,9 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
         </div>
 
         {/* Modal Body */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.75rem' }}>
           {/* Main Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
             <div className="input-wrapper">
               <span className="input-name">Pre-Retire Return (%)</span>
               <input
@@ -120,8 +120,29 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
                 style={{ width: '100%' }}
                 value={expectedReturn}
                 step="0.1"
-                onChange={(e) => setExpectedReturn(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const valStr = e.target.value;
+                  const val = parseFloat(valStr);
+                  if (!isNaN(val) && val > 25) {
+                    setExpectedReturn(25);
+                  } else {
+                    setExpectedReturn(valStr);
+                  }
+                }}
+                onBlur={() => {
+                  let val = parseFloat(expectedReturn);
+                  if (isNaN(val) || val < 0) {
+                    setExpectedReturn(0);
+                  } else if (val > 25) {
+                    setExpectedReturn(25);
+                  }
+                }}
               />
+              {parseFloat(expectedReturn) >= 25 && (
+                <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem', lineHeight: '1.25' }}>
+                  Return rates above 25% create unrealistic projections. We capped this at 25%.
+                </div>
+              )}
             </div>
             <div className="input-wrapper">
               <span className="input-name">Post-Retire Return (%)</span>
@@ -131,8 +152,29 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
                 style={{ width: '100%' }}
                 value={postRetirementReturn}
                 step="0.1"
-                onChange={(e) => setPostRetirementReturn(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const valStr = e.target.value;
+                  const val = parseFloat(valStr);
+                  if (!isNaN(val) && val > 15) {
+                    setPostRetirementReturn(15);
+                  } else {
+                    setPostRetirementReturn(valStr);
+                  }
+                }}
+                onBlur={() => {
+                  let val = parseFloat(postRetirementReturn);
+                  if (isNaN(val) || val < 0) {
+                    setPostRetirementReturn(0);
+                  } else if (val > 15) {
+                    setPostRetirementReturn(15);
+                  }
+                }}
               />
+              {parseFloat(postRetirementReturn) >= 15 && (
+                <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem', lineHeight: '1.25' }}>
+                  Return rates above 15% create unrealistic projections. We capped this at 15%.
+                </div>
+              )}
             </div>
             <div className="input-wrapper">
               <span className="input-name">Cash Return Rate (%)</span>
@@ -153,8 +195,29 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
                 style={{ width: '100%' }}
                 value={inflationRate}
                 step="0.1"
-                onChange={(e) => setInflationRate(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const valStr = e.target.value;
+                  const val = parseFloat(valStr);
+                  if (!isNaN(val) && val > 20) {
+                    setInflationRate(20);
+                  } else {
+                    setInflationRate(valStr);
+                  }
+                }}
+                onBlur={() => {
+                  let val = parseFloat(inflationRate);
+                  if (isNaN(val) || val < 0) {
+                    setInflationRate(0);
+                  } else if (val > 20) {
+                    setInflationRate(20);
+                  }
+                }}
               />
+              {parseFloat(inflationRate) >= 20 && (
+                <div style={{ color: '#ef4444', fontSize: '0.72rem', marginTop: '0.25rem', lineHeight: '1.25' }}>
+                  Inflation rates above 20% create unrealistic projections. We capped this at 20%.
+                </div>
+              )}
             </div>
             <div className="input-wrapper" style={{ position: 'relative' }}>
               <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -188,95 +251,104 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
             </div>
           </div>
 
-          {/* Taxes Model */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={includeTaxes}
-                onChange={(e) => setIncludeTaxes(e.target.checked)}
-              />
-              Include Taxes (U.S. Federal Progressive)
-            </label>
-            {includeTaxes && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <div className="input-wrapper" style={{ maxWidth: '300px' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Filing Status</span>
-                  <select
-                    className="input-number-box"
-                    style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem', textAlign: 'left' }}
-                    value={filingStatus}
-                    onChange={(e) => setFilingStatus(e.target.value)}
-                  >
-                    <option value="single">Single Filer</option>
-                    <option value="married">Married Filing Jointly</option>
-                  </select>
+          {/* Bottom Assumptional Models (Taxes & Healthcare) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1.25rem',
+            borderTop: '1px solid var(--border-color)',
+            paddingTop: '0.75rem'
+          }}>
+            {/* Taxes Model */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={includeTaxes}
+                  onChange={(e) => setIncludeTaxes(e.target.checked)}
+                />
+                Include Taxes (U.S. Federal Progressive)
+              </label>
+              {includeTaxes && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <div className="input-wrapper" style={{ maxWidth: '100%' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Filing Status</span>
+                    <select
+                      className="input-number-box"
+                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem', textAlign: 'left' }}
+                      value={filingStatus}
+                      onChange={(e) => setFilingStatus(e.target.value)}
+                    >
+                      <option value="single">Single Filer</option>
+                      <option value="married">Married Filing Jointly</option>
+                    </select>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
+                    ℹ️ Taxes use progressive brackets (10% to 37%) and standard deductions ($16.1k Single / $32.2k Married for 2026), inflated annually.
+                  </p>
                 </div>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
-                  ℹ️ Taxes are calculated using progressive brackets (10% to 37%) and standard deductions ($16,100 Single / $32,200 Married for 2026), inflated annually.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Healthcare & Medicare Bridge */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={enableHealthcareModel}
-                onChange={(e) => setEnableHealthcareModel(e.target.checked)}
-              />
-              🏥 Enable Healthcare & Medicare Bridge
-            </label>
-            {enableHealthcareModel && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                  <div className="input-wrapper">
-                    <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span className="input-name">Pre-Medicare Cost ($/yr)</span>
-                      <span className="tooltip-icon">?</span>
-                      <span className="tooltip-text">
-                        Estimated annual cost of private health insurance (ACA/COBRA) if you retire before age 65.
-                      </span>
+            {/* Healthcare & Medicare Bridge */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={enableHealthcareModel}
+                  onChange={(e) => setEnableHealthcareModel(e.target.checked)}
+                />
+                🏥 Enable Healthcare & Medicare Bridge
+              </label>
+              {enableHealthcareModel && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                    <div className="input-wrapper">
+                      <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span className="input-name" style={{ fontSize: '0.7rem' }}>Pre-Medicare ($/yr)</span>
+                        <span className="tooltip-icon">?</span>
+                        <span className="tooltip-text">
+                          Estimated annual cost of private health insurance (ACA/COBRA) if you retire before age 65.
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%', marginTop: '0.15rem' }}
+                        value={preMedicarePremium}
+                        step="500"
+                        onChange={(e) => setPreMedicarePremium(parseFloat(e.target.value) || 0)}
+                      />
                     </div>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%', marginTop: '0.15rem' }}
-                      value={preMedicarePremium}
-                      step="500"
-                      onChange={(e) => setPreMedicarePremium(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="input-wrapper">
-                    <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span className="input-name">Medicare Cost ($/yr)</span>
-                      <span className="tooltip-icon">?</span>
-                      <span className="tooltip-text">
-                        Estimated annual cost of Medicare premiums and out-of-pocket costs after age 65.
-                      </span>
+                    <div className="input-wrapper">
+                      <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span className="input-name" style={{ fontSize: '0.7rem' }}>Medicare ($/yr)</span>
+                        <span className="tooltip-icon">?</span>
+                        <span className="tooltip-text">
+                          Estimated annual cost of Medicare premiums and out-of-pocket costs after age 65.
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        className="input-number-box"
+                        style={{ width: '100%', marginTop: '0.15rem' }}
+                        value={medicarePremium}
+                        step="200"
+                        onChange={(e) => setMedicarePremium(parseFloat(e.target.value) || 0)}
+                      />
                     </div>
-                    <input
-                      type="number"
-                      className="input-number-box"
-                      style={{ width: '100%', marginTop: '0.15rem' }}
-                      value={medicarePremium}
-                      step="200"
-                      onChange={(e) => setMedicarePremium(parseFloat(e.target.value) || 0)}
-                    />
                   </div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
+                    ℹ️ Pre-Medicare costs apply until age 65, then Medicare starts. Both are inflated.
+                  </p>
                 </div>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
-                  ℹ️ Pre-Medicare costs apply from retirement age until age 65. Medicare eligibility starts at age 65. Both are adjusted for inflation.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* Modal Actions */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
           <button
             type="button"
             className="list-builder-edit-btn"
