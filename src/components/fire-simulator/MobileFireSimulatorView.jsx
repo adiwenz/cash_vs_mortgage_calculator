@@ -259,7 +259,22 @@ function LedgerRow({ row, formatCurrency }) {
 }
 
 const CustomEventMarker = (props) => {
-  const { cx, cy, event, lane, xOffset, selectedMilestone, onSelectMilestone, isMobile, xScale, yScale, chartData } = props;
+  const {
+    cx,
+    cy,
+    event,
+    lane,
+    xOffset,
+    selectedMilestone,
+    onSelectMilestone,
+    isMobile,
+    xScale,
+    yScale,
+    chartData,
+    stackIndex = 0,
+    stackCount = 1,
+    stackEvents = []
+  } = props;
   
   if (cx === undefined || cy === undefined) return null;
 
@@ -274,16 +289,32 @@ const CustomEventMarker = (props) => {
     ? getEventMarkerPosition(event, chartData, xScale, yScale)
     : { x: cx, y: cy };
 
-  // Calculate lane height and offset
-  const laneOffset = isMobile ? (26 + lane * 22) : (36 + lane * 32);
+  // Helper to compute radius of an event
+  const getEventRadius = (evt) => {
+    const isRet = evt.type.startsWith('retirementReady') || evt.type === 'retire';
+    return isRet ? (isMobile ? 13.5 : 15) : (isMobile ? 11 : 12.5);
+  };
+
+  // Stacking/Collapsing logic
+  const topEventIndex = stackCount - 1;
+  const topOffset = isMobile ? (26 + topEventIndex * 22) : (36 + topEventIndex * 32);
+  const topY = marker.y - topOffset;
+  const topEvent = stackEvents.length > 0 ? stackEvents[topEventIndex] : event;
+  const topR = getEventRadius(topEvent);
+  const stackGoesOver = stackCount > 1 && (topY - topR < 0);
+
+  if (stackGoesOver && stackIndex > 0) {
+    return null;
+  }
+
+  // Calculate lane height and offset (for collapsed stacks, stackIndex/lane is 0)
+  const resolvedLane = stackGoesOver ? 0 : stackIndex;
+  const laneOffset = isMobile ? (26 + resolvedLane * 22) : (36 + resolvedLane * 32);
   const y = marker.y - laneOffset;
   const targetX = marker.x;
 
   // Base radius and coordinates
-  const baseR = isRetirement
-    ? (isMobile ? 13.5 : 15) // larger icon for Work Optional
-    : (isMobile ? 11 : 12.5); // standard size
-
+  const baseR = getEventRadius(event);
   const r = isSelected ? baseR + 1.5 : baseR;
 
   const baseIconSize = isRetirement
@@ -301,6 +332,17 @@ const CustomEventMarker = (props) => {
 
   const isMajorImpact = ['buyHouse', 'sellHouse', 'marriage', 'haveChild', 'college', 'windfall', 'retire'].includes(event.type) || event.type.startsWith('retirementReady');
   const eventIcon = getEventIcon(event);
+
+  // Styling for the badge (+N)
+  const strokeColor = isSelected ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #10b981)' : 'rgba(255, 255, 255, 0.25)';
+  const badgeFill = isSelected ? 'var(--primary)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #1e293b)';
+  const badgeStroke = strokeColor;
+  const badgeTextColor = '#ffffff';
+
+  const countText = `+${stackCount - 1}`;
+  const badgeW = isMobile ? (countText.length > 2 ? 20 : 16) : (countText.length > 2 ? 24 : 18);
+  const badgeH = isMobile ? 16 : 18;
+  const badgeX = targetX + r + 4;
 
   return (
     <g
@@ -354,8 +396,8 @@ const CustomEventMarker = (props) => {
         cx={targetX}
         cy={y}
         r={r}
-        fill={isSelected ? 'var(--primary)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #1e293b)'}
-        stroke={isSelected ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #10b981)' : 'rgba(255, 255, 255, 0.25)'}
+        fill={badgeFill}
+        stroke={badgeStroke}
         strokeWidth={isSelected ? 1.5 : 1}
       />
 
@@ -369,9 +411,56 @@ const CustomEventMarker = (props) => {
       >
         {eventIcon || '✨'}
       </text>
+
+      {/* 6. Collapse count badge (+N) on the right side */}
+      {stackGoesOver && stackIndex === 0 && (
+        <g>
+          {/* Badge Glow effect */}
+          {(isRetirement || isSelected) && (
+            <rect
+              x={badgeX - 4}
+              y={y - badgeH / 2 - 4}
+              width={badgeW + 8}
+              height={badgeH + 8}
+              rx={(badgeH + 8) / 2}
+              fill={
+                isSelected
+                  ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
+                  : 'rgba(16, 185, 129, 0.18)'
+              }
+              filter="blur(3px)"
+            />
+          )}
+
+          {/* Badge Rect */}
+          <rect
+            x={badgeX}
+            y={y - badgeH / 2}
+            width={badgeW}
+            height={badgeH}
+            rx={badgeH / 2}
+            fill={badgeFill}
+            stroke={badgeStroke}
+            strokeWidth={isSelected ? 1.5 : 1}
+          />
+
+          {/* Badge Text */}
+          <text
+            x={badgeX + badgeW / 2}
+            y={y + (isMobile ? 3.5 : 4)}
+            textAnchor="middle"
+            fontSize={isMobile ? "9px" : "10px"}
+            fontWeight="bold"
+            fill={badgeTextColor}
+            style={{ userSelect: 'none' }}
+          >
+            {countText}
+          </text>
+        </g>
+      )}
     </g>
   );
-}
+};
 
 
 /**
@@ -703,74 +792,7 @@ export default function MobileFireSimulatorView({
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
-  // Mobilized event markers lane and offset calculations
-  const { eventLanes, eventOffsets } = useMemo(() => {
-    if (!timelineEvents || timelineEvents.length === 0) {
-      return { eventLanes: {}, eventOffsets: {} };
-    }
 
-    const sortedEvents = [...timelineEvents].sort((a, b) => a.age - b.age);
-    const maxLanes = 2; // Mobile maximum 2 lanes
-    const ageThreshold = 5; // Mobile proximity threshold 5 years
-    const laneLastAges = Array(maxLanes).fill(-Infinity);
-    const eventLanes = {};
-
-    sortedEvents.forEach(event => {
-      let assignedLane = -1;
-      for (let lane = 0; lane < maxLanes; lane++) {
-        if (event.age - laneLastAges[lane] >= ageThreshold) {
-          assignedLane = lane;
-          break;
-        }
-      }
-      if (assignedLane === -1) {
-        let minLane = 0;
-        let minAge = laneLastAges[0];
-        for (let l = 1; l < maxLanes; l++) {
-          if (laneLastAges[l] < minAge) {
-            minAge = laneLastAges[l];
-            minLane = l;
-          }
-        }
-        assignedLane = minLane;
-      }
-      const key = event.originalId || `${event.type}-${event.age}`;
-      eventLanes[key] = assignedLane;
-      laneLastAges[assignedLane] = event.age;
-    });
-
-    const eventsByAge = {};
-    timelineEvents.forEach(evt => {
-      const ageKey = Math.round(evt.age);
-      if (!eventsByAge[ageKey]) {
-        eventsByAge[ageKey] = [];
-      }
-      eventsByAge[ageKey].push(evt);
-    });
-
-    const eventOffsets = {};
-    Object.keys(eventsByAge).forEach(ageStr => {
-      const evs = eventsByAge[ageStr];
-      const N = evs.length;
-      if (N === 1) {
-        const key = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
-        eventOffsets[key] = 0;
-      } else if (N === 2) {
-        const k0 = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
-        const k1 = evs[1].originalId || `${evs[1].type}-${evs[1].age}`;
-        eventOffsets[k0] = -8;
-        eventOffsets[k1] = 8;
-      } else {
-        evs.forEach((ev, idx) => {
-          const key = ev.originalId || `${ev.type}-${ev.age}`;
-          const fraction = idx / (N - 1);
-          eventOffsets[key] = Math.round((fraction - 0.5) * 20);
-        });
-      }
-    });
-
-    return { eventLanes, eventOffsets };
-  }, [timelineEvents]);
 
   // Align event ages to closest discrete integer age point in chartData to lookup Net Worth coordinate
   const referenceDotsData = useMemo(() => {
@@ -1456,30 +1478,55 @@ export default function MobileFireSimulatorView({
                             strokeWidth={2}
                             dot={false}
                           />
-                          {referenceDotsData.map((d) => (
-                            <ReferenceDot
-                              key={d.key}
-                              x={d.x}
-                              y={d.y}
-                              shape={(props) => (
-                                <CustomEventMarker
-                                  {...props}
-                                  event={d.event}
-                                  lane={eventLanes[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
-                                  xOffset={eventOffsets[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
-                                  selectedMilestone={timelineEvents[selectedEventIndex]}
-                                  onSelectMilestone={(evt) => {
-                                    const idx = timelineEvents.indexOf(evt);
-                                    if (idx !== -1) {
-                                      setSelectedEventIndex(idx);
-                                    }
-                                  }}
-                                  isMobile={true}
-                                  chartData={chartData}
-                                />
-                              )}
-                            />
-                          ))}
+                           {(() => {
+                            // Group reference dots by their mapped age (x) and assign stacking information
+                            const grouped = {};
+                            referenceDotsData.forEach(d => {
+                              if (!grouped[d.x]) {
+                                grouped[d.x] = [];
+                              }
+                              grouped[d.x].push(d);
+                            });
+
+                            const referenceDotsWithStackInfo = [];
+                            Object.keys(grouped).forEach(ageStr => {
+                              const stack = grouped[ageStr];
+                              stack.forEach((item, index) => {
+                                referenceDotsWithStackInfo.push({
+                                  ...item,
+                                  stackIndex: index,
+                                  stackCount: stack.length,
+                                  stackEvents: stack.map(s => s.event)
+                                });
+                              });
+                            });
+
+                            return referenceDotsWithStackInfo.map((d) => (
+                              <ReferenceDot
+                                key={d.key}
+                                x={d.x}
+                                y={d.y}
+                                shape={(props) => (
+                                  <CustomEventMarker
+                                    {...props}
+                                    event={d.event}
+                                    selectedMilestone={timelineEvents[selectedEventIndex]}
+                                    onSelectMilestone={(evt) => {
+                                      const idx = timelineEvents.indexOf(evt);
+                                      if (idx !== -1) {
+                                        setSelectedEventIndex(idx);
+                                      }
+                                    }}
+                                    isMobile={true}
+                                    chartData={chartData}
+                                    stackIndex={d.stackIndex}
+                                    stackCount={d.stackCount}
+                                    stackEvents={d.stackEvents}
+                                  />
+                                )}
+                              />
+                            ));
+                          })()}
                           {selectedAge !== null && (
                             <>
                               <ReferenceLine

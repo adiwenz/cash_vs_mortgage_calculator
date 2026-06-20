@@ -19,7 +19,10 @@ const CustomEventMarker = (props) => {
     draggingInfo,
     chartData,
     xScale,
-    yScale
+    yScale,
+    stackIndex = 0,
+    stackCount = 1,
+    stackEvents = []
   } = props;
   
   if (cx === undefined || cy === undefined) return null;
@@ -37,16 +40,32 @@ const CustomEventMarker = (props) => {
     ? getEventMarkerPosition(event, chartData, xScale, yScale, displayAge)
     : { x: cx, y: cy };
 
-  // Calculate lane height and offset
-  const laneOffset = isMobile ? (26 + lane * 22) : (36 + lane * 32);
+  // Helper to compute radius of an event
+  const getEventRadius = (evt) => {
+    const isRet = evt.type.startsWith('retirementReady') || evt.type === 'retire';
+    return isRet ? (isMobile ? 13.5 : 15) : (isMobile ? 11 : 12.5);
+  };
+
+  // Stacking/Collapsing logic
+  const topEventIndex = stackCount - 1;
+  const topOffset = isMobile ? (26 + topEventIndex * 22) : (36 + topEventIndex * 32);
+  const topY = marker.y - topOffset;
+  const topEvent = stackEvents.length > 0 ? stackEvents[topEventIndex] : event;
+  const topR = getEventRadius(topEvent);
+  const stackGoesOver = stackCount > 1 && (topY - topR < 0);
+
+  if (stackGoesOver && stackIndex > 0) {
+    return null;
+  }
+
+  // Calculate lane height and offset (for collapsed stacks, stackIndex/lane is 0)
+  const resolvedLane = stackGoesOver ? 0 : stackIndex;
+  const laneOffset = isMobile ? (26 + resolvedLane * 22) : (36 + resolvedLane * 32);
   const y = marker.y - laneOffset;
   const targetX = marker.x;
 
   // Base radius and floated coordinates on hover/selection
-  const baseR = isRetirement
-    ? (isMobile ? 13.5 : 15) // larger icon for Work Optional
-    : (isMobile ? 11 : 12.5); // standard size
-
+  const baseR = getEventRadius(event);
   const r = isSelected ? baseR + 2.5 : baseR;
   const currentY = isHovered ? y - 3 : y;
   const currentR = isHovered ? r * 1.15 : r;
@@ -81,10 +100,24 @@ const CustomEventMarker = (props) => {
         ? 'milestone-event'
         : 'standard-milestone';
   
-  // Use a class name that does not have "position: absolute" to prevent browser positioning conflict on SVG element
   const milestoneClassName = `custom-chart-badge ${wrapperClass} ${isSelected ? 'selected' : ''} ${isHovered ? 'hovered' : ''}`;
   
   const currentEventAge = displayAge !== undefined ? displayAge : event.age;
+
+  // Styling for the badge (+N)
+  const strokeColor = isHovered ? 'var(--primary-hover)' : 'var(--primary)';
+  const badgeFill = 'var(--bg-secondary)';
+  const badgeStroke = strokeColor;
+  const badgeTextColor = strokeColor;
+
+  const countText = `+${stackCount - 1}`;
+  const badgeW = isMobile ? (countText.length > 2 ? 20 : 16) : (countText.length > 2 ? 24 : 18);
+  const badgeH = isMobile ? 16 : 18;
+  const badgeX = targetX + currentR + 4;
+
+  const labelText = stackGoesOver
+    ? `${event.title || event.label} (+${stackCount - 1})`
+    : (event.title || event.label);
 
   return (
     <g
@@ -129,7 +162,7 @@ const CustomEventMarker = (props) => {
           fontWeight="600"
           style={{ ...transitionStyle, userSelect: 'none' }}
         >
-          {event.title || event.label}
+          {labelText}
         </text>
       )}
 
@@ -206,6 +239,57 @@ const CustomEventMarker = (props) => {
       >
         {eventIcon || '✨'}
       </text>
+
+      {/* 6. Collapse count badge (+N) on the right side */}
+      {stackGoesOver && stackIndex === 0 && (
+        <g>
+          {/* Badge Glow effect */}
+          {(isRetirement || isSelected || isHovered) && (
+            <rect
+              x={badgeX - 4}
+              y={currentY - badgeH / 2 - 4}
+              width={badgeW + 8}
+              height={badgeH + 8}
+              rx={(badgeH + 8) / 2}
+              fill={
+                isHovered
+                  ? (isRetirement ? 'rgba(22, 163, 74, 0.4)' : 'rgba(30, 58, 95, 0.4)')
+                  : isSelected
+                    ? (isRetirement ? 'rgba(22, 163, 74, 0.3)' : 'rgba(30, 58, 95, 0.3)')
+                    : 'rgba(22, 163, 74, 0.18)'
+              }
+              filter="blur(3px)"
+              style={transitionStyle}
+            />
+          )}
+
+          {/* Badge Rect */}
+          <rect
+            x={badgeX}
+            y={currentY - badgeH / 2}
+            width={badgeW}
+            height={badgeH}
+            rx={badgeH / 2}
+            fill={badgeFill}
+            stroke={badgeStroke}
+            strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1.5}
+            style={transitionStyle}
+          />
+
+          {/* Badge Text */}
+          <text
+            x={badgeX + badgeW / 2}
+            y={currentY + (isMobile ? 3.5 : 4)}
+            textAnchor="middle"
+            fontSize={isMobile ? "9px" : "10px"}
+            fontWeight="bold"
+            fill={badgeTextColor}
+            style={{ ...transitionStyle, userSelect: 'none' }}
+          >
+            {countText}
+          </text>
+        </g>
+      )}
     </g>
   );
 };
@@ -251,82 +335,7 @@ export default function ProjectionGraph({
     return { x: tooltipX, y: tooltipY };
   }, [activeTooltipCoord, isMobile]);
 
-  // Sort events by age and assign lanes (to resolve overlaps)
-  const { eventLanes, eventOffsets } = useMemo(() => {
-    if (!timelineEvents || timelineEvents.length === 0) {
-      return { eventLanes: {}, eventOffsets: {} };
-    }
 
-    const sortedEvents = [...timelineEvents].sort((a, b) => a.age - b.age);
-    const maxLanes = isMobile ? 2 : 3;
-    const ageThreshold = isMobile ? 5 : 3.5;
-    const laneLastAges = Array(maxLanes).fill(-Infinity);
-    const eventLanes = {};
-
-    sortedEvents.forEach(event => {
-      let assignedLane = -1;
-      for (let lane = 0; lane < maxLanes; lane++) {
-        if (event.age - laneLastAges[lane] >= ageThreshold) {
-          assignedLane = lane;
-          break;
-        }
-      }
-      if (assignedLane === -1) {
-        let minLane = 0;
-        let minAge = laneLastAges[0];
-        for (let l = 1; l < maxLanes; l++) {
-          if (laneLastAges[l] < minAge) {
-            minAge = laneLastAges[l];
-            minLane = l;
-          }
-        }
-        assignedLane = minLane;
-      }
-      const key = event.originalId || `${event.type}-${event.age}`;
-      eventLanes[key] = assignedLane;
-      laneLastAges[assignedLane] = event.age;
-    });
-
-    // Handle offsets for events sharing the exact same age
-    const eventsByAge = {};
-    timelineEvents.forEach(evt => {
-      const ageKey = Math.round(evt.age);
-      if (!eventsByAge[ageKey]) {
-        eventsByAge[ageKey] = [];
-      }
-      eventsByAge[ageKey].push(evt);
-    });
-
-    const eventOffsets = {};
-    Object.keys(eventsByAge).forEach(ageStr => {
-      const evs = eventsByAge[ageStr];
-      const N = evs.length;
-      if (N === 1) {
-        const key = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
-        eventOffsets[key] = 0;
-      } else if (N === 2) {
-        const k0 = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
-        const k1 = evs[1].originalId || `${evs[1].type}-${evs[1].age}`;
-        eventOffsets[k0] = -8;
-        eventOffsets[k1] = 8;
-      } else if (N === 3) {
-        const k0 = evs[0].originalId || `${evs[0].type}-${evs[0].age}`;
-        const k1 = evs[1].originalId || `${evs[1].type}-${evs[1].age}`;
-        const k2 = evs[2].originalId || `${evs[2].type}-${evs[2].age}`;
-        eventOffsets[k0] = -10;
-        eventOffsets[k1] = 0;
-        eventOffsets[k2] = 10;
-      } else {
-        evs.forEach((ev, idx) => {
-          const key = ev.originalId || `${ev.type}-${ev.age}`;
-          const fraction = idx / (N - 1);
-          eventOffsets[key] = Math.round((fraction - 0.5) * 24);
-        });
-      }
-    });
-
-    return { eventLanes, eventOffsets };
-  }, [timelineEvents, isMobile]);
 
   // Align event ages to the closest discrete age point in chartData to lookup Net Worth coordinate
   const referenceDotsData = useMemo(() => {
@@ -465,30 +474,55 @@ export default function ProjectionGraph({
           />
 
           {/* Render ReferenceDots inside the LineChart to position custom event pins */}
-          {referenceDotsData.map((d) => (
-            <ReferenceDot
-              key={d.key}
-              x={d.x}
-              y={d.y}
-              shape={(props) => (
-                <CustomEventMarker
-                  {...props}
-                  event={d.event}
-                  lane={eventLanes[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
-                  xOffset={eventOffsets[d.event.originalId || `${d.event.type}-${d.event.age}`] ?? 0}
-                  selectedMilestone={selectedMilestone}
-                  onSelectMilestone={onSelectMilestone}
-                  handleNodeDragStart={handleNodeDragStart}
-                  dragOccurredRef={dragOccurredRef}
-                  isMobile={isMobile}
-                  displayAge={d.displayAge}
-                  inputs={inputs}
-                  draggingInfo={draggingInfo}
-                  chartData={chartData}
-                />
-              )}
-            />
-          ))}
+          {(() => {
+            // Group reference dots by their mapped age (x) and assign stacking information
+            const grouped = {};
+            referenceDotsData.forEach(d => {
+              if (!grouped[d.x]) {
+                grouped[d.x] = [];
+              }
+              grouped[d.x].push(d);
+            });
+
+            const referenceDotsWithStackInfo = [];
+            Object.keys(grouped).forEach(ageStr => {
+              const stack = grouped[ageStr];
+              stack.forEach((item, index) => {
+                referenceDotsWithStackInfo.push({
+                  ...item,
+                  stackIndex: index,
+                  stackCount: stack.length,
+                  stackEvents: stack.map(s => s.event)
+                });
+              });
+            });
+
+            return referenceDotsWithStackInfo.map((d) => (
+              <ReferenceDot
+                key={d.key}
+                x={d.x}
+                y={d.y}
+                shape={(props) => (
+                  <CustomEventMarker
+                    {...props}
+                    event={d.event}
+                    selectedMilestone={selectedMilestone}
+                    onSelectMilestone={onSelectMilestone}
+                    handleNodeDragStart={handleNodeDragStart}
+                    dragOccurredRef={dragOccurredRef}
+                    isMobile={isMobile}
+                    displayAge={d.displayAge}
+                    inputs={inputs}
+                    draggingInfo={draggingInfo}
+                    chartData={chartData}
+                    stackIndex={d.stackIndex}
+                    stackCount={d.stackCount}
+                    stackEvents={d.stackEvents}
+                  />
+                )}
+              />
+            ));
+          })()}
 
 
 
