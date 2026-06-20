@@ -760,7 +760,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(childcareRow).not.toBeNull();
     expect(childcareRow.textContent).toContain('Childcare');
     expect(childcareRow.textContent).toContain('🔒');
-    expect(childcareRow.textContent).toContain('$1,500');
+    expect(childcareRow.textContent).toContain('$1,250');
 
     // Verify that even if we click "Edit Needs", the childcare row remains locked (does not contain an input box)
     const editNeedsBtn = screen.getByRole('button', { name: /Edit Needs/i });
