@@ -608,7 +608,14 @@ describe('Mobile Event Wizard & Flow', () => {
   describe('Refactored Wizard Split - Specific Scenarios & Verification', () => {
     // Helper to select an event type and navigate to Step 4
     const navigateToStep4 = (itemLabel) => {
-      const btn = screen.getByText(itemLabel);
+      let btn = screen.queryByText(itemLabel);
+      if (!btn) {
+        const showMoreBtn = screen.queryByText('Show More ↓');
+        if (showMoreBtn) {
+          fireEvent.click(showMoreBtn);
+        }
+        btn = screen.getByText(itemLabel);
+      }
       fireEvent.click(btn);
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     };
@@ -820,10 +827,62 @@ describe('Mobile Event Wizard & Flow', () => {
       confirmSpy.mockRestore();
     });
 
-    test('11. Existing MobileFireSimulatorView import still works through compatibility wrapper', () => {
-      // Import the component dynamically and verify it resolves to the component function
-      expect(MobileEventWizard).toBeDefined();
-      expect(typeof MobileEventWizard).toBe('function');
+    test('12. Life Decision picker displays primary options by default and toggles advanced options with Show More/Less', () => {
+      const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+      render(
+        <MobileEventWizard
+          inputs={inputs}
+          editingEvent={{ type: 'selectType', isNew: true }}
+          setEditingEvent={vi.fn()}
+          handleSaveEvent={vi.fn()}
+          handleDeleteEvent={vi.fn()}
+          onClose={vi.fn()}
+          getInputsWithEvent={vi.fn()}
+          baselineResults={null}
+        />
+      );
+
+      // Verify primary events are visible
+      expect(screen.getByText('Marriage / Partner')).toBeDefined();
+      expect(screen.getByText('Home Purchase')).toBeDefined();
+      expect(screen.getByText('Child / Adoption')).toBeDefined();
+
+      // Verify advanced events are NOT visible by default
+      expect(screen.queryByText(/Stop Working/i)).toBeNull();
+      expect(screen.queryByText(/Social Security/i)).toBeNull();
+      expect(screen.queryByText(/Pension Inflow/i)).toBeNull();
+
+      // Verify Show More button is visible
+      const toggleBtn = screen.getByText('Show More ↓');
+      expect(toggleBtn).toBeDefined();
+
+      // Click Show More
+      fireEvent.click(toggleBtn);
+
+      // Now advanced events should be visible
+      expect(screen.getByText(/Stop Working/i)).toBeDefined();
+      expect(screen.getByText(/Social Security/i)).toBeDefined();
+      expect(screen.getByText(/Pension Inflow/i)).toBeDefined();
+      expect(screen.getByText('Show Less ↑')).toBeDefined();
+
+      // Click Show Less
+      fireEvent.click(screen.getByText('Show Less ↑'));
+
+      // Advanced events should be hidden again
+      expect(screen.queryByText(/Stop Working/i)).toBeNull();
+      expect(screen.queryByText(/Social Security/i)).toBeNull();
+      expect(screen.queryByText(/Pension Inflow/i)).toBeNull();
+      expect(screen.getByText('Show More ↓')).toBeDefined();
+
+      // Verify search reveals advanced events directly without Show More
+      const searchInput = screen.getByPlaceholderText('Search events...');
+      fireEvent.change(searchInput, { target: { value: 'pension' } });
+
+      // Displays Pension Inflow directly
+      expect(screen.getByText('Pension Inflow')).toBeDefined();
+      // Show More / Less button should not be displayed
+      expect(screen.queryByText('Show More ↓')).toBeNull();
+      expect(screen.queryByText('Show Less ↑')).toBeNull();
     });
   });
 });

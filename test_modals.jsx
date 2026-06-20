@@ -867,4 +867,44 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Verify Career Change modal opens
     expect(screen.getByRole('heading', { name: /Career Change/i })).toBeDefined();
   });
+
+  test('15. Desktop Life Decision picker displays primary options by default and toggles advanced options with Show More/Less', () => {
+    navigateToStep2();
+
+    // Click "Add Life Decision" to open the popover
+    const addDecisionBtn = screen.getByText('Add Life Decision');
+    fireEvent.click(addDecisionBtn);
+
+    // Verify primary options are visible
+    expect(screen.getByRole('button', { name: '💍 Get Married' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '🏠 Buy a House' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '👶 Have a Child' })).toBeDefined();
+
+    // Verify advanced options are NOT visible by default
+    expect(screen.queryByRole('button', { name: /^🏖 Retire/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^💰 Social Security/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^📜 Pension/i })).toBeNull();
+
+    // Verify Show More button is visible
+    const toggleBtn = screen.getByRole('button', { name: 'Show More ↓' });
+    expect(toggleBtn).toBeDefined();
+
+    // Click Show More
+    fireEvent.click(toggleBtn);
+
+    // Now advanced options should be visible
+    expect(screen.getByRole('button', { name: /^🏖 Retire/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^💰 Social Security/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^📜 Pension/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Show Less ↑' })).toBeDefined();
+
+    // Click Show Less
+    fireEvent.click(screen.getByRole('button', { name: 'Show Less ↑' }));
+
+    // Advanced options should be hidden again
+    expect(screen.queryByRole('button', { name: /^🏖 Retire/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^💰 Social Security/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^📜 Pension/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show More ↓' })).toBeDefined();
+  });
 });

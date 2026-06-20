@@ -491,12 +491,14 @@ export default function LifePlanScreen({
   const [copiedRaw, setCopiedRaw] = useState(false);
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
   const [activePopover, setActivePopover] = useState(null);
+  const [showAdvancedEvents, setShowAdvancedEvents] = useState(false);
   const [isGraphClusterExpanded, setIsGraphClusterExpanded] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (activePopover && !e.target.closest('.action-card-container')) {
         setActivePopover(null);
+        setShowAdvancedEvents(false);
       }
     };
     document.addEventListener('click', handleOutsideClick);
@@ -669,7 +671,10 @@ export default function LifePlanScreen({
               {/* 2. Add Life Decision Card */}
               <div className="action-card-container" style={{ position: 'relative', width: '100%' }}>
                 <div 
-                  onClick={() => setActivePopover(activePopover === 'decision' ? null : 'decision')}
+                  onClick={() => {
+                    setActivePopover(activePopover === 'decision' ? null : 'decision');
+                    setShowAdvancedEvents(false);
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -719,65 +724,140 @@ export default function LifePlanScreen({
                       borderRadius: '12px',
                       boxShadow: 'var(--shadow-lg)',
                       zIndex: 1000,
-                      maxHeight: '260px',
+                      maxHeight: showAdvancedEvents ? '380px' : '260px',
                       overflowY: 'auto',
                       marginTop: '0.35rem',
                       padding: '0.4rem',
                       boxSizing: 'border-box'
                     }}
                   >
-                    {[
-                      { type: 'marriage', label: '💍 Get Married' },
-                      { type: 'buyHouse', label: '🏠 Buy a House' },
-                      { type: 'haveChild', label: '👶 Have a Child' },
-                      { type: 'careerChange', label: '💼 Career Change' },
-                      { type: 'move', label: '📍 Move / Relocate' },
-                      { 
-                         type: 'retire', 
-                         label: '🏖 Retire', 
-                         disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
-                      },
-                      { 
-                         type: 'socialSecurity', 
-                         label: '💰 Social Security', 
-                         disabled: inputs.includeSocialSecurity !== false 
-                      },
-                      { type: 'pension', label: '📜 Pension' },
-                      { type: 'rentalIncome', label: '🏢 Rental Income' },
-                      { type: 'annuity', label: '📈 Annuity' },
-                      { type: 'otherRetirementIncome', label: '💵 Other Income' },
-                      { type: 'windfall', label: '💰 Windfall' },
-                      { type: 'college', label: '🎓 College Costs' },
-                      { type: 'debtPayoff', label: '💸 Debt Payoff' },
-                      { type: 'custom', label: '➕ Custom Event' }
-                    ].map((opt) => (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        disabled={opt.disabled}
-                        onClick={() => {
-                          handleCreateEvent(opt.type);
-                          setActivePopover(null);
-                        }}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '0.5rem 0.75rem',
-                          background: 'none',
-                          border: 'none',
-                          color: opt.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                          fontSize: '0.82rem',
-                          fontWeight: '600',
-                          cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                          borderRadius: '6px',
-                          display: 'block',
-                          transition: 'background var(--transition-fast)'
-                        }}
-                        className="popover-item-hover"
-                      >
-                        {opt.label} {opt.disabled ? ' (Already Added)' : ''}
-                      </button>
-                    ))}
+                    {(() => {
+                      const allOpts = [
+                        { type: 'marriage', label: '💍 Get Married' },
+                        { type: 'buyHouse', label: '🏠 Buy a House' },
+                        { type: 'haveChild', label: '👶 Have a Child' },
+                        { type: 'careerChange', label: '💼 Career Change' },
+                        { type: 'move', label: '📍 Move / Relocate' },
+                        { 
+                           type: 'retire', 
+                           label: '🏖 Retire', 
+                           disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
+                        },
+                        { 
+                           type: 'socialSecurity', 
+                           label: '💰 Social Security', 
+                           disabled: inputs.includeSocialSecurity !== false 
+                        },
+                        { type: 'pension', label: '📜 Pension' },
+                        { type: 'rentalIncome', label: '🏢 Rental Income' },
+                        { type: 'annuity', label: '📈 Annuity' },
+                        { type: 'otherRetirementIncome', label: '💵 Other Income' },
+                        { type: 'windfall', label: '💰 Windfall' },
+                        { type: 'college', label: '🎓 College Costs' },
+                        { type: 'debtPayoff', label: '💸 Debt Payoff' },
+                        { type: 'custom', label: '➕ Custom Event' }
+                      ];
+
+                      const primaryKeys = ['marriage', 'buyHouse', 'haveChild', 'careerChange', 'move', 'windfall'];
+                      const advancedKeys = ['retire', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome', 'college', 'debtPayoff', 'custom'];
+
+                      const primaryOpts = allOpts.filter(o => primaryKeys.includes(o.type));
+                      const sortedPrimaryOpts = primaryKeys.map(k => primaryOpts.find(o => o.type === k)).filter(Boolean);
+
+                      const advancedOpts = allOpts.filter(o => advancedKeys.includes(o.type));
+                      const sortedAdvancedOpts = advancedKeys.map(k => advancedOpts.find(o => o.type === k)).filter(Boolean);
+
+                      return (
+                        <>
+                          {sortedPrimaryOpts.map((opt) => (
+                            <button
+                              key={opt.type}
+                              type="button"
+                              disabled={opt.disabled}
+                              onClick={() => {
+                                handleCreateEvent(opt.type);
+                                setActivePopover(null);
+                              }}
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                padding: '0.5rem 0.75rem',
+                                background: 'none',
+                                border: 'none',
+                                color: opt.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                                fontSize: '0.82rem',
+                                fontWeight: '600',
+                                cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                                borderRadius: '6px',
+                                display: 'block',
+                                transition: 'background var(--transition-fast)'
+                              }}
+                              className="popover-item-hover"
+                            >
+                              {opt.label} {opt.disabled ? ' (Already Added)' : ''}
+                            </button>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowAdvancedEvents(!showAdvancedEvents)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'center',
+                              padding: '0.4rem 0.75rem',
+                              background: 'none',
+                              border: '1px dashed var(--border-color)',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.78rem',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              borderRadius: '6px',
+                              display: 'block',
+                              marginTop: '0.25rem',
+                              marginBottom: '0.25rem',
+                              boxSizing: 'border-box'
+                            }}
+                            className="popover-item-hover"
+                          >
+                            {showAdvancedEvents ? 'Show Less ↑' : 'Show More ↓'}
+                          </button>
+
+                          {showAdvancedEvents && (
+                            <>
+                              <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.35rem 0' }} />
+                              {sortedAdvancedOpts.map((opt) => (
+                                <button
+                                  key={opt.type}
+                                  type="button"
+                                  disabled={opt.disabled}
+                                  onClick={() => {
+                                    handleCreateEvent(opt.type);
+                                    setActivePopover(null);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '0.5rem 0.75rem',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: opt.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                                    fontSize: '0.82rem',
+                                    fontWeight: '600',
+                                    cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                                    borderRadius: '6px',
+                                    display: 'block',
+                                    transition: 'background var(--transition-fast)'
+                                  }}
+                                  className="popover-item-hover"
+                                >
+                                  {opt.label} {opt.disabled ? ' (Already Added)' : ''}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

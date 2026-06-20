@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Search } from 'lucide-react';
 
 export default function EventTypeStep({
@@ -10,6 +11,8 @@ export default function EventTypeStep({
   filteredEventTypes,
   inputs
 }) {
+  const [showAdvancedEvents, setShowAdvancedEvents] = useState(false);
+
   const isTypeDisabled = (type) => {
     if (!inputs) return false;
     if (type === 'retire') {
@@ -20,6 +23,36 @@ export default function EventTypeStep({
     }
     return false;
   };
+
+  const primaryKeys = [
+    'marriage',
+    'buyHouse',
+    'haveChild',
+    'careerChange',
+    'move',
+    'windfall'
+  ];
+
+  const advancedKeys = [
+    'retire',
+    'socialSecurity',
+    'pension',
+    'rentalIncome',
+    'annuity',
+    'otherRetirementIncome',
+    'college',
+    'debtPayoff',
+    'custom',
+    'sabbatical',
+    'sellHouse',
+    'studentLoan',
+    'creditCard',
+    'carLoan',
+    'personalLoan'
+  ];
+
+  const primaryEvents = primaryKeys.map(key => eventTypes.find(e => e.type === key)).filter(Boolean);
+  const advancedEvents = advancedKeys.map(key => eventTypes.find(e => e.type === key)).filter(Boolean);
 
   return (
     <div className="mobile-wizard-step-content animate-slide-up">
@@ -40,31 +73,82 @@ export default function EventTypeStep({
       </div>
 
       {searchQuery === '' && (
-        <>
-          {/* Popular Events Section */}
-          <h4 className="mobile-wizard-section-lbl">Popular Events</h4>
-          <div className="mobile-wizard-list">
-            {eventTypes.filter(e => e.popular).map((item) => {
-              const disabled = isTypeDisabled(item.type);
-              return (
-                <button 
-                  key={item.type} 
-                  type="button" 
-                  className="mobile-wizard-list-item"
-                  onClick={() => !disabled && selectEventType(item.type)}
-                  disabled={disabled}
-                  style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                >
-                  <span className="item-icon">{item.icon}</span>
-                  <span className="item-label">
-                    {item.label}{disabled ? ' (Already Added)' : ''}
-                  </span>
-                  <span className="item-arrow">→</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
+        <div className="mobile-wizard-list" style={{ marginTop: '1rem' }}>
+          {primaryEvents.map((item) => {
+            const disabled = isTypeDisabled(item.type);
+            return (
+              <button 
+                key={item.type} 
+                type="button" 
+                className="mobile-wizard-list-item"
+                onClick={() => !disabled && selectEventType(item.type)}
+                disabled={disabled}
+                style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
+                <span className="item-icon">{item.icon}</span>
+                <span className="item-label">
+                  {item.label}{disabled ? ' (Already Added)' : ''}
+                </span>
+                <span className="item-arrow">→</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            className="mobile-wizard-list-item show-more-toggle-row"
+            onClick={() => setShowAdvancedEvents(!showAdvancedEvents)}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.01)',
+              border: '1px dashed rgba(255, 255, 255, 0.1)',
+              color: 'var(--text-secondary, #94a3b8)',
+              padding: '0.75rem 1rem',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              width: '100%',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>
+              {showAdvancedEvents ? 'Show Less ↑' : 'Show More ↓'}
+            </span>
+          </button>
+
+          {showAdvancedEvents && (
+            <>
+              <div 
+                className="advanced-divider"
+                style={{
+                  height: '1px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  margin: '0.25rem 0'
+                }} 
+              />
+              {advancedEvents.map((item) => {
+                const disabled = isTypeDisabled(item.type);
+                return (
+                  <button 
+                    key={item.type} 
+                    type="button" 
+                    className="mobile-wizard-list-item"
+                    onClick={() => !disabled && selectEventType(item.type)}
+                    disabled={disabled}
+                    style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                  >
+                    <span className="item-icon">{item.icon}</span>
+                    <span className="item-label">
+                      {item.label}{disabled ? ' (Already Added)' : ''}
+                    </span>
+                    <span className="item-arrow">→</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </div>
       )}
 
       {searchQuery !== '' && (
@@ -97,42 +181,6 @@ export default function EventTypeStep({
             </div>
           )}
         </div>
-      )}
-
-      {searchQuery === '' && (
-        <>
-          {/* Categories Sections */}
-          {['Family', 'Career', 'Housing', 'Debt', 'Goals', 'Stop Working'].map((cat) => {
-            const catItems = eventTypes.filter(e => e.category === cat && !e.popular);
-            if (catItems.length === 0) return null;
-            return (
-              <div key={cat} style={{ marginTop: '1.25rem' }}>
-                <h4 className="mobile-wizard-section-lbl">{cat}</h4>
-                <div className="mobile-wizard-list">
-                  {catItems.map((item) => {
-                    const disabled = isTypeDisabled(item.type);
-                    return (
-                      <button 
-                        key={item.type} 
-                        type="button" 
-                        className="mobile-wizard-list-item"
-                        onClick={() => !disabled && selectEventType(item.type)}
-                        disabled={disabled}
-                        style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                      >
-                        <span className="item-icon">{item.icon}</span>
-                        <span className="item-label">
-                          {item.label}{disabled ? ' (Already Added)' : ''}
-                        </span>
-                        <span className="item-arrow">→</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </>
       )}
     </div>
   );

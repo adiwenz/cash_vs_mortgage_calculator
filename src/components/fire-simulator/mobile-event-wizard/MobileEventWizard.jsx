@@ -183,7 +183,9 @@ export default function MobileEventWizard({
     { type: 'retire', label: 'Stop Working', category: 'Stop Working', icon: '🏖️', popular: true },
     { type: 'socialSecurity', label: 'Social Security', category: 'Stop Working', icon: '💰', popular: true },
     { type: 'pension', label: 'Pension Inflow', category: 'Stop Working', icon: '📜', popular: false },
-    { type: 'rentalIncome', label: 'Rental Income', category: 'Stop Working', icon: '🏢', popular: false }
+    { type: 'rentalIncome', label: 'Rental Income', category: 'Stop Working', icon: '🏢', popular: false },
+    { type: 'annuity', label: 'Annuity', category: 'Stop Working', icon: '📈', popular: false },
+    { type: 'otherRetirementIncome', label: 'Other Income', category: 'Stop Working', icon: '💵', popular: false }
   ];
 
   // Initialize event with defaults
