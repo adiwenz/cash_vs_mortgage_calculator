@@ -525,6 +525,45 @@ export default function ProjectionGraph({
 
 
 
+          {/* Goal Age Marker */}
+          {inputs && inputs.targetRetirementAge && (
+            <ReferenceLine
+              x={inputs.targetRetirementAge}
+              stroke="var(--warning, #f59e0b)"
+              strokeDasharray="4 4"
+              strokeWidth={2}
+              label={(props) => {
+                const { viewBox } = props;
+                if (!viewBox) return null;
+                const { x, y } = viewBox;
+                return (
+                  <g>
+                    <text
+                      x={x}
+                      y={y - 25}
+                      fill="var(--warning, #f59e0b)"
+                      fontSize={10}
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      Goal Age
+                    </text>
+                    <text
+                      x={x}
+                      y={y - 10}
+                      fill="var(--warning, #f59e0b)"
+                      fontSize={13}
+                      fontWeight="900"
+                      textAnchor="middle"
+                    >
+                      {inputs.targetRetirementAge}
+                    </text>
+                  </g>
+                );
+              }}
+            />
+          )}
+
           {/* 3. Assets Depleted Age */}
           {displayedResults.runOutAge && (
             <ReferenceLine
