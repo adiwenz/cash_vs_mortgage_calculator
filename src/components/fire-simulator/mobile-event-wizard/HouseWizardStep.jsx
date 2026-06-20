@@ -141,7 +141,7 @@ export default function HouseWizardStep({
                 marginTop: '0.35rem',
                 background: 'none',
                 border: 'none',
-                color: 'var(--primary, #6366f1)',
+                color: 'var(--primary, #16a34a)',
                 fontWeight: '600',
                 cursor: 'pointer',
                 padding: '0.5rem 0',

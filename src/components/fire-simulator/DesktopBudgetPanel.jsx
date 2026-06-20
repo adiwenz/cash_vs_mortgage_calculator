@@ -339,7 +339,7 @@ export default function DesktopBudgetPanel({
                 <div style={{ display: 'flex', height: '0.65rem', borderRadius: '9999px', overflow: 'hidden', background: '#334155' }}>
                   <div style={{ width: `${takeHomeIncome > 0 ? (needsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-emerald)', transition: 'width 0.3s' }} title={`Needs: ${Math.round((needsTotal/takeHomeIncome)*100)}%`} />
                   <div style={{ width: `${takeHomeIncome > 0 ? (wantsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-amber)', transition: 'width 0.3s' }} title={`Wants: ${Math.round((wantsTotal/takeHomeIncome)*100)}%`} />
-                  <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-violet)', transition: 'width 0.3s' }} title={`Savings: ${Math.round((activeSavings/takeHomeIncome)*100)}%`} />
+                  <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-navy)', transition: 'width 0.3s' }} title={`Savings: ${Math.round((activeSavings/takeHomeIncome)*100)}%`} />
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -349,7 +349,7 @@ export default function DesktopBudgetPanel({
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-amber)' }} /> Wants
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-violet)' }} /> Savings
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-navy)' }} /> Savings
                   </span>
                 </div>
               </div>

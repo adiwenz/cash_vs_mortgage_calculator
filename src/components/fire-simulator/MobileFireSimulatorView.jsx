@@ -69,13 +69,13 @@ export function MobileRecommendationsPanel({
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {rankedPlan.map((scenario, idx) => {
-          const badgeColor = scenario.savingsFocus === 'Earn More' ? '#10b981' : scenario.savingsFocus === 'Save More' ? '#6366f1' : '#f59e0b';
-          const badgeBg = scenario.savingsFocus === 'Earn More' ? 'rgba(16, 185, 129, 0.12)' : scenario.savingsFocus === 'Save More' ? 'rgba(99, 102, 241, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+          const badgeColor = scenario.savingsFocus === 'Earn More' ? '#10b981' : scenario.savingsFocus === 'Save More' ? '#0ea5e9' : '#f59e0b';
+          const badgeBg = scenario.savingsFocus === 'Earn More' ? 'rgba(16, 185, 129, 0.12)' : scenario.savingsFocus === 'Save More' ? 'rgba(14, 165, 233, 0.12)' : 'rgba(245, 158, 11, 0.12)';
           
           return (
             <div className="mobile-rec-card" key={scenario.type || idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
               <div className="mobile-rec-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h5 className="mobile-rec-card-title" style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: '#ffffff' }}>
+                <h5 className="mobile-rec-card-title" style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {scenario.icon} {scenario.title}
                 </h5>
                 <span 
@@ -1274,12 +1274,12 @@ export default function MobileFireSimulatorView({
               />
 
               {/* Compact status card */}
-              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(20, 27, 47, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '20px', marginBottom: '1.5rem' }}>
+              <div className="mobile-status-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '20px', marginBottom: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                   {/* Current Status Column */}
                   <div style={{ flex: 1, textAlign: 'left' }}>
                     <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Current Status</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#60a5fa', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--accent-sky, #0284c7)', marginTop: '0.25rem' }}>
                       {inputs.currentAge < (activeResults.retirementReadyAge || 65) ? 'Working' : 'Retired'}
                     </div>
                   </div>
@@ -1759,7 +1759,7 @@ export default function MobileFireSimulatorView({
                 </div>
                 <div className="mobile-phase-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {normalizedPhases.map((p, idx) => {
-                    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+                    const colors = ['#0ea5e9', '#f59e0b', '#10b981', '#1e3a5f'];
                     const badgeColor = colors[idx % colors.length];
                     const isExpanded = expandedPhaseId === p.id;
 
@@ -1771,7 +1771,7 @@ export default function MobileFireSimulatorView({
                       <div 
                         key={p.id}
                         className={"mobile-phase-card " + (isExpanded ? "expanded" : "")}
-                        style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'rgba(20, 27, 47, 0.65)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '16px', cursor: 'pointer' }}
+                        style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}
                         onClick={() => setExpandedPhaseId(isExpanded ? null : p.id)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>

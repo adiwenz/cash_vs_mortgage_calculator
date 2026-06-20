@@ -116,7 +116,7 @@ export default function MobileBudgetPanel({
                 padding: '0.4rem 0.85rem',
                 fontSize: '0.78rem',
                 borderRadius: '6px',
-                border: isActive ? '2px solid var(--accent-violet)' : '1px solid var(--border-color)'
+                border: isActive ? '2px solid var(--accent-navy)' : '1px solid var(--border-color)'
               }}
               onClick={() => handleSwitchBudgetPhase(p.id)}
             >
@@ -165,7 +165,7 @@ export default function MobileBudgetPanel({
           <div style={{ display: 'flex', height: '0.5rem', borderRadius: '4px', overflow: 'hidden', background: '#334155', marginTop: '0.25rem' }}>
             <div style={{ width: `${takeHomeIncome > 0 ? (needsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-emerald)' }} />
             <div style={{ width: `${takeHomeIncome > 0 ? (wantsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-amber)' }} />
-            <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-violet)' }} />
+            <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-navy)' }} />
           </div>
         </div>
 
@@ -257,7 +257,7 @@ export default function MobileBudgetPanel({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--accent-violet)', fontWeight: 'bold', fontSize: '0.9rem' }}>Savings</span>
+              <span style={{ color: 'var(--accent-navy)', fontWeight: 'bold', fontSize: '0.9rem' }}>Savings</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0}%</span>
@@ -268,7 +268,7 @@ export default function MobileBudgetPanel({
               Brokerage, cash, retirement
             </div>
             <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
-              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-violet)' }} />
+              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-navy)' }} />
             </div>
           </div>
 

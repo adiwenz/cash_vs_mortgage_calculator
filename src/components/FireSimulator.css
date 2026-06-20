@@ -64,7 +64,7 @@
 }
 
 .list-builder-item {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 0, 0, 0.01);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
@@ -74,12 +74,8 @@
   position: relative;
 }
 
-[data-theme='light'] .list-builder-item {
-  background: rgba(0, 0, 0, 0.01);
-}
-
 .list-builder-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .list-builder-row {
@@ -268,7 +264,7 @@
 .timeline-row-label {
   position: sticky;
   left: 0;
-  background: var(--bg-secondary);
+  background: #f8fafc;
   z-index: 10;
   width: 150px;
   min-width: 150px;
@@ -283,10 +279,6 @@
   display: flex;
   align-items: center;
   align-self: stretch;
-}
-
-[data-theme='light'] .timeline-row-label {
-  background: #f8fafc;
 }
 
 .timeline-row-content {
@@ -1114,12 +1106,8 @@
 
 .large-progress-circle-bg {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.03);
-  stroke-width: 12;
-}
-
-[data-theme='light'] .large-progress-circle-bg {
   stroke: rgba(0, 0, 0, 0.04);
+  stroke-width: 12;
 }
 
 .large-progress-circle-bar {
@@ -3322,7 +3310,7 @@
   color: var(--text-secondary);
 }
 
-/* Custom background themes for budget/phase segments in light/dark mode */
+/* Custom background colors for budget/phase segments */
 .budget-segment.theme-working-standard {
   background: rgba(99, 102, 241, 0.08);
   border: 1px solid rgba(99, 102, 241, 0.25);
@@ -3339,9 +3327,9 @@
   color: #f43f5e;
 }
 .budget-segment.theme-working-student-loan {
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  color: #8b5cf6;
+  background: var(--accent-sky-light);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  color: var(--accent-sky);
 }
 .budget-segment.theme-working-house {
   background: rgba(6, 182, 212, 0.08);
@@ -3361,7 +3349,7 @@
 
 /* Compact input boxes for CurrentSituationCard */
 .situation-summary-card .input-number-box {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 4px;
   color: var(--text-primary);

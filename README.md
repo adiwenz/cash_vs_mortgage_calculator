@@ -23,6 +23,12 @@ A premium, interactive web application comparing long-term net worth trajectorie
 
 ---
 
+## Design Philosophy
+
+Finley uses a single, thoughtfully-designed light theme. Research and industry patterns show that users generally perceive financial planning tools as more trustworthy, readable, and approachable when presented in a clean light interface. This aligns our design direction with leading products in the space, such as Vanguard, Fidelity Investments, Empower, and Monarch Money.
+
+---
+
 ## Project Structure
 
 This project follows a strict boundary-driven structure separating pure mathematical simulation pipelines, domain hooks, decoupled handlers, and presentational UI components.

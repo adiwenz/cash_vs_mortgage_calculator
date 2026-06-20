@@ -23,11 +23,10 @@ import {
 
 // Premium Scenario Colors
 const SCENARIO_COLORS = [
-  '#6366f1', // Indigo
-  '#10b981', // Emerald
+  '#16a34a', // Emerald Green (Primary)
+  '#1e3a5f', // Brand Navy
   '#f59e0b', // Amber
   '#ec4899', // Pink
-  '#8b5cf6', // Violet
   '#0ea5e9', // Sky Blue
   '#f43f5e'  // Rose
 ];

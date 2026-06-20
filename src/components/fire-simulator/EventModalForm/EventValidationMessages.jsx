@@ -100,7 +100,7 @@ export function LiquidAssetsWarning({
             alignSelf: 'flex-start',
             background: 'none',
             border: 'none',
-            color: 'var(--primary, #6366f1)',
+            color: 'var(--primary, #16a34a)',
             fontWeight: '600',
             cursor: 'pointer',
             padding: 0,
