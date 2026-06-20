@@ -77,7 +77,7 @@ export default function MobileResults({
                 type="monotone"
                 dataKey="netWorth"
                 name="Net Worth"
-                stroke="#8b5cf6"
+                stroke="#1e3a5f"
                 strokeWidth={2.5}
                 dot={false}
               />

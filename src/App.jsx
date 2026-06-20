@@ -73,9 +73,6 @@ export default function App() {
     };
   });
 
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('theme') || 'light';
-  }); // 'dark' | 'light'
   const [isWarningsOpen, setIsWarningsOpen] = useState(true);
 
   // Mobile drawer & collapsible sections state
@@ -175,12 +172,6 @@ export default function App() {
     }
     window.history.pushState(null, '', `?${params.toString()}`);
   };
-
-  // Theme synchronization
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
 
   // Handle inputs change
   const handleInputChange = (key, value) => {
@@ -326,14 +317,6 @@ export default function App() {
               </>
             )}
           </div>
-
-          <button
-            className="btn-icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
         </div>
       </header>
 

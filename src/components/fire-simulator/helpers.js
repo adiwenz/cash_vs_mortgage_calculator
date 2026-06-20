@@ -226,9 +226,9 @@ export const getPaceBadgeStyles = (savingsFocus) => {
   }
   if (focusLower.includes('balanced')) {
     return {
-      color: '#6366f1',
-      background: 'rgba(99, 102, 241, 0.12)',
-      border: '1px solid rgba(99, 102, 241, 0.3)'
+      color: '#16a34a',
+      background: 'rgba(22, 163, 74, 0.12)',
+      border: '1px solid rgba(22, 163, 74, 0.3)'
     };
   }
   if (focusLower.includes('moderate') || focusLower.includes('save')) {
@@ -240,9 +240,9 @@ export const getPaceBadgeStyles = (savingsFocus) => {
   }
   if (focusLower.includes('earnings') || focusLower.includes('active') || focusLower.includes('earn')) {
     return {
-      color: '#8b5cf6',
-      background: 'rgba(139, 92, 246, 0.12)',
-      border: '1px solid rgba(139, 92, 246, 0.3)'
+      color: '#1e3a5f',
+      background: 'rgba(30, 58, 95, 0.12)',
+      border: '1px solid rgba(30, 58, 95, 0.3)'
     };
   }
   if (focusLower.includes('accelerated') || focusLower.includes('proactive') || focusLower.includes('dynamic')) {

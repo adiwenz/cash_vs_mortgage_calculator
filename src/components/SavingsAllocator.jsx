@@ -5,16 +5,16 @@ import { getAnnualContributionLimit } from '../simulatorMathUtils';
 
 // 10 allocation categories with curated colors and descriptions
 const CATEGORIES = [
-  { id: 'trad401k', name: '401(k) (Pre-Tax)', color: '#6366f1', desc: 'Pre-tax workplace retirement plan.' },
+  { id: 'trad401k', name: '401(k) (Pre-Tax)', color: '#1e3a5f', desc: 'Pre-tax workplace retirement plan.' },
   { id: 'rothIra', name: 'Roth IRA', color: '#f59e0b', desc: 'Tax-free retirement growth and withdrawals.' },
-  { id: 'tradIra', name: 'Traditional IRA', color: '#3b82f6', desc: 'Individual pre-tax retirement account.' },
+  { id: 'tradIra', name: 'Traditional IRA', color: '#0ea5e9', desc: 'Individual pre-tax retirement account.' },
   { id: 'hsa', name: 'HSA', color: '#10b981', desc: 'Triple tax-advantaged health savings account.' },
-  { id: 'brokerage', name: 'Taxable Brokerage', color: '#8b5cf6', desc: 'Standard investment account (no tax shelter).' },
-  { id: 'checking', name: 'Checking', color: '#0ea5e9', desc: 'Primary transactional account for daily expenses.' },
-  { id: 'hysa', name: 'High-Yield Savings', color: '#0d9488', desc: 'Interest-bearing savings account (liquid).' },
+  { id: 'brokerage', name: 'Taxable Brokerage', color: '#0d9488', desc: 'Standard investment account (no tax shelter).' },
+  { id: 'checking', name: 'Checking', color: '#64748b', desc: 'Primary transactional account for daily expenses.' },
+  { id: 'hysa', name: 'High-Yield Savings', color: '#0284c7', desc: 'Interest-bearing savings account (liquid).' },
   { id: 'emergency', name: 'Emergency Fund', color: '#ec4899', desc: 'Liquid reserve for unexpected life events.' },
   { id: 'debt', name: 'Debt Payoff', color: '#ef4444', desc: 'Accelerated payments on credit cards, loans, etc.' },
-  { id: 'other', name: 'Other Savings', color: '#64748b', desc: 'Miscellaneous savings goals or niche assets.' }
+  { id: 'other', name: 'Other Savings', color: '#94a3b8', desc: 'Miscellaneous savings goals or niche assets.' }
 ];
 
 // U.S. Federal Tax Data (2026 guidelines)

@@ -5,40 +5,46 @@
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Theme: Dark Mode (Default) */
-  --bg-primary: #0b0f19;
-  --bg-secondary: #131a2c;
-  --bg-tertiary: #1b253b;
-  --bg-card: rgba(20, 27, 47, 0.7);
-  --bg-card-hover: rgba(27, 37, 63, 0.8);
+  /* Theme: Balanced Light Theme (Default & Only) */
+  --bg-primary: #f8f7f4;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafaf9;
   
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: #5f5af6;
+  --border-color: #e5e7eb;
+  --border-focus: #16a34a;
   
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #64748b;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
   
   /* Primary & Accent colors */
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-light: rgba(99, 102, 241, 0.15);
+  --primary: #16a34a;
+  --primary-hover: #15803d;
+  --primary-light: rgba(22, 163, 74, 0.08);
   
-  --accent-emerald: #10b981;
-  --accent-emerald-light: rgba(16, 185, 129, 0.1);
-  --accent-amber: #f59e0b;
-  --accent-amber-light: rgba(245, 158, 11, 0.1);
-  --accent-rose: #f43f5e;
-  --accent-rose-light: rgba(244, 63, 94, 0.1);
-  --accent-sky: #0ea5e9;
-  --accent-sky-light: rgba(14, 165, 233, 0.1);
-  --accent-violet: #c084fc;
-  --accent-violet-light: rgba(192, 132, 252, 0.1);
+  --brand-navy: #1e3a5f;
   
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.25);
+  --accent-emerald: #16a34a;
+  --accent-emerald-light: rgba(22, 163, 74, 0.08);
+  --accent-amber: #d97706;
+  --accent-amber-light: rgba(217, 119, 6, 0.08);
+  --accent-rose: #dc2626;
+  --accent-rose-light: rgba(220, 38, 38, 0.08);
+  --accent-sky: #0284c7;
+  --accent-sky-light: rgba(2, 132, 199, 0.08);
+  --accent-navy: #1e3a5f;
+  --accent-navy-light: rgba(30, 58, 95, 0.08);
+  
+  /* Temporary aliases for backward compatibility */
+  --accent-violet: var(--accent-navy); /* TODO: Remove after all component references are migrated */
+  --accent-violet-light: var(--accent-navy-light); /* TODO: Remove after all component references are migrated */
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 25px rgba(22, 163, 74, 0.12);
   
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -48,31 +54,6 @@
   --transition-normal: 0.25s ease;
   
   --glass-blur: 12px;
-}
-
-/* Light Mode overrides */
-[data-theme='light'] {
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F3F4F6;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #FFFFFF;
-  
-  --border-color: #E5E7EB;
-  --border-focus: #4f46e5;
-  
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
-  --text-tertiary: #9CA3AF;
-  
-  --primary: #4f46e5;
-  --primary-hover: #3730a3;
-  --primary-light: rgba(79, 70, 229, 0.1);
-  
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.05);
-  --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.15);
 }
 
 /* Reset & Global Styles */
@@ -156,16 +137,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .brand-logo-img {
-  height: 38px;
+  height: 80px;
   object-fit: contain;
   display: block;
 }
 
 .brand-separator {
   width: 1px;
-  height: 24px;
+  height: 56px;
   background: var(--border-color);
-  margin: 0 0.6rem;
+  margin: 0 0.8rem;
 }
 
 .brand-title h1 {
@@ -388,7 +369,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 50%;
   background: var(--primary);
   cursor: pointer;
-  box-shadow: 0 0 5px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 5px rgba(22, 163, 74, 0.5);
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
@@ -537,7 +518,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .comparison-table tr:hover {
-  background: rgba(99, 102, 241, 0.04);
+  background: rgba(22, 163, 74, 0.04);
 }
 
 .comparison-table tr:last-child td {
@@ -741,7 +722,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .kpi-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
+  border-color: rgba(22, 163, 74, 0.25);
   transform: translateY(-1px);
 }
 

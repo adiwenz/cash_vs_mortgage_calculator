@@ -291,9 +291,9 @@ export default function DesktopResults({
                   type="checkbox"
                   checked={showNetWorth}
                   onChange={(e) => setShowNetWorth(e.target.checked)}
-                  style={{ accentColor: '#8b5cf6', cursor: 'pointer' }}
+                  style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
                 />
-                <span style={{ color: '#8b5cf6', fontWeight: '700' }}>Net Worth (Purple)</span>
+                <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
               </label>
             </div>
           </div>
@@ -363,7 +363,7 @@ export default function DesktopResults({
                   type="monotone"
                   dataKey="netWorth"
                   name="Net Worth"
-                  stroke="#8b5cf6"
+                  stroke="#1e3a5f"
                   strokeWidth={2.5}
                   dot={false}
                   hide={!showNetWorth}

@@ -329,11 +329,11 @@ export default function CreditCardBehavior() {
     if (key === BEHAVIOR_KEYS.PAYOFF_IN_FULL) return '#22c55e';
     if (colorBlindMode) {
       switch (key) {
-        case BEHAVIOR_KEYS.PAYDOWN: return '#2563eb'; // Blue
-        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return '#0284c7';       // Sky Blue
+        case BEHAVIOR_KEYS.PAYDOWN: return '#10b981'; // Emerald
+        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return '#2563eb';       // Blue
         case BEHAVIOR_KEYS.CARRY_BALANCE: return '#ea580c';    // Orange
         case BEHAVIOR_KEYS.INTEREST_TRAP: return '#dc2626';       // Bright Red
-        case BEHAVIOR_KEYS.BUDGET_GAP: return '#4f46e5';  // Indigo
+        case BEHAVIOR_KEYS.BUDGET_GAP: return '#1e3a5f';  // Navy
         default: return '#94a3b8';
       }
     } else {
@@ -342,7 +342,7 @@ export default function CreditCardBehavior() {
         case BEHAVIOR_KEYS.SLOW_PAYDOWN: return '#0ea5e9';       // Sky
         case BEHAVIOR_KEYS.CARRY_BALANCE: return '#f59e0b';    // Amber
         case BEHAVIOR_KEYS.INTEREST_TRAP: return '#f43f5e';       // Rose
-        case BEHAVIOR_KEYS.BUDGET_GAP: return '#8b5cf6';  // Violet
+        case BEHAVIOR_KEYS.BUDGET_GAP: return '#1e3a5f';  // Navy
         default: return '#64748b';
       }
     }

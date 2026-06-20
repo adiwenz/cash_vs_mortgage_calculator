@@ -90,8 +90,8 @@ export default function CapitalGainsBreakdownCard({ inputs, calcResults }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
         {/* Cash Buyer Column */}
-        <div style={{ background: 'rgba(99, 102, 241, 0.02)', border: '1px solid rgba(99, 102, 241, 0.08)', borderRadius: '8px', padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cash Buyer Tax</span>
+        <div style={{ background: 'rgba(30, 58, 95, 0.02)', border: '1px solid rgba(30, 58, 95, 0.08)', borderRadius: '8px', padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#1e3a5f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cash Buyer Tax</span>
           <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--accent-rose)' }}>
             {formatCurrency(cashBuyerTax)}
           </div>

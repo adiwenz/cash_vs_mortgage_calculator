@@ -671,7 +671,7 @@ export default function LifePlanScreen({
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0.85rem 1rem',
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, var(--bg-secondary) 100%)',
+                    background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.04) 0%, var(--bg-secondary) 100%)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '12px',
                     cursor: 'pointer',
@@ -687,7 +687,7 @@ export default function LifePlanScreen({
                       width: '36px',
                       height: '36px',
                       borderRadius: '8px',
-                      background: 'rgba(99, 102, 241, 0.1)',
+                      background: 'rgba(22, 163, 74, 0.1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -787,7 +787,7 @@ export default function LifePlanScreen({
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0.85rem 1rem',
-                    background: 'linear-gradient(135deg, rgba(192, 132, 252, 0.04) 0%, var(--bg-secondary) 100%)',
+                    background: 'linear-gradient(135deg, rgba(30, 58, 95, 0.04) 0%, var(--bg-secondary) 100%)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '12px',
                     cursor: 'pointer',
@@ -803,12 +803,12 @@ export default function LifePlanScreen({
                       width: '36px',
                       height: '36px',
                       borderRadius: '8px',
-                      background: 'rgba(192, 132, 252, 0.1)',
+                      background: 'rgba(30, 58, 95, 0.1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: '1.2rem',
-                      color: 'var(--accent-violet)'
+                      color: 'var(--accent-navy)'
                     }}>
                       💳
                     </div>
@@ -953,9 +953,9 @@ export default function LifePlanScreen({
                         type="checkbox"
                         checked={showNetWorth}
                         onChange={(e) => setShowNetWorth(e.target.checked)}
-                        style={{ accentColor: '#8b5cf6', cursor: 'pointer' }}
+                        style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
                       />
-                      <span style={{ color: '#8b5cf6', fontWeight: '700' }}>Net Worth (Purple)</span>
+                      <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
                     </label>
                   </div>
                 </div>
@@ -1267,9 +1267,9 @@ export default function LifePlanScreen({
                             <span className="badge" style={{ 
                               fontSize: '0.75rem', 
                               padding: '0.2rem 0.6rem', 
-                              background: isWorking ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
-                              color: isWorking ? 'var(--primary)' : 'var(--accent-emerald)',
-                              border: `1px solid ${isWorking ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                              background: isWorking ? 'rgba(30, 58, 95, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                              color: isWorking ? 'var(--accent-navy)' : 'var(--accent-emerald)',
+                              border: `1px solid ${isWorking ? 'rgba(30, 58, 95, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
                               borderRadius: '12px',
                               fontWeight: '600'
                             }}>
@@ -1951,7 +1951,7 @@ export default function LifePlanScreen({
                     padding: '0.4rem 0.8rem',
                     fontSize: '0.75rem',
                     borderRadius: '6px',
-                    background: 'var(--primary, #6366f1)',
+                    background: 'var(--primary, #16a34a)',
                     color: '#fff',
                     border: 'none',
                     cursor: 'pointer',
@@ -2006,8 +2006,8 @@ export default function LifePlanScreen({
                     fontWeight: '700',
                     border: 'none',
                     background: 'transparent',
-                    color: debugTab === tab.id ? 'var(--primary, #6366f1)' : 'var(--text-secondary, #94a3b8)',
-                    borderBottom: debugTab === tab.id ? '2px solid var(--primary, #6366f1)' : '2px solid transparent',
+                    color: debugTab === tab.id ? 'var(--primary, #16a34a)' : 'var(--text-secondary, #94a3b8)',
+                    borderBottom: debugTab === tab.id ? '2px solid var(--primary, #16a34a)' : '2px solid transparent',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
@@ -2070,7 +2070,7 @@ export default function LifePlanScreen({
                                 <span style={{ fontWeight: '700', color: '#f8fafc' }}>{ac.val}%</span>
                               </div>
                               <div style={{ width: '100%', height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ width: `${ac.val}%`, height: '100%', background: 'var(--primary, #6366f1)', borderRadius: '3px' }} />
+                                <div style={{ width: `${ac.val}%`, height: '100%', background: 'var(--primary, #16a34a)', borderRadius: '3px' }} />
                               </div>
                             </div>
                           ))}
@@ -2086,7 +2086,7 @@ export default function LifePlanScreen({
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', padding: '1rem', borderRadius: '8px' }}>
                           <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '600' }}>Effective Retirement Return</span>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#6366f1', marginTop: '0.25rem' }}>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e3a5f', marginTop: '0.25rem' }}>
                             {(debugSnapshot.savingsAllocation.effectiveRetirementReturn * 100).toFixed(2)}%
                           </div>
                           <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Weighted average return post-retirement</span>
@@ -2188,8 +2188,8 @@ export default function LifePlanScreen({
                         { label: 'Required Portfolio (FIRE Number)', value: formatCurrency(debugSnapshot.retirementReadinessCalc.requiredPortfolio), highlight: true }
                       ].map((item, idx) => (
                         <div key={idx} style={{
-                          background: item.highlight ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
-                          border: item.highlight ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #1e293b',
+                          background: item.highlight ? 'rgba(30, 58, 95, 0.08)' : 'rgba(255,255,255,0.02)',
+                          border: item.highlight ? '1px solid rgba(30, 58, 95, 0.3)' : '1px solid #1e293b',
                           padding: '1rem',
                           borderRadius: '6px'
                         }}>
@@ -2374,8 +2374,8 @@ export default function LifePlanScreen({
                               <span style={{
                                 padding: '1px 4px',
                                 borderRadius: '4px',
-                                background: row.retirementStatus === 'Retired' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                color: row.retirementStatus === 'Retired' ? '#6366f1' : '#f59e0b'
+                                background: row.retirementStatus === 'Retired' ? 'rgba(30, 58, 95, 0.12)' : 'rgba(217, 119, 6, 0.12)',
+                                color: row.retirementStatus === 'Retired' ? '#1e3a5f' : '#d97706'
                               }}>
                                 {row.retirementStatus === 'Retired' ? 'Stopped Working' : row.retirementStatus}
                               </span>

@@ -198,7 +198,7 @@ export default function MarriageWizard({
             {/* Grid of Key Benefits */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
               <div className="marriage-benefit-card">
-                <Wallet size={28} color="#8b5cf6" strokeWidth={1.5} />
+                <Wallet size={28} color="#1e3a5f" strokeWidth={1.5} />
                 <div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.15rem' }}>More Income</div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Bigger monthly budget.</p>
@@ -240,7 +240,7 @@ export default function MarriageWizard({
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#8b5cf6',
+                  color: 'var(--primary)',
                   fontSize: '0.95rem',
                   fontWeight: '600',
                   cursor: 'pointer',
@@ -699,11 +699,11 @@ export default function MarriageWizard({
                 fontSize: '0.9rem',
                 fontWeight: 'bold',
                 marginTop: '0.5rem',
-                background: 'linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%)',
+                background: 'linear-gradient(135deg, var(--primary) 0%, #1e3a5f 100%)',
                 border: 'none',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)',
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.2)',
                 transition: 'all 0.2s ease-in-out',
                 display: 'flex',
                 alignItems: 'center',

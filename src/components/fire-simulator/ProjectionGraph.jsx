@@ -125,7 +125,7 @@ const CustomEventMarker = (props) => {
           y={currentY - currentR - 8}
           textAnchor="middle"
           fontSize="9px"
-          fill="var(--text-primary, #ffffff)"
+          fill="var(--text-primary, #1f2937)"
           fontWeight="600"
           style={{ ...transitionStyle, userSelect: 'none' }}
         >
@@ -147,7 +147,7 @@ const CustomEventMarker = (props) => {
       {/* 1. Vertical connector line from (marker.x, marker.y) to (marker.x, currentY + currentR) */}
       <path
         d={`M ${targetX} ${marker.y} L ${targetX} ${currentY + currentR}`}
-        stroke={isSelected || isHovered ? 'var(--primary)' : isMajorImpact ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.2)'}
+        stroke={isSelected || isHovered ? 'var(--primary)' : isMajorImpact ? 'var(--text-tertiary)' : 'var(--border-color)'}
         strokeWidth={isSelected || isHovered ? 2 : isMajorImpact ? 1.5 : 1}
         strokeDasharray={(isMajorImpact || isHovered) && !isSelected ? 'none' : '2 2'}
         fill="none"
@@ -177,22 +177,21 @@ const CustomEventMarker = (props) => {
         <circle
           cx={targetX}
           cy={currentY}
-          r={currentR + 4}
+          r={currentR + 3}
           fill="none"
           stroke="var(--primary)"
           strokeWidth={1.5}
-          strokeDasharray="3 2"
           style={transitionStyle}
         />
       )}
 
-      {/* 4. Main badge circle */}
+      {/* 4. Main Circle Maker */}
       <circle
         cx={targetX}
         cy={currentY}
         r={currentR}
-        fill={isSelected ? 'var(--primary)' : isHovered ? 'var(--primary-dark, #4f46e5)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #1e293b)'}
-        stroke={isSelected || isHovered ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #10b981)' : 'rgba(255, 255, 255, 0.25)'}
+        fill={isSelected ? 'var(--primary)' : isHovered ? 'var(--primary-hover, #3730a3)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #ffffff)'}
+        stroke={isSelected || isHovered ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #16a34a)' : 'var(--border-color)'}
         strokeWidth={isSelected || isHovered ? 1.5 : 1}
         style={transitionStyle}
       />
@@ -459,7 +458,7 @@ export default function ProjectionGraph({
             type="monotone"
             dataKey="netWorth"
             name="Net Worth"
-            stroke="#8b5cf6"
+            stroke="#1e3a5f"
             strokeWidth={2.5}
             dot={false}
             hide={!showNetWorth}

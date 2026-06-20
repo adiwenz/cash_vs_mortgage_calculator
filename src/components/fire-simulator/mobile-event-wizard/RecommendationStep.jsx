@@ -520,8 +520,8 @@ export default function RecommendationStep({
             Recommended Adjustments
           </h4>
           {displayRankedPlan.map((scenario, idx) => {
-            const badgeColor = scenario.savingsFocus === 'Earn More' ? '#10b981' : scenario.savingsFocus === 'Save More' ? '#6366f1' : '#f59e0b';
-            const badgeBg = scenario.savingsFocus === 'Earn More' ? 'rgba(16, 185, 129, 0.12)' : scenario.savingsFocus === 'Save More' ? 'rgba(99, 102, 241, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+            const badgeColor = scenario.savingsFocus === 'Earn More' ? '#10b981' : scenario.savingsFocus === 'Save More' ? '#0ea5e9' : '#f59e0b';
+            const badgeBg = scenario.savingsFocus === 'Earn More' ? 'rgba(16, 185, 129, 0.12)' : scenario.savingsFocus === 'Save More' ? 'rgba(14, 165, 233, 0.12)' : 'rgba(245, 158, 11, 0.12)';
             return (
               <div className="mobile-rec-card" key={scenario.type || idx}>
                 <div className="mobile-rec-card-header">
