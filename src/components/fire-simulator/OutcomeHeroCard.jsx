@@ -14,43 +14,90 @@ export default function OutcomeHeroCard({
   let accentColor;
   let gradientStart;
   let borderColor;
-  
-  // Tree transform values:
-  // Comfortable: close & large
-  // Needs Adjustment: mid-path
-  // Not Yet Ready: distant horizon
-  let treeTransform;
+
+  let readinessScore = 0.0;
+  if (planStatus === 'comfortable') {
+    readinessScore = 1.0;
+  } else if (planStatus === 'sustainable') {
+    readinessScore = 0.5;
+  }
 
   if (planStatus === 'comfortable') {
-    statusBadgeText = "You're Set 🎉";
-    statusIcon = '🌱';
-    explanation = 'You\'ll have enough saved that work becomes a choice. 💚';
+    statusBadgeText = "You're Set";
+    statusIcon = '🌳';
+    explanation = "You'll have enough saved that work becomes a choice.";
     displayAge = readyAge || targetRetirementAge || 65;
-    accentColor = 'var(--accent-emerald)'; // Emerald Green
-    gradientStart = 'rgba(16, 185, 129, 0.08)';
-    borderColor = 'rgba(16, 185, 129, 0.2)';
-    treeTransform = 'translate(320px, 150px) scale(1.15)';
+    accentColor = '#16a34a'; // Emerald green
+    gradientStart = 'rgba(22, 163, 74, 0.08)';
+    borderColor = 'rgba(22, 163, 74, 0.2)';
   } else if (planStatus === 'sustainable') {
-    // Sustainable maps to "Needs Adjustment" / "Almost There"
-    statusBadgeText = 'Almost There';
-    statusIcon = '🧭';
+    statusBadgeText = 'Growing Strong';
+    statusIcon = '🌿';
     explanation = 'A few changes could help you get there sooner.';
     displayAge = readyAge || targetRetirementAge || 72;
-    accentColor = 'var(--accent-amber)';
-    gradientStart = 'rgba(245, 158, 11, 0.08)';
-    borderColor = 'rgba(245, 158, 11, 0.2)';
-    treeTransform = 'translate(255px, 138px) scale(0.7)';
+    accentColor = '#4e7c59'; // Sage green
+    gradientStart = 'rgba(78, 124, 89, 0.08)';
+    borderColor = 'rgba(78, 124, 89, 0.2)';
   } else {
-    // Needs Adjustment / Not Yet Ready (retirementGap / assets run out)
-    statusBadgeText = "Let's Build a Plan";
-    statusIcon = '🌤';
-    explanation = 'Your current path doesn\'t reach financial independence yet.';
+    statusBadgeText = 'Building Your Future';
+    statusIcon = '🌱';
+    explanation = "Your current path doesn't reach financial independence yet.";
     displayAge = '—';
-    accentColor = 'var(--primary)'; // Blue/Purple Accent
-    gradientStart = 'rgba(99, 102, 241, 0.08)';
-    borderColor = 'rgba(99, 102, 241, 0.2)';
-    treeTransform = 'translate(218px, 126px) scale(0.35)';
+    accentColor = '#0d9488'; // Mint green
+    gradientStart = 'rgba(13, 148, 136, 0.08)';
+    borderColor = 'rgba(13, 148, 136, 0.2)';
   }
+
+  // Tree helper function to render foliage growth states
+  function renderTreeFoliage(status) {
+    if (status === 'comfortable') {
+      // Mature Tree: wide, lush canopy, extra clusters and depth highlights
+      return (
+        <>
+          <circle cx="0" cy="-9" r="10.5" fill="#16a34a" />
+          <circle cx="-6" cy="-6" r="8" fill="#15803d" />
+          <circle cx="6" cy="-6" r="8" fill="#15803d" />
+          <circle cx="0" cy="-14" r="7" fill="#22c55e" />
+          <circle cx="-4" cy="-12" r="6" fill="#16a34a" />
+          <circle cx="4" cy="-12" r="6" fill="#16a34a" />
+          <circle cx="-8" cy="-8" r="5" fill="#15803d" />
+          <circle cx="8" cy="-8" r="5" fill="#15803d" />
+          <circle cx="-3" cy="-10" r="5" fill="#4ade80" opacity="0.8" />
+          <circle cx="3" cy="-10" r="5" fill="#4ade80" opacity="0.8" />
+          <circle cx="0" cy="-6" r="4.5" fill="#4ade80" opacity="0.6" />
+        </>
+      );
+    }
+    if (status === 'sustainable') {
+      // Young Tree: moderate baseline canopy
+      return (
+        <>
+          <circle cx="0" cy="-8" r="9" fill="#16a34a" />
+          <circle cx="-5" cy="-5" r="7" fill="#15803d" />
+          <circle cx="5" cy="-5" r="7" fill="#15803d" />
+          <circle cx="0" cy="-12" r="6" fill="#22c55e" />
+          <circle cx="-3" cy="-9" r="4.5" fill="#4ade80" opacity="0.8" />
+          <circle cx="3" cy="-9" r="4.5" fill="#4ade80" opacity="0.8" />
+        </>
+      );
+    }
+    // Sapling: minimal foliage, small canopy, overlapping/rooted to top of trunk at y=0
+    return (
+      <>
+        <circle cx="0" cy="-4" r="5" fill="#16a34a" />
+        <circle cx="-2.5" cy="-3" r="3.5" fill="#15803d" />
+        <circle cx="2.5" cy="-3" r="3.5" fill="#15803d" />
+        <circle cx="0" cy="-6.5" r="3.5" fill="#22c55e" />
+        <circle cx="0" cy="-4.5" r="2.5" fill="#4ade80" opacity="0.8" />
+      </>
+    );
+  }
+
+  // Fixed tree position and scale, dynamic environmental progress values
+  const treeTransform = 'translate(218px, 98.25px) scale(3)';
+  const sunOpacity = 0.55 + (readinessScore * 0.45);
+  const hillSaturation = 75 + (readinessScore * 25);
+  const showTreeGlow = planStatus === 'comfortable';
 
   return (
     <div 
@@ -232,10 +279,15 @@ export default function OutcomeHeroCard({
               <stop offset="0%" stopColor="#fef9c3" stopOpacity="0.7" />
               <stop offset="100%" stopColor="#fef08a" stopOpacity="0.95" />
             </linearGradient>
+            <radialGradient id="tree-glow-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+            </radialGradient>
           </defs>
 
           {/* Sun */}
-          <circle cx="300" cy="85" r="50" fill="url(#sun-grad)" />
+          <circle cx="300" cy="85" r="50" fill="url(#sun-grad)" style={{ opacity: sunOpacity, transition: 'opacity 600ms ease' }} />
 
           {/* Clouds */}
           <path d="M 120,40 Q 128,32 138,36 Q 146,26 156,34 Q 166,31 170,40 Z" fill="#ffffff" opacity="0.35" />
@@ -246,30 +298,42 @@ export default function OutcomeHeroCard({
           <path d="M 162,20 Q 164,17 166,20 Q 168,17 170,20" fill="none" stroke="var(--text-tertiary)" strokeWidth="1" opacity="0.4" />
           <path d="M 220,35 Q 222,32 224,35 Q 226,32 228,35" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.2" opacity="0.5" />
 
-          {/* Hills */}
-          <path d="M -20,180 L -20,115 Q 110,70 230,105 Q 315,130 420,100 L 420,180 Z" fill="url(#hill-grad-back)" />
-          <path d="M -20,180 L -20,130 Q 120,90 250,125 Q 330,140 420,120 L 420,180 Z" fill="url(#hill-grad-mid)" />
-          <path d="M -20,180 L -20,145 Q 150,110 310,143 Q 365,150 420,140 L 420,180 Z" fill="url(#hill-grad-front)" />
+          {/* Hills and winding path with dynamic saturation */}
+          <g style={{ filter: `saturate(${hillSaturation}%)`, transition: 'filter 600ms ease' }}>
+            {/* Hills */}
+            <path d="M -20,180 L -20,115 Q 110,70 230,105 Q 315,130 420,100 L 420,180 Z" fill="url(#hill-grad-back)" />
+            <path d="M -20,180 L -20,130 Q 120,90 250,125 Q 330,140 420,120 L 420,180 Z" fill="url(#hill-grad-mid)" />
+            <path d="M -20,180 L -20,145 Q 150,110 310,143 Q 365,150 420,140 L 420,180 Z" fill="url(#hill-grad-front)" />
 
-          {/* Winding Path */}
-          <path d="M 280,180 C 265,160 250,155 248,150 C 246,145 258,142 258,137 C 258,132 232,130 220,124 L 216,124 C 226,130 248,132 248,137 C 248,142 236,145 238,150 C 240,155 250,160 260,180 Z" fill="url(#path-grad)" />
+            {/* Winding Path */}
+            <path d="M 280,180 C 265,160 250,155 248,150 C 246,145 258,142 258,137 C 258,132 232,130 220,124 L 216,124 C 226,130 248,132 248,137 C 248,142 236,145 238,150 C 240,155 250,160 260,180 Z" fill="url(#path-grad)" />
+          </g>
 
           {/* Dynamic Tree */}
           <g 
             style={{ 
-              transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)', 
+              transition: 'transform 600ms ease', 
               transform: treeTransform 
             }}
           >
+            {/* Subtle premium glow behind foliage for Comfortable state */}
+            {showTreeGlow && (
+              <circle
+                cx="0"
+                cy="-8"
+                r="18"
+                fill="url(#tree-glow-grad)"
+                style={{
+                  mixBlendMode: 'screen',
+                  transition: 'opacity 600ms ease',
+                  opacity: showTreeGlow ? 1.0 : 0
+                }}
+              />
+            )}
             {/* Trunk */}
             <rect x="-2" y="0" width="4" height="15" rx="1" fill="#78350f" />
             {/* Leaves */}
-            <circle cx="0" cy="-8" r="9" fill="#16a34a" />
-            <circle cx="-5" cy="-5" r="7" fill="#15803d" />
-            <circle cx="5" cy="-5" r="7" fill="#15803d" />
-            <circle cx="0" cy="-12" r="6" fill="#22c55e" />
-            <circle cx="-3" cy="-9" r="4.5" fill="#4ade80" opacity="0.8" />
-            <circle cx="3" cy="-9" r="4.5" fill="#4ade80" opacity="0.8" />
+            {renderTreeFoliage(planStatus)}
           </g>
         </svg>
       </div>
