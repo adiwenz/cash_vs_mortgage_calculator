@@ -129,7 +129,7 @@ describe('Simplified Child Planning Flow', () => {
     const incomeGoal = updatedInputs.incomeList.find(inc => inc.id === linkedPromoId || inc.parentEventId === savedChild.id);
     
     expect(incomeGoal).toBeDefined();
-    expect(incomeGoal.name).toBe('Income Goal (Emma)');
+    expect(incomeGoal.name).toBe('Promotion (Emma)');
     expect(incomeGoal.amount).toBe(7200);
     expect(incomeGoal.salaryIncrease).toBe(7200);
   });

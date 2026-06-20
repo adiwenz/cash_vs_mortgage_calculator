@@ -142,9 +142,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const continueBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(continueBtn);
     
-    // Save child event anyway
-    const saveAnywayBtn = screen.getByRole('button', { name: /Save Child Event Anyway/i });
-    fireEvent.click(saveAnywayBtn);
+    // Confirm child event rebalance/promotion selection
+    const confirmBtn = screen.getByRole('button', { name: /Confirm/i });
+    fireEvent.click(confirmBtn);
     
     // Verify Modal closes
     await waitFor(() => {
@@ -332,9 +332,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -349,9 +349,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -397,9 +397,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -423,12 +423,8 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const parentAgeInput = getInputByWrapperText(/Age Child Arrives/i);
     fireEvent.change(parentAgeInput, { target: { value: '36' } });
     
-    // Continue & Save
-    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    // Save directly (no Continue step for editing)
+    fireEvent.click(screen.getByRole('button', { name: /Save/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Edit Child Details/i })).toBeNull();
@@ -538,9 +534,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Save
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -737,9 +733,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -791,9 +787,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     // Save
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Child Event Anyway/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Save Child Event Anyway/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
@@ -829,5 +825,46 @@ describe('FireSimulator Modals and Decision Wizards', () => {
       expect(screen.queryByText('👶 Have Child: Liam')).toBeNull();
       expect(document.querySelector('.selected-event-details-card')).toBeNull();
     });
+  });
+
+  test('14. Clicking on the work/promotion event allows editing/deleting it', async () => {
+    navigateToStep2();
+
+    // Create a child event with default (promotion) strategy
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'haveChild' } });
+    const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
+    fireEvent.change(childNameInput, { target: { value: 'Liam' } });
+
+    // Save
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
+    });
+
+    // Find the career/promotion milestone icon
+    const promoTextNode = screen.getByText('💼 Career Phase: Promotion (Liam)');
+    const promoNode = promoTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    expect(promoNode).not.toBeNull();
+
+    // Click to select
+    fireEvent.click(promoNode);
+
+    // Confirm detail card appears
+    const detailCard = document.querySelector('.selected-event-details-card');
+    expect(detailCard).not.toBeNull();
+    expect(detailCard.textContent).toContain('Career Phase: Promotion (Liam)');
+
+    // Click Edit Decision to open the edit modal
+    const editBtn = screen.getByRole('button', { name: /Edit Decision/i });
+    fireEvent.click(editBtn);
+
+    // Verify Career Change modal opens
+    expect(screen.getByRole('heading', { name: /Career Change/i })).toBeDefined();
   });
 });
