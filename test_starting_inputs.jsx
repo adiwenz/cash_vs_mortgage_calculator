@@ -159,6 +159,41 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     expect(screen.getByText(/Current Savings Breakdown/i)).toBeDefined();
   });
 
+  test('verifies that the Details button opens the Current Savings Breakdown modal, allows editing, and saves details successfully', async () => {
+    render(<FireSimulator />);
+
+    const detailsButton = screen.getByRole('button', { name: /^Details$/i });
+    expect(detailsButton).toBeDefined();
+
+    // Click details button
+    fireEvent.click(detailsButton);
+
+    // Verify modal is open
+    expect(screen.getByText(/Current Savings Breakdown/i)).toBeDefined();
+
+    // Find and modify Taxable Brokerage input
+    const brokerageLabel = screen.getByText('Taxable Brokerage');
+    const parent = brokerageLabel.parentElement;
+    const input = parent.querySelector('input');
+    expect(input).toBeDefined();
+
+    fireEvent.change(input, { target: { value: '5000' } });
+
+    // Click Save Details
+    const saveButton = screen.getByRole('button', { name: /Save Details/i });
+    fireEvent.click(saveButton);
+
+    // Verify modal is closed
+    await waitFor(() => {
+      expect(screen.queryByText(/Current Savings Breakdown/i)).toBeNull();
+    });
+
+    // Verify current savings input is updated
+    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
+    expect(currentSavingsInput.value).toBe('$5,000');
+  });
+
+
   test('verifies that the Budget button next to Savings Rate opens the Budget modal', () => {
     render(<FireSimulator />);
 

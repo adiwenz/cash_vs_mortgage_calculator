@@ -81,7 +81,7 @@ export default function SavingsDetailsModal({
               type="button"
               className="btn-primary"
               style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
-              onClick={handleSaveSavingsDetails}
+              onClick={() => handleSaveSavingsDetails(savingsDetails)}
             >
               Save Details
             </button>

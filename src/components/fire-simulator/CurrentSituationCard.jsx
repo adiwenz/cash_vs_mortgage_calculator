@@ -73,38 +73,6 @@ export default function CurrentSituationCard({
         >
           🌱 Your Current Situation
         </h3>
-        <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--primary)',
-              fontSize: '0.78rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              padding: '0.1rem 0.25rem'
-            }}
-            onClick={() => setIsCurrentSituationModalOpen(true)}
-          >
-            ✏️ Edit
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenSavingsDetails}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--primary)',
-              fontSize: '0.78rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              padding: '0.1rem 0.25rem'
-            }}
-          >
-            Details
-          </button>
-        </div>
       </div>
 
       {/* Values List */}
@@ -212,7 +180,25 @@ export default function CurrentSituationCard({
 
         {/* Row 4: Current Savings */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '30px', padding: '0.1rem 0' }}>
-          <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🏦 Current Savings</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🏦 Current Savings</span>
+            <button
+              type="button"
+              onClick={handleOpenSavingsDetails}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--success)',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                padding: 0,
+                textDecoration: 'underline'
+              }}
+            >
+              Details
+            </button>
+          </div>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <CurrencyInput
