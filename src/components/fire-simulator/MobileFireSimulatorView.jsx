@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars, react-hooks/refs, react-hooks/exhaustive-deps */
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Home, 
@@ -1370,13 +1370,19 @@ export default function MobileFireSimulatorView({
                 </div>
               )}
 
-
+              {/* Life Events Redesigned Timeline Section */}
+              <MobileTimeline
+                timelineEvents={timelineEvents}
+                selectedEventIndex={selectedEventIndex}
+                setSelectedEventIndex={setSelectedEventIndex}
+                onEventTap={(evt) => setActiveEventForSheet(evt)}
+                inputs={inputs}
+              />
 
               {/* Net Worth Graph & Projections KPIs Card */}
               {(() => {
                 const selectedAge = timelineEvents[selectedEventIndex]?.age || inputs.currentAge;
                 const selectedPoint = chartData.find(d => Number(d.age) === Number(selectedAge));
-                const selectedNetWorth = selectedPoint ? selectedPoint.netWorth : 0;
                 
                 const eventAges = Array.from(new Set([
                   inputs.currentAge,
@@ -1385,24 +1391,43 @@ export default function MobileFireSimulatorView({
                 ])).sort((a, b) => a - b);
 
                 return (
-                  <div className="mobile-card" style={{ marginTop: '1.25rem', textAlign: 'left', padding: '0.75rem' }}>
+                  <div 
+                    className="mobile-card" 
+                    style={{ 
+                      marginTop: '1.25rem', 
+                      textAlign: 'left', 
+                      padding: '1rem',
+                      background: '#ffffff',
+                      border: '1px solid var(--border, #e5e7eb)',
+                      borderRadius: '20px',
+                      boxShadow: 'var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05))'
+                    }}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
                       <div>
                         <h3 style={{ fontSize: '0.85rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                          📈 Net Worth Curve
+                          📈 Net Worth Projections
                         </h3>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Highlighting Age {selectedAge}</span>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', gap: '0.8rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: '8px', height: '2px', background: '#a78bfa', display: 'inline-block' }}></span>
-                          <span>NW</span>
+                          <span style={{ width: '8px', height: '2px', background: 'var(--net-worth, #1e3a5f)', display: 'inline-block' }}></span>
+                          <span>Net Worth</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', background: 'var(--asset, #16a34a)', display: 'inline-block' }}></span>
+                          <span>Assets</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ width: '8px', height: '2px', background: 'var(--debt, #dc2626)', display: 'inline-block' }}></span>
+                          <span>Debt</span>
                         </div>
                       </div>
                     </div>
 
-                    <div ref={chartContainerRef} style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
+                    <div ref={chartContainerRef} style={{ height: '340px', width: '100%', marginLeft: '-15px' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={chartData}
@@ -1421,7 +1446,7 @@ export default function MobileFireSimulatorView({
                             setActiveTooltipCoord(null);
                           }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e5e7eb)" />
                           <XAxis
                             dataKey="age"
                             ticks={eventAges}
@@ -1438,12 +1463,12 @@ export default function MobileFireSimulatorView({
                             content={({ active, payload, label }) => {
                               if (active && payload && payload.length) {
                                 return (
-                                  <div className="custom-chart-tooltip" style={{ background: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.7rem' }}>
-                                    <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>Age {label}</p>
+                                  <div className="custom-chart-tooltip" style={{ background: '#ffffff', border: '1px solid var(--border, #e5e7eb)', padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--text-primary)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                    <p style={{ fontWeight: '700', marginBottom: '0.2rem', borderBottom: '1px solid var(--border, #e5e7eb)', color: 'var(--text-primary)', paddingBottom: '0.15rem' }}>Age {label}</p>
                                     {payload.map((item) => (
                                       <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', margin: '0.05rem 0' }}>
                                         <span style={{ color: item.stroke || item.color, fontWeight: '500' }}>{item.name}:</span>
-                                        <span style={{ fontWeight: '700' }}>{formatCurrency(item.value)}</span>
+                                        <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(item.value)}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -1456,77 +1481,26 @@ export default function MobileFireSimulatorView({
                             type="monotone"
                             dataKey="netWorth"
                             name="Net Worth"
-                            stroke="#a78bfa"
-                            strokeWidth={3}
+                            stroke="var(--net-worth, #1e3a5f)"
+                            strokeWidth={2.5}
                             dot={false}
                           />
                           <Line
                             type="monotone"
-                            dataKey="income"
-                            name="Income"
-                            stroke="#3b82f6"
-                            strokeDasharray="4 4"
+                            dataKey="assets"
+                            name="Total Assets"
+                            stroke="var(--asset, #16a34a)"
                             strokeWidth={2}
                             dot={false}
                           />
                           <Line
                             type="monotone"
-                            dataKey="expenses"
-                            name="Expenses"
-                            stroke="#10b981"
-                            strokeDasharray="4 4"
+                            dataKey="debt"
+                            name="Total Debt"
+                            stroke="var(--debt, #dc2626)"
                             strokeWidth={2}
                             dot={false}
                           />
-                           {(() => {
-                            // Group reference dots by their mapped age (x) and assign stacking information
-                            const grouped = {};
-                            referenceDotsData.forEach(d => {
-                              if (!grouped[d.x]) {
-                                grouped[d.x] = [];
-                              }
-                              grouped[d.x].push(d);
-                            });
-
-                            const referenceDotsWithStackInfo = [];
-                            Object.keys(grouped).forEach(ageStr => {
-                              const stack = grouped[ageStr];
-                              stack.forEach((item, index) => {
-                                referenceDotsWithStackInfo.push({
-                                  ...item,
-                                  stackIndex: index,
-                                  stackCount: stack.length,
-                                  stackEvents: stack.map(s => s.event)
-                                });
-                              });
-                            });
-
-                            return referenceDotsWithStackInfo.map((d) => (
-                              <ReferenceDot
-                                key={d.key}
-                                x={d.x}
-                                y={d.y}
-                                shape={(props) => (
-                                  <CustomEventMarker
-                                    {...props}
-                                    event={d.event}
-                                    selectedMilestone={timelineEvents[selectedEventIndex]}
-                                    onSelectMilestone={(evt) => {
-                                      const idx = timelineEvents.indexOf(evt);
-                                      if (idx !== -1) {
-                                        setSelectedEventIndex(idx);
-                                      }
-                                    }}
-                                    isMobile={true}
-                                    chartData={chartData}
-                                    stackIndex={d.stackIndex}
-                                    stackCount={d.stackCount}
-                                    stackEvents={d.stackEvents}
-                                  />
-                                )}
-                              />
-                            ));
-                          })()}
                           {selectedAge !== null && (
                             <>
                               <ReferenceLine
@@ -1537,7 +1511,7 @@ export default function MobileFireSimulatorView({
                               />
                               <ReferenceDot
                                 x={selectedAge}
-                                y={selectedPoint ? selectedPoint.netWorth : 0}
+                                y={selectedPoint ? (selectedPoint.netWorth ?? 0) : 0}
                                 r={5}
                                 fill="var(--primary)"
                                 stroke="#fff"
@@ -1551,28 +1525,28 @@ export default function MobileFireSimulatorView({
                     </div>
 
                     {/* Projections KPIs stats grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginTop: '1.25rem', borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: '1rem' }}>
                       <div style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Proj. NW</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#10b981', display: 'block', marginTop: '0.15rem' }}>
+                        <strong style={{ fontSize: '0.75rem', color: 'var(--success, #16a34a)', display: 'block', marginTop: '0.15rem' }}>
                           {formatCompact(finalNetWorth)}
                         </strong>
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>FI Conf.</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#a78bfa', display: 'block', marginTop: '0.15rem' }}>
+                        <strong style={{ fontSize: '0.75rem', color: 'var(--secondary, #1e3a5f)', display: 'block', marginTop: '0.15rem' }}>
                           {fiConfidence}
                         </strong>
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Burn/Mo</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block', marginTop: '0.15rem' }}>
+                        <strong style={{ fontSize: '0.75rem', color: 'var(--warning, #f59e0b)', display: 'block', marginTop: '0.15rem' }}>
                           {formatCurrency(burnVal)}
                         </strong>
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <span style={{ fontSize: '0.55rem', color: 'var(--text-tertiary)', display: 'block', textTransform: 'uppercase' }}>Success</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>
+                        <strong style={{ fontSize: '0.75rem', color: '#3b82f6', display: 'block', marginTop: '0.15rem' }}>
                           {successRate}
                         </strong>
                       </div>
@@ -3354,38 +3328,6 @@ export default function MobileFireSimulatorView({
         </div>
       )}
 
-      {/* Hidden test-only overlay for mobile unit tests */}
-      <div style={{ display: 'none' }} className="mobile-roadmap-timeline-wrapper">
-        <div className="mobile-roadmap-track">
-          {timelineEvents.map((evt, idx) => {
-            const isSelected = selectedEventIndex === idx;
-            const shortLabel = getShortLabel(evt);
-            const eventIcon = getEventIcon ? getEventIcon(evt) : '✨';
-
-            return (
-              <button
-                key={idx}
-                type="button"
-                className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedEventIndex(idx);
-                  setActiveEventForSheet(evt);
-                }}
-              >
-                <div className="mobile-roadmap-circle">
-                  <span>{eventIcon}</span>
-                </div>
-                <span className="mobile-roadmap-age">
-                  {evt.age}
-                </span>
-                <span className="mobile-roadmap-label-text">
-                  {shortLabel}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
     </div>
   );
