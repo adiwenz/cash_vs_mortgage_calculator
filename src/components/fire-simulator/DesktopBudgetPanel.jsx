@@ -81,124 +81,10 @@ export default function DesktopBudgetPanel({
 
   return (
     <div className="budget-modal-layout">
-      {/* Left/Main Column */}
-      <div className="budget-main-col">
-        {/* Header */}
-        <div className="budget-modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ 
-                fontSize: '1.25rem', 
-                fontWeight: 'bold', 
-                margin: 0, 
-                color: 'var(--text-primary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                verticalAlign: 'middle'
-              }}>
-                <span>🎯 {modalTitle} {activePhaseObj && `(Age ${activePhaseObj.startAge}–${activePhaseObj.endAge})`}</span>
-                {activePhaseObj && (
-                  <div 
-                    style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-                    onMouseEnter={() => setIsHovering(true)}
-                    onMouseLeave={() => setIsHovering(false)}
-                  >
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowPopover(!showPopover);
-                      }}
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border-color)',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '1.2rem',
-                        height: '1.2rem',
-                        borderRadius: '50%',
-                        transition: 'all 0.2s',
-                      }}
-                      className="phase-info-icon-btn"
-                      aria-label="Phase Info"
-                    >
-                      ⓘ
-                    </button>
-                    
-                    {(showPopover || isHovering) && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: '0',
-                          marginTop: '0.5rem',
-                          zIndex: 100,
-                          width: '280px',
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          padding: '0.85rem 1rem',
-                          boxShadow: 'var(--shadow-lg)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.82rem',
-                          textAlign: 'left',
-                          lineHeight: '1.4',
-                          fontWeight: 'normal'
-                        }}
-                        className="phase-info-popover"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div style={{ fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.6rem', color: 'var(--primary)' }}>
-                          Why this phase exists
-                        </div>
-                        
-                        <div style={{ marginBottom: '0.6rem' }}>
-                          <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Active Events:</div>
-                          <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
-                            {getPopoverDetails().activeEvents.map((evt, idx) => (
-                              <li key={idx} style={{ marginBottom: '0.15rem' }}>{evt}</li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        {getPopoverDetails().phaseChanges.length > 0 && (
-                          <div>
-                            <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Phase Changes:</div>
-                            <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
-                              {getPopoverDetails().phaseChanges.map((chg, idx) => (
-                                <li key={idx} style={{ marginBottom: '0.15rem' }}>{chg}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </h3>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                Set your monthly plan for this phase.
-              </span>
-            </div>
-            <button 
-              type="button" 
-              onClick={handleCloseBudgetModal}
-              className="modal-close-btn"
-            >
-              ✖
-            </button>
-          </div>
-        </div>
-
-        {/* Tabs for Budget Phases */}
-        <h4 className="budget-phases-heading">Budget Phases</h4>
-        <div className="budget-modal-tabs">
+      {/* Left Sidebar for Budget Phases */}
+      <aside className="budget-sidebar">
+        <h4 className="budget-phases-heading budget-phases-heading-vertical">Budget Phases</h4>
+        <div className="budget-sidebar-phases">
           {normalizedPhases.map((p) => {
             const isActive = p.id === activeBudgetPhase;
             const icons = p.activeEvents && p.activeEvents.slice(0, 3).map(evId => getEventDetails(evId).icon) || [];
@@ -207,15 +93,141 @@ export default function DesktopBudgetPanel({
               <button
                 key={p.id}
                 type="button"
-                className={`budget-modal-tab ${themeClass} ${isActive ? 'active' : ''}`}
+                className={`budget-sidebar-tab budget-modal-tab ${themeClass} ${isActive ? 'active' : ''}`}
                 onClick={() => handleSwitchBudgetPhase(p.id)}
               >
-                <span className="budget-modal-tab-age">Age {p.startAge}–{p.endAge}</span>
-                <span className="budget-modal-tab-label">{icons.join('')} {p.label}</span>
+                <span className="budget-sidebar-tab-age">Age {p.startAge}–{p.endAge}</span>
+                <span className="budget-sidebar-tab-label">{icons.join('')} {p.label}</span>
               </button>
             );
           })}
+          
+          <button 
+            type="button"
+            className="budget-sidebar-add-phase"
+            title="Use the Event timeline in the main screen to add life phases."
+          >
+            <span>+</span> Add New Phase
+          </button>
         </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="budget-main-content">
+        {/* Left/Main Column */}
+        <div className="budget-main-col">
+          {/* Header */}
+          <div className="budget-modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ 
+                  fontSize: '1.25rem', 
+                  fontWeight: 'bold', 
+                  margin: 0, 
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  verticalAlign: 'middle'
+                }}>
+                  <span>🎯 {modalTitle} {activePhaseObj && `(Age ${activePhaseObj.startAge}–${activePhaseObj.endAge})`}</span>
+                  {activePhaseObj && (
+                    <div 
+                      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                      onMouseEnter={() => setIsHovering(true)}
+                      onMouseLeave={() => setIsHovering(false)}
+                    >
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowPopover(!showPopover);
+                        }}
+                        style={{
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '1.2rem',
+                          height: '1.2rem',
+                          borderRadius: '50%',
+                          transition: 'all 0.2s',
+                        }}
+                        className="phase-info-icon-btn"
+                        aria-label="Phase Info"
+                      >
+                        ⓘ
+                      </button>
+                      
+                      {(showPopover || isHovering) && (
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '0',
+                            marginTop: '0.5rem',
+                            zIndex: 100,
+                            width: '280px',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '0.85rem 1rem',
+                            boxShadow: 'var(--shadow-lg)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            textAlign: 'left',
+                            lineHeight: '1.4',
+                            fontWeight: 'normal'
+                          }}
+                          className="phase-info-popover"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div style={{ fontWeight: '600', fontSize: '0.88rem', marginBottom: '0.6rem', color: 'var(--primary)' }}>
+                            Why this phase exists
+                          </div>
+                          
+                          <div style={{ marginBottom: '0.6rem' }}>
+                            <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Active Events:</div>
+                            <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
+                              {getPopoverDetails().activeEvents.map((evt, idx) => (
+                                <li key={idx} style={{ marginBottom: '0.15rem' }}>{evt}</li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {getPopoverDetails().phaseChanges.length > 0 && (
+                            <div>
+                              <div style={{ fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Phase Changes:</div>
+                              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
+                                {getPopoverDetails().phaseChanges.map((chg, idx) => (
+                                  <li key={idx} style={{ marginBottom: '0.15rem' }}>{chg}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </h3>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Set your monthly plan for this phase.
+                </span>
+              </div>
+              <button 
+                type="button" 
+                onClick={handleCloseBudgetModal}
+                className="modal-close-btn"
+              >
+                ✖
+              </button>
+            </div>
+          </div>
 
         <div className="budget-main-scroll-body">
           {pendingImprovement && (
@@ -240,78 +252,165 @@ export default function DesktopBudgetPanel({
           )}
 
           {/* Primary Section: Three Budget Cards */}
-          <div className="budget-cards-grid">
+          <div className="budget-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', justifyItems: 'center', gap: '1.5rem', margin: '1.5rem 0' }}>
             {/* Needs Card */}
-            <div 
-              className={`budget-card needs ${showBreakdown && activeBreakdownTab === 'needs' ? 'active' : ''}`}
-              onClick={() => {
-                if (showBreakdown && activeBreakdownTab === 'needs') {
-                  setShowBreakdown(false);
-                } else {
-                  setShowBreakdown(true);
-                  setActiveBreakdownTab('needs');
-                }
-              }}
-            >
-              <div className="budget-card-icon-circle">🏠</div>
-              <div className="budget-card-title">Needs</div>
-              <div className="budget-card-amount">{formatCurrency(needsTotal)}/mo</div>
-              <div className="budget-card-pct">{takeHomeIncome > 0 ? Math.round((needsTotal / takeHomeIncome) * 100) : 0}%</div>
-              <div className="budget-card-progress">
+            {(() => {
+              const pct = takeHomeIncome > 0 ? Math.round((needsTotal / takeHomeIncome) * 100) : 0;
+              const clampedPct = Math.min(100, Math.max(0, pct));
+              const radius = 78;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference * (1 - clampedPct / 100);
+              return (
                 <div 
-                  className="budget-card-progress-fill" 
-                  style={{ width: `${Math.min(100, takeHomeIncome > 0 ? Math.round((needsTotal / takeHomeIncome) * 100) : 0)}%` }}
-                />
-              </div>
-            </div>
+                  className={`budget-card-circular budget-card needs ${showBreakdown && activeBreakdownTab === 'needs' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (showBreakdown && activeBreakdownTab === 'needs') {
+                      setShowBreakdown(false);
+                    } else {
+                      setShowBreakdown(true);
+                      setActiveBreakdownTab('needs');
+                    }
+                  }}
+                >
+                  <svg width="100%" height="100%" viewBox="0 0 180 180" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)', pointerEvents: 'none' }}>
+                    {/* Soft Track Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="rgba(16, 185, 129, 0.08)"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                    />
+                    {/* Progress Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="var(--success)"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+                    />
+                  </svg>
+                  <div className="budget-card-circular-content">
+                    <span className="budget-card-circular-icon">🏠</span>
+                    <span className="budget-card-circular-label">Needs</span>
+                    <span className="budget-card-circular-amount">{formatCurrency(needsTotal)}/mo</span>
+                    <span className="budget-card-circular-pct">{pct}%</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Wants Card */}
-            <div 
-              className={`budget-card wants ${showBreakdown && activeBreakdownTab === 'wants' ? 'active' : ''}`}
-              onClick={() => {
-                if (showBreakdown && activeBreakdownTab === 'wants') {
-                  setShowBreakdown(false);
-                } else {
-                  setShowBreakdown(true);
-                  setActiveBreakdownTab('wants');
-                }
-              }}
-            >
-              <div className="budget-card-icon-circle">🎉</div>
-              <div className="budget-card-title">Wants</div>
-              <div className="budget-card-amount">{formatCurrency(wantsTotal)}/mo</div>
-              <div className="budget-card-pct">{takeHomeIncome > 0 ? Math.round((wantsTotal / takeHomeIncome) * 100) : 0}%</div>
-              <div className="budget-card-progress">
+            {(() => {
+              const pct = takeHomeIncome > 0 ? Math.round((wantsTotal / takeHomeIncome) * 100) : 0;
+              const clampedPct = Math.min(100, Math.max(0, pct));
+              const radius = 78;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference * (1 - clampedPct / 100);
+              return (
                 <div 
-                  className="budget-card-progress-fill" 
-                  style={{ width: `${Math.min(100, takeHomeIncome > 0 ? Math.round((wantsTotal / takeHomeIncome) * 100) : 0)}%` }}
-                />
-              </div>
-            </div>
+                  className={`budget-card-circular budget-card wants ${showBreakdown && activeBreakdownTab === 'wants' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (showBreakdown && activeBreakdownTab === 'wants') {
+                      setShowBreakdown(false);
+                    } else {
+                      setShowBreakdown(true);
+                      setActiveBreakdownTab('wants');
+                    }
+                  }}
+                >
+                  <svg width="100%" height="100%" viewBox="0 0 180 180" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)', pointerEvents: 'none' }}>
+                    {/* Soft Track Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="rgba(245, 158, 11, 0.08)"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                    />
+                    {/* Progress Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="var(--warning)"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+                    />
+                  </svg>
+                  <div className="budget-card-circular-content">
+                    <span className="budget-card-circular-icon">🎉</span>
+                    <span className="budget-card-circular-label">Wants</span>
+                    <span className="budget-card-circular-amount">{formatCurrency(wantsTotal)}/mo</span>
+                    <span className="budget-card-circular-pct">{pct}%</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Save & Invest Card */}
-            <div 
-              className={`budget-card save ${showBreakdown && activeBreakdownTab === 'savings' ? 'active' : ''}`}
-              onClick={() => {
-                if (showBreakdown && activeBreakdownTab === 'savings') {
-                  setShowBreakdown(false);
-                } else {
-                  setShowBreakdown(true);
-                  setActiveBreakdownTab('savings');
-                }
-              }}
-            >
-              <div className="budget-card-icon-circle">💰</div>
-              <div className="budget-card-title">Save & Invest</div>
-              <div className="budget-card-amount">{isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo</div>
-              <div className="budget-card-pct">{takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0}%</div>
-              <div className="budget-card-progress">
+            {(() => {
+              const pct = takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0;
+              const clampedPct = Math.min(100, Math.max(0, pct));
+              const radius = 78;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference * (1 - clampedPct / 100);
+              return (
                 <div 
-                  className="budget-card-progress-fill" 
-                  style={{ width: `${Math.min(100, takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0)}%` }}
-                />
-              </div>
-            </div>
+                  className={`budget-card-circular budget-card save ${showBreakdown && activeBreakdownTab === 'savings' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (showBreakdown && activeBreakdownTab === 'savings') {
+                      setShowBreakdown(false);
+                    } else {
+                      setShowBreakdown(true);
+                      setActiveBreakdownTab('savings');
+                    }
+                  }}
+                >
+                  <svg width="100%" height="100%" viewBox="0 0 180 180" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)', pointerEvents: 'none' }}>
+                    {/* Soft Track Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="rgba(124, 58, 237, 0.08)"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                    />
+                    {/* Progress Circle */}
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#7c3aed"
+                      strokeWidth="var(--circle-stroke-width, 10px)"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+                    />
+                  </svg>
+                  <div className="budget-card-circular-content">
+                    <span className="budget-card-circular-icon">💰</span>
+                    <span className="budget-card-circular-label">Save & Invest</span>
+                    <span className="budget-card-circular-amount">{isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo</span>
+                    <span className="budget-card-circular-pct">{pct}%</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Income & Allocation Progress Panel */}
@@ -976,6 +1075,7 @@ export default function DesktopBudgetPanel({
           )}
         </div>
       </div>
+      </main>
     </div>
   );
 }
