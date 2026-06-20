@@ -20,6 +20,7 @@ export const DEFAULT_FIRE_INPUTS = {
   simpleExpenses: 42500,
   simpleInvestments: 5000,
   hasCustomizedSavingsAllocation: false,
+  hasCustomizedBudget: false,
   schemaVersion: 1,
   childCosts: {
     ages0to4: 15000,

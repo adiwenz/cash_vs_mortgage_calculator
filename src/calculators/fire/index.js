@@ -23,7 +23,8 @@ import {
 import {
   derivePhasesFromEvents,
   getNormalizedPhases,
-  getPhaseChangeExplanations
+  getPhaseChangeExplanations,
+  syncBudgetDetails
 } from './phases.js';
 
 import {
@@ -70,6 +71,7 @@ export {
   derivePhasesFromEvents,
   getNormalizedPhases,
   getPhaseChangeExplanations,
+  syncBudgetDetails,
   projectYearlyBalances,
   computeRetirementResult,
   buildSimulationDebugSnapshot,

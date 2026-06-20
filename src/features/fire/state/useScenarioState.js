@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs';
+import { syncBudgetDetails } from '../../../calculators/fire/index.js';
 
 export function useScenarioState() {
   const [scenarios, setScenarios] = useState([
@@ -23,12 +24,23 @@ export function useScenarioState() {
   const updateInput = (key, value, currentScenarioId) => {
     setScenarios(prev => prev.map(scen => {
       if (scen.id === currentScenarioId) {
+        let updatedInputs = {
+          ...scen.inputs,
+          [key]: value
+        };
+
+        if (updatedInputs.hasCustomizedBudget === false && (key === 'simpleIncome' || key === 'simpleExpenses')) {
+          const syncRes = syncBudgetDetails(
+            updatedInputs.simpleIncome,
+            updatedInputs.simpleExpenses,
+            updatedInputs.budgetDetails
+          );
+          updatedInputs.budgetDetails = syncRes.budgetDetails;
+        }
+
         return {
           ...scen,
-          inputs: {
-            ...scen.inputs,
-            [key]: value
-          }
+          inputs: updatedInputs
         };
       }
       return scen;

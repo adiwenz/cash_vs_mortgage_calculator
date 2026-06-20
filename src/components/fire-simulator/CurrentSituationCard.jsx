@@ -30,12 +30,13 @@ export default function CurrentSituationCard({
     } else if (field === 'simpleIncome') {
       const newIncome = val === '' ? null : (parseFloat(val) || 0);
       handleStep1Change('simpleIncome', newIncome);
-      if (newIncome !== null) {
+      if (newIncome !== null && !inputs.hasCustomizedBudget) {
         const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
         const newExpenses = Math.round(newIncome * (1 - rate / 100));
         handleStep1Change('simpleExpenses', newExpenses);
       }
     } else if (field === 'simpleExpenses') {
+      if (inputs.hasCustomizedBudget) return;
       handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
     } else if (field === 'simpleInvestments') {
       handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
@@ -43,6 +44,7 @@ export default function CurrentSituationCard({
   };
 
   const handleSavingsRateChange = (val) => {
+    if (inputs.hasCustomizedBudget) return;
     setSavingsRateOverride(val);
     if (val === '') return;
     const rate = parseFloat(val) || 0;
@@ -136,7 +138,7 @@ export default function CurrentSituationCard({
                 setActiveSavingsRate(null);
                 const clamped = clampMoneyValue(e.target.value);
                 handleStep1Change('simpleIncome', clamped);
-                if (clamped !== null) {
+                if (clamped !== null && !inputs.hasCustomizedBudget) {
                   const rate = simpleSavingsRate;
                   const newExpenses = Math.round(clamped * (1 - rate / 100));
                   handleStep1Change('simpleExpenses', newExpenses);
@@ -146,7 +148,7 @@ export default function CurrentSituationCard({
             />
           </div>
         </div>
-
+ 
         {/* Row 3: Annual Spending */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '30px', padding: '0.1rem 0' }}>
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🛒 Annual Spending</span>
@@ -165,12 +167,15 @@ export default function CurrentSituationCard({
                 borderBottom: '1px solid transparent',
                 color: 'var(--text-primary)',
                 fontWeight: '700',
-                outline: 'none'
+                outline: 'none',
+                opacity: inputs.hasCustomizedBudget ? 0.6 : 1
               }}
+              disabled={inputs.hasCustomizedBudget}
               value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
               useCompact={true}
               onChange={(e) => handleFieldChange('simpleExpenses', e.target.value)}
               onBlur={(e) => {
+                if (inputs.hasCustomizedBudget) return;
                 const clamped = clampMoneyValue(e.target.value);
                 handleStep1Change('simpleExpenses', clamped);
               }}
@@ -264,13 +269,20 @@ export default function CurrentSituationCard({
                 border: 'none',
                 borderBottom: '1px solid transparent',
                 fontWeight: '700',
-                outline: 'none'
+                outline: 'none',
+                opacity: inputs.hasCustomizedBudget ? 0.6 : 1
               }}
+              disabled={inputs.hasCustomizedBudget}
+              max={100}
               value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
               placeholder="e.g. 20"
-              onFocus={() => setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate))}
+              onFocus={() => {
+                if (inputs.hasCustomizedBudget) return;
+                setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate));
+              }}
               onChange={(e) => handleSavingsRateChange(e.target.value)}
               onBlur={(e) => {
+                if (inputs.hasCustomizedBudget) return;
                 setSavingsRateOverride(null);
                 const clamped = clampPercentageValue(e.target.value);
                 if (clamped !== null) {
@@ -286,6 +298,39 @@ export default function CurrentSituationCard({
             <span style={{ position: 'absolute', right: '4px', color: 'var(--success)', fontSize: '0.82rem', fontWeight: 'bold' }}>%</span>
           </div>
         </div>
+        {simpleSavingsRate === 100 && (
+          <div style={{
+            fontSize: '0.72rem',
+            color: 'var(--success)',
+            marginTop: '0.15rem',
+            padding: '0.35rem 0.5rem',
+            background: 'rgba(16, 185, 129, 0.06)',
+            border: '1px solid rgba(16, 185, 129, 0.15)',
+            borderRadius: '6px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}>
+            <span>Savings target set to 100%.</span>
+            <button
+              type="button"
+              onClick={() => handleSetBudgetClick()}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--success)',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                padding: 0,
+                textDecoration: 'underline',
+                fontSize: '0.72rem'
+              }}
+            >
+              Budget details updated →
+            </button>
+          </div>
+        )}
       </div>
 
 

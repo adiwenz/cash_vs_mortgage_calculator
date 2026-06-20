@@ -1112,7 +1112,7 @@ export default function MobileFireSimulatorView({
                               setActiveSavingsRate(null);
                               const clamped = clampMoneyValue(e.target.value);
                               handleStep1Change('simpleIncome', clamped);
-                              if (clamped !== null) {
+                              if (clamped !== null && !inputs.hasCustomizedBudget) {
                                 const rate = inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0;
                                 const newExpenses = Math.round(clamped * (1 - rate / 100));
                                 handleStep1Change('simpleExpenses', newExpenses);
@@ -1122,7 +1122,7 @@ export default function MobileFireSimulatorView({
                               const val = e.target.value;
                               const newIncome = val === '' ? null : (parseFloat(val) || 0);
                               handleStep1Change('simpleIncome', newIncome);
-                              if (newIncome !== null) {
+                              if (newIncome !== null && !inputs.hasCustomizedBudget) {
                                 const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
                                 const newExpenses = Math.round(newIncome * (1 - rate / 100));
                                 handleStep1Change('simpleExpenses', newExpenses);
@@ -1146,14 +1146,18 @@ export default function MobileFireSimulatorView({
                               fontSize: '0.85rem',
                               fontWeight: '800',
                               padding: '0.25rem 0.4rem 0.25rem 1rem',
-                              boxSizing: 'border-box'
+                              boxSizing: 'border-box',
+                              opacity: inputs.hasCustomizedBudget ? 0.6 : 1
                             }}
+                            disabled={inputs.hasCustomizedBudget}
                             value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
                             onChange={(e) => {
+                              if (inputs.hasCustomizedBudget) return;
                               const val = e.target.value;
                               handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
                             }}
                             onBlur={(e) => {
+                              if (inputs.hasCustomizedBudget) return;
                               handleStep1Change('simpleExpenses', clampMoneyValue(e.target.value));
                             }}
                           />
@@ -1239,11 +1243,15 @@ export default function MobileFireSimulatorView({
                               fontWeight: '800',
                               padding: '0.25rem 0.95rem 0.25rem 0.4rem',
                               boxSizing: 'border-box',
-                              textAlign: 'right'
+                              textAlign: 'right',
+                              opacity: inputs.hasCustomizedBudget ? 0.6 : 1
                             }}
+                            disabled={inputs.hasCustomizedBudget}
+                            max={100}
                             value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                             placeholder="e.g. 20"
                             onChange={(e) => {
+                              if (inputs.hasCustomizedBudget) return;
                               const val = e.target.value;
                               setSavingsRateOverride(val);
                               if (val === '') {
@@ -1259,6 +1267,7 @@ export default function MobileFireSimulatorView({
                               handleStep1Change('simpleExpenses', newExpenses);
                             }}
                             onBlur={(e) => {
+                              if (inputs.hasCustomizedBudget) return;
                               setSavingsRateOverride(null);
                               const clamped = clampPercentageValue(e.target.value);
                               if (clamped !== null) {
@@ -1273,6 +1282,42 @@ export default function MobileFireSimulatorView({
                           />
                           <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.75rem', fontWeight: 'bold' }}>%</span>
                         </div>
+                        {simpleSavingsRate === 100 && (
+                          <div style={{
+                            gridColumn: 'span 3',
+                            fontSize: '0.7rem',
+                            color: 'var(--success)',
+                            marginTop: '0.35rem',
+                            padding: '0.35rem 0.5rem',
+                            background: 'rgba(16, 185, 129, 0.06)',
+                            border: '1px solid rgba(16, 185, 129, 0.15)',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}>
+                            <span>Savings target set to 100%.</span>
+                            <button
+                              type="button"
+                              onClick={() => handleSetBudgetClick()}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--success)',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                padding: 0,
+                                textDecoration: 'underline',
+                                fontSize: '0.7rem'
+                              }}
+                            >
+                              Budget details updated →
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

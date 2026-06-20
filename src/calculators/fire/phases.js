@@ -310,6 +310,14 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
   let standardPartnerSavings = profile.budgetDetails?.partnerSavings ? { ...profile.budgetDetails.partnerSavings } : {};
   let standardSavingsAllocMode = profile.budgetDetails?.savingsAllocMode || 'fixed';
 
+  if (profile.hasCustomizedBudget === false) {
+    const syncRes = syncBudgetDetails(profile.simpleIncome, profile.simpleExpenses, profile.budgetDetails);
+    standardExpenses = syncRes.budgetDetails.expenses;
+    standardSavings = syncRes.budgetDetails.savings;
+    standardPartnerSavings = syncRes.budgetDetails.partnerSavings;
+    standardSavingsAllocMode = syncRes.budgetDetails.savingsAllocMode;
+  }
+
   if (Object.keys(standardExpenses).length === 0) {
     const defaultTemplate = profile.budgetDetails?.defaultTemplate || { needsPct: 50, wantsPct: 30, savingsPct: 20 };
     const totalInc = standardIncome;
@@ -1393,4 +1401,134 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
   }
   
   return explanations;
+}
+
+export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDetails = {}) {
+  const income = Number(simpleIncome) || 0;
+  const expenses = Number(simpleExpenses) || 0;
+  const monthlyIncome = Math.round(income / 12);
+  const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
+  const targetSavings = Math.round(monthlyIncome * (savingsRate / 100));
+  const targetSpending = Math.max(0, monthlyIncome - targetSavings);
+
+  const baseNeeds = { housing: 1500, utilities: 300, food: 400, transportation: 400, healthcare: 300 };
+  const baseWants = { diningOut: 200, leisure: 300, misc: 142 };
+  const baseNeedsTotal = 2900;
+  const baseWantsTotal = 642;
+
+  const existingExpenses = currentBudgetDetails.expenses || {};
+
+  const needs = {};
+  let existingNeedsSum = 0;
+  Object.keys(baseNeeds).forEach(k => {
+    needs[k] = existingExpenses[k] !== undefined ? Number(existingExpenses[k]) : baseNeeds[k];
+    existingNeedsSum += needs[k];
+  });
+
+  const wants = {};
+  let existingWantsSum = 0;
+  Object.keys(baseWants).forEach(k => {
+    wants[k] = existingExpenses[k] !== undefined ? Number(existingExpenses[k]) : baseWants[k];
+    existingWantsSum += wants[k];
+  });
+
+  let reducedWants = false;
+  let reducedNeeds = false;
+  let autoReducedBudget = false;
+  const isFullSavingsRate = (savingsRate === 100);
+
+  if (targetSpending === 0) {
+    Object.keys(needs).forEach(k => { needs[k] = 0; });
+    Object.keys(wants).forEach(k => { wants[k] = 0; });
+    reducedWants = (existingWantsSum > 0);
+    reducedNeeds = (existingNeedsSum > 0);
+    autoReducedBudget = reducedWants || reducedNeeds;
+  } else if (targetSpending < existingNeedsSum) {
+    Object.keys(wants).forEach(k => { wants[k] = 0; });
+    reducedWants = (existingWantsSum > 0);
+    reducedNeeds = true;
+    autoReducedBudget = true;
+
+    if (existingNeedsSum > 0) {
+      const scale = targetSpending / existingNeedsSum;
+      Object.keys(needs).forEach(k => { needs[k] = Math.round(needs[k] * scale); });
+    } else {
+      Object.keys(baseNeeds).forEach(k => {
+        needs[k] = Math.round(targetSpending * (baseNeeds[k] / baseNeedsTotal));
+      });
+    }
+    // Adjust rounding error
+    const currentSum = Object.values(needs).reduce((sum, val) => sum + val, 0);
+    const diff = targetSpending - currentSum;
+    if (diff !== 0) {
+      needs.housing = Math.max(0, (needs.housing || 0) + diff);
+    }
+  } else {
+    const targetWants = targetSpending - existingNeedsSum;
+    if (targetWants < existingWantsSum) {
+      reducedWants = true;
+      autoReducedBudget = true;
+    }
+
+    if (existingWantsSum > 0) {
+      const scale = targetWants / existingWantsSum;
+      Object.keys(wants).forEach(k => { wants[k] = Math.round(wants[k] * scale); });
+    } else {
+      Object.keys(baseWants).forEach(k => {
+        wants[k] = Math.round(targetWants * (baseWants[k] / baseWantsTotal));
+      });
+    }
+    // Adjust rounding error
+    const currentSum = Object.values(wants).reduce((sum, val) => sum + val, 0);
+    const diff = targetWants - currentSum;
+    if (diff !== 0) {
+      wants.leisure = Math.max(0, (wants.leisure || 0) + diff);
+    }
+  }
+
+  const mergedExpenses = { ...existingExpenses, ...needs, ...wants };
+  Object.keys(mergedExpenses).forEach(k => {
+    if (k.startsWith('debt_') || k === 'childcare') return;
+    if (isNaN(mergedExpenses[k])) mergedExpenses[k] = 0;
+  });
+
+  const newSavings = {
+    trad401k: 0,
+    rothIra: 0,
+    tradIra: 0,
+    hsa: 0,
+    brokerage: targetSavings,
+    checking: 0,
+    hysa: 0,
+    emergency: 0,
+    debt: 0,
+    other: 0
+  };
+
+  const newPartnerSavings = {
+    trad401k: 0,
+    rothIra: 0,
+    tradIra: 0,
+    hsa: 0,
+    brokerage: 0,
+    checking: 0,
+    hysa: 0,
+    emergency: 0,
+    debt: 0,
+    other: 0
+  };
+
+  return {
+    budgetDetails: {
+      ...currentBudgetDetails,
+      expenses: mergedExpenses,
+      savings: newSavings,
+      partnerSavings: newPartnerSavings,
+      savingsAllocMode: 'fixed'
+    },
+    autoReducedBudget,
+    reducedWants,
+    reducedNeeds,
+    isFullSavingsRate
+  };
 }

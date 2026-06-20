@@ -144,9 +144,18 @@ export function PercentInput({
 
   const handleBlur = (e) => {
     setIsEditing(false);
-    const parsed = parseRawString(localValue);
+    let rawStr = parseRawString(localValue);
+    const parsedNum = parseFloat(rawStr);
+    if (Number.isFinite(parsedNum)) {
+      if (props.max !== undefined && parsedNum > props.max) {
+        rawStr = String(props.max);
+      }
+      if (props.min !== undefined && parsedNum < props.min) {
+        rawStr = String(props.min);
+      }
+    }
     if (onChange) {
-      onChange(makeFakeEvent(parsed, props.name));
+      onChange(makeFakeEvent(rawStr, props.name));
     }
     if (props.onBlur) {
       props.onBlur(e);
@@ -154,11 +163,22 @@ export function PercentInput({
   };
 
   const handleChange = (e) => {
-    const val = e.target.value;
+    let val = e.target.value;
+    let rawStr = parseRawString(val);
+    const parsedNum = parseFloat(rawStr);
+    if (Number.isFinite(parsedNum)) {
+      if (props.max !== undefined && parsedNum > props.max) {
+        rawStr = String(props.max);
+        val = String(props.max);
+      }
+      if (props.min !== undefined && parsedNum < props.min) {
+        rawStr = String(props.min);
+        val = String(props.min);
+      }
+    }
     setLocalValue(val);
-    const parsed = parseRawString(val);
     if (onChange) {
-      onChange(makeFakeEvent(parsed, props.name));
+      onChange(makeFakeEvent(rawStr, props.name));
     }
   };
 

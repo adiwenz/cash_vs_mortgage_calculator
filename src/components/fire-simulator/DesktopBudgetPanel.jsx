@@ -1,6 +1,7 @@
 import { formatCurrency, formatCompactCurrency, clampMoneyValue, clampPercentageValue } from './helpers';
 import { getRetirementLimit } from '../../simulatorMathUtils';
 import { NumberInput } from '../ui/PlainInputs';
+import { syncBudgetDetails } from '../../calculators/fire/index.js';
 
 export default function DesktopBudgetPanel({
   inputs,
@@ -71,6 +72,7 @@ export default function DesktopBudgetPanel({
   budgetScalingMode,
   handleToggleBudgetScalingMode
 }) {
+  const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
   const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
   const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
@@ -231,6 +233,31 @@ export default function DesktopBudgetPanel({
           </div>
 
         <div className="budget-main-scroll-body">
+          {!inputs.hasCustomizedBudget && syncResult.autoReducedBudget === true && (
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              borderRadius: '8px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'flex-start'
+            }}>
+              <span style={{ fontSize: '1.1rem', marginTop: '-0.1rem' }}>ℹ️</span>
+              <div>
+                <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary, #3b82f6)' }}>
+                  Modeling budget
+                </h5>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  {syncResult.isFullSavingsRate
+                    ? "This savings target uses your full monthly income, so Needs and Wants are shown as $0 for this projection."
+                    : "Your savings target leaves less room for spending, so Wants were reduced first and Needs were reduced only as needed for this projection."}
+                </p>
+              </div>
+            </div>
+          )}
+
           {pendingImprovement && (
             <div style={{
               background: 'rgba(124, 58, 237, 0.08)',
