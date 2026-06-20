@@ -161,10 +161,11 @@ export function useEventEditingController({
         // Bypassed: ChildPlanningModal handles affordability check inline
         setChildImpactSummary(null);
       } else if (eventToSave.type === 'buyHouse') {
-        setHouseImpactSummary(result.sideEffects.impactSummary);
+        // Bypassed: HousePlanningModal handles affordability check inline
+        setHouseImpactSummary(null);
       }
     }
-    if (result.sideEffects.rebalanceStrategies?.length > 0) {
+    if (result.sideEffects.rebalanceStrategies?.length > 0 && eventToSave.type !== 'buyHouse') {
       setHouseRebalanceSummary(result.sideEffects.rebalanceStrategies);
     } else {
       setHouseRebalanceSummary(null);
@@ -172,7 +173,7 @@ export function useEventEditingController({
 
     // Handle UI requests
     result.uiRequests.forEach(req => {
-      if (req.type === 'showImprovementModal') {
+      if (req.type === 'showImprovementModal' && eventToSave.type !== 'buyHouse') {
         setShowImprovementModal(req.value);
       }
     });

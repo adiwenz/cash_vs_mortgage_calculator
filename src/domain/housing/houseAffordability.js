@@ -1,4 +1,5 @@
 import { runFireSimulation } from '../../fireCalculations.js';
+import { calculateUSTaxForModal } from '../../simulatorMathUtils.js';
 
 /**
  * Calculates the total upfront cash required to complete a home purchase.
@@ -230,3 +231,34 @@ export function getSimulatedRetirementAge(inputs, event) {
     return inputs.targetRetirementAge || 65;
   }
 }
+
+/**
+ * Calculates grossed up income for a net raise need.
+ */
+export function grossUpIncome(netNeed, currentGrossIncome, filingStatus) {
+  if (netNeed <= 0) return 0;
+  const taxAtCurrent = calculateUSTaxForModal(currentGrossIncome, 0, filingStatus);
+  const currentNet = currentGrossIncome - taxAtCurrent;
+  
+  let low = netNeed;
+  let high = netNeed * 2.5;
+  let grossRaise = netNeed;
+  
+  for (let i = 0; i < 20; i++) {
+    grossRaise = (low + high) / 2;
+    const taxAtNew = calculateUSTaxForModal(currentGrossIncome + grossRaise, 0, filingStatus);
+    const newNet = (currentGrossIncome + grossRaise) - taxAtNew;
+    const netRaise = newNet - currentNet;
+    
+    if (Math.abs(netRaise - netNeed) < 1) {
+      break;
+    }
+    if (netRaise < netNeed) {
+      low = grossRaise;
+    } else {
+      high = grossRaise;
+    }
+  }
+  return Math.round(grossRaise);
+}
+
