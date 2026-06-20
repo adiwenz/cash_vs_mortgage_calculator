@@ -240,7 +240,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(savingsRate.value).toBe('100');
     
     // Click Next to Step 2 (Wedding)
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn);
 
     // Step 2: Wedding
@@ -453,7 +453,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(spouseRetAgeInput.placeholder).toContain('65 (optional)');
     
     // Click Next through step 1 (Congratulations) -> Step 2 (Wedding)
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn);
     
     // Click Next through step 2 (Wedding) -> Step 3 (Life Together)
@@ -577,7 +577,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(editProfileBtn);
 
     // Modify spouse income or just go next
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn); // Step 2
 
     fireEvent.click(nextBtn); // Step 3

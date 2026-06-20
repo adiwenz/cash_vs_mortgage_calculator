@@ -334,11 +334,11 @@ export default function HousePlanningModal({
   };
 
   const decorations = [
-    { char: '✨', style: { left: '4%', top: '10%', fontSize: '1.25rem', opacity: 0.7 } },
-    { char: '🎉', style: { left: '12%', top: '35%', fontSize: '1.4rem', opacity: 0.9 } },
-    { char: '🌱', style: { left: '6%', top: '65%', fontSize: '1.2rem', opacity: 0.75 } },
-    { char: '⭐', style: { right: '6%', top: '15%', fontSize: '1.3rem', opacity: 0.9 } },
-    { char: '💜', style: { right: '10%', top: '55%', fontSize: '1.2rem', opacity: 0.8 } }
+    { char: '✨', style: { left: '8%', top: '15%', fontSize: '1.25rem', '--child-dec-rot': '-15deg', opacity: 0.7 } },
+    { char: '⭐', style: { left: '20%', top: '35%', fontSize: '1.4rem', '--child-dec-rot': '10deg', opacity: 0.9 } },
+    { char: '💜', style: { left: '12%', top: '65%', fontSize: '1.2rem', '--child-dec-rot': '-10deg', opacity: 0.75 } },
+    { char: '🎉', style: { right: '10%', top: '20%', fontSize: '1.3rem', '--child-dec-rot': '15deg', opacity: 0.9 } },
+    { char: '🌱', style: { right: '15%', top: '68%', fontSize: '1.2rem', '--child-dec-rot': '5deg', opacity: 0.8 } }
   ];
 
   const formatAgeCompare = () => {
@@ -354,21 +354,17 @@ export default function HousePlanningModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.4)', overflowY: 'auto' }}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-content animate-slide-up"
+        className="event-form-overlay-card modal-content animate-slide-up"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: '460px',
+          maxWidth: '520px',
           width: '90%',
           padding: '2rem',
-          margin: '2rem auto',
+          margin: isMobile ? 'auto 1rem' : 'auto',
           borderRadius: '24px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          background: '#ffffff', // CLEAN WHITE CARD BACKGROUND
-          color: '#1e293b',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          border: '1px solid #e2e8f0'
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)'
         }}
       >
         {/* Visually Hidden Title for Accessibility */}
@@ -377,25 +373,30 @@ export default function HousePlanningModal({
         </h3>
 
         {step === 1 && (
-          <div>
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* Step 1 Hero Section */}
-            <div style={{ position: 'relative', textAlign: 'center', paddingBottom: '1rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>🏡</div>
+            <div style={{ position: 'relative', textAlign: 'center', padding: '1rem 0' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🏡</div>
               <h4 style={{
-                fontSize: '1.75rem',
-                fontWeight: '850',
-                margin: '0 0 0.15rem 0',
-                color: '#8b5cf6'
+                fontSize: '2rem',
+                fontWeight: '800',
+                margin: '0 0 0.25rem 0',
+                color: 'var(--text-primary)',
+                backgroundImage: 'linear-gradient(135deg, #a78bfa 0%, #818cf8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                display: 'inline-block'
               }}>
-                🏡 Congrats!
+                Congrats! 🎉
               </h4>
-              <p style={{ fontSize: '0.95rem', color: '#64748b', margin: 0, fontWeight: '500' }}>
-                Let’s plan your new home.
+              <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>
+                You’re planning your new home.
               </p>
 
               {decorations.map((dec, i) => (
                 <span
                   key={i}
+                  className="child-dec-item"
                   style={{
                     position: 'absolute',
                     pointerEvents: 'none',
@@ -408,21 +409,21 @@ export default function HousePlanningModal({
               ))}
             </div>
 
-            <hr style={{ border: '0', borderTop: '1px solid #f1f5f9', margin: '0 0 1.25rem 0' }} />
+            <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', margin: '0' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748b' }}>Home Price</span>
+              <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                <span className="input-name" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Home Price</span>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  background: '#f8f7f4',
-                  border: '1px solid #cbd5e1',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '12px',
-                  padding: '0 0.75rem',
-                  height: '40px'
+                  padding: '0 1rem',
+                  height: '42px'
                 }}>
-                  <span style={{ color: '#64748b', marginRight: '0.5rem', fontSize: '0.95rem', fontWeight: '650' }}>$</span>
+                  <span style={{ color: 'var(--text-tertiary)', marginRight: '0.5rem', fontSize: '0.95rem', fontWeight: '500' }}>$</span>
                   <input
                     type="text"
                     value={priceInput}
@@ -431,7 +432,7 @@ export default function HousePlanningModal({
                       border: 'none',
                       background: 'none',
                       width: '100%',
-                      color: '#1e293b',
+                      color: 'var(--text-primary)',
                       fontSize: '0.95rem',
                       fontWeight: '600',
                       padding: 0,
@@ -441,19 +442,20 @@ export default function HousePlanningModal({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748b' }}>Purchase Age</span>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.25rem' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                  <span className="input-name" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Purchase Age</span>
                   <input
                     type="number"
                     style={{
-                      height: '40px',
+                      height: '42px',
                       borderRadius: '12px',
-                      padding: '0 0.75rem',
+                      padding: '0 1rem',
                       fontSize: '0.95rem',
                       fontWeight: '600',
-                      background: '#f8f7f4',
-                      border: '1px solid #cbd5e1'
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
                     }}
                     value={purchaseAge}
                     onChange={(e) => setPurchaseAge(Math.max(18, Math.min(85, parseInt(e.target.value) || 35)))}
@@ -462,19 +464,21 @@ export default function HousePlanningModal({
                   />
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#64748b' }}>Down Payment</span>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                  <span className="input-name" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Down Payment</span>
                   <select
                     value={downPaymentPct}
                     onChange={(e) => setDownPaymentPct(parseInt(e.target.value) || 20)}
                     style={{
-                      height: '40px',
+                      height: '42px',
                       borderRadius: '12px',
-                      padding: '0 0.5rem',
+                      padding: '0 1rem',
                       fontSize: '0.95rem',
                       fontWeight: '600',
-                      background: '#f8f7f4',
-                      border: '1px solid #cbd5e1'
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
                     }}
                   >
                     <option value="5">5%</option>
@@ -490,8 +494,8 @@ export default function HousePlanningModal({
                 </div>
               </div>
 
-              {/* Advanced Settings */}
-              <div>
+              {/* Advanced Options */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div
                   onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
                   style={{
@@ -499,13 +503,14 @@ export default function HousePlanningModal({
                     alignItems: 'center',
                     gap: '0.35rem',
                     cursor: 'pointer',
-                    color: '#64748b',
+                    color: 'var(--text-secondary)',
                     fontSize: '0.85rem',
                     fontWeight: '600',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    marginTop: '0.5rem'
                   }}
                 >
-                  <span style={{ fontSize: '0.65rem', transform: isAdvancedOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease', display: 'inline-block' }}>▶</span>
+                  <span style={{ fontSize: '0.7rem', transform: isAdvancedOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease', display: 'inline-block' }}>▶</span>
                   <span>Advanced Options</span>
                 </div>
 
@@ -513,66 +518,114 @@ export default function HousePlanningModal({
                   <div className="animate-slide-down" style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',
-                    gap: '0.75rem',
+                    gap: '1.25rem',
                     marginTop: '0.5rem',
-                    padding: '1rem',
-                    background: '#f8f7f4',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1'
+                    padding: '1.25rem',
+                    background: 'rgba(255,255,255,0.01)',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border-color)'
                   }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Rate (%)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Rate (%)</span>
                       <input
                         type="number"
                         step="0.1"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={mortgageRate}
                         onChange={(e) => setMortgageRate(parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Term (Yrs)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Term (Yrs)</span>
                       <input
                         type="number"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={loanTerm}
                         onChange={(e) => setLoanTerm(parseInt(e.target.value) || 0)}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Closing (%)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Closing (%)</span>
                       <input
                         type="number"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={closingCosts}
                         onChange={(e) => setClosingCosts(parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tax (%)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Tax (%)</span>
                       <input
                         type="number"
                         step="0.05"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={propertyTax}
                         onChange={(e) => setPropertyTax(parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Ins (%)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Ins (%)</span>
                       <input
                         type="number"
                         step="0.05"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={insurance}
                         onChange={(e) => setInsurance(parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>HOA ($/mo)</span>
+                    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
+                      <span className="input-name" style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>HOA ($/mo)</span>
                       <input
                         type="number"
-                        style={{ height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 0.5rem', fontSize: '0.85rem' }}
+                        style={{
+                          height: '38px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          padding: '0 0.75rem',
+                          fontSize: '0.9rem',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--text-primary)'
+                        }}
                         value={hoa}
                         onChange={(e) => setHoa(parseFloat(e.target.value) || 0)}
                       />
@@ -582,47 +635,78 @@ export default function HousePlanningModal({
               </div>
             </div>
 
-            {/* Step 1 Actions */}
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Bottom Actions */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '1rem',
+              width: '100%' 
+            }}>
               <div>
                 {!isNew ? (
-                  <button type="button" onClick={handleDelete} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}>
-                    Delete
+                  <button 
+                    type="button" 
+                    onClick={handleDelete}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#ef4444', 
+                      cursor: 'pointer', 
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      padding: '0 0.5rem 0 0'
+                    }}
+                  >
+                    Delete Home
                   </button>
-                ) : (
-                  <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}>
-                    Cancel
-                  </button>
-                )}
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={handleStep1Continue}
-                style={{
-                  padding: '0.6rem 1.5rem',
-                  fontSize: '0.95rem',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                Continue →
-              </button>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={onClose}
+                  style={{ 
+                    padding: '0.6rem 1.25rem', 
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={handleStep1Continue}
+                  style={{ 
+                    padding: '0.6rem 1.5rem', 
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    background: 'var(--primary, #8b5cf6)',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Continue →
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {step === 2 && hasShortfall && (
-          <div>
-            <div style={{ textAlign: 'center', paddingBottom: '0.75rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>🏡</div>
-              <h4 style={{ fontSize: '1.6rem', fontWeight: '850', margin: '0 0 0.25rem 0', color: '#1e293b' }}>
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ textAlign: 'center', paddingBottom: '0.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🏡</div>
+              <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '0 0 0.25rem 0', color: 'var(--text-primary)' }}>
                 Let’s make it fit your plan
               </h4>
-              <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '0.25rem 0 0.75rem 0', lineHeight: '1.4', fontWeight: '500' }}>
+              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0', lineHeight: '1.4', fontWeight: '500' }}>
                 You don’t currently have enough cash available for the down payment.
               </p>
               <div style={{ background: '#f0fdf4', borderRadius: '16px', padding: '0.75rem 1rem', border: '1px solid #bbf7d0', marginTop: '0.5rem' }}>
@@ -635,7 +719,7 @@ export default function HousePlanningModal({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {/* Option A */}
               <div
                 onClick={() => setSelectedOption('A')}
@@ -644,8 +728,8 @@ export default function HousePlanningModal({
                   alignItems: 'flex-start',
                   padding: '1rem',
                   borderRadius: '16px',
-                  border: selectedOption === 'A' ? '2.5px solid #8b5cf6' : '1.5px solid #cbd5e1',
-                  background: selectedOption === 'A' ? '#f5f3ff' : '#ffffff',
+                  border: selectedOption === 'A' ? '2px solid var(--primary, #8b5cf6)' : '1px solid var(--border-color)',
+                  background: selectedOption === 'A' ? 'rgba(139, 92, 246, 0.04)' : 'rgba(255, 255, 255, 0.01)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -654,18 +738,18 @@ export default function HousePlanningModal({
                   width: '18px',
                   height: '18px',
                   borderRadius: '50%',
-                  border: selectedOption === 'A' ? '6px solid #8b5cf6' : '2px solid #cbd5e1',
+                  border: selectedOption === 'A' ? '6px solid var(--primary, #8b5cf6)' : '2px solid var(--text-tertiary, #cbd5e1)',
                   marginRight: '10px',
                   marginTop: '2px',
                   flexShrink: 0
                 }} />
                 <div style={{ fontSize: '0.85rem' }}>
-                  <strong style={{ display: 'block', color: '#1e293b', fontSize: '0.9rem' }}>
+                  <strong style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                     🏠 Buy a {formatCurrency(affordableHomePrice)} Home
                   </strong>
-                  <span style={{ display: 'block', color: '#64748b', marginTop: '0.2rem' }}>✓ Affordable with your finances</span>
-                  <span style={{ display: 'block', color: '#64748b' }}>✓ Similar monthly cost to renting</span>
-                  <span style={{ display: 'block', color: '#64748b' }}>✓ Keeps your plan on track</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>✓ Affordable with your finances</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)' }}>✓ Similar monthly cost to renting</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)' }}>✓ Keeps your plan on track</span>
                 </div>
               </div>
 
@@ -677,8 +761,8 @@ export default function HousePlanningModal({
                   alignItems: 'flex-start',
                   padding: '1rem',
                   borderRadius: '16px',
-                  border: selectedOption === 'B' ? '2.5px solid #8b5cf6' : '1.5px solid #cbd5e1',
-                  background: selectedOption === 'B' ? '#f5f3ff' : '#ffffff',
+                  border: selectedOption === 'B' ? '2px solid var(--primary, #8b5cf6)' : '1px solid var(--border-color)',
+                  background: selectedOption === 'B' ? 'rgba(139, 92, 246, 0.04)' : 'rgba(255, 255, 255, 0.01)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -687,72 +771,100 @@ export default function HousePlanningModal({
                   width: '18px',
                   height: '18px',
                   borderRadius: '50%',
-                  border: selectedOption === 'B' ? '6px solid #8b5cf6' : '2px solid #cbd5e1',
+                  border: selectedOption === 'B' ? '6px solid var(--primary, #8b5cf6)' : '2px solid var(--text-tertiary, #cbd5e1)',
                   marginRight: '10px',
                   marginTop: '2px',
                   flexShrink: 0
                 }} />
                 <div style={{ fontSize: '0.85rem' }}>
-                  <strong style={{ display: 'block', color: '#1e293b', fontSize: '0.9rem' }}>
+                  <strong style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                     🚀 Keep the {formatCurrency(homePrice)} Home
                   </strong>
-                  <span style={{ display: 'block', color: '#64748b', marginTop: '0.2rem' }}>✓ Add a down payment windfall</span>
-                  <span style={{ display: 'block', color: '#64748b', marginTop: '0.2rem' }}>✓ Maintain comfortable cash flow</span>
-                  <span style={{ display: 'block', color: '#64748b', marginTop: '0.2rem' }}>✓ Add promotion only if monthly costs rise</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>✓ Add a down payment windfall</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>✓ Maintain comfortable cash flow</span>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>✓ Add promotion only if monthly costs rise</span>
                 </div>
               </div>
             </div>
 
             {/* Step 2 Actions */}
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button type="button" onClick={() => setStep(1)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}>
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleStep2Continue}
-                style={{
-                  padding: '0.6rem 1.5rem',
-                  fontSize: '0.95rem',
-                  borderRadius: '12px',
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', width: '100%' }}>
+              <button 
+                type="button" 
+                onClick={() => setStep(1)} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--text-secondary, #94a3b8)', 
+                  cursor: 'pointer', 
+                  fontSize: '0.9rem', 
                   fontWeight: '600',
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: 'pointer'
+                  padding: '0 0.5rem 0 0'
                 }}
               >
-                Continue →
+                Back
               </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={onClose}
+                  style={{ 
+                    padding: '0.6rem 1.25rem', 
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleStep2Continue}
+                  style={{
+                    padding: '0.6rem 1.5rem',
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600',
+                    background: 'var(--primary, #8b5cf6)',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Continue →
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div>
-            <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>⭐</div>
-              <h4 style={{ fontSize: '1.75rem', fontWeight: '850', margin: '0', color: '#16a34a' }}>
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ textAlign: 'center', paddingBottom: '0.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⭐</div>
+              <h4 style={{ fontSize: '1.75rem', fontWeight: '800', margin: '0', color: 'var(--primary)' }}>
                 Great News!
               </h4>
-              <p style={{ fontSize: '0.95rem', color: '#64748b', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
+              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
                 Your plan still works.
               </p>
             </div>
 
             <div style={{
-              background: '#f8f7f4',
+              background: 'rgba(255, 255, 255, 0.02)',
               borderRadius: '16px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border-color)',
               padding: '1.25rem',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.75rem',
               fontSize: '0.9rem'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                <span style={{ color: '#64748b', fontWeight: '600' }}>You Chose:</span>
-                <strong style={{ color: '#16a34a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>You Chose:</span>
+                <strong style={{ color: 'var(--primary)' }}>
                   {selectedOption === 'A' && hasShortfall 
                     ? `Buy a ${formatCurrency(affordableHomePrice)} Home` 
                     : `Keep the ${formatCurrency(homePrice)} Home`}
@@ -760,20 +872,20 @@ export default function HousePlanningModal({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Work Optional Age</span>
-                <strong style={{ color: '#1e293b' }}>{formatAgeCompare()}</strong>
+                <span style={{ color: 'var(--text-secondary)' }}>Work Optional Age</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{formatAgeCompare()}</strong>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Home Purchase Price</span>
-                <strong style={{ color: '#1e293b' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Home Purchase Price</span>
+                <strong style={{ color: 'var(--text-primary)' }}>
                   {formatCurrency(selectedOption === 'A' && hasShortfall ? affordableHomePrice : homePrice)}
                 </strong>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Promotion</span>
-                <strong style={{ color: '#1e293b' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Promotion</span>
+                <strong style={{ color: 'var(--text-primary)' }}>
                   {selectedOption === 'B' && hasShortfall && needRaise 
                     ? `+$${raiseAmount.toLocaleString()}/year` 
                     : 'None Needed'}
@@ -781,8 +893,8 @@ export default function HousePlanningModal({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Down Payment Windfall</span>
-                <strong style={{ color: '#1e293b' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Down Payment Windfall</span>
+                <strong style={{ color: 'var(--text-primary)' }}>
                   {selectedOption === 'B' && hasShortfall && needWindfall 
                     ? formatCurrency(shortfallAmount) 
                     : 'None Needed'}
@@ -792,43 +904,71 @@ export default function HousePlanningModal({
 
             {/* Green comfortable banner */}
             <div style={{
-              background: '#ecfdf5',
-              border: '1px solid #34d399',
+              background: 'rgba(22, 163, 74, 0.04)',
+              border: '1px solid var(--primary)',
               borderRadius: '16px',
               padding: '0.85rem 1.25rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.65rem',
-              marginTop: '1.25rem'
+              marginTop: '0.5rem'
             }}>
               <span style={{ fontSize: '1.4rem' }}>😊</span>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <strong style={{ color: '#065f46', fontSize: '0.9rem' }}>Comfortable</strong>
-                <span style={{ color: '#047857', fontSize: '0.8rem' }}>You’re on track with confidence.</span>
+                <strong style={{ color: 'var(--primary)', fontSize: '0.9rem' }}>Comfortable</strong>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>You’re on track with confidence.</span>
               </div>
             </div>
 
             {/* Step 3 Actions */}
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button type="button" onClick={() => setStep(hasShortfall ? 2 : 1)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}>
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={onSave}
-                style={{
-                  padding: '0.6rem 1.5rem',
-                  fontSize: '0.95rem',
-                  borderRadius: '12px',
-                  fontWeight: '700',
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: 'pointer'
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', width: '100%' }}>
+              <button 
+                type="button" 
+                onClick={() => setStep(hasShortfall ? 2 : 1)} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--text-secondary, #94a3b8)', 
+                  cursor: 'pointer', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600',
+                  padding: '0 0.5rem 0 0'
                 }}
               >
-                Done
+                Back
               </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={onClose}
+                  style={{ 
+                    padding: '0.6rem 1.25rem', 
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={onSave}
+                  style={{
+                    padding: '0.6rem 1.5rem',
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '700',
+                    background: '#10b981', // Confirm button green
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         )}
