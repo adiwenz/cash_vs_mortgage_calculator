@@ -3351,3 +3351,18 @@
   color: var(--text-primary);
 }
 
+/* Child Event Redesign Floating Animations */
+@keyframes child-float-slow {
+  0%, 100% {
+    transform: translateY(0) rotate(var(--child-dec-rot, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(calc(var(--child-dec-rot, 0deg) + 6deg));
+  }
+}
+
+.child-dec-item {
+  animation: child-float-slow 5s ease-in-out infinite;
+}
+
+
