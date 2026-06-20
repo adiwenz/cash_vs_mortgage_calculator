@@ -1,4 +1,7 @@
 import { calculateUSTaxForModal } from '../../simulatorMathUtils';
+import formatCompactCurrency from '../../utils/formatCompactCurrency';
+
+export { formatCompactCurrency };
 
 export const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -7,6 +10,28 @@ export const formatCurrency = (val) => {
     maximumFractionDigits: 0
   }).format(val);
 };
+
+export const clampMoneyValue = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  const num = parseFloat(val);
+  if (!Number.isFinite(num)) return 0;
+  return Math.min(999999999999, Math.max(0, num));
+};
+
+export const clampAgeValue = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  const num = parseInt(val, 10);
+  if (!Number.isFinite(num)) return 0;
+  return Math.min(120, Math.max(0, num));
+};
+
+export const clampPercentageValue = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  const num = parseFloat(val);
+  if (!Number.isFinite(num)) return 0;
+  return Math.min(100, Math.max(0, num));
+};
+
 
 export const formatYAxis = (val) => {
   if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;

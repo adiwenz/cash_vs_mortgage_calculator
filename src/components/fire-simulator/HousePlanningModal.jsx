@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { formatCurrency } from './helpers';
 import { runFireSimulation } from '../../fireCalculations';
+import { NumberInput } from '../ui/PlainInputs';
 import {
   calculateTotalCashRequired,
   calculateLiquidAssetsAtPurchaseAge,

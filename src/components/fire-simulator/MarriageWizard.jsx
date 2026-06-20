@@ -1,6 +1,7 @@
 import { Wallet, TrendingUp, Home, Target, User } from 'lucide-react';
 import { runFireSimulation } from '../../fireCalculations';
 import { formatCurrency } from './helpers';
+import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
 import { calculateCombinedIncome, calculateMarriageEstimates } from '../../domain/events/marriage/marriageImpact';
 import { validateWeddingCostFunding } from '../../domain/events/marriage/marriageValidation';
 import { createMarriageEventObject, createSpouseRecord } from '../../domain/events/marriage/marriageEventFactory';
@@ -317,8 +318,7 @@ export default function MarriageWizard({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Spouse Income ($/year)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.spouseIncome}
@@ -327,8 +327,7 @@ export default function MarriageWizard({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Savings Rate (%)</span>
-                    <input
-                      type="number"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.savingsRate}
@@ -337,8 +336,7 @@ export default function MarriageWizard({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Partner Assets ($)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={Number(editingEvent.cash || 0) + Number(editingEvent.investments || 0) + Number(editingEvent.retirement || 0)}
@@ -347,8 +345,7 @@ export default function MarriageWizard({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Partner Debt ($)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={Number(editingEvent.debtStudent || 0) + Number(editingEvent.debtCredit || 0) + Number(editingEvent.debtOther || 0)}
@@ -388,8 +385,7 @@ export default function MarriageWizard({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Spouse Est. SS Benefit ($/yr)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.spouseEstimatedSocialSecurityBenefit !== undefined && editingEvent.spouseEstimatedSocialSecurityBenefit !== '' ? editingEvent.spouseEstimatedSocialSecurityBenefit : 0}
@@ -500,8 +496,7 @@ export default function MarriageWizard({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Wedding Cost ($)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ 
                         width: '100%',

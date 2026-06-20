@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../helpers';
+import { CurrencyInput, PercentInput, NumberInput } from '../../ui/PlainInputs';
 
 export default function RetirementFields({
   type,
@@ -15,8 +16,7 @@ export default function RetirementFields({
         <>
           <div className="input-wrapper">
             <span className="input-name">Can Stop Working Age</span>
-            <input
-              type="number"
+            <NumberInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.age}
@@ -25,8 +25,7 @@ export default function RetirementFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Spending Replacement Rate (%)</span>
-            <input
-              type="number"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.spendingPercent !== undefined ? editingEvent.spendingPercent : 70}
@@ -53,8 +52,7 @@ export default function RetirementFields({
             <span className="input-name">
               {type === 'socialSecurity' ? 'Claiming Age' : 'Start Age'}
             </span>
-            <input
-              type="number"
+            <NumberInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.claimingAge !== undefined ? editingEvent.claimingAge : (editingEvent.startAge !== undefined ? editingEvent.startAge : 65)}
@@ -103,8 +101,7 @@ export default function RetirementFields({
           {type === 'socialSecurity' && editingEvent.useEarnings === true && (
             <div className="input-wrapper">
               <span className="input-name">Age Started Working</span>
-              <input
-                type="number"
+              <NumberInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingEvent.ageStartedWorking !== undefined ? editingEvent.ageStartedWorking : 22}
@@ -115,8 +112,7 @@ export default function RetirementFields({
           {(!editingEvent.useEarnings || type !== 'socialSecurity') ? (
             <div className="input-wrapper">
               <span className="input-name">Monthly Amount ($)</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingEvent.monthlyBenefit !== undefined ? editingEvent.monthlyBenefit : 1000}

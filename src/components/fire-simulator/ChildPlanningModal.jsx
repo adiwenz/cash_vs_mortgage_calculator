@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Info } from 'lucide-react';
 import { formatCurrency } from './helpers';
 import { getNormalizedPhases } from '../../fireCalculations';
+import { NumberInput } from '../ui/PlainInputs';
 
 export default function ChildPlanningModal({
   scenario,
@@ -259,22 +260,24 @@ export default function ChildPlanningModal({
                   height: '42px'
                 }}>
                   <span style={{ color: 'var(--text-tertiary)', marginRight: '0.5rem', fontSize: '0.95rem', fontWeight: '500' }}>$</span>
-                  <input
-                    type="text"
-                    value={costInput}
-                    onChange={handleCostChange}
+                  <NumberInput
+                    value={childcareCostAnnual}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setChildcareCostAnnual(val);
+                    }}
                     style={{
                       border: 'none',
                       background: 'none',
                       width: '100%',
                       color: 'var(--text-primary)',
-                      fontSize: '0.95rem',
-                      fontWeight: '600',
-                      padding: 0,
-                      outline: 'none'
+                      fontSize: '1rem',
+                      fontWeight: '700',
+                      outline: 'none',
+                      textAlign: 'right',
+                      padding: '0'
                     }}
-                  />
-                  <span style={{ color: 'var(--text-tertiary)', marginLeft: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>/year</span>
+                  /><span style={{ color: 'var(--text-tertiary)', marginLeft: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>/year</span>
                 </div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
                   Default estimate is $15,000/year. You can adjust this anytime.

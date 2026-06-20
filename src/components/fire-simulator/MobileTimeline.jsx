@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components, no-case-declarations, no-useless-assignment, no-unused-vars, react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { isEditableEvent, getEventIcon } from './helpers';
+import { isEditableEvent, getEventIcon, formatCompactCurrency } from './helpers';
 
 const getShortLabel = (evt) => {
   if (!evt) return '';
@@ -89,7 +89,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
       whyItMatters = 'Combines household incomes, tax brackets, and sharing living expenses (like housing and utilities) to increase savings rate.';
       if (evt.spouseIncome) {
         benefitLabel = 'Spouse Details';
-        benefitValue = `Income: ${formatCurrency(evt.spouseIncome)}/yr | Savings: ${evt.savingsRate || 0}%`;
+        benefitValue = `Income: ${formatCompactCurrency(evt.spouseIncome)}/yr | Savings: ${evt.savingsRate || 0}%`;
       }
       break;
     case 'buyHouse':
@@ -97,7 +97,7 @@ export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
       const houseAsset = inputs?.houseAssets?.find(h => h.id === evt.houseId);
       if (houseAsset) {
         benefitLabel = 'Property Details';
-        benefitValue = `${formatCurrency(houseAsset.purchasePrice || houseAsset.homePrice || 200000)} home • ${formatCurrency(houseAsset.downPayment || 40000)} down`;
+        benefitValue = `${formatCompactCurrency(houseAsset.purchasePrice || houseAsset.homePrice || 200000)} home • ${formatCompactCurrency(houseAsset.downPayment || 40000)} down`;
       }
       break;
     case 'sellHouse':

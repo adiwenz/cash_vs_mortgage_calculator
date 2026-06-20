@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import './SavingsAllocator.css';
+import { CurrencyInput, PercentInput, NumberInput } from './ui/PlainInputs';
 import { getAnnualContributionLimit } from '../simulatorMathUtils';
 
 // 10 allocation categories with curated colors and descriptions
@@ -409,8 +410,7 @@ export default function SavingsAllocator() {
               <label className="field-label">Gross Annual Income</label>
               <div className="input-prefix-wrapper">
                 <span className="currency-symbol">$</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="allocator-input-box"
                   value={grossIncome}
                   onChange={(e) => setGrossIncome(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -422,8 +422,7 @@ export default function SavingsAllocator() {
               <label className="field-label">Monthly Spending / Expenses</label>
               <div className="input-prefix-wrapper">
                 <span className="currency-symbol">$</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="allocator-input-box"
                   value={monthlyExpenses}
                   onChange={(e) => setMonthlyExpenses(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -433,8 +432,7 @@ export default function SavingsAllocator() {
 
             <div className="input-field-group">
               <label className="field-label">Current Age</label>
-              <input
-                type="number"
+              <NumberInput
                 className="allocator-input-box"
                 value={age}
                 onChange={(e) => setAge(Math.max(18, Math.min(100, parseInt(e.target.value) || 30)))}
@@ -526,8 +524,7 @@ export default function SavingsAllocator() {
               <label className="field-label">Current Emergency Fund Balance</label>
               <div className="input-prefix-wrapper">
                 <span className="currency-symbol">$</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="allocator-input-box"
                   value={currentEmergencyFund}
                   onChange={(e) => setCurrentEmergencyFund(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -539,8 +536,7 @@ export default function SavingsAllocator() {
               <label className="field-label">Current Checking Balance</label>
               <div className="input-prefix-wrapper">
                 <span className="currency-symbol">$</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="allocator-input-box"
                   value={currentChecking}
                   onChange={(e) => setCurrentChecking(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -564,8 +560,7 @@ export default function SavingsAllocator() {
                 <div className="input-field-group">
                   <label className="field-label">Match Rate</label>
                   <div className="input-prefix-wrapper">
-                    <input
-                      type="number"
+                    <NumberInput
                       className="allocator-input-box text-right"
                       value={matchRate}
                       onChange={(e) => setMatchRate(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -576,8 +571,7 @@ export default function SavingsAllocator() {
                 <div className="input-field-group">
                   <label className="field-label">Up to % of Salary</label>
                   <div className="input-prefix-wrapper">
-                    <input
-                      type="number"
+                    <NumberInput
                       className="allocator-input-box text-right"
                       value={matchLimit}
                       onChange={(e) => setMatchLimit(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -640,8 +634,7 @@ export default function SavingsAllocator() {
                       onChange={(e) => handleSliderChange(cat.id, e.target.value)}
                     />
                     <div className="slider-val-input-wrapper">
-                      <input
-                        type="number"
+                      <NumberInput
                         className="slider-val-input"
                         value={val}
                         onChange={(e) => handleTextPercentChange(cat.id, e.target.value)}

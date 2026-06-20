@@ -70,16 +70,16 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
 
     // Verify generated partner profile values match user exactly
     const spouseIncomeInput = getInputByWrapperText(/Spouse Income/i);
-    expect(spouseIncomeInput.value).toBe('50000'); // same salary
+    expect(spouseIncomeInput.value).toBe('$50,000'); // same salary
 
     const savingsRateInput = getInputByWrapperText(/Savings Rate/i);
-    expect(savingsRateInput.value).toBe('15'); // same savings
+    expect(savingsRateInput.value).toBe('15%'); // same savings
 
     const spouseAssetsInput = getInputByWrapperText(/Partner Assets/i);
-    expect(spouseAssetsInput.value).toBe('100000'); // same assets (user simpleInvestments=100000)
+    expect(spouseAssetsInput.value).toBe('$100,000'); // same assets (user simpleInvestments=100000)
 
     const spouseDebtInput = getInputByWrapperText(/Partner Debt/i);
-    expect(spouseDebtInput.value).toBe('0'); // same debt (user has 0 debt by default)
+    expect(spouseDebtInput.value).toBe('$0'); // same debt (user has 0 debt by default)
 
     const spouseAgeInput = getInputByWrapperText(/Marriage Age/i);
     expect(spouseAgeInput.value).toBe('35'); // starts at age 35
@@ -263,7 +263,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
 
     // Increase household spending: Housing Rent/Mortgage
     const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);
-    const currentHousingVal = parseInt(housingInput.value, 10) || 1500;
+    const currentHousingVal = parseInt(housingInput.value.replace(/,/g, ''), 10) || 1500;
     const newHousingVal = String(currentHousingVal + 1000);
     fireEvent.change(housingInput, { target: { value: newHousingVal } });
 

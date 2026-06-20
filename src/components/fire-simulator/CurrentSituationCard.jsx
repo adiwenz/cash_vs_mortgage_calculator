@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { formatCurrency } from './helpers';
+import { formatCurrency, clampAgeValue, clampMoneyValue, clampPercentageValue } from './helpers';
 import CurrentConditionsPanel from './CurrentConditionsPanel';
+import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 
 export default function CurrentSituationCard({
   inputs,
@@ -112,8 +113,7 @@ export default function CurrentSituationCard({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '30px', padding: '0.1rem 0' }}>
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🎂 Age</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
-          <input
-            type="number"
+          <NumberInput
             className="input-number-box borderless-input"
             style={{
               width: '90px',
@@ -130,8 +130,11 @@ export default function CurrentSituationCard({
             }}
             value={inputs.currentAge === null ? '' : inputs.currentAge}
             placeholder="e.g. 35"
-            onClick={() => handleStep1Change('currentAge', null)}
             onChange={(e) => handleFieldChange('currentAge', e.target.value)}
+            onBlur={(e) => {
+              const clamped = clampAgeValue(e.target.value);
+              handleStep1Change('currentAge', clamped);
+            }}
           />
         </div>
 
@@ -140,15 +143,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>💰 Annual Income</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -159,12 +160,19 @@ export default function CurrentSituationCard({
               }}
               value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
               placeholder="e.g. 120000"
-              onClick={() => {
+              useCompact={true}
+              onFocus={() => {
                 setActiveSavingsRate(simpleSavingsRate);
-                handleStep1Change('simpleIncome', null);
               }}
-              onBlur={() => {
+              onBlur={(e) => {
                 setActiveSavingsRate(null);
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleIncome', clamped);
+                if (clamped !== null) {
+                  const rate = simpleSavingsRate;
+                  const newExpenses = Math.round(clamped * (1 - rate / 100));
+                  handleStep1Change('simpleExpenses', newExpenses);
+                }
               }}
               onChange={(e) => handleFieldChange('simpleIncome', e.target.value)}
             />
@@ -176,15 +184,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🛒 Annual Spending</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -194,7 +200,12 @@ export default function CurrentSituationCard({
                 outline: 'none'
               }}
               value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
+              useCompact={true}
               onChange={(e) => handleFieldChange('simpleExpenses', e.target.value)}
+              onBlur={(e) => {
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleExpenses', clamped);
+              }}
             />
           </div>
         </div>
@@ -204,15 +215,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🏦 Current Savings</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -223,8 +232,12 @@ export default function CurrentSituationCard({
               }}
               value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
               placeholder="e.g. 250000"
-              onClick={() => handleStep1Change('simpleInvestments', null)}
+              useCompact={true}
               onChange={(e) => handleFieldChange('simpleInvestments', e.target.value)}
+              onBlur={(e) => {
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleInvestments', clamped);
+              }}
             />
           </div>
         </div>
@@ -252,10 +265,7 @@ export default function CurrentSituationCard({
           </div>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              type="number"
-              min="0"
-              max="100"
+            <PercentInput
               className="input-number-box borderless-input"
               style={{
                 width: '90px',
@@ -272,14 +282,26 @@ export default function CurrentSituationCard({
               }}
               value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
               placeholder="e.g. 20"
-              onClick={() => setSavingsRateOverride('')}
+              onFocus={() => setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate))}
               onChange={(e) => handleSavingsRateChange(e.target.value)}
-              onBlur={() => setSavingsRateOverride(null)}
+              onBlur={(e) => {
+                setSavingsRateOverride(null);
+                const clamped = clampPercentageValue(e.target.value);
+                if (clamped !== null) {
+                  if (lastNonZeroSavingsRateRef) {
+                    lastNonZeroSavingsRateRef.current = clamped;
+                  }
+                  const income = Number(inputs.simpleIncome) || 0;
+                  const newExpenses = Math.round(income * (1 - clamped / 100));
+                  handleStep1Change('simpleExpenses', newExpenses);
+                }
+              }}
             />
             <span style={{ position: 'absolute', right: '4px', color: 'var(--success)', fontSize: '0.82rem', fontWeight: 'bold' }}>%</span>
           </div>
         </div>
       </div>
+
 
       {/* Show Details Toggle */}
       <button

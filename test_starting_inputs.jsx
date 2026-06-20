@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
@@ -27,12 +27,12 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
     expect(currentAgeInput.value).toBe('35');
-    expect(annualIncomeInput.value).toBe('50000');
-    expect(preTaxSavingsRateInput.value).toBe('15'); // (50000 - 42500) / 50000 = 15%
-    expect(currentSavingsInput.value).toBe('5000');
+    expect(annualIncomeInput.value).toBe('$50,000');
+    expect(preTaxSavingsRateInput.value).toBe('15%');
+    expect(currentSavingsInput.value).toBe('$5,000');
   });
 
-  test('clicking starting inputs resets their value to null (renders as empty)', () => {
+  test('focusing starting inputs shows raw values and does not clear them', async () => {
     render(<FireSimulator />);
     fireEvent.click(screen.getByText(/Current Situation/));
 
@@ -41,24 +41,24 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
     const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
-    // Reset Current Age
-    fireEvent.click(currentAgeInput);
-    expect(currentAgeInput.value).toBe('');
+    // Focus Current Age
+    fireEvent.focus(currentAgeInput);
+    await waitFor(() => expect(currentAgeInput.value).toBe('35'));
 
-    // Reset Annual Income
-    fireEvent.click(annualIncomeInput);
-    expect(annualIncomeInput.value).toBe('');
+    // Focus Annual Income
+    fireEvent.focus(annualIncomeInput);
+    await waitFor(() => expect(annualIncomeInput.value).toBe('50000'));
 
-    // Reset Pre-Tax Savings Rate
-    fireEvent.click(preTaxSavingsRateInput);
-    expect(preTaxSavingsRateInput.value).toBe('');
+    // Focus Pre-Tax Savings Rate
+    fireEvent.focus(preTaxSavingsRateInput);
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15'));
 
-    // Reset Current Savings
-    fireEvent.click(currentSavingsInput);
-    expect(currentSavingsInput.value).toBe('');
+    // Focus Current Savings
+    fireEvent.focus(currentSavingsInput);
+    await waitFor(() => expect(currentSavingsInput.value).toBe('5000'));
   });
 
-  test('typing custom values in starting inputs works correctly', () => {
+  test('typing custom values in starting inputs works correctly', async () => {
     render(<FireSimulator />);
     fireEvent.click(screen.getByText(/Current Situation/));
 
@@ -68,60 +68,60 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
     // Age
-    fireEvent.click(currentAgeInput);
+    fireEvent.focus(currentAgeInput);
     fireEvent.change(currentAgeInput, { target: { value: '42' } });
-    expect(currentAgeInput.value).toBe('42');
+    await waitFor(() => expect(currentAgeInput.value).toBe('42'));
 
     // Income
-    fireEvent.click(annualIncomeInput);
+    fireEvent.focus(annualIncomeInput);
     fireEvent.change(annualIncomeInput, { target: { value: '100000' } });
-    expect(annualIncomeInput.value).toBe('100000');
+    await waitFor(() => expect(annualIncomeInput.value).toBe('100000'));
 
     // Savings Rate
-    fireEvent.click(preTaxSavingsRateInput);
+    fireEvent.focus(preTaxSavingsRateInput);
     fireEvent.change(preTaxSavingsRateInput, { target: { value: '30' } });
-    expect(preTaxSavingsRateInput.value).toBe('30');
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30'));
 
     // Savings Value
-    fireEvent.click(currentSavingsInput);
+    fireEvent.focus(currentSavingsInput);
     fireEvent.change(currentSavingsInput, { target: { value: '150000' } });
-    expect(currentSavingsInput.value).toBe('150000');
+    await waitFor(() => expect(currentSavingsInput.value).toBe('150000'));
   });
 
-  test('blurring the savings rate field without typing restores the calculated rate', () => {
+  test('focusing and blurring the savings rate field without typing keeps the calculated rate', async () => {
     render(<FireSimulator />);
     fireEvent.click(screen.getByText(/Current Situation/));
 
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
 
-    expect(preTaxSavingsRateInput.value).toBe('15');
+    expect(preTaxSavingsRateInput.value).toBe('15%');
 
-    // Focus/Click to reset
-    fireEvent.click(preTaxSavingsRateInput);
-    expect(preTaxSavingsRateInput.value).toBe('');
+    // Focus
+    fireEvent.focus(preTaxSavingsRateInput);
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15'));
 
     // Blur without typing
     fireEvent.blur(preTaxSavingsRateInput);
-    expect(preTaxSavingsRateInput.value).toBe('15');
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15%'));
   });
 
-  test('typing in savings rate and blurring preserves the new calculated rate', () => {
+  test('typing in savings rate and blurring preserves the new calculated rate', async () => {
     render(<FireSimulator />);
     fireEvent.click(screen.getByText(/Current Situation/));
 
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
 
-    // Click and type 30
-    fireEvent.click(preTaxSavingsRateInput);
+    // Focus and type 30
+    fireEvent.focus(preTaxSavingsRateInput);
     fireEvent.change(preTaxSavingsRateInput, { target: { value: '30' } });
-    expect(preTaxSavingsRateInput.value).toBe('30');
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30'));
 
     // Blur
     fireEvent.blur(preTaxSavingsRateInput);
-    expect(preTaxSavingsRateInput.value).toBe('30');
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30%'));
   });
 
-  test('changing the income field preserves the savings rate and scales expenses', () => {
+  test('changing the income field preserves the savings rate and scales expenses', async () => {
     render(<FireSimulator />);
     fireEvent.click(screen.getByText(/Current Situation/));
 
@@ -129,21 +129,21 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
 
     // Default rate is 15% (derived from 50k income, 42.5k expenses)
-    expect(preTaxSavingsRateInput.value).toBe('15');
+    expect(preTaxSavingsRateInput.value).toBe('15%');
 
-    // Click income field (resets to empty)
-    fireEvent.click(annualIncomeInput);
-    expect(annualIncomeInput.value).toBe('');
+    // Focus income field
+    fireEvent.focus(annualIncomeInput);
+    await waitFor(() => expect(annualIncomeInput.value).toBe('50000'));
 
     // Type new income 100000
     fireEvent.change(annualIncomeInput, { target: { value: '100000' } });
-    expect(annualIncomeInput.value).toBe('100000');
+    await waitFor(() => expect(annualIncomeInput.value).toBe('100000'));
 
     // Blur income field
     fireEvent.blur(annualIncomeInput);
 
     // Savings rate should still be 15%
-    expect(preTaxSavingsRateInput.value).toBe('15');
+    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15%'));
   });
 
   test('verifies that the Details button opens the Current Savings Breakdown modal', () => {

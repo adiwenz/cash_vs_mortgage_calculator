@@ -1,4 +1,5 @@
-import { formatCurrency, getDefaultValuesForType } from './helpers';
+import { formatCurrency, getDefaultValuesForType, formatCompactCurrency, clampMoneyValue, clampAgeValue, clampPercentageValue } from './helpers';
+import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 
 export default function CurrentConditionsPanel({
   inputs,
@@ -68,15 +69,15 @@ export default function CurrentConditionsPanel({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.8rem' }}>
               {c.type !== 'child' && c.type !== 'obligation' && (
                 <strong style={{ color: 'var(--text-primary)' }}>
-                  {formatCurrency(c.value)}
+                  {formatCompactCurrency(c.value)}
                 </strong>
               )}
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                 {c.monthlyAmount > 0 ? (
                   ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.type) ? (
-                    <span style={{ color: 'var(--primary-light)' }}>+{formatCurrency(c.monthlyAmount)}/mo</span>
+                    <span style={{ color: 'var(--primary-light)' }}>+{formatCompactCurrency(c.monthlyAmount)}/mo</span>
                   ) : (
-                    <span style={{ color: 'var(--accent-rose)' }}>-{formatCurrency(c.monthlyAmount)}/mo</span>
+                    <span style={{ color: 'var(--accent-rose)' }}>-{formatCompactCurrency(c.monthlyAmount)}/mo</span>
                   )
                 ) : null}
                 {c.rate > 0 && ` (${c.rate}% ${c.type === 'debt' ? 'interest' : c.type === 'house' ? 'appr.' : 'growth'})`}
@@ -254,12 +255,12 @@ export function CurrentConditionModal({
           {type !== 'child' && type !== 'obligation' && (
             <div className="input-wrapper">
               <span className="input-name">{valueLabel}</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingCondition.value || 0}
                 onChange={(e) => setEditingCondition({ ...editingCondition, value: parseFloat(e.target.value) || 0 })}
+                onBlur={(e) => setEditingCondition({ ...editingCondition, value: clampMoneyValue(e.target.value) || 0 })}
               />
             </div>
           )}
@@ -267,12 +268,12 @@ export function CurrentConditionModal({
           {/* Monthly Cost/Contribution */}
           <div className="input-wrapper">
             <span className="input-name">{amountLabel}</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingCondition.monthlyAmount || 0}
               onChange={(e) => setEditingCondition({ ...editingCondition, monthlyAmount: parseFloat(e.target.value) || 0 })}
+              onBlur={(e) => setEditingCondition({ ...editingCondition, monthlyAmount: clampMoneyValue(e.target.value) || 0 })}
             />
             <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{amountDesc}</span>
           </div>
@@ -280,12 +281,12 @@ export function CurrentConditionModal({
           {/* Growth Rate / Interest Rate */}
           <div className="input-wrapper">
             <span className="input-name">{rateLabel}</span>
-            <input
-              type="number"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingCondition.rate || 0}
               onChange={(e) => setEditingCondition({ ...editingCondition, rate: parseFloat(e.target.value) || 0 })}
+              onBlur={(e) => setEditingCondition({ ...editingCondition, rate: clampPercentageValue(e.target.value) || 0 })}
             />
             <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{rateDesc}</span>
           </div>
@@ -305,13 +306,13 @@ export function CurrentConditionModal({
           {/* End Age (Optional) */}
           <div className="input-wrapper">
             <span className="input-name">End Age (Optional)</span>
-            <input
-              type="number"
+            <NumberInput
               className="input-number-box"
               style={{ width: '100%' }}
               placeholder="e.g. 50 (lasts until age 50, empty if lifetime)"
               value={editingCondition.endAge || ''}
               onChange={(e) => setEditingCondition({ ...editingCondition, endAge: e.target.value ? parseInt(e.target.value) || null : '' })}
+              onBlur={(e) => setEditingCondition({ ...editingCondition, endAge: e.target.value ? clampAgeValue(e.target.value) : '' })}
             />
           </div>
 

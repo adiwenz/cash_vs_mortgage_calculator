@@ -1,4 +1,5 @@
 import React from 'react';
+import { CurrencyInput, PercentInput } from '../../ui/PlainInputs';
 
 export default function GenericEventFields({
   type,
@@ -31,10 +32,9 @@ export default function GenericEventFields({
               onChange={(e) => setEditingEvent({ ...editingEvent, moveAge: parseInt(e.target.value) || 30 })}
             />
           </div>
-          <div className="input-wrapper">
+           <div className="input-wrapper">
             <span className="input-name">New Annual Spending ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.newSpending}
@@ -43,8 +43,7 @@ export default function GenericEventFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">One-time Moving Cost ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.movingCost !== undefined ? editingEvent.movingCost : 0}
@@ -69,8 +68,7 @@ export default function GenericEventFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Amount ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.amount}
@@ -79,8 +77,7 @@ export default function GenericEventFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Tax Rate (%)</span>
-            <input
-              type="number"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.taxRate}
@@ -105,8 +102,7 @@ export default function GenericEventFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Annual Tuition Cost ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.tuitionCost}
@@ -151,8 +147,7 @@ export default function GenericEventFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Cash Flow ($: negative for cost)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.amount}

@@ -1,5 +1,5 @@
 import { getActiveChildrenCountAtAge, propPIAmount } from '../../simulatorMathUtils';
-import { formatCurrency, isEditableEvent, isFinancialEvent } from './helpers';
+import { formatCurrency, isEditableEvent, isFinancialEvent, formatCompactCurrency } from './helpers';
 
 export default function DesktopTimeline({
   inputs,
@@ -165,7 +165,7 @@ export default function DesktopTimeline({
                               if (asset) {
                                 return (
                                   <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                    P&I Savings: {formatCurrency(propPIAmount(asset))}/yr
+                                    P&I Savings: {formatCompactCurrency(propPIAmount(asset))}/yr
                                   </div>
                                 );
                               }
@@ -228,7 +228,7 @@ export default function DesktopTimeline({
                               if (asset) {
                                 return (
                                   <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                    Price: {formatCurrency(asset.purchasePrice || asset.homePrice || 0)} 
+                                    Price: {formatCompactCurrency(asset.purchasePrice || asset.homePrice || 0)} 
                                     {asset.purchaseType !== 'cash' && ` (${asset.mortgageRate || 6.5}% APR)`}
                                   </div>
                                 );
@@ -257,7 +257,7 @@ export default function DesktopTimeline({
                             if (evt.type === 'marriage') {
                               return (
                                 <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
-                                  Spouse Income: {formatCurrency(evt.spouseIncome)}/yr
+                                  Spouse Income: {formatCompactCurrency(evt.spouseIncome)}/yr
                                 </div>
                               );
                             }

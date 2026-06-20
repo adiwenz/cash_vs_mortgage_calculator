@@ -13,11 +13,12 @@ import {
   Trash2,
   Edit2
 } from 'lucide-react';
-import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails, getEventIcon, getEventMarkerPosition } from './helpers';
+import { formatCurrency, formatCompactCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcomeDetails, getEventIcon, getEventMarkerPosition, clampAgeValue, clampMoneyValue, clampPercentageValue } from './helpers';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
 import OutcomeHeroCard from './OutcomeHeroCard';
+import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import ChildPlanningModal from './ChildPlanningModal';
@@ -1018,11 +1019,7 @@ export default function MobileFireSimulatorView({
             ? (currentAgePhase ? Object.values(currentAgePhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0) : 4250)
             : (activeResults.annualRetirementSpending || 51000) / 12;
 
-          const formatCompact = (val) => {
-            if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-            if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}k`;
-            return formatCurrency(val);
-          };
+          const formatCompact = (val) => formatCompactCurrency(val);
 
           const simpleSavingsRate = inputs.simpleIncome 
             ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) 
@@ -1079,10 +1076,12 @@ export default function MobileFireSimulatorView({
                           }}
                           value={inputs.currentAge === null ? '' : inputs.currentAge}
                           placeholder="e.g. 35"
-                          onClick={() => handleStep1Change('currentAge', null)}
                           onChange={(e) => {
                             const val = e.target.value;
                             handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                          }}
+                          onBlur={(e) => {
+                            handleStep1Change('currentAge', clampAgeValue(e.target.value));
                           }}
                         />
                       </div>
@@ -1090,8 +1089,7 @@ export default function MobileFireSimulatorView({
                         <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Income</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1106,12 +1104,18 @@ export default function MobileFireSimulatorView({
                             }}
                             value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                             placeholder="e.g. 120000"
-                            onClick={() => {
+                            onFocus={() => {
                               setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
-                              handleStep1Change('simpleIncome', null);
                             }}
-                            onBlur={() => {
+                            onBlur={(e) => {
                               setActiveSavingsRate(null);
+                              const clamped = clampMoneyValue(e.target.value);
+                              handleStep1Change('simpleIncome', clamped);
+                              if (clamped !== null) {
+                                const rate = inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0;
+                                const newExpenses = Math.round(clamped * (1 - rate / 100));
+                                handleStep1Change('simpleExpenses', newExpenses);
+                              }
                             }}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -1130,8 +1134,7 @@ export default function MobileFireSimulatorView({
                         <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Spending</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1148,6 +1151,9 @@ export default function MobileFireSimulatorView({
                             onChange={(e) => {
                               const val = e.target.value;
                               handleStep1Change('simpleExpenses', val === '' ? null : (parseFloat(val) || 0));
+                            }}
+                            onBlur={(e) => {
+                              handleStep1Change('simpleExpenses', clampMoneyValue(e.target.value));
                             }}
                           />
                         </div>
@@ -1174,8 +1180,7 @@ export default function MobileFireSimulatorView({
                         </div>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1190,10 +1195,12 @@ export default function MobileFireSimulatorView({
                             }}
                             value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                             placeholder="e.g. 250000"
-                            onClick={() => handleStep1Change('simpleInvestments', null)}
                             onChange={(e) => {
                               const val = e.target.value;
                               handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                            }}
+                            onBlur={(e) => {
+                              handleStep1Change('simpleInvestments', clampMoneyValue(e.target.value));
                             }}
                           />
                         </div>
@@ -1219,10 +1226,7 @@ export default function MobileFireSimulatorView({
                           </button>
                         </div>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
+                          <PercentInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1238,7 +1242,6 @@ export default function MobileFireSimulatorView({
                             }}
                             value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                             placeholder="e.g. 20"
-                            onClick={() => setSavingsRateOverride('')}
                             onChange={(e) => {
                               const val = e.target.value;
                               setSavingsRateOverride(val);
@@ -1254,8 +1257,17 @@ export default function MobileFireSimulatorView({
                               const newExpenses = Math.round(income * (1 - clampedRate / 100));
                               handleStep1Change('simpleExpenses', newExpenses);
                             }}
-                            onBlur={() => {
+                            onBlur={(e) => {
                               setSavingsRateOverride(null);
+                              const clamped = clampPercentageValue(e.target.value);
+                              if (clamped !== null) {
+                                if (lastNonZeroSavingsRateRef && lastNonZeroSavingsRateRef.current !== undefined) {
+                                  lastNonZeroSavingsRateRef.current = clamped;
+                                }
+                                const income = Number(inputs.simpleIncome) || 0;
+                                const newExpenses = Math.round(income * (1 - clamped / 100));
+                                handleStep1Change('simpleExpenses', newExpenses);
+                              }
                             }}
                           />
                           <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.75rem', fontWeight: 'bold' }}>%</span>
@@ -1806,25 +1818,25 @@ export default function MobileFireSimulatorView({
                               <div>
                                 <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💵 Income</span>
                                 <strong style={{ fontSize: '0.85rem', color: 'var(--accent-emerald)', display: 'block' }}>
-                                  {formatCurrency(p.income || 0)}/mo
+                                  {formatCompactCurrency(p.income || 0)}/mo
                                 </strong>
                               </div>
                               <div>
                                 <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💸 Expenses</span>
                                 <strong style={{ fontSize: '0.85rem', color: 'var(--accent-rose)', display: 'block' }}>
-                                  {formatCurrency(totalExpenses)}/mo
+                                  {formatCompactCurrency(totalExpenses)}/mo
                                 </strong>
                               </div>
                               <div>
                                 <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>💰 Savings</span>
                                 <strong style={{ fontSize: '0.85rem', color: '#3b82f6', display: 'block' }}>
-                                  {formatCurrency(totalSavings)}/mo
+                                  {formatCompactCurrency(totalSavings)}/mo
                                 </strong>
                               </div>
                               <div>
                                 <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', display: 'block' }}>🏠 Housing Cost</span>
                                 <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)', display: 'block' }}>
-                                  {formatCurrency(p.expenses?.housing || 0)}/mo
+                                  {formatCompactCurrency(p.expenses?.housing || 0)}/mo
                                 </strong>
                               </div>
                             </div>
@@ -1849,7 +1861,7 @@ export default function MobileFireSimulatorView({
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
                                     <div>
                                       <span style={{ color: 'var(--text-tertiary)' }}>Surplus: </span>
-                                      <strong style={{ color: phaseSurplusVal >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{formatCurrency(phaseSurplusVal)}/mo</strong>
+                                      <strong style={{ color: phaseSurplusVal >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{formatCompactCurrency(phaseSurplusVal)}/mo</strong>
                                     </div>
                                     <div>
                                       <span style={{ color: 'var(--text-tertiary)' }}>Rate: </span>
@@ -2035,33 +2047,33 @@ export default function MobileFireSimulatorView({
                     <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Net Worth</span>
                       <strong style={{ fontSize: '0.95rem', color: yearData.netWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
-                        {formatCurrency(yearData.netWorth)}
+                        {formatCompactCurrency(yearData.netWorth)}
                       </strong>
                     </div>
                     <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio / Assets</span>
                       <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
-                        {formatCurrency(yearData.assets)}
+                        {formatCompactCurrency(yearData.assets)}
                       </strong>
                     </div>
                     {yearData.debt > 0 && (
                       <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Total Debt</span>
                         <strong style={{ fontSize: '0.95rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.15rem' }}>
-                          {formatCurrency(yearData.debt)}
+                          {formatCompactCurrency(yearData.debt)}
                         </strong>
                       </div>
                     )}
                     <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Income</span>
                       <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
-                        {formatCurrency(yearData.income)}
+                        {formatCompactCurrency(yearData.income)}
                       </strong>
                     </div>
                     <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Spending</span>
                       <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.15rem' }}>
-                        {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
+                        {formatCompactCurrency(yearData.expenses - (yearData.taxes || 0))}
                       </strong>
                     </div>
                     <div style={{ padding: '0.5rem 0.65rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
@@ -2074,7 +2086,7 @@ export default function MobileFireSimulatorView({
                         display: 'block', 
                         marginTop: '0.15rem' 
                       }}>
-                        {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
+                        {yearData.withdrawals > 0 ? `-${formatCompactCurrency(yearData.withdrawals)}` : `+${formatCompactCurrency(yearData.savings)}`}
                       </strong>
                     </div>
                   </div>
@@ -2583,7 +2595,7 @@ export default function MobileFireSimulatorView({
               {/* Large Typography Budget Layout */}
               <div className="mobile-budget-income-section">
                 <div className="mobile-budget-income-label">Income</div>
-                <div className="mobile-budget-income-val">{formatCurrency(selectedPhaseObj.income || 0)}</div>
+                <div className="mobile-budget-income-val">{formatCompactCurrency(selectedPhaseObj.income || 0)}</div>
                 <div className="mobile-budget-income-sub">After tax</div>
               </div>
 
@@ -2613,18 +2625,18 @@ export default function MobileFireSimulatorView({
                   <div className="mobile-budget-categories-row">
                     <div className="mobile-budget-cat">
                       <div className="mobile-budget-cat-label">Needs</div>
-                      <div className="mobile-budget-cat-val val-red">{formatCurrency(phaseNeedsTotal)}</div>
+                      <div className="mobile-budget-cat-val val-red">{formatCompactCurrency(phaseNeedsTotal)}</div>
                       <div className="mobile-budget-cat-pct">{needsPct}%</div>
                     </div>
                     <div className="mobile-budget-cat">
                       <div className="mobile-budget-cat-label">Wants</div>
-                      <div className="mobile-budget-cat-val val-orange">{formatCurrency(phaseWantsTotal)}</div>
+                      <div className="mobile-budget-cat-val val-orange">{formatCompactCurrency(phaseWantsTotal)}</div>
                       <div className="mobile-budget-cat-pct">{wantsPct}%</div>
                     </div>
                     <div className="mobile-budget-cat">
                       <div className="mobile-budget-cat-label">Save & Invest</div>
                       <div className="mobile-budget-cat-val val-blue">
-                        {phaseSavingsTotal < 0 ? '-' : ''}{formatCurrency(Math.abs(phaseSavingsTotal))}
+                        {phaseSavingsTotal < 0 ? '-' : ''}{formatCompactCurrency(Math.abs(phaseSavingsTotal))}
                       </div>
                       <div className="mobile-budget-cat-pct">{savingsPct}%</div>
                     </div>

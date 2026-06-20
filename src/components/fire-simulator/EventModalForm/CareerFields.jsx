@@ -1,4 +1,5 @@
 import React from 'react';
+import { CurrencyInput, PercentInput } from '../../ui/PlainInputs';
 
 export default function CareerFields({
   editingEvent,
@@ -42,8 +43,7 @@ export default function CareerFields({
       {(editingEvent.incomeChangeType === 'increaseByAmount') ? (
         <div className="input-wrapper">
           <span className="input-name">Salary Increase Amount ($/yr)</span>
-          <input
-            type="number"
+          <CurrencyInput
             className="input-number-box"
             style={{ width: '100%' }}
             value={editingEvent.salaryIncrease !== undefined ? editingEvent.salaryIncrease : editingEvent.amount}
@@ -56,8 +56,7 @@ export default function CareerFields({
       ) : (
         <div className="input-wrapper">
           <span className="input-name">New Annual Income ($/yr)</span>
-          <input
-            type="number"
+          <CurrencyInput
             className="input-number-box"
             style={{ width: '100%' }}
             value={editingEvent.amount}
@@ -68,8 +67,7 @@ export default function CareerFields({
 
       <div className="input-wrapper">
         <span className="input-name">Raise / Growth Rate (%)</span>
-        <input
-          type="number"
+        <PercentInput
           className="input-number-box"
           style={{ width: '100%' }}
           value={editingEvent.growthRate}

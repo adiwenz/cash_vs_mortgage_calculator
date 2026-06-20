@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { formatCurrency } from './helpers';
+import { formatCurrency, clampAgeValue, clampMoneyValue, clampPercentageValue } from './helpers';
+import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
 
 export default function TodayScreen({
   inputs,
@@ -30,7 +31,7 @@ export default function TodayScreen({
   }, [inputs.lifeEvents]);
 
   return (
-    <div className="today-screen-layout" style={{ alignItems: 'stretch' }}>
+    <div className="onboarding-today-layout" style={{ display: 'flex', flexDirection: 'row', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch' }}>
       {/* Inputs Grid */}
       <div className="glass-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column' }}>
         <h2 className="card-title" style={{ fontSize: '1.3rem', marginBottom: '0.25rem' }}>Your Life Today</h2>
@@ -48,10 +49,13 @@ export default function TodayScreen({
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.currentAge === null ? '' : inputs.currentAge}
                 placeholder="e.g. 35"
-                onClick={() => handleStep1Change('currentAge', null)}
                 onChange={(e) => {
                   const val = e.target.value;
                   handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
+                }}
+                onBlur={(e) => {
+                  const clamped = clampAgeValue(e.target.value);
+                  handleStep1Change('currentAge', clamped);
                 }}
               />
             </div>
@@ -63,18 +67,14 @@ export default function TodayScreen({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
               <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                 placeholder="e.g. 120000"
-                onClick={() => {
+                useCompact={true}
+                onFocus={() => {
                   setActiveSavingsRate(simpleSavingsRate);
-                  handleStep1Change('simpleIncome', null);
-                }}
-                onBlur={() => {
-                  setActiveSavingsRate(null);
                 }}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -83,6 +83,16 @@ export default function TodayScreen({
                   if (newIncome !== null) {
                     const rate = activeSavingsRate !== null ? activeSavingsRate : simpleSavingsRate;
                     const newExpenses = Math.round(newIncome * (1 - rate / 100));
+                    handleStep1Change('simpleExpenses', newExpenses);
+                  }
+                }}
+                onBlur={(e) => {
+                  setActiveSavingsRate(null);
+                  const clamped = clampMoneyValue(e.target.value);
+                  handleStep1Change('simpleIncome', clamped);
+                  if (clamped !== null) {
+                    const rate = simpleSavingsRate;
+                    const newExpenses = Math.round(clamped * (1 - rate / 100));
                     handleStep1Change('simpleExpenses', newExpenses);
                   }
                 }}
@@ -106,16 +116,12 @@ export default function TodayScreen({
                   📊 Calculate from budget
                 </button>
               </div>
-              <input
-                type="number"
-                min="0"
-                max="100"
+              <PercentInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                 placeholder="e.g. 20"
-                onClick={() => setSavingsRateOverride('')}
-                onBlur={() => setSavingsRateOverride(null)}
+                onFocus={() => setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate))}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSavingsRateOverride(val);
@@ -130,6 +136,18 @@ export default function TodayScreen({
                   const income = Number(inputs.simpleIncome) || 0;
                   const newExpenses = Math.round(income * (1 - clampedRate / 100));
                   handleStep1Change('simpleExpenses', newExpenses);
+                }}
+                onBlur={(e) => {
+                  setSavingsRateOverride(null);
+                  const clamped = clampPercentageValue(e.target.value);
+                  if (clamped !== null) {
+                    if (lastNonZeroSavingsRateRef) {
+                      lastNonZeroSavingsRateRef.current = clamped;
+                    }
+                    const income = Number(inputs.simpleIncome) || 0;
+                    const newExpenses = Math.round(income * (1 - clamped / 100));
+                    handleStep1Change('simpleExpenses', newExpenses);
+                  }
                 }}
               />
             </div>
@@ -151,16 +169,19 @@ export default function TodayScreen({
                   ✏️ Details
                 </button>
               </div>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                 placeholder="e.g. 250000"
-                onClick={() => handleStep1Change('simpleInvestments', null)}
+                useCompact={true}
                 onChange={(e) => {
                   const val = e.target.value;
                   handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
+                }}
+                onBlur={(e) => {
+                  const clamped = clampMoneyValue(e.target.value);
+                  handleStep1Change('simpleInvestments', clamped);
                 }}
               />
             </div>
