@@ -3266,6 +3266,22 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
 }
 
+@media (max-width: 768px) {
+  .outcome-hero-card {
+    flex-direction: column !important;
+  }
+  .outcome-hero-card > div {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+  }
+  .hero-landscape-container {
+    border-left: none !important;
+    border-top: 1px solid var(--border-color) !important;
+    min-height: 140px !important;
+    min-width: 100% !important;
+  }
+}
+
 /* 3-Layer Timeline Row Compressions */
 .timeline-row.compact-row {
   border-bottom: 1px solid var(--border-color);
@@ -3349,5 +3365,20 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   color: var(--text-primary);
+}
+
+.action-card-hover {
+  transition: all var(--transition-fast) !important;
+}
+
+.action-card-hover:hover {
+  border-color: var(--primary) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  background-color: var(--bg-card-hover) !important;
+}
+
+.popover-item-hover:hover {
+  background: var(--bg-tertiary) !important;
 }
 

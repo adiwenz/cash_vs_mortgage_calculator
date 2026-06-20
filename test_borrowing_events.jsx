@@ -143,7 +143,7 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     
     // Check baseline events on the timeline
     expect(screen.getAllByText(/Today/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Can Stop Working/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/You're Set!/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Social Security/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Life Expectancy/i).length).toBeGreaterThan(0);
   });

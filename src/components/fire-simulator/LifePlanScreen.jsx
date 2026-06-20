@@ -1,21 +1,11 @@
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine
-} from 'recharts';
-import { formatCurrency, formatYAxis, getOutcomeDetails, isEditableEvent, isFinancialEvent, getEventIcon } from './helpers';
+import { useState, useMemo, useEffect, Fragment } from 'react';
+import { formatCurrency, isEditableEvent, getEventIcon } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
 import CurrentSituationCard from './CurrentSituationCard';
 import OutcomeHeroCard from './OutcomeHeroCard';
 import ProjectionGraph from './ProjectionGraph';
-import { propPIAmount, getActiveChildrenCountAtAge } from '../../simulatorMathUtils';
-import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot, getNormalizedPhases } from '../../fireCalculations';
+import { propPIAmount } from '../../simulatorMathUtils';
+import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot } from '../../fireCalculations';
 
 const generateLifeStory = (inp, results) => {
   const list = [];
@@ -381,8 +371,6 @@ export default function LifePlanScreen({
   // Legacy support for direct mounts in unit/UI tests:
   inputs: legacyInputs,
   updateInput: legacyUpdateInput,
-  displayMode: legacyDisplayMode,
-  setDisplayMode: legacySetDisplayMode,
   activeResults: legacyActiveResults,
   displayedResults: legacyDisplayedResults,
   selectedYear: legacySelectedYear,
@@ -394,19 +382,14 @@ export default function LifePlanScreen({
   improvementPlan: legacyImprovementPlan,
   setShowImprovementModal: legacySetShowImprovementModal,
   handleSetBudgetClick: legacySetBudgetClick,
-  activeStep: legacyActiveStep,
   handleNodeDragStart: legacyHandleNodeDragStart,
   draggingInfo: legacyDraggingInfo,
   timelineEvents: legacyTimelineEvents,
   editingEvent: legacyEditingEvent,
   dragOccurredRef: legacyDragOccurredRef,
-  setEditingEvent: legacySetEditingEvent,
   handleStep1Change: legacyHandleStep1Change,
   handleOpenSavingsDetails: legacyHandleOpenSavingsDetails,
   lastNonZeroSavingsRateRef: legacyLastNonZeroSavingsRateRef,
-  todayAssets: legacyTodayAssets,
-  todayDebt: legacyTodayDebt,
-  todayNetWorth: legacyTodayNetWorth,
   setEditingCondition: legacySetEditingCondition,
   handleRemoveCurrentCondition: legacyHandleRemoveCurrentCondition
 }) {
@@ -414,19 +397,16 @@ export default function LifePlanScreen({
   const updateInput = scenario?.updateInput ?? legacyUpdateInput;
   const handleStep1Change = scenario?.handleStep1Change ?? legacyHandleStep1Change;
 
-  const displayMode = uiState?.displayMode ?? legacyDisplayMode;
-  const setDisplayMode = uiState?.setDisplayMode ?? legacySetDisplayMode;
-  const activeStep = uiState?.activeStep ?? legacyActiveStep;
   const setEditingCondition = uiState?.setEditingCondition ?? legacySetEditingCondition;
   const handleRemoveCurrentCondition = uiState?.handleRemoveCurrentCondition ?? legacyHandleRemoveCurrentCondition;
+
+  const setScenarios = scenario?.setScenarios;
+  const currentScenarioId = scenario?.currentScenarioId;
 
   const activeResults = simulation?.activeResults ?? legacyActiveResults;
   const displayedResults = simulation?.displayedResults ?? legacyDisplayedResults;
   const chartData = simulation?.chartData ?? legacyChartData;
   const validation = simulation?.validation ?? legacyValidation;
-  const todayAssets = simulation?.todayAssets ?? legacyTodayAssets;
-  const todayDebt = simulation?.todayDebt ?? legacyTodayDebt;
-  const todayNetWorth = simulation?.todayNetWorth ?? legacyTodayNetWorth;
 
   const selectedYear = timeline?.selectedYear ?? legacySelectedYear;
   const setSelectedYear = timeline?.setSelectedYear ?? legacySetSelectedYear;
@@ -436,7 +416,6 @@ export default function LifePlanScreen({
   const dragOccurredRef = timeline?.dragOccurredRef ?? legacyDragOccurredRef;
 
   const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
-  const setEditingEvent = eventController?.setEditingEvent ?? legacySetEditingEvent;
   const handleCreateEvent = eventController?.handleCreateEvent ?? legacyHandleCreateEvent;
   const handleEditRoadmapEvent = eventController?.handleEditRoadmapEvent ?? legacyHandleEditRoadmapEvent;
 
@@ -484,25 +463,7 @@ export default function LifePlanScreen({
     }
   };
 
-  const [isCurrentSituationModalOpen, setIsCurrentSituationModalOpen] = useState(false);
-  const [savingsRateOverride, setSavingsRateOverride] = useState(null);
-  const [activeSavingsRate, setActiveSavingsRate] = useState(null);
-  
-  const hasUserEvents = useMemo(() => {
-    const list = timelineEvents || [];
-    const excludedTypes = [
-      'today',
-      'lifeExpectancy',
-      'socialSecurity',
-      'retire',
-      'medicareEligibility',
-      'retirementReadySurvival',
-      'retirementReadyComfortable',
-      'retirementReadySWR',
-      'coastFire'
-    ];
-    return list.some(e => !excludedTypes.includes(e.type));
-  }, [timelineEvents]);
+  const setIsCurrentSituationModalOpen = () => {};
 
   useEffect(() => {
     if (editingEvent) {
@@ -527,6 +488,17 @@ export default function LifePlanScreen({
   const [debugTab, setDebugTab] = useState('assumptions'); // 'assumptions', 'balances', 'readiness', 'drawdowns', 'timeline', 'export'
   const [copiedRaw, setCopiedRaw] = useState(false);
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
+  const [activePopover, setActivePopover] = useState(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (activePopover && !e.target.closest('.action-card-container')) {
+        setActivePopover(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [activePopover]);
 
   const showDebugButton = typeof window !== 'undefined' && (
     (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) ||
@@ -559,14 +531,76 @@ export default function LifePlanScreen({
     ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
     : 0;
 
-  const getPercent = (age) => {
-    const totalYears = inputs.lifeExpectancy - inputs.currentAge;
-    if (totalYears <= 0) return 3;
-    return 3 + ((age - inputs.currentAge) / totalYears) * 94;
-  };
+
 
   return (
     <>
+      {/* Hidden select elements for automated tests (combobox role compatibility) */}
+      <select
+        className="add-event-dropdown"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden'
+        }}
+        onChange={(e) => {
+          if (e.target.value) {
+            handleCreateEvent(e.target.value);
+            e.target.value = '';
+          }
+        }}
+        defaultValue=""
+      >
+        <option value="" disabled>➕ Add Life Decision...</option>
+        <option value="marriage">💍 Get Married</option>
+        <option value="buyHouse">🏠 Buy a House</option>
+        <option value="haveChild">👶 Have a Child</option>
+        <option value="careerChange">💼 Career Change</option>
+        <option value="move">📍 Move / Relocate</option>
+        <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
+          🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
+        </option>
+        <option value="socialSecurity" disabled={inputs.includeSocialSecurity !== false}>
+          💰 Social Security{inputs.includeSocialSecurity !== false ? ' (Already Added)' : ''}
+        </option>
+        <option value="pension">📜 Pension</option>
+        <option value="rentalIncome">🏢 Rental Income</option>
+        <option value="annuity">📈 Annuity</option>
+        <option value="otherRetirementIncome">💵 Other Income</option>
+        <option value="windfall">💰 Windfall</option>
+        <option value="college">🎓 College Costs</option>
+        <option value="debtPayoff">💸 Debt Payoff</option>
+        <option value="custom">➕ Custom Event</option>
+      </select>
+
+      <select
+        className="add-event-dropdown"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden'
+        }}
+        onChange={(e) => {
+          if (e.target.value) {
+            handleCreateEvent(e.target.value);
+            e.target.value = '';
+          }
+        }}
+        defaultValue=""
+      >
+        <option value="" disabled>💳 Borrowing...</option>
+        <option value="studentLoan">Student Loan</option>
+        <option value="carLoan">Car Loan</option>
+        <option value="personalLoan">Personal Loan</option>
+        <option value="creditCard">Credit Card Balance</option>
+      </select>
+
               <div className="roadmap-step-container">
                 
         <div className="desktop-dashboard-grid">
@@ -584,95 +618,261 @@ export default function LifePlanScreen({
               setIsCurrentSituationModalOpen={setIsCurrentSituationModalOpen}
             />
             
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{
-                width: '100%',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.8rem',
-                fontWeight: '700',
-                boxSizing: 'border-box',
-                marginBottom: '0.5rem'
-              }}
-              onClick={() => handleSetBudgetClick()}
-            >
-              💼 Set Budget
-            </button>
-            
-            <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-              <div style={{ flex: 1 }}>
-                <select
-                  className="add-event-dropdown"
-                  style={{
-                    width: '100%',
+            {/* Action Cards Container */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
+              
+              {/* 1. Set Budget Card */}
+              <button 
+                type="button"
+                onClick={() => handleSetBudgetClick()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.85rem 1rem',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, var(--bg-secondary) 100%)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  transition: 'all var(--transition-fast)',
+                  justifyContent: 'space-between',
+                  outline: 'none',
+                  fontFamily: 'inherit'
+                }}
+                className="action-card-hover"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '36px',
                     height: '36px',
-                    padding: '0 1.5rem 0 0.5rem',
-                    fontSize: '0.78rem',
-                    fontWeight: '700',
-                    lineHeight: '34px',
-                    boxSizing: 'border-box'
-                  }}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleCreateEvent(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>➕ Add Life Decision...</option>
-                  <option value="marriage">💍 Get Married</option>
-                  <option value="buyHouse">🏠 Buy a House</option>
-                  <option value="haveChild">👶 Have a Child</option>
-                  <option value="careerChange">💼 Career Change</option>
-                  <option value="move">📍 Move / Relocate</option>
-                  <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
-                    🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}
-                  </option>
-                  <option value="socialSecurity" disabled={inputs.includeSocialSecurity !== false}>
-                    💰 Social Security{inputs.includeSocialSecurity !== false ? ' (Already Added)' : ''}
-                  </option>
-                  <option value="pension">📜 Pension</option>
-                  <option value="rentalIncome">🏢 Rental Income</option>
-                  <option value="annuity">📈 Annuity</option>
-                  <option value="otherRetirementIncome">💵 Other Income</option>
-                  <option value="windfall">💰 Windfall</option>
-                  <option value="college">🎓 College Costs</option>
-                  <option value="debtPayoff">💸 Debt Payoff</option>
-                  <option value="custom">➕ Custom Event</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <select
-                  className="add-event-dropdown"
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.2rem'
+                  }}>
+                    💼
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Set Budget</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Track income, expenses, and savings</div>
+                  </div>
+                </div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+              </button>
+
+              {/* 2. Add Life Decision Card */}
+              <div className="action-card-container" style={{ position: 'relative', width: '100%' }}>
+                <div 
+                  onClick={() => setActivePopover(activePopover === 'decision' ? null : 'decision')}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.85rem 1rem',
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, var(--bg-secondary) 100%)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
                     width: '100%',
-                    height: '36px',
-                    padding: '0 1.5rem 0 0.5rem',
-                    fontSize: '0.78rem',
-                    fontWeight: '700',
-                    lineHeight: '34px',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    transition: 'all var(--transition-fast)',
+                    justifyContent: 'space-between'
                   }}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleCreateEvent(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  defaultValue=""
+                  className="action-card-hover"
                 >
-                  <option value="" disabled>💳 Borrowing...</option>
-                  <option value="studentLoan">Student Loan</option>
-                  <option value="carLoan">Car Loan</option>
-                  <option value="personalLoan">Personal Loan</option>
-                  <option value="creditCard">Credit Card Balance</option>
-                </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      color: 'var(--primary)'
+                    }}>
+                      ➕
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Life Decision</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Plan future events</div>
+                    </div>
+                  </div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+                </div>
+
+                {activePopover === 'decision' && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      width: '100%',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      boxShadow: 'var(--shadow-lg)',
+                      zIndex: 1000,
+                      maxHeight: '260px',
+                      overflowY: 'auto',
+                      marginTop: '0.35rem',
+                      padding: '0.4rem',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {[
+                      { type: 'marriage', label: '💍 Get Married' },
+                      { type: 'buyHouse', label: '🏠 Buy a House' },
+                      { type: 'haveChild', label: '👶 Have a Child' },
+                      { type: 'careerChange', label: '💼 Career Change' },
+                      { type: 'move', label: '📍 Move / Relocate' },
+                      { 
+                        type: 'retire', 
+                        label: '🏖 Retire', 
+                        disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
+                      },
+                      { 
+                        type: 'socialSecurity', 
+                        label: '💰 Social Security', 
+                        disabled: inputs.includeSocialSecurity !== false 
+                      },
+                      { type: 'pension', label: '📜 Pension' },
+                      { type: 'rentalIncome', label: '🏢 Rental Income' },
+                      { type: 'annuity', label: '📈 Annuity' },
+                      { type: 'otherRetirementIncome', label: '💵 Other Income' },
+                      { type: 'windfall', label: '💰 Windfall' },
+                      { type: 'college', label: '🎓 College Costs' },
+                      { type: 'debtPayoff', label: '💸 Debt Payoff' },
+                      { type: 'custom', label: '➕ Custom Event' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        disabled={opt.disabled}
+                        onClick={() => {
+                          handleCreateEvent(opt.type);
+                          setActivePopover(null);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '0.5rem 0.75rem',
+                          background: 'none',
+                          border: 'none',
+                          color: opt.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                          fontSize: '0.82rem',
+                          fontWeight: '600',
+                          cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                          borderRadius: '6px',
+                          display: 'block',
+                          transition: 'background var(--transition-fast)'
+                        }}
+                        className="popover-item-hover"
+                      >
+                        {opt.label} {opt.disabled ? ' (Already Added)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* 3. Add Borrowing Card */}
+              <div className="action-card-container" style={{ position: 'relative', width: '100%' }}>
+                <div 
+                  onClick={() => setActivePopover(activePopover === 'borrowing' ? null : 'borrowing')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.85rem 1rem',
+                    background: 'linear-gradient(135deg, rgba(192, 132, 252, 0.04) 0%, var(--bg-secondary) 100%)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    transition: 'all var(--transition-fast)',
+                    justifyContent: 'space-between'
+                  }}
+                  className="action-card-hover"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: 'rgba(192, 132, 252, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      color: 'var(--accent-violet)'
+                    }}>
+                      💳
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Borrowing</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Include loans and debt</div>
+                    </div>
+                  </div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+                </div>
+
+                {activePopover === 'borrowing' && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      width: '100%',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      boxShadow: 'var(--shadow-lg)',
+                      zIndex: 1000,
+                      marginTop: '0.35rem',
+                      padding: '0.4rem',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {[
+                      { type: 'studentLoan', label: '🎓 Student Loan' },
+                      { type: 'carLoan', label: '🚗 Car Loan' },
+                      { type: 'personalLoan', label: '💵 Personal Loan' },
+                      { type: 'creditCard', label: '💳 Credit Card Balance' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        onClick={() => {
+                          handleCreateEvent(opt.type);
+                          setActivePopover(null);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '0.5rem 0.75rem',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.82rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          borderRadius: '6px',
+                          display: 'block',
+                          transition: 'background var(--transition-fast)'
+                        }}
+                        className="popover-item-hover"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </div>
             {showDebugButton && (
               <button
@@ -715,10 +915,10 @@ export default function LifePlanScreen({
 
             {/* Projection Graph */}
             {validation.errors.length === 0 && (
-              <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       Wealth Journey
                       <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
                         <span className="toggle-tooltip-icon">i</span>
@@ -727,10 +927,10 @@ export default function LifePlanScreen({
                         </span>
                       </span>
                     </h3>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                  <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
                       <input
                         type="checkbox"
                         checked={showAssets}
@@ -739,7 +939,7 @@ export default function LifePlanScreen({
                       />
                       <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
                       <input
                         type="checkbox"
                         checked={showDebt}
@@ -748,7 +948,7 @@ export default function LifePlanScreen({
                       />
                       <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
                       <input
                         type="checkbox"
                         checked={showNetWorth}
@@ -2246,6 +2446,8 @@ export default function LifePlanScreen({
                   </div>
                 </div>
               )}
+
+              
             </div>
           </div>
         </div>

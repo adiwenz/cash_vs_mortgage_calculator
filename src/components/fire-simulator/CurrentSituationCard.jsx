@@ -65,12 +65,12 @@ export default function CurrentSituationCard({
       borderRadius: '12px'
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h3 
-          style={{ fontSize: '0.9rem', fontWeight: '700', margin: 0, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
+          style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
           onClick={() => setIsCurrentSituationModalOpen(true)}
         >
-          👤 Current Situation
+          🌱 Your Current Situation
         </h3>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
@@ -79,8 +79,8 @@ export default function CurrentSituationCard({
               background: 'none',
               border: 'none',
               color: 'var(--primary)',
-              fontSize: '0.75rem',
-              fontWeight: '600',
+              fontSize: '0.8rem',
+              fontWeight: '700',
               cursor: 'pointer',
               padding: '0.15rem 0.35rem'
             }}
@@ -95,8 +95,8 @@ export default function CurrentSituationCard({
               background: 'none',
               border: 'none',
               color: 'var(--primary)',
-              fontSize: '0.75rem',
-              fontWeight: '600',
+              fontSize: '0.8rem',
+              fontWeight: '700',
               cursor: 'pointer',
               padding: '0.15rem 0.35rem'
             }}
@@ -107,18 +107,18 @@ export default function CurrentSituationCard({
       </div>
 
       {/* Values List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {/* Row 1: Age */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Age</span>
-          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '4px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', padding: '0.2rem 0' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🎂 Age</span>
+          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '8px' }} />
           <input
             type="number"
             className="input-number-box borderless-input"
             style={{
-              width: '80px',
-              height: '24px',
-              fontSize: '0.85rem',
+              width: '90px',
+              height: '28px',
+              fontSize: '1.05rem',
               padding: '0.15rem 0.35rem',
               textAlign: 'right',
               background: 'transparent',
@@ -136,19 +136,19 @@ export default function CurrentSituationCard({
         </div>
 
         {/* Row 2: Annual Income */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Annual Income</span>
-          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '4px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', padding: '0.2rem 0' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>💰 Annual Income</span>
+          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '8px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>$</span>
+            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: '600' }}>$</span>
             <input
               type="number"
               className="input-number-box borderless-input"
               style={{
-                width: '90px',
-                height: '24px',
-                fontSize: '0.85rem',
-                padding: '0.15rem 0.35rem 0.15rem 0.85rem',
+                width: '100px',
+                height: '28px',
+                fontSize: '1.05rem',
+                padding: '0.15rem 0.35rem 0.15rem 1rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -172,19 +172,19 @@ export default function CurrentSituationCard({
         </div>
 
         {/* Row 3: Annual Spending */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Annual Spending</span>
-          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '4px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', padding: '0.2rem 0' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🛒 Annual Spending</span>
+          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '8px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>$</span>
+            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: '600' }}>$</span>
             <input
               type="number"
               className="input-number-box borderless-input"
               style={{
-                width: '90px',
-                height: '24px',
-                fontSize: '0.85rem',
-                padding: '0.15rem 0.35rem 0.15rem 0.85rem',
+                width: '100px',
+                height: '28px',
+                fontSize: '1.05rem',
+                padding: '0.15rem 0.35rem 0.15rem 1rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -200,19 +200,19 @@ export default function CurrentSituationCard({
         </div>
 
         {/* Row 4: Current Savings */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Current Savings</span>
-          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '4px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', padding: '0.2rem 0' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🏦 Current Savings</span>
+          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '8px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>$</span>
+            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.9rem', fontWeight: '600' }}>$</span>
             <input
               type="number"
               className="input-number-box borderless-input"
               style={{
-                width: '90px',
-                height: '24px',
-                fontSize: '0.85rem',
-                padding: '0.15rem 0.35rem 0.15rem 0.85rem',
+                width: '100px',
+                height: '28px',
+                fontSize: '1.05rem',
+                padding: '0.15rem 0.35rem 0.15rem 1rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -230,9 +230,9 @@ export default function CurrentSituationCard({
         </div>
 
         {/* Row 5: Savings Rate */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', padding: '0.2rem 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Savings Rate</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>📈 Savings Rate</span>
             <button
               type="button"
               onClick={() => handleSetBudgetClick()}
@@ -240,8 +240,8 @@ export default function CurrentSituationCard({
                 background: 'none',
                 border: 'none',
                 color: 'var(--primary)',
-                fontSize: '0.65rem',
-                fontWeight: '600',
+                fontSize: '0.75rem',
+                fontWeight: '700',
                 cursor: 'pointer',
                 padding: 0,
                 textDecoration: 'underline'
@@ -250,7 +250,7 @@ export default function CurrentSituationCard({
               Budget
             </button>
           </div>
-          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '4px' }} />
+          <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.5rem', alignSelf: 'flex-end', marginBottom: '8px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
               type="number"
@@ -258,9 +258,9 @@ export default function CurrentSituationCard({
               max="100"
               className="input-number-box borderless-input"
               style={{
-                width: '80px',
-                height: '24px',
-                fontSize: '0.85rem',
+                width: '90px',
+                height: '28px',
+                fontSize: '1.05rem',
                 padding: '0.15rem 0.55rem 0.15rem 0.35rem',
                 textAlign: 'right',
                 color: 'var(--accent-emerald)',
@@ -276,7 +276,7 @@ export default function CurrentSituationCard({
               onChange={(e) => handleSavingsRateChange(e.target.value)}
               onBlur={() => setSavingsRateOverride(null)}
             />
-            <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.75rem', fontWeight: 'bold' }}>%</span>
+            <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.85rem', fontWeight: 'bold' }}>%</span>
           </div>
         </div>
       </div>

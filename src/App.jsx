@@ -246,7 +246,7 @@ export default function App() {
       {/* App Header */}
       <header className="app-header">
         <div className="brand-section">
-          <img src={logoImg} alt="ProsperCalc" className="brand-logo-img" />
+          <img src={logoImg} alt="Finley" className="brand-logo-img" />
           <div className="brand-separator" />
           <div className="brand-title">
             {activeTool === 'cashVsMortgageSimple' ? (
@@ -266,8 +266,8 @@ export default function App() {
               </>
             ) : activeTool === 'fireSimulator' ? (
               <>
-                <h1>FIRE & Life Simulator</h1>
-                <p>Interactive compounding life-planning and financial independence simulator</p>
+                <h1>Financial Freedom Planner</h1>
+                <p style={{ margin: 0 }}>Model life decisions and discover when work becomes optional. 💛</p>
               </>
             ) : activeTool === 'savingsAllocator' ? (
               <>

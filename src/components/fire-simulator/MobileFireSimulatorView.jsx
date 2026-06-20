@@ -17,7 +17,7 @@ import { formatCurrency, getAssetLabel, isEditableEvent, formatYAxis, getOutcome
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
-import MobileWorkOptionalHero from './MobileWorkOptionalHero';
+import OutcomeHeroCard from './OutcomeHeroCard';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import ChildPlanningModal from './ChildPlanningModal';
@@ -1264,10 +1264,13 @@ export default function MobileFireSimulatorView({
               </div>
 
               {/* 2. ROADMAP VISUAL HERO & TIMELINE FROM MAIN */}
-              <MobileWorkOptionalHero
-                workOptionalAge={activeResults.retirementReadyAge}
-                trackPercent={isPlanOnTrack ? '78%' : '45%'}
-                isPlanOnTrack={isPlanOnTrack}
+              <OutcomeHeroCard
+                readyAge={activeResults.retirementReadyAge}
+                targetRetirementAge={activeResults.targetRetirementAge}
+                planStatus={activeResults.retirementOutcome}
+                runOutAge={activeResults.runOutAge}
+                onViewRecommendations={() => setShowImprovementModal(true)}
+                hasRecommendations={improvementPlan?.rankedPlan?.length > 0}
               />
 
               {/* Compact status card */}

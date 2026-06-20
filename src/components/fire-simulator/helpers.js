@@ -461,7 +461,7 @@ export const getEventIcon = (evt) => {
     return ''; // neutral endpoint circle only
   }
   if (evt.type?.startsWith('retirementReady')) {
-    return '🎉';
+    return '🎯';
   }
   if (evt.type === 'retire') {
     return '🏖️';
