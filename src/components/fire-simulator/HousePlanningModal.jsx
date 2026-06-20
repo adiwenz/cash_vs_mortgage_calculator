@@ -16,12 +16,15 @@ export default function HousePlanningModal({
   scenario,
   eventController,
   simulation,
+  uiState,
   onClose
 }) {
   const inputs = scenario?.inputs || {};
   const editingEvent = eventController?.editingEvent;
   const handleSaveEvent = eventController?.handleSaveEvent;
   const handleDeleteEvent = eventController?.handleDeleteEvent;
+
+  const isMobile = uiState?.isMobile || false;
 
   const isNew = !editingEvent || !editingEvent.id || editingEvent.isNew;
   const [isPriceTouched, setIsPriceTouched] = useState(!isNew);
