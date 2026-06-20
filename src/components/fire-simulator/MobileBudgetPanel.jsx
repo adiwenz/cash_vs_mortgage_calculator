@@ -83,7 +83,7 @@ export default function MobileBudgetPanel({
         <button 
           type="button" 
           onClick={handleCloseBudgetModal}
-          style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '1.25rem', padding: '0.5rem' }}
+          className="modal-close-btn"
         >
           ✖
         </button>
@@ -115,12 +115,12 @@ export default function MobileBudgetPanel({
                 flex: '0 0 auto',
                 padding: '0.4rem 0.85rem',
                 fontSize: '0.78rem',
-                borderRadius: '6px',
-                border: isActive ? '2px solid var(--accent-navy)' : '1px solid var(--border-color)'
+                borderRadius: '8px',
+                border: isActive ? '2px solid var(--theme-border-selected, var(--primary))' : '1px solid var(--border-color)'
               }}
               onClick={() => handleSwitchBudgetPhase(p.id)}
             >
-              <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>Age {p.startAge}–{p.endAge}</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Age {p.startAge}–{p.endAge}</div>
               <div style={{ fontWeight: '600' }}>{icons.join('')} {p.label}</div>
             </button>
           );
@@ -139,7 +139,7 @@ export default function MobileBudgetPanel({
             fontSize: '0.78rem',
             lineHeight: '1.4'
           }}>
-            <span style={{ color: '#c084fc', fontWeight: 'bold', display: 'block', marginBottom: '0.2rem' }}>
+            <span style={{ color: '#7c3aed', fontWeight: 'bold', display: 'block', marginBottom: '0.2rem' }}>
               💡 Applying: {pendingImprovement.scenario.title}
             </span>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
@@ -149,7 +149,7 @@ export default function MobileBudgetPanel({
         )}
 
         {/* Phase Summary card */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', display: 'block' }}>Monthly Net Salary</span>
@@ -157,21 +157,21 @@ export default function MobileBudgetPanel({
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', display: 'block' }}>Remaining Balance</span>
-              <strong style={{ fontSize: '1.2rem', color: remainingBalance < 0 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+              <strong style={{ fontSize: '1.2rem', color: remainingBalance < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
                 {formatCurrency(remainingBalance)}
               </strong>
             </div>
           </div>
-          <div style={{ display: 'flex', height: '0.5rem', borderRadius: '4px', overflow: 'hidden', background: '#334155', marginTop: '0.25rem' }}>
+          <div style={{ display: 'flex', height: '0.5rem', borderRadius: '4px', overflow: 'hidden', background: 'var(--border-color)', marginTop: '0.25rem' }}>
             <div style={{ width: `${takeHomeIncome > 0 ? (needsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-emerald)' }} />
             <div style={{ width: `${takeHomeIncome > 0 ? (wantsTotal / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-amber)' }} />
-            <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: 'var(--accent-navy)' }} />
+            <div style={{ width: `${takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0}%`, background: '#7c3aed' }} />
           </div>
         </div>
 
         {/* Needs / Wants / Savings breakdown card */}
         <div style={{ 
-          background: 'rgba(255,255,255,0.02)', 
+          background: 'var(--bg-secondary)', 
           border: '1px solid var(--border-color)', 
           borderRadius: '8px', 
           padding: '0.85rem', 
@@ -191,7 +191,7 @@ export default function MobileBudgetPanel({
               gap: '0.35rem', 
               cursor: 'pointer', 
               paddingBottom: '0.5rem', 
-              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+              borderBottom: '1px solid var(--border-color)' 
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -205,7 +205,7 @@ export default function MobileBudgetPanel({
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               Housing, food, healthcare
             </div>
-            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+            <div style={{ width: '100%', height: '3px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
               <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (needsTotal / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-emerald)' }} />
             </div>
           </div>
@@ -222,7 +222,7 @@ export default function MobileBudgetPanel({
               gap: '0.35rem', 
               cursor: 'pointer', 
               paddingBottom: '0.5rem', 
-              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+              borderBottom: '1px solid var(--border-color)' 
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -236,7 +236,7 @@ export default function MobileBudgetPanel({
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               Dining, travel, fun
             </div>
-            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+            <div style={{ width: '100%', height: '3px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
               <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (wantsTotal / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-amber)' }} />
             </div>
           </div>
@@ -253,11 +253,11 @@ export default function MobileBudgetPanel({
               gap: '0.35rem', 
               cursor: 'pointer', 
               paddingBottom: '0.5rem', 
-              borderBottom: '1px solid rgba(255,255,255,0.05)' 
+              borderBottom: '1px solid var(--border-color)' 
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--accent-navy)', fontWeight: 'bold', fontSize: '0.9rem' }}>Savings</span>
+              <span style={{ color: '#7c3aed', fontWeight: 'bold', fontSize: '0.9rem' }}>Savings</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{isRetirementPhase ? '$0' : formatCurrency(activeSavings)}/mo</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{takeHomeIncome > 0 ? Math.round((activeSavings / takeHomeIncome) * 100) : 0}%</span>
@@ -267,8 +267,8 @@ export default function MobileBudgetPanel({
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               Brokerage, cash, retirement
             </div>
-            <div style={{ width: '100%', height: '3px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
-              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: 'var(--accent-navy)' }} />
+            <div style={{ width: '100%', height: '3px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+              <div style={{ width: `${Math.min(100, takeHomeIncome > 0 ? (activeSavings / takeHomeIncome) * 100 : 0)}%`, height: '100%', background: '#7c3aed' }} />
             </div>
           </div>
 
@@ -277,7 +277,7 @@ export default function MobileBudgetPanel({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.9rem' }}>Remaining</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingRight: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: remainingBalance < 0 ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: remainingBalance < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
                   {formatCurrency(remainingBalance)}/mo
                 </span>
               </div>
@@ -291,7 +291,7 @@ export default function MobileBudgetPanel({
         {/* Strategy Controls (Strategy & Scaling) */}
         {!isRetirementPhase && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Savings Strategy</span>
                 <button
@@ -301,7 +301,7 @@ export default function MobileBudgetPanel({
                     padding: '0.25rem 0.5rem',
                     borderRadius: '4px',
                     border: '1px solid var(--border-color)',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer'
                   }}
@@ -317,7 +317,7 @@ export default function MobileBudgetPanel({
               </span>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Budget Scaling</span>
                 <button
@@ -327,7 +327,7 @@ export default function MobileBudgetPanel({
                     padding: '0.25rem 0.5rem',
                     borderRadius: '4px',
                     border: '1px solid var(--border-color)',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer'
                   }}
@@ -457,7 +457,7 @@ export default function MobileBudgetPanel({
             left: 0, 
             right: 0, 
             bottom: 0, 
-            background: 'var(--bg-secondary, #1e293b)', 
+            background: 'var(--bg-secondary)', 
             zIndex: 2100, 
             display: 'flex', 
             flexDirection: 'column',
@@ -724,11 +724,18 @@ export default function MobileBudgetPanel({
           </div>
 
           {/* Sticky Footer */}
-          <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto', background: 'var(--bg-secondary, #1e293b)' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto', background: 'var(--bg-secondary)' }}>
             <button
               type="button"
-              className="btn-secondary"
-              style={{ flex: 1, padding: '0.65rem', fontSize: '0.85rem', color: 'var(--accent-rose, #f43f5e)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              className="btn-primary"
+              style={{ 
+                flex: 1, 
+                padding: '0.65rem', 
+                fontSize: '0.85rem', 
+                background: 'var(--danger)', 
+                borderColor: 'var(--danger)', 
+                color: '#ffffff' 
+              }}
               onClick={() => {
                 if (activeEditCategory === 'needs') handleClearNeeds();
                 if (activeEditCategory === 'wants') handleClearWants();
