@@ -85,7 +85,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(spouseAgeInput.value).toBe('35'); // starts at age 35
 
     // Click Next to Step 2 (Wedding)
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn);
 
     // Step 2: Wedding
@@ -221,7 +221,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     fireEvent.change(select, { target: { value: 'marriage' } });
     
     // Step through the wizard
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn); // Step 1 -> 2
     fireEvent.click(nextBtn); // Step 2 -> 3
     fireEvent.click(nextBtn); // Step 3 -> 4
@@ -289,7 +289,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     fireEvent.change(select, { target: { value: 'marriage' } });
 
     // Step 1: Click Next
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
+    const nextBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn);
 
     // Step 2: Plan Wedding (Verify defaults)

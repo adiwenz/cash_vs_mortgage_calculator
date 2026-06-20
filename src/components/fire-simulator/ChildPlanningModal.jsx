@@ -148,10 +148,10 @@ export default function ChildPlanningModal({
         </h3>
 
         {step === 1 ? (
-          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
             {/* Hero Section */}
-            <div style={{ position: 'relative', textAlign: 'center', padding: '1rem 0' }}>
+            <div style={{ position: 'relative', textAlign: 'center', padding: '0.5rem 0' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>👶</div>
               <h4 style={{
                 fontSize: '2rem',
@@ -165,7 +165,7 @@ export default function ChildPlanningModal({
               }}>
                 Congrats! 🎉
               </h4>
-              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>
+              <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>
                 You're planning for a new adventure.
               </p>
 
@@ -214,7 +214,7 @@ export default function ChildPlanningModal({
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-              gap: '1.25rem'
+              gap: '1rem'
             }}>
               {/* Age Child Arrives */}
               <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
@@ -279,7 +279,7 @@ export default function ChildPlanningModal({
                     }}
                   /><span style={{ color: 'var(--text-tertiary)', marginLeft: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>/year</span>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.15rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.05rem' }}>
                   Default estimate is $15,000/year. You can adjust this anytime.
                 </span>
               </div>
@@ -298,7 +298,7 @@ export default function ChildPlanningModal({
                   fontSize: '0.85rem',
                   fontWeight: '600',
                   userSelect: 'none',
-                  marginTop: '0.5rem'
+                  marginTop: '0.25rem'
                 }}
               >
                 <span style={{ fontSize: '0.7rem', transform: isAdvancedOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease', display: 'inline-block' }}>▶</span>

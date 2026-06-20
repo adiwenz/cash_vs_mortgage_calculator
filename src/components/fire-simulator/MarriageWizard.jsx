@@ -24,6 +24,14 @@ export default function MarriageWizard({
   const stepId = editingEvent.wizardStep || 1;
   const showTaxesStep = !!inputs.includeTaxes;
 
+  const decorations = [
+    { char: '✨', style: { left: '8%', top: '15%', fontSize: '1.25rem', '--child-dec-rot': '-15deg', opacity: 0.7 } },
+    { char: '⭐', style: { left: '20%', top: '35%', fontSize: '1.4rem', '--child-dec-rot': '10deg', opacity: 0.9 } },
+    { char: '💜', style: { left: '12%', top: '65%', fontSize: '1.2rem', '--child-dec-rot': '-10deg', opacity: 0.75 } },
+    { char: '🎉', style: { right: '10%', top: '20%', fontSize: '1.3rem', '--child-dec-rot': '15deg', opacity: 0.9 } },
+    { char: '🌱', style: { right: '15%', top: '68%', fontSize: '1.2rem', '--child-dec-rot': '5deg', opacity: 0.8 } }
+  ];
+
   const handleNext = () => {
     if (stepId < 4) {
       setEditingEvent({ ...editingEvent, wizardStep: stepId + 1 });
@@ -122,21 +130,25 @@ export default function MarriageWizard({
   }
 
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
     <div className="modal-backdrop" onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}>
-      <div className="event-form-overlay-card modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
-        <h3 style={{
-          fontSize: '1.2rem',
-          fontWeight: 'bold',
-          marginBottom: stepId === 1 ? '1.5rem' : '1.25rem',
-          color: 'var(--primary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          borderBottom: stepId === 1 ? '1px solid var(--border-color)' : 'none',
-          paddingBottom: stepId === 1 ? '1rem' : '0'
-        }}>
-          💍 Get Married
+      <div 
+        className="event-form-overlay-card modal-content" 
+        onClick={(e) => e.stopPropagation()} 
+        style={{ 
+          maxWidth: '520px', 
+          width: '90%',
+          padding: '2rem',
+          margin: isMobile ? 'auto 1rem' : 'auto',
+          borderRadius: '24px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        {/* Visually hidden heading for accessibility/test compatibility */}
+        <h3 style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}>
+          Get Married
         </h3>
 
         {/* Stepper Headers - hidden on Step 1 */}
@@ -178,12 +190,15 @@ export default function MarriageWizard({
 
         {/* STEP 1: CONGRATULATIONS */}
         {stepId === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
+          <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Hero Section */}
+            <div style={{ position: 'relative', textAlign: 'center', padding: '0.5rem 0' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💍</div>
               <h4 style={{
                 fontSize: '2rem',
                 fontWeight: '800',
-                margin: '0 0 0.5rem 0',
+                margin: '0 0 0.25rem 0',
+                color: 'var(--text-primary)',
                 backgroundImage: 'linear-gradient(135deg, #a78bfa 0%, #818cf8 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -191,13 +206,30 @@ export default function MarriageWizard({
               }}>
                 Congrats! 🎉
               </h4>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+              <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>
                 You'll combine finances after marriage.
               </p>
+
+              {decorations.map((dec, i) => (
+                <span
+                  key={i}
+                  className="child-dec-item"
+                  style={{
+                    position: 'absolute',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    ...dec.style
+                  }}
+                >
+                  {dec.char}
+                </span>
+              ))}
             </div>
 
+            <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', margin: '0' }} />
+
             {/* Grid of Key Benefits */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
               <div className="marriage-benefit-card">
                 <Wallet size={28} color="#1e3a5f" strokeWidth={1.5} />
                 <div>
@@ -232,7 +264,7 @@ export default function MarriageWizard({
             </div>
 
             {/* Edit Partner Profile Toggle Button */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.25rem' }}>
               <button
                 key="toggle-partner-profile"
                 type="button"
@@ -918,33 +950,35 @@ export default function MarriageWizard({
         )}
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', width: '100%' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
             {editingEvent.id ? (
               <>
                 <button
                   type="button"
-                  className="list-builder-remove-btn"
+                  className="btn-secondary"
                   onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
-                  style={{ alignSelf: 'center', margin: 0 }}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="list-builder-remove-btn"
                   onClick={handleDeleteEvent}
                   style={{
-                    alignSelf: 'center',
-                    margin: 0,
-                    background: 'var(--danger)',
-                    color: '#fff',
-                    borderColor: 'var(--danger)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
                     cursor: 'pointer',
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '4px',
+                    fontSize: '0.9rem',
                     fontWeight: '600',
-                    fontSize: '0.8rem'
+                    padding: '0 0.5rem 0 0',
+                    alignSelf: 'center'
                   }}
                 >
                   Delete Event
@@ -957,14 +991,13 @@ export default function MarriageWizard({
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.95rem',
+                  color: 'var(--text-secondary, #94a3b8)',
+                  fontSize: '0.9rem',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  padding: '0.5rem 1rem',
-                  transition: 'color 0.2s',
-                  alignSelf: 'center',
-                  margin: 0
+                  textAlign: 'center',
+                  padding: '0 0.5rem 0 0',
+                  alignSelf: 'center'
                 }}
               >
                 Skip
@@ -972,21 +1005,31 @@ export default function MarriageWizard({
             ) : (
               <button
                 type="button"
-                className="list-builder-remove-btn"
+                className="btn-secondary"
                 onClick={() => { setEditingEvent(null); setIsFullPartnerProfileOpen(false); setIsZeroSpendingConfirmed(false); setIsPartnerZeroSpendingConfirmed(false); }}
-                style={{ alignSelf: 'center', margin: 0 }}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.9rem',
+                  borderRadius: '12px',
+                  fontWeight: '600'
+                }}
               >
                 Cancel
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
             {stepId > 1 && (
               <button
                 type="button"
-                className="list-builder-edit-btn"
+                className="btn-secondary"
                 onClick={handleBack}
-                style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1rem', cursor: 'pointer' }}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  fontSize: '0.9rem',
+                  borderRadius: '12px',
+                  fontWeight: '600'
+                }}
               >
                 Back
               </button>
@@ -996,29 +1039,34 @@ export default function MarriageWizard({
                 type="button"
                 className="btn-primary"
                 onClick={handleNext}
-                style={stepId === 1 ? {
-                  background: '#5850ec',
-                  borderColor: '#5850ec',
-                  color: '#ffffff',
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  fontSize: '0.9rem',
                   borderRadius: '12px',
-                  padding: '0.6rem 2.25rem',
-                  fontSize: '0.95rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(88, 80, 236, 0.2)',
+                  fontWeight: '600',
+                  background: 'var(--primary, #8b5cf6)',
+                  color: '#fff',
                   border: 'none',
-                  alignSelf: 'center',
-                  margin: 0
-                } : { alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  cursor: 'pointer'
+                }}
               >
-                Next
+                Continue →
               </button>
             ) : (
               <button
                 type="button"
                 className="btn-primary"
                 onClick={handleSaveEvent}
-                style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--success)', borderColor: 'var(--success)', cursor: 'pointer' }}
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  fontSize: '0.9rem',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  background: '#10b981', // Confirm button green
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
                 disabled={isStep4Invalid}
               >
                 Save Marriage Event
