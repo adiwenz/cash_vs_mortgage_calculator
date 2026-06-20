@@ -81,14 +81,14 @@ export default function OutcomeHeroCard({
         </>
       );
     }
-    // Sapling: minimal foliage, small canopy, overlapping/rooted to top of trunk at y=0
+    // Sapling: minimal foliage, young tree canopy (~75% of middle stage canopy size, rooted at y=0)
     return (
       <>
-        <circle cx="0" cy="-4" r="5" fill="#16a34a" />
-        <circle cx="-2.5" cy="-3" r="3.5" fill="#15803d" />
-        <circle cx="2.5" cy="-3" r="3.5" fill="#15803d" />
-        <circle cx="0" cy="-6.5" r="3.5" fill="#22c55e" />
-        <circle cx="0" cy="-4.5" r="2.5" fill="#4ade80" opacity="0.8" />
+        <circle cx="0" cy="-6.5" r="7" fill="#16a34a" />
+        <circle cx="-4" cy="-4.5" r="5" fill="#15803d" />
+        <circle cx="4" cy="-4.5" r="5" fill="#15803d" />
+        <circle cx="0" cy="-10" r="4.5" fill="#22c55e" />
+        <circle cx="0" cy="-6.5" r="3.5" fill="#4ade80" opacity="0.8" />
       </>
     );
   }
