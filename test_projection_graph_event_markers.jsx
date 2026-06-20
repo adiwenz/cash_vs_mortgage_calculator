@@ -289,13 +289,137 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     const badges = container.querySelectorAll('.custom-chart-badge');
     expect(badges.length).toBe(1);
 
-    // It should render a badge rect with "+1"
-    const rects = container.querySelectorAll('rect');
-    expect(rects.length).toBeGreaterThan(0); // badge rect (and possibly badge glow rect)
-    
     // The text should contain "+1"
     const texts = Array.from(container.querySelectorAll('text')).map(el => el.textContent);
     expect(texts).toContain('+1');
+  });
+
+  test('Clicking a collapsed cluster marker opens the popover, lists the events, and edit button triggers handleEditRoadmapEvent', async () => {
+    const customChartData = [
+      { age: 35, netWorth: 100000, assets: 100000, debt: 0 },
+      { age: 36, netWorth: 50, assets: 120000, debt: 0 }
+    ];
+
+    const multipleEventsSameAge = [
+      {
+        age: 36,
+        type: 'buyHouse',
+        title: 'Buy House',
+        description: 'Buy house 1',
+        icon: '🏠',
+        originalId: 'event-1'
+      },
+      {
+        age: 36,
+        type: 'haveChild',
+        title: 'Have Child',
+        description: 'Have a baby',
+        icon: '👶',
+        originalId: 'event-2'
+      }
+    ];
+
+    const handleEditRoadmapEvent = vi.fn();
+
+    const { container } = render(
+      <ProjectionGraph
+        chartData={customChartData}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showAssets={true}
+        showDebt={true}
+        showNetWorth={true}
+        setSelectedYear={vi.fn()}
+        timelineEvents={multipleEventsSameAge}
+        isMobile={false}
+        handleEditRoadmapEvent={handleEditRoadmapEvent}
+      />
+    );
+
+    // The popover panel should not be in the document initially
+    expect(container.querySelector('.cluster-popover-panel')).toBeNull();
+
+    // Click the collapsed badge
+    const badge = container.querySelector('.custom-chart-badge');
+    expect(badge).not.toBeNull();
+    fireEvent.click(badge);
+
+    // The popover panel should now be in the document
+    const popover = container.querySelector('.cluster-popover-panel');
+    expect(popover).not.toBeNull();
+
+    // The popover should display both event titles
+    expect(screen.getByText('Buy House')).not.toBeNull();
+    expect(screen.getByText('Have Child')).not.toBeNull();
+
+    // It should have two Edit buttons
+    const editButtons = screen.getAllByText('Edit');
+    expect(editButtons.length).toBe(2);
+
+    // Click the second Edit button (corresponding to 'Have Child')
+    fireEvent.click(editButtons[1]);
+
+    // handleEditRoadmapEvent should have been called with the second event
+    expect(handleEditRoadmapEvent).toHaveBeenCalledWith(multipleEventsSameAge[1]);
+
+    // The popover panel should be closed/removed from DOM
+    expect(container.querySelector('.cluster-popover-panel')).toBeNull();
+  });
+
+  test('Clicking the backdrop of the popover closes it', async () => {
+    const customChartData = [
+      { age: 35, netWorth: 100000, assets: 100000, debt: 0 },
+      { age: 36, netWorth: 50, assets: 120000, debt: 0 }
+    ];
+
+    const multipleEventsSameAge = [
+      {
+        age: 36,
+        type: 'buyHouse',
+        title: 'Buy House',
+        description: 'Buy house 1',
+        icon: '🏠',
+        originalId: 'event-1'
+      },
+      {
+        age: 36,
+        type: 'haveChild',
+        title: 'Have Child',
+        description: 'Have a baby',
+        icon: '👶',
+        originalId: 'event-2'
+      }
+    ];
+
+    const { container } = render(
+      <ProjectionGraph
+        chartData={customChartData}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showAssets={true}
+        showDebt={true}
+        showNetWorth={true}
+        setSelectedYear={vi.fn()}
+        timelineEvents={multipleEventsSameAge}
+        isMobile={false}
+      />
+    );
+
+    // Click the collapsed badge
+    const badge = container.querySelector('.custom-chart-badge');
+    fireEvent.click(badge);
+
+    const popover = container.querySelector('.cluster-popover-panel');
+    expect(popover).not.toBeNull();
+
+    // Click the backdrop
+    const backdrop = container.querySelector('.cluster-backdrop');
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop);
+
+    // The popover and backdrop should be closed/removed from DOM
+    expect(container.querySelector('.cluster-popover-panel')).toBeNull();
+    expect(container.querySelector('.cluster-backdrop')).toBeNull();
   });
 });
 

@@ -267,6 +267,7 @@ const CustomEventMarker = (props) => {
     xOffset,
     selectedMilestone,
     onSelectMilestone,
+    onSelectCluster,
     isMobile,
     xScale,
     yScale,
@@ -302,6 +303,8 @@ const CustomEventMarker = (props) => {
   const topEvent = stackEvents.length > 0 ? stackEvents[topEventIndex] : event;
   const topR = getEventRadius(topEvent);
   const stackGoesOver = stackCount > 1 && (topY - topR < 0);
+
+  const isCollapsedCluster = stackGoesOver && stackIndex === 0 && stackEvents?.length > 1;
 
   if (stackGoesOver && stackIndex > 0) {
     return null;
@@ -348,8 +351,14 @@ const CustomEventMarker = (props) => {
     <g
       onClick={(e) => {
         e.stopPropagation();
-        if (onSelectMilestone) {
-          onSelectMilestone(event);
+        if (isCollapsedCluster) {
+          if (onSelectCluster) {
+            onSelectCluster(stackEvents);
+          }
+        } else {
+          if (onSelectMilestone) {
+            onSelectMilestone(event);
+          }
         }
       }}
       style={{ cursor: 'pointer' }}
@@ -414,49 +423,17 @@ const CustomEventMarker = (props) => {
 
       {/* 6. Collapse count badge (+N) on the right side */}
       {stackGoesOver && stackIndex === 0 && (
-        <g>
-          {/* Badge Glow effect */}
-          {(isRetirement || isSelected) && (
-            <rect
-              x={badgeX - 4}
-              y={y - badgeH / 2 - 4}
-              width={badgeW + 8}
-              height={badgeH + 8}
-              rx={(badgeH + 8) / 2}
-              fill={
-                isSelected
-                  ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
-                  : 'rgba(16, 185, 129, 0.18)'
-              }
-              filter="blur(3px)"
-            />
-          )}
-
-          {/* Badge Rect */}
-          <rect
-            x={badgeX}
-            y={y - badgeH / 2}
-            width={badgeW}
-            height={badgeH}
-            rx={badgeH / 2}
-            fill={badgeFill}
-            stroke={badgeStroke}
-            strokeWidth={isSelected ? 1.5 : 1}
-          />
-
-          {/* Badge Text */}
-          <text
-            x={badgeX + badgeW / 2}
-            y={y + (isMobile ? 3.5 : 4)}
-            textAnchor="middle"
-            fontSize={isMobile ? "9px" : "10px"}
-            fontWeight="bold"
-            fill={badgeTextColor}
-            style={{ userSelect: 'none' }}
-          >
-            {countText}
-          </text>
-        </g>
+        <text
+          x={targetX + r * 0.55}
+          y={y + r + 3}
+          textAnchor="start"
+          fontSize={isMobile ? "9px" : "10px"}
+          fontWeight="bold"
+          fill={badgeTextColor}
+          style={{ userSelect: 'none' }}
+        >
+          {countText}
+        </text>
       )}
     </g>
   );
@@ -789,6 +766,7 @@ export default function MobileFireSimulatorView({
   };
 
   const [activeEventForSheet, setActiveEventForSheet] = useState(null);
+  const [expandedClusterEvents, setExpandedClusterEvents] = useState(null);
   const [isMobileLedgerExpanded, setIsMobileLedgerExpanded] = useState(false);
   const [expandedPhaseId, setExpandedPhaseId] = useState(null);
 
@@ -1501,6 +1479,7 @@ export default function MobileFireSimulatorView({
                             strokeWidth={2}
                             dot={false}
                           />
+
                           {selectedAge !== null && (
                             <>
                               <ReferenceLine
@@ -3142,6 +3121,126 @@ export default function MobileFireSimulatorView({
         );
       })()}
 
+
+      {/* Expanded Collapsed Cluster Events Bottom Sheet */}
+      {expandedClusterEvents && (
+        <div 
+          className="modal-backdrop" 
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh', 
+            background: 'rgba(10, 10, 18, 0.6)', 
+            backdropFilter: 'blur(4px)', 
+            zIndex: 2500, 
+            display: 'flex', 
+            alignItems: 'flex-end', 
+            justifyContent: 'center',
+            padding: 0
+          }}
+          onClick={() => setExpandedClusterEvents(null)}
+        >
+          <div 
+            className="mobile-bottom-sheet"
+            style={{
+              width: '100%',
+              maxWidth: '500px',
+              background: 'var(--bg-secondary)',
+              borderTop: '1px solid var(--border-color)',
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
+              padding: '1.75rem',
+              boxSizing: 'border-box',
+              position: 'relative',
+              textAlign: 'left',
+              boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.5)',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Slide up drag handle visual decoration */}
+            <div style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 1.25rem auto' }} />
+
+            {/* Close button in top-right */}
+            <button 
+              type="button" 
+              onClick={() => setExpandedClusterEvents(null)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1.25rem',
+                background: 'rgba(255,255,255,0.06)',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '1.1rem'
+              }}
+            >
+              ×
+            </button>
+
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 1.25rem 0' }}>
+              Hidden Events ({expandedClusterEvents.length})
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
+              {expandedClusterEvents.map((evt, idx) => (
+                <div 
+                  key={`${evt.originalId || evt.type}-${evt.age}-${idx}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    height: '48px',
+                    borderBottom: idx < expandedClusterEvents.length - 1 ? '1px solid var(--border)' : 'none',
+                    padding: '0 0.5rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
+                    <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{getEventIcon(evt) || '✨'}</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: '500', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
+                    </span>
+                  </div>
+                  {isEditableEvent(evt) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedClusterEvents(null);
+                        if (handleEditRoadmapEvent) {
+                          handleEditRoadmapEvent(evt);
+                        }
+                      }}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '8px',
+                        background: 'var(--primary-light)',
+                        color: 'var(--primary)',
+                        border: 'none',
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Event Options Bottom Sheet */}
       {activeEventForSheet && (

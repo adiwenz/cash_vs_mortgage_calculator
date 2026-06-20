@@ -491,6 +491,7 @@ export default function LifePlanScreen({
   const [copiedRaw, setCopiedRaw] = useState(false);
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
   const [activePopover, setActivePopover] = useState(null);
+  const [isGraphClusterExpanded, setIsGraphClusterExpanded] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -917,7 +918,7 @@ export default function LifePlanScreen({
 
             {/* Projection Graph */}
             {validation.errors.length === 0 && (
-              <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px' }}>
+              <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px', position: 'relative', zIndex: isGraphClusterExpanded ? 100 : 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -973,10 +974,12 @@ export default function LifePlanScreen({
                   timelineEvents={timelineEvents}
                   selectedMilestone={selectedMilestone}
                   onSelectMilestone={handleSelectMilestone}
+                  handleEditRoadmapEvent={handleEditRoadmapEvent}
                   handleNodeDragStart={handleNodeDragStart}
                   dragOccurredRef={dragOccurredRef}
                   isMobile={false}
                   draggingInfo={draggingInfo}
+                  onClusterExpandedChange={setIsGraphClusterExpanded}
                 />
 
                 {/* Selected Event details card */}
