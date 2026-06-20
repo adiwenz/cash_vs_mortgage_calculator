@@ -1205,24 +1205,7 @@
   border-top: 1px solid var(--border-color);
 }
 
-/* Plan summary bubble */
-.plan-summary-story-card {
-  padding: 1rem 1.25rem;
-  background: rgba(255,255,255,0.01);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  line-height: 1.6;
-}
 
-.plan-summary-story-text {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.plan-summary-story-text strong {
-  color: var(--success);
-}
 
 /* Instant feedback statistics bar */
 .instant-feedback-row {

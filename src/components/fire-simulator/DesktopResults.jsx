@@ -3,128 +3,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { formatCurrency, formatYAxis } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
 
-const generateLifeStory = (inp, results) => {
-  const list = [];
-  const curAge = inp.currentAge || 35;
-  
-  inp.incomeList.forEach(inc => {
-    if (inc.startAge > curAge) {
-      const isIncrease = inc.incomeChangeType === 'increaseByAmount';
-      const amountVal = isIncrease 
-        ? (inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) 
-        : (inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount);
-      list.push({
-        age: inc.startAge,
-        text: `Start new career: "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/yr`
-      });
-    }
-  });
 
-  inp.spendingPhases.forEach(phase => {
-    if (phase.startAge > curAge) {
-      list.push({
-        age: phase.startAge,
-        text: `Change lifestyle: "${phase.name}" costing ${formatCurrency(phase.frequency === 'monthly' ? phase.amount * 12 : phase.amount)}/yr${phase.movingCost ? ` (one-time moving cost: ${formatCurrency(phase.movingCost)})` : ''}`
-      });
-    }
-  });
-
-  inp.lifeEvents.forEach(ev => {
-    if (ev.enabled) {
-      if (ev.type === 'buyHouse') {
-        const asset = (ev.houseId && inp.houseAssets)
-          ? inp.houseAssets.find(h => h.id === ev.houseId)
-          : ev;
-        const price = asset ? (asset.homePrice !== undefined ? asset.homePrice : asset.purchasePrice) : ev.homePrice;
-        const pType = asset ? asset.purchaseType : ev.purchaseType;
-        const ageVal = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-        list.push({
-          age: ageVal,
-          text: `Buy a home for ${formatCurrency(price)} (${pType === 'cash' ? 'in cash' : 'with mortgage'})`
-        });
-      } else if (ev.type === 'haveChild') {
-        const supportEndParentAge = Number(ev.birthAge) + (ev.includeCollege ? 22 : 18);
-        const childCurrentAge = Math.max(0, curAge - Number(ev.birthAge));
-        const bornText = Number(ev.birthAge) < curAge 
-          ? `(already born, current age ${childCurrentAge}, support ends at parent age ${supportEndParentAge})` 
-          : `(support ends at parent age ${supportEndParentAge})`;
-        list.push({
-          age: Number(ev.birthAge),
-          text: `Have a child${ev.childName ? ` "${ev.childName}"` : ''} ${bornText}`
-        });
-      } else if (ev.type === 'college') {
-        list.push({
-          age: Number(ev.startAge),
-          text: `Start paying college tuition of ${formatCurrency(ev.tuitionCost)}/yr`
-        });
-      } else if (ev.type === 'careerChange') {
-        list.push({
-          age: Number(ev.startAge),
-          text: `Change career to "${ev.name}" earning ${formatCurrency(ev.newIncome)}/yr`
-        });
-      } else if (ev.type === 'spouseCareerChange') {
-        list.push({
-          age: Number(ev.startAge),
-          text: `Spouse changes career to "${ev.name}" earning ${formatCurrency(ev.newIncome)}/yr`
-        });
-      } else if (ev.type === 'marriage') {
-        list.push({
-          age: Number(ev.marriageAge),
-          text: `Get Married! Combined household income increases by ${formatCurrency(ev.spouseIncome)}/yr`
-        });
-      }
-    }
-  });
-
-  inp.debtList.forEach(debt => {
-    if (debt.enabled) {
-      list.push({
-        age: debt.startAge,
-        text: `Take on debt: "${debt.name}" of ${formatCurrency(debt.balance)} at ${debt.interestRate}% interest`
-      });
-    }
-  });
-
-  // Sort list chronologically by age
-  list.sort((a, b) => a.age - b.age);
-
-  // Group events by age
-  const grouped = {};
-  list.forEach(item => {
-    if (!grouped[item.age]) grouped[item.age] = [];
-    grouped[item.age].push(item.text);
-  });
-
-  // Generate HTML blocks
-  const ages = Object.keys(grouped).map(Number).sort((a, b) => a - b);
-
-  if (ages.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: '2rem 1rem', fontSize: '0.82rem' }}>
-        No major planned events on your timeline yet.
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '350px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-      {ages.map(age => (
-        <div key={age} style={{ display: 'flex', gap: '1rem', borderLeft: '2px solid var(--primary)', paddingLeft: '0.85rem', marginLeft: '0.25rem' }}>
-          <div style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.9rem', minWidth: '45px' }}>
-            Age {age}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            {grouped[age].map((text, idx) => (
-              <div key={idx} style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                {text}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 function LedgerRow({ row, formatCurrency }) {
   const [expanded, setExpanded] = useState(false);
@@ -468,13 +347,7 @@ export default function DesktopResults({
         {/* Left Column: Plan Story */}
         <div className="roadmap-grid-col-left">
           {/* Life Story Summary */}
-          <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
-            <h2 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Your Life Plan</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-              Select a life decision or milestone from the dropdown above the timeline to add it. Drag events on the timeline above or edit them below to map out your roadmap.
-            </p>
-            {generateLifeStory(inputs, displayedResults)}
-          </div>
+
           <ChildCostsBuckets
             inputs={inputs}
             handleEditRoadmapEvent={handleEditRoadmapEvent}

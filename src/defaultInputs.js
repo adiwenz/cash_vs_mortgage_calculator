@@ -9,7 +9,6 @@ export const DEFAULT_FIRE_INPUTS = {
   cashReturnRate: 2.0,
   lifestyleUpgrades: 0.0,
   swr: 4.0,
-  fireMode: 'traditional',
   includeTaxes: false,
   filingStatus: 'single',
   isAdvancedMode: false, // Simple Mode by default

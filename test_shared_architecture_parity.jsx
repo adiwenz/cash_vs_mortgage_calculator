@@ -91,8 +91,8 @@ describe('Shared Simulator Architecture - Desktop & Mobile Parity', () => {
     const buildBtn = screen.getByRole('button', { name: /Start Planning/i });
     fireEvent.click(buildBtn);
     
-    // Desktop shows retirement age inside "🏆 Retirement Plan Summary"
-    const desktopSummaryText = desktopContainer.querySelector('.plan-summary-story-card')?.textContent || "";
+    // Desktop shows retirement age inside "🏆 Retirement Plan Summary" / OutcomeHeroCard
+    const desktopSummaryText = desktopContainer.textContent || "";
     
     cleanup();
 

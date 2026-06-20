@@ -114,7 +114,6 @@
  * @property {number} inflationRate - Annual inflation rate (%).
  * @property {number} lifestyleUpgrades - Lifestyle upgrade rate (%).
  * @property {number} swr - Safe withdrawal rate (%).
- * @property {string} fireMode - Simulation fire mode ('traditional', 'coast', 'barista', etc.).
  * @property {boolean} includeTaxes - Whether tax simulations are active.
  * @property {string} filingStatus - Tax filing status ('single' or 'married').
  * @property {boolean} isAdvancedMode - If advanced mode calculations are enabled.
@@ -157,7 +156,6 @@ export function createRetirementProfile(overrides = {}) {
     inflationRate: 3.0,
     lifestyleUpgrades: 0.0,
     swr: 4.0,
-    fireMode: 'traditional',
     includeTaxes: false,
     filingStatus: 'single',
     isAdvancedMode: false,

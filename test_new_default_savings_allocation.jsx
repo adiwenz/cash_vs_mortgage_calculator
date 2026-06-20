@@ -226,8 +226,7 @@ describe('New Default Savings Allocation', () => {
     const saveBudgetBtn = screen.getByRole('button', { name: /Save Budget/i });
     fireEvent.click(saveBudgetBtn);
 
-    // Click Step 2: Life Plan
-    const lifePlanTab = screen.getByText(/Life Plan/i);
-    fireEvent.click(lifePlanTab);
+    // Verify we are back on the main dashboard
+    expect(screen.getByText(/Your Current Situation/i)).toBeDefined();
   });
 });

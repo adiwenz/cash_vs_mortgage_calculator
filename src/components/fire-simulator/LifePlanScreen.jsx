@@ -7,190 +7,7 @@ import ProjectionGraph from './ProjectionGraph';
 import { propPIAmount } from '../../simulatorMathUtils';
 import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot } from '../../fireCalculations';
 
-const generateLifeStory = (inp, results) => {
-  const list = [];
-  const curAge = inp.currentAge || 35;
-  
-  inp.incomeList.forEach(inc => {
-    if (inc.startAge > curAge) {
-      const isIncrease = inc.incomeChangeType === 'increaseByAmount';
-      const amountVal = isIncrease 
-        ? (inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) 
-        : (inc.frequency === 'monthly' ? inc.amount * 12 : inc.amount);
-      list.push({
-        age: inc.startAge,
-        text: `Start new career: "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/yr`
-      });
-    }
-  });
 
-  inp.spendingPhases.forEach(phase => {
-    if (phase.startAge > curAge) {
-      list.push({
-        age: phase.startAge,
-        text: `Change lifestyle: "${phase.name}" costing ${formatCurrency(phase.frequency === 'monthly' ? phase.amount * 12 : phase.amount)}/yr${phase.movingCost ? ` (one-time moving cost: ${formatCurrency(phase.movingCost)})` : ''}`
-      });
-    }
-  });
-
-  inp.lifeEvents.forEach(ev => {
-    if (ev.enabled) {
-      if (ev.type === 'buyHouse') {
-        const asset = (ev.houseId && inp.houseAssets)
-          ? inp.houseAssets.find(h => h.id === ev.houseId)
-          : ev;
-        const price = asset ? (asset.homePrice !== undefined ? asset.homePrice : asset.purchasePrice) : ev.homePrice;
-        const pType = asset ? asset.purchaseType : ev.purchaseType;
-        const ageVal = Number(ev.purchaseAge !== undefined ? ev.purchaseAge : ev.age);
-        list.push({
-          age: ageVal,
-          text: `Buy a home for ${formatCurrency(price)} (${pType === 'cash' ? 'in cash' : 'with mortgage'})`
-        });
-      } else if (ev.type === 'haveChild') {
-        const supportEndParentAge = Number(ev.birthAge) + (ev.includeCollege ? 22 : 18);
-        const childCurrentAge = Math.max(0, curAge - Number(ev.birthAge));
-        const bornText = Number(ev.birthAge) < curAge 
-          ? `(already born, current age ${childCurrentAge}, support ends at parent age ${supportEndParentAge})` 
-          : `(support ends at parent age ${supportEndParentAge})`;
-        list.push({
-          age: Number(ev.birthAge),
-          text: `Have a child${ev.childName ? ` "${ev.childName}"` : ''} ${bornText}`
-        });
-      } else if (ev.type === 'college') {
-        list.push({
-          age: Number(ev.startAge),
-          text: `Start paying college tuition of ${formatCurrency(ev.tuitionCost)}/yr`
-        });
-      } else if (ev.type === 'windfall') {
-        list.push({
-          age: Number(ev.ageReceived),
-          text: `Receive a windfall of ${formatCurrency(ev.amount)}`
-        });
-      } else if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
-        const label = ev.type === 'socialSecurity' ? 'Social Security' : ev.name || 'Retirement Income';
-        let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
-        const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
-        if (ev.type === 'socialSecurity') {
-          if (claimingAge < 62) {
-            monthlyBenefit = 0;
-          } else {
-            monthlyBenefit = monthlyBenefit * getSocialSecurityFactor(claimingAge);
-          }
-        }
-        list.push({
-          age: claimingAge,
-          text: `Receive ${label} benefits (${formatCurrency(monthlyBenefit)}/mo${ev.type === 'socialSecurity' && claimingAge !== 67 ? ' - claiming age adjusted' : ''})`
-        });
-      } else if (ev.type === 'marriage') {
-        const startAge = ev.weddingAge !== undefined ? Number(ev.weddingAge) : Number(ev.age);
-        let text = `Get married`;
-        if (ev.includeWeddingCost) {
-          const isFinanced = ['debt', 'finance', 'financed', 'loan'].includes(ev.weddingFundingMethod);
-          const userAssets = (inp.assets?.cash || 0) + 
-                             (inp.assets?.emergencyFund || 0) + 
-                             (inp.assets?.brokerage || 0) + 
-                             (inp.assets?.trad401k || 0) + 
-                             (inp.assets?.tradIra || 0) + 
-                             (inp.assets?.rothIra || 0) + 
-                             (inp.assets?.hsa || 0) + 
-                             (inp.assets?.other || 0);
-          const spouseAssets = Number(ev.cash || 0) + Number(ev.investments || 0) + Number(ev.retirement || 0);
-          const totalLiquidAssets = userAssets + spouseAssets;
-          const inflationRateVal = (Number(inp.inflationRate) || 3) / 100;
-          const nominalFactor = Math.pow(1 + inflationRateVal, Math.max(0, startAge - curAge));
-          const totalCost = (Number(ev.weddingCost) || 0) * nominalFactor;
-
-          if (isFinanced) {
-            const isEntire = ['finance', 'financed', 'loan'].includes(ev.weddingFundingMethod);
-            const financedAmount = isEntire ? totalCost : Math.max(0, totalCost - totalLiquidAssets);
-            const paidFromSavings = totalCost - financedAmount;
-
-            if (financedAmount > 0 && paidFromSavings > 0) {
-              text = `Get married — ${formatCurrency(paidFromSavings)} paid from savings, ${formatCurrency(financedAmount)} financed`;
-            } else if (financedAmount > 0) {
-              text = `Get married — wedding financed, ${formatCurrency(financedAmount)} debt added`;
-            } else {
-              text = `Get married — ${formatCurrency(totalCost)} paid from savings`;
-            }
-          } else {
-            text = `Get married — ${formatCurrency(totalCost)} paid from savings`;
-          }
-        }
-        list.push({
-          age: startAge,
-          text
-        });
-      } else {
-        const age = Number(ev.age || ev.startAge || ev.payoffAge || ev.purchaseAge || ev.birthAge || ev.ageReceived || ev.claimingAge || ev.transferAge || 0);
-        let desc = `Event: ${ev.name || 'Custom'}`;
-        if (ev.type === 'debtPayoff') {
-          desc = `Pay off debt: "${ev.name || 'Debt Payoff'}" costing ${formatCurrency(ev.amount)}`;
-        } else if (ev.type === 'sabbatical') {
-          desc = `Take sabbatical "${ev.name || 'Sabbatical'}" until age ${ev.endAge}`;
-        } else if (ev.type === 'baristaFire') {
-          desc = `Transition to Barista FIRE (expenses: ${formatCurrency(ev.annualExpenses)}/yr)`;
-        } else if (ev.type === 'coastFire') {
-          desc = `Transition to Coast FIRE`;
-        } else if (ev.type === 'assetTransfer') {
-          desc = `Transfer ${formatCurrency(ev.amount)} from ${ev.fromAsset || 'portfolio'} to ${ev.toAsset || 'portfolio'}`;
-        }
-        list.push({
-          age,
-          text: desc
-        });
-      }
-    }
-  });
-
-  list.sort((a, b) => a.age - b.age);
-
-  const criteria = inp.readinessCriteria;
-  const roadmapLabel = criteria === 'lastsLifeExp' ? 'Sustainable' : criteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite';
-  const retirementReadyAge = results.retirementReadyAge;
-  if (retirementReadyAge) {
-    const targetValForStory = criteria === 'lastsLifeExp'
-      ? results.retirementReadyTargetSurvival
-      : criteria === 'lastsComfortable'
-        ? results.retirementReadyTargetComfortable
-        : results.retirementReadyTarget;
-    list.push({
-      age: retirementReadyAge,
-      text: `<strong style="color: var(--success)">Reach ${roadmapLabel} Financial Freedom (Target: ${formatCurrency(targetValForStory)})</strong>`
-    });
-  }
-
-  if (results.runOutAge) {
-    list.push({
-      age: results.runOutAge,
-      text: `<strong style="color: var(--danger)">Assets Depleted: investable assets reach zero</strong>`
-    });
-  }
-
-  if (list.length === 0) {
-    return (
-      <div className="plan-summary-story-card">
-        <p className="plan-summary-story-text" style={{ margin: 0 }}>
-          No future events yet. Add some life decisions using the dropdown above to build your roadmap!
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="plan-summary-story-card">
-      <h3 style={{ fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.50rem', color: 'var(--primary)', letterSpacing: '0.05em' }}>
-        Your Life Story Roadmap
-      </h3>
-      <ul style={{ paddingLeft: '1.1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        {list.map((item, idx) => (
-          <li key={idx} style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            Age <strong>{item.age}</strong>: <span dangerouslySetInnerHTML={{ __html: item.text }} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
 
 
 
@@ -1319,14 +1136,7 @@ export default function LifePlanScreen({
                   
                   {/* Left Column: Plan Story */}
                   <div className="roadmap-grid-col-left">
-                    {/* Life Story Summary */}
-                    <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
-                      <h2 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Your Life Plan</h2>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-                        Select a life decision or milestone from the dropdown above the timeline to add it. Drag events on the timeline above or edit them below to map out your roadmap.
-                      </p>
-                      {generateLifeStory(inputs, displayedResults)}
-                    </div>
+
                     <ChildCostsBuckets
                       inputs={inputs}
                       handleEditRoadmapEvent={handleEditRoadmapEvent}
@@ -1850,28 +1660,7 @@ export default function LifePlanScreen({
                             )}
                           </div>
       
-                          <div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>FIRE Strategy Mode</span>
-                            <div className="segmented-control">
-                              {[
-                                { val: 'traditional', label: 'Traditional' },
-                                { val: 'coast', label: 'Coast' },
-                                { val: 'barista', label: 'Barista' },
-                                { val: 'lean', label: 'Lean' },
-                                { val: 'fat', label: 'Fat' }
-                              ].map(modeItem => (
-                                <button
-                                  key={modeItem.val}
-                                  type="button"
-                                  className={`segmented-control-btn ${inputs.fireMode === modeItem.val ? 'active' : ''}`}
-                                  onClick={() => updateInput('fireMode', modeItem.val)}
-                                  style={{ fontSize: '0.7rem' }}
-                                >
-                                  {modeItem.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+
                         </div>
                       )}
                     </div>

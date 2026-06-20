@@ -32,7 +32,6 @@ export function getProfileFromInputs(inputs) {
     cashReturnRate: parseNum(inputs.cashReturnRate, 2) / 100,
     lifestyleUpgrades: parseNum(inputs.lifestyleUpgrades, 0) / 100,
     swr: parseNum(inputs.swr, 4) / 100,
-    fireMode: inputs.fireMode || 'traditional',
     includeTaxes: !!inputs.includeTaxes,
     filingStatus: inputs.filingStatus || 'single',
     preTaxSavingsRate: inputs.preTaxSavingsRate,

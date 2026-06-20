@@ -102,7 +102,6 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
   const cashReturnRate = profile.cashReturnRate !== undefined ? profile.cashReturnRate : 0.02;
   const lifestyleUpgrades = profile.lifestyleUpgrades;
   const swr = profile.swr;
-  const fireMode = profile.fireMode;
   const includeTaxes = profile.includeTaxes;
   const enableHealthcareModel = profile.enableHealthcareModel;
   const filingStatus = profile.filingStatus;
@@ -972,7 +971,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       if (currentLiquidWorth >= coastFireNumber) {
         isCoastAchieved = true;
         const hasCoastEventActive = enabledEvents.some(e => e.type === 'coastFire' && age >= Number(e.startAge));
-        if (fireMode === 'coast' || hasCoastEventActive) {
+        if (hasCoastEventActive) {
           isCoasting = true;
           if (coastAge === null) {
             coastAge = age;
@@ -1848,13 +1847,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       const estRetSpending = spendingForYear * retirementSpendingPercent;
       retirementBaseExpenses = estRetSpending + taxes;
     }
-    if (age >= targetRetirementAge) {
-      if (fireMode === 'lean') {
-        retirementBaseExpenses *= 0.8;
-      } else if (fireMode === 'fat') {
-        retirementBaseExpenses *= 1.3;
-      }
-    }
+
 
     if (enableHealthcareModel) {
       const preMedicarePremium = profile.preMedicarePremium || 10000;
