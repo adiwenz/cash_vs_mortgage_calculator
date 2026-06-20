@@ -992,6 +992,7 @@ export default function LifePlanScreen({
               runOutAge={displayedResults.runOutAge}
               onViewRecommendations={() => setShowImprovementModal(true)}
               hasRecommendations={improvementPlan?.rankedPlan?.length > 0}
+              currentAge={inputs.currentAge}
             />
 
 

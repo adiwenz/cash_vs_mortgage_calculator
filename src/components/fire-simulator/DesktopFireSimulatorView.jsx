@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TodayScreen from './TodayScreen';
+import RetireSoonerModal from './RetireSoonerModal';
 import LifePlanScreen from './LifePlanScreen';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildPlanningModal from './ChildPlanningModal';
@@ -19,22 +20,24 @@ const getPaceBadgeStyles = (pace) => {
       border: '1px solid rgba(16, 185, 129, 0.2)'
     };
   }
-  if (pace === 'Moderate') {
+  if (pace === 'Balanced' || pace === 'Moderate') {
     return {
-      background: 'rgba(245, 158, 11, 0.1)',
-      color: '#f59e0b',
-      border: '1px solid rgba(245, 158, 11, 0.2)'
+      background: 'rgba(217, 119, 6, 0.1)',
+      color: '#d97706',
+      border: '1px solid rgba(217, 119, 6, 0.2)'
     };
   }
   return {
-    background: 'rgba(239, 68, 68, 0.1)',
-    color: '#ef4444',
-    border: '1px solid rgba(239, 68, 68, 0.2)'
+    background: 'rgba(59, 130, 246, 0.1)',
+    color: '#3b82f6',
+    border: '1px solid rgba(59, 130, 246, 0.2)'
   };
 };
 
 /**
- * @param {Object} props
+ * Desktop view of the FIRE & Life Simulator.
+ * 
+ * @param {Object} props Component props
  * @param {import('../FireSimulator').SimulationViewModel} props.simulation
  * @param {import('../FireSimulator').ScenarioModel} props.scenario
  * @param {import('../FireSimulator').EventController} props.eventController
@@ -256,7 +259,16 @@ export default function DesktopFireSimulatorView({
         scenario={scenario}
       />
 
-      {showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (() => {
+      {showImprovementModal && (
+        <RetireSoonerModal
+          scenario={scenario}
+          simulation={simulation}
+          uiState={uiState}
+          onClose={() => setShowImprovementModal(false)}
+        />
+      )}
+
+      {false && showImprovementModal && improvementPlan && improvementPlan.rankedPlan.length > 0 && (() => {
         const allScenarios = improvementPlan.rankedPlan;
         let visibleScenarios = [];
         let hiddenScenarios = [];

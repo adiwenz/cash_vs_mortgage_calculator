@@ -18,7 +18,11 @@ import {
   projectYearlyBalances,
   computeRetirementResult,
   runFireSimulation,
-  buildSimulationDebugSnapshot
+  buildSimulationDebugSnapshot,
+  calculateRetireSoonerOptions,
+  applySaveMoreAdjustment,
+  applyEarnMoreAdjustment,
+  applyBalancedAdjustment
 } from './calculators/fire/index.js';
 
 // Deep imports for legacy compatibility (Option B)
@@ -80,5 +84,9 @@ export {
   projectYearlyBalances,
   computeRetirementResult,
   runFireSimulation,
-  buildSimulationDebugSnapshot
+  buildSimulationDebugSnapshot,
+  calculateRetireSoonerOptions,
+  applySaveMoreAdjustment,
+  applyEarnMoreAdjustment,
+  applyBalancedAdjustment
 };

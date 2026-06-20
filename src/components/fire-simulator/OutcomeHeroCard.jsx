@@ -4,7 +4,8 @@ export default function OutcomeHeroCard({
   planStatus,
   runOutAge,
   onViewRecommendations,
-  hasRecommendations = false
+  hasRecommendations = false,
+  currentAge = 35
 }) {
   // Determine layout and copy based on status
   let statusBadgeText;
@@ -204,32 +205,38 @@ export default function OutcomeHeroCard({
           {explanation}
         </p>
 
-        {/* Small text link for recommendations if they exist */}
-        {hasRecommendations && (
-          <button
-            type="button"
-            onClick={onViewRecommendations}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: 'var(--primary)',
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.2rem',
-              marginTop: '0.25rem',
-              transition: 'color var(--transition-fast)'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
-          >
-            See ways to retire sooner &rarr;
-          </button>
-        )}
+        {(() => {
+          const alreadyWorkOptional = readyAge && readyAge <= currentAge;
+          const showCTA = alreadyWorkOptional || hasRecommendations;
+          const ctaLabel = alreadyWorkOptional ? 'Model a different age →' : 'See ways to retire sooner →';
+          
+          if (!showCTA) return null;
+          return (
+            <button
+              type="button"
+              onClick={onViewRecommendations}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: 'var(--primary)',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+                marginTop: '0.25rem',
+                transition: 'color var(--transition-fast)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
+            >
+              {ctaLabel}
+            </button>
+          );
+        })()}
       </div>
 
       {/* Right Column: Landscape Illustration */}
