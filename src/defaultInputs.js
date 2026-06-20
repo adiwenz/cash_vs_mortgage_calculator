@@ -136,6 +136,15 @@ export const DEFAULT_FIRE_INPUTS = {
   debtList: [],
   currentConditions: [],
   householdMembers: [],
-  houseAssets: []
+  houseAssets: [],
+  lifeProfile: {
+    household: { status: 'single', partnerIncome: 0, partnerSavings: 0, partnerRetirement: 0, partnerDebts: 0 },
+    home: { status: 'rent', monthlyRent: 1500, homeValue: 0, mortgageBalance: 0, monthlyPayment: 0, propertyTaxes: 0, insurance: 0, hoa: 0 },
+    children: [],
+    debts: [],
+    assets: { cash: 0, brokerage: 5000, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, crypto: 0, businessEquity: 0 },
+    incomeSources: []
+  },
+  useLifeProfile: false
 };
 

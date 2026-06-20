@@ -31,6 +31,9 @@ export function useTimelineEvents(inputs, displayedResults) {
 
     // 1. Income Phases
     inp.incomeList.forEach(inc => {
+      if (inc.isDerived) {
+        return;
+      }
       if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc')) {
         return;
       }
@@ -58,6 +61,9 @@ export function useTimelineEvents(inputs, displayedResults) {
 
     // 2. Spending Phases
     inp.spendingPhases.forEach(phase => {
+      if (phase.isDerived) {
+        return;
+      }
       if (phase.id && typeof phase.id === 'string' && phase.id.startsWith('simple-spend')) {
         return;
       }
@@ -84,6 +90,9 @@ export function useTimelineEvents(inputs, displayedResults) {
 
     // 3. Life Events & Asset Transfers
     inp.lifeEvents.forEach(ev => {
+      if (ev.isDerived) {
+        return;
+      }
       if (ev.enabled) {
         const age = Number(
           ev.purchaseAge !== undefined ? ev.purchaseAge :
@@ -406,6 +415,12 @@ export function useTimelineEvents(inputs, displayedResults) {
     const calculationMilestones = calc.dynamicMilestones || [];
     calculationMilestones.forEach(m => {
       if (m.type === 'sellHouse') {
+        return;
+      }
+      if (m.id && typeof m.id === 'string' && m.id.startsWith('derived-')) {
+        return;
+      }
+      if (m.label && (m.label.startsWith('derived-') || m.label.includes('derived-') || m.label.includes('Home Mortgage'))) {
         return;
       }
       if (m.type === 'debtPayoff' && inp.lifeEvents.some(e => e.type === 'borrowing' && `${e.name} Paid Off` === m.label)) {

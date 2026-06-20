@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import fs from 'fs';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
@@ -59,15 +59,18 @@ describe('Child Event Linked Dragging Regression Test', () => {
     });
 
     // Verify initial positions of markers
-    // There should be exactly two child milestone icons (one for birth, one for support end)
-    const babyMilestones = document.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    // There should be exactly two child milestone icons in the chart (one for birth, one for support end)
+    const chartTrack = document.querySelector('.chart-container-inner');
+    expect(chartTrack).not.toBeNull();
+
+    const babyMilestones = chartTrack.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
     // Let's filter to find those with '👶'
     const childMilestones = Array.from(babyMilestones).filter(node => node.textContent.includes('👶'));
     expect(childMilestones.length).toBe(2);
 
     // Find the child start and support end elements by text inside their tooltips
-    const birthTextNode = screen.getByText('👶 Have Child: Liam');
-    const endTextNode = screen.getByText('👶 Support for Liam Ends');
+    const birthTextNode = within(chartTrack).getByText('👶 Have Child: Liam');
+    const endTextNode = within(chartTrack).getByText('👶 Support for Liam Ends');
 
     const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     const endNode = endTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
@@ -102,7 +105,7 @@ describe('Child Event Linked Dragging Regression Test', () => {
     // b. Only one child end marker is visible
     // c. The child end marker remains offset by the correct span (18 years)
     // d. No duplicate child milestone nodes have been created
-    const babyMilestonesDuringDrag = document.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    const babyMilestonesDuringDrag = chartTrack.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
     const childMilestonesDuringDrag = Array.from(babyMilestonesDuringDrag).filter(node => node.textContent.includes('👶'));
     expect(childMilestonesDuringDrag.length).toBe(2); // Only 2 baby icons, no duplicates!
 
@@ -123,8 +126,8 @@ describe('Child Event Linked Dragging Regression Test', () => {
     // 4. Verify post-drop committed state
     // Make sure they committed to Age 45 and Age 63
     await waitFor(() => {
-      const updatedBirthText = screen.getByText('👶 Have Child: Liam');
-      const updatedEndText = screen.getByText('👶 Support for Liam Ends');
+      const updatedBirthText = within(chartTrack).getByText('👶 Have Child: Liam');
+      const updatedEndText = within(chartTrack).getByText('👶 Support for Liam Ends');
       const updatedBirthNode = updatedBirthText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
       const updatedEndNode = updatedEndText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
       expect(updatedBirthNode.textContent).toContain('Age 45');
@@ -132,7 +135,7 @@ describe('Child Event Linked Dragging Regression Test', () => {
     });
 
     // Double check that there are still only 2 child milestone nodes total
-    const babyMilestonesPostDrop = document.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    const babyMilestonesPostDrop = chartTrack.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
     const childMilestonesPostDrop = Array.from(babyMilestonesPostDrop).filter(node => node.textContent.includes('👶'));
     expect(childMilestonesPostDrop.length).toBe(2);
 

@@ -6,7 +6,8 @@ import {
   calculateTop35AverageIncome,
   calculateSocialSecurityBenefit,
   calculateClaimingAgeMultiplier,
-  normalizeSocialSecurityEvent
+  normalizeSocialSecurityEvent,
+  buildEffectiveSimulationInputs
 } from '../../../fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
 
@@ -131,7 +132,8 @@ export function useSimulationResults(inputs, scenarios, editingEvent) {
 
   // Inputs validation
   const validation = useMemo(() => {
-    return validateFireInputs(inputs);
+    const effectiveInputs = buildEffectiveSimulationInputs(inputs);
+    return validateFireInputs(effectiveInputs);
   }, [inputs]);
 
   // Compute Social Security Claim Preview details

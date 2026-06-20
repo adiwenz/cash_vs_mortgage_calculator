@@ -74,9 +74,12 @@ export default function DesktopTimeline({
   }
 
   // Marriage commitment span
+  const lifeProfile = inputs.lifeProfile || {};
+  const household = lifeProfile.household || {};
+  const startsMarried = household.status === 'married' || household.status === 'partnered';
   const marriageEvent = inputs.lifeEvents?.find(e => e.type === 'marriage' && e.enabled);
-  if (marriageEvent) {
-    const marriageAge = Number(marriageEvent.age || marriageEvent.marriageAge || 35);
+  if (marriageEvent || startsMarried) {
+    const marriageAge = startsMarried ? inputs.currentAge : Number(marriageEvent.age || marriageEvent.marriageAge || 35);
     activeCommitments.push({
       id: 'commitment-marriage',
       label: 'Married Life',
@@ -99,6 +102,34 @@ export default function DesktopTimeline({
           <div className="timeline-row-content events-row-content">
             <div className="timeline-track-inner">
               <div className="events-axis-line" />
+              
+              {/* Today Pin */}
+              <div
+                className="financial-milestone-wrapper today-pin"
+                style={{
+                  left: '0%',
+                  bottom: '16px',
+                  zIndex: 100
+                }}
+              >
+                <div 
+                  className="financial-milestone-dot today-dot" 
+                  style={{ 
+                    background: 'var(--primary, #6366f1)', 
+                    color: '#fff', 
+                    fontSize: '0.62rem', 
+                    padding: '0.12rem 0.35rem', 
+                    borderRadius: '4px', 
+                    height: 'auto', 
+                    width: 'auto', 
+                    fontWeight: '800',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}
+                >
+                  📍 TODAY
+                </div>
+              </div>
+
               {timelineEvents.map((evt, idx) => {
                 const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
                 const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));

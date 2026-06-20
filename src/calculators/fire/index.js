@@ -54,6 +54,10 @@ import {
   applyBalancedAdjustment
 } from './retireSooner.js';
 
+import {
+  buildEffectiveSimulationInputs
+} from './effectiveInputs.js';
+
 export {
   getActiveChildrenCountAtAge,
   getSocialSecurityFactor,
@@ -78,13 +82,15 @@ export {
   calculateRetireSoonerOptions,
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
-  applyBalancedAdjustment
+  applyBalancedAdjustment,
+  buildEffectiveSimulationInputs
 };
 
 // getSavingsPriority is now defined and exported from fireCalculations.js for legacy compatibility
 
 export function runFireSimulation(inputs) {
-  const normalizedInputs = normalizeInputsStage(inputs);
+  const effectiveInputs = buildEffectiveSimulationInputs(inputs);
+  const normalizedInputs = normalizeInputsStage(effectiveInputs);
   const timelineDetails = deriveTimelineStage(normalizedInputs);
   const { profile, events } = applyEventsStage(normalizedInputs, timelineDetails);
   const phases = deriveBudgetPhasesStage(profile, events, normalizedInputs.budgetDetails?.phases);

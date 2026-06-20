@@ -6,6 +6,8 @@ import OutcomeHeroCard from './OutcomeHeroCard';
 import ProjectionGraph from './ProjectionGraph';
 import { propPIAmount } from '../../simulatorMathUtils';
 import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot } from '../../fireCalculations';
+import LifeProfileModal from './LifeProfileModal';
+import DesktopTimeline from './DesktopTimeline';
 
 
 
@@ -299,6 +301,8 @@ export default function LifePlanScreen({
   }, [editingEvent, timelineEvents, setSelectedEventId, eventController]);
 
   const [expandedMethodology, setExpandedMethodology] = useState(false);
+  const [isLifeProfileOpen, setIsLifeProfileOpen] = useState(false);
+  const [lifeProfileTab, setLifeProfileTab] = useState('household');
   const [showAssets, setShowAssets] = useState(true);
   const [showDebt, setShowDebt] = useState(true);
   const [showNetWorth, setShowNetWorth] = useState(true);
@@ -438,6 +442,10 @@ export default function LifePlanScreen({
               handleRemoveCurrentCondition={handleRemoveCurrentCondition}
               setIsCurrentSituationModalOpen={setIsCurrentSituationModalOpen}
               onOpenAdvancedSettings={() => uiState?.setIsAdvancedSettingsModalOpen?.(true)}
+              onOpenLifeProfile={(tab) => {
+                setLifeProfileTab(tab);
+                setIsLifeProfileOpen(true);
+              }}
             />
             
             {/* Action Cards Container */}
@@ -1131,7 +1139,23 @@ export default function LifePlanScreen({
           </div>
         </div>
 
-      
+        {validation.errors.length === 0 && (
+          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginTop: '1rem', marginBottom: '1rem', borderRadius: '16px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              🗺️ Timeline View
+            </h3>
+            <DesktopTimeline
+              inputs={inputs}
+              timelineEvents={timelineEvents}
+              editingEvent={editingEvent}
+              draggingInfo={draggingInfo}
+              dragOccurredRef={dragOccurredRef}
+              handleNodeDragStart={handleNodeDragStart}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
+            />
+          </div>
+        )}
+
                 <div className="roadmap-grid-layout">
                   
                   {/* Left Column: Plan Story */}
@@ -2145,6 +2169,14 @@ export default function LifePlanScreen({
           </div>
         </div>
       )}
+
+      <LifeProfileModal
+        isOpen={isLifeProfileOpen}
+        onClose={() => setIsLifeProfileOpen(false)}
+        inputs={inputs}
+        updateInput={updateInput}
+        initialTab={lifeProfileTab}
+      />
 
     </>
   );

@@ -3634,3 +3634,316 @@
   }
 }
 
+/* Life Profile Modal Styles */
+.life-profile-modal-card {
+  margin: auto;
+  width: 95%;
+  max-width: 1100px;
+  max-height: 90vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(20px);
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  animation: modalSlideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.life-profile-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+}
+
+.life-profile-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.75rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+}
+
+.life-profile-modal-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.life-profile-modal-body-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.life-profile-edit-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.life-profile-tabs-row {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.life-profile-tab-button {
+  background: none;
+  border: none;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.life-profile-tab-button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.life-profile-tab-button.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.life-profile-tab-content-panel {
+  padding: 0.5rem 0;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.life-profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.life-profile-summary-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.life-profile-summary-cards-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.summary-tinted-card {
+  padding: 0.75rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: transform 0.2s;
+}
+
+.summary-tinted-card:hover {
+  transform: translateY(-2px);
+}
+
+.summary-tinted-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.summary-tinted-card .card-emoji {
+  font-size: 1rem;
+}
+
+.summary-tinted-card .card-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.summary-tinted-card .card-highlight {
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: block;
+}
+
+.summary-tinted-card .card-details {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Tint colors - light theme optimized with high contrast text */
+.card-household {
+  background: hsla(270, 60%, 50%, 0.04);
+  border: 1px solid hsla(270, 60%, 50%, 0.12);
+  color: #6d28d9;
+}
+
+.card-home {
+  background: hsla(150, 60%, 45%, 0.04);
+  border: 1px solid hsla(150, 60%, 45%, 0.12);
+  color: #047857;
+}
+
+.card-children {
+  background: hsla(35, 60%, 50%, 0.04);
+  border: 1px solid hsla(35, 60%, 50%, 0.12);
+  color: #b45309;
+}
+
+.card-debts {
+  background: hsla(0, 60%, 50%, 0.04);
+  border: 1px solid hsla(0, 60%, 50%, 0.12);
+  color: #b91c1c;
+}
+
+.card-assets {
+  background: hsla(190, 60%, 45%, 0.04);
+  border: 1px solid hsla(190, 60%, 45%, 0.12);
+  color: #0369a1;
+}
+
+.card-income {
+  background: hsla(220, 60%, 50%, 0.04);
+  border: 1px solid hsla(220, 60%, 50%, 0.12);
+  color: #1d4ed8;
+}
+
+/* Scoped form layout & input elements */
+.life-profile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.life-profile-label-bold {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.life-profile-label-small {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.life-profile-row-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.life-profile-row-three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.life-profile-input-field,
+.life-profile-select-field,
+.life-profile-text-input {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.88rem;
+  width: 100%;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.life-profile-input-field:focus,
+.life-profile-select-field:focus,
+.life-profile-text-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--primary-light);
+  background: var(--bg-secondary);
+}
+
+.life-profile-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.life-profile-sub-section-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.life-profile-list-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+/* Mobile responsive media queries for Life Profile Modal */
+@media (max-width: 768px) {
+  .life-profile-modal-body-layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .life-profile-summary-cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .life-profile-summary-column.mobile-accordion {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    padding: 0.5rem;
+  }
+
+  .mobile-summary-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--text-primary);
+  }
+}
+
+

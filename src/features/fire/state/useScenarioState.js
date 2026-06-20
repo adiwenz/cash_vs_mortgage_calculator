@@ -50,15 +50,31 @@ export function useScenarioState() {
   const updateAsset = (assetKey, value, currentScenarioId) => {
     setScenarios(prev => prev.map(scen => {
       if (scen.id === currentScenarioId) {
+        const lifeProfile = scen.inputs.lifeProfile || {
+          household: { status: 'single', partnerIncome: 0, partnerSavings: 0, partnerRetirement: 0, partnerDebts: 0 },
+          home: { status: 'rent', monthlyRent: 1500, homeValue: 0, mortgageBalance: 0, monthlyPayment: 0, propertyTaxes: 0, insurance: 0, hoa: 0 },
+          children: [],
+          debts: [],
+          assets: { cash: 0, brokerage: 5000, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, crypto: 0, businessEquity: 0 },
+          incomeSources: []
+        };
+        const nextLifeProfileAssets = {
+          ...lifeProfile.assets,
+          [assetKey]: value
+        };
         const nextAssets = {
           ...scen.inputs.assets,
           [assetKey]: value
         };
-        const total = value === null ? null : Object.values(nextAssets).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const total = value === null ? null : Object.values(nextLifeProfileAssets).reduce((sum, v) => sum + (Number(v) || 0), 0);
         return {
           ...scen,
           inputs: {
             ...scen.inputs,
+            lifeProfile: {
+              ...lifeProfile,
+              assets: nextLifeProfileAssets
+            },
             assets: nextAssets,
             simpleInvestments: total
           }

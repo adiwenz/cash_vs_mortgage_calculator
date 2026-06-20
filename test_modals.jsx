@@ -156,7 +156,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
     
     // Verify child event is saved to the timeline
-    expect(screen.getByText('👶 Have Child: Liam')).toBeDefined();
+    expect(screen.getAllByText('👶 Have Child: Liam')[0]).toBeDefined();
   });
 
   test('3. Debt Payoff Modal - Opens, updates state, and saves', async () => {
@@ -435,7 +435,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
     
     // Verify edited info is saved on the timeline
-    expect(screen.getByText('👶 Have Child: Liam Edited')).toBeDefined();
+    expect(screen.getAllByText('👶 Have Child: Liam Edited')[0]).toBeDefined();
   });
 
   test('8. Marriage Flow - Budget Modal Savings Fields are present and editable', async () => {
@@ -547,7 +547,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
 
     // Find the child start element
-    const birthTextNode = screen.getByText('👶 Have Child: Liam');
+    const birthTextNode = screen.getAllByText('👶 Have Child: Liam')[0];
     const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(birthNode).not.toBeNull();
 
@@ -604,7 +604,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
 
     // Find the marriage event on the timeline
-    const marriageTextNode = screen.getByText('💍 💍 Get Married');
+    const marriageTextNode = screen.getAllByText('💍 💍 Get Married')[0];
     const marriageNode = marriageTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(marriageNode).not.toBeNull();
 
@@ -800,7 +800,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
 
     // Find the child start element on the timeline/chart
-    const birthTextNode = screen.getByText('👶 Have Child: Liam');
+    const birthTextNode = screen.getAllByText('👶 Have Child: Liam')[0];
     const birthNode = birthTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(birthNode).not.toBeNull();
 
@@ -852,7 +852,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
 
     // Find the career/promotion milestone icon
-    const promoTextNode = screen.getByText('💼 Career Phase: Promotion (Liam)');
+    const promoTextNode = screen.getAllByText('💼 Career Phase: Promotion (Liam)')[0];
     const promoNode = promoTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(promoNode).not.toBeNull();
 

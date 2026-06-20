@@ -4,7 +4,6 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import FireSimulator from './src/components/FireSimulator';
 
 // Mock Recharts to avoid layout/sizable errors in jsdom
-// Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
@@ -24,12 +23,11 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
     expect(currentAgeInput.value).toBe('35');
     expect(annualIncomeInput.value).toBe('$50,000');
     expect(preTaxSavingsRateInput.value).toBe('15%');
-    expect(currentSavingsInput.value).toBe('$5,000');
+    expect(screen.getByText('$5,000')).toBeDefined();
   });
 
   test('focusing starting inputs shows raw values and does not clear them', async () => {
@@ -39,7 +37,6 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
     // Focus Current Age
     fireEvent.focus(currentAgeInput);
@@ -52,10 +49,6 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     // Focus Pre-Tax Savings Rate
     fireEvent.focus(preTaxSavingsRateInput);
     await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15'));
-
-    // Focus Current Savings
-    fireEvent.focus(currentSavingsInput);
-    await waitFor(() => expect(currentSavingsInput.value).toBe('5000'));
   });
 
   test('typing custom values in starting inputs works correctly', async () => {
@@ -65,7 +58,6 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
     const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
     const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
 
     // Age
     fireEvent.focus(currentAgeInput);
@@ -81,11 +73,6 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     fireEvent.focus(preTaxSavingsRateInput);
     fireEvent.change(preTaxSavingsRateInput, { target: { value: '30' } });
     await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30'));
-
-    // Savings Value
-    fireEvent.focus(currentSavingsInput);
-    fireEvent.change(currentSavingsInput, { target: { value: '150000' } });
-    await waitFor(() => expect(currentSavingsInput.value).toBe('150000'));
   });
 
   test('focusing and blurring the savings rate field without typing keeps the calculated rate', async () => {
@@ -146,56 +133,52 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15%'));
   });
 
-  test('verifies that the Details button opens the Current Savings Breakdown modal', () => {
+  test('verifies that clicking Total Invested Assets opens the Life Profile modal to the assets tab', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const detailsButton = screen.getByRole('button', { name: /^Details$/i });
-    expect(detailsButton).toBeDefined();
+    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
+    expect(totalAssetsRow).toBeDefined();
 
-    // Click details button
-    fireEvent.click(detailsButton);
+    // Click it
+    fireEvent.click(totalAssetsRow);
 
-    // Verify modal is open
-    expect(screen.getByText(/Current Savings Breakdown/i)).toBeDefined();
+    // Verify Edit Life Profile modal is open on Assets tab
+    expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();
+    expect(screen.getByText(/💵 Cash/i)).toBeDefined();
   });
 
-  test('verifies that the Details button opens the Current Savings Breakdown modal, allows editing, and saves details successfully', async () => {
+  test('verifies that editing assets in the Life Profile modal updates the total invested assets and saves successfully', async () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const detailsButton = screen.getByRole('button', { name: /^Details$/i });
-    expect(detailsButton).toBeDefined();
-
-    // Click details button
-    fireEvent.click(detailsButton);
-
-    // Verify modal is open
-    expect(screen.getByText(/Current Savings Breakdown/i)).toBeDefined();
+    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
+    fireEvent.click(totalAssetsRow);
 
     // Find and modify Taxable Brokerage input
-    const brokerageLabel = screen.getByText('Taxable Brokerage');
+    const brokerageLabel = screen.getByText('📈 Taxable Brokerage');
     const parent = brokerageLabel.parentElement;
     const input = parent.querySelector('input');
     expect(input).toBeDefined();
 
-    fireEvent.change(input, { target: { value: '5000' } });
+    fireEvent.change(input, { target: { value: '150000' } });
 
-    // Click Save Details
-    const saveButton = screen.getByRole('button', { name: /Save Details/i });
+    // Click Save Profile
+    const saveButton = screen.getByRole('button', { name: /Save Profile/i });
     fireEvent.click(saveButton);
 
     // Verify modal is closed
     await waitFor(() => {
-      expect(screen.queryByText(/Current Savings Breakdown/i)).toBeNull();
+      expect(screen.queryByText(/Edit Life Profile/i)).toBeNull();
     });
 
-    // Verify current savings input is updated
-    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
-    expect(currentSavingsInput.value).toBe('$5,000');
+    // Verify Total Invested Assets is updated on the situation card
+    expect(screen.getByText('$150,000')).toBeDefined();
   });
-
 
   test('verifies that the Budget button next to Savings Rate opens the Budget modal', () => {
     render(<FireSimulator />);
+    fireEvent.click(screen.getByText(/Current Situation/));
 
     const budgetButton = screen.getByRole('button', { name: /^Budget$/i });
     expect(budgetButton).toBeDefined();

@@ -29,6 +29,7 @@ import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
 import SavingsDetailsModal from './SavingsDetailsModal';
 import { CurrentConditionModal } from './CurrentConditionsPanel';
+import LifeProfileModal from './LifeProfileModal';
 import './MobileFireSimulator.css';
 
 const getPaceBadgeStyles = (pace) => {
@@ -682,6 +683,8 @@ export default function MobileFireSimulatorView({
   const [activeTab, setActiveTab] = useState('Plan'); // 'Plan' | 'Results' | 'Details'
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
 
+  const [isLifeProfileOpen, setIsLifeProfileOpen] = useState(false);
+  const [lifeProfileTab, setLifeProfileTab] = useState('household');
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
   const [isCurrentSituationExpanded, setIsCurrentSituationExpanded] = useState(true);
@@ -1163,51 +1166,31 @@ export default function MobileFireSimulatorView({
                           />
                         </div>
                       </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.2rem', marginBottom: '0.2rem' }}>
-                          <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Savings</span>
-                          <button
-                            type="button"
-                            onClick={() => setIsSavingsDetailsOpen(true)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--primary)',
-                              fontSize: '0.55rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              padding: 0,
-                              textDecoration: 'underline'
-                            }}
-                          >
-                            Details
-                          </button>
-                        </div>
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <CurrencyInput
-                            className="input-number-box"
-                            style={{
-                              width: '100%',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: '800',
-                              padding: '0.25rem 0.4rem 0.25rem 1rem',
-                              boxSizing: 'border-box'
-                            }}
-                            value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
-                            placeholder="e.g. 250000"
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
-                            }}
-                            onBlur={(e) => {
-                              handleStep1Change('simpleInvestments', clampMoneyValue(e.target.value));
-                            }}
-                          />
+                      <div 
+                        onClick={() => {
+                          setLifeProfileTab('assets');
+                          setIsLifeProfileOpen(true);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Total Assets</span>
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px dashed var(--border-color)',
+                          borderRadius: '6px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.82rem',
+                          fontWeight: '800',
+                          padding: '0.35rem 0.4rem',
+                          boxSizing: 'border-box',
+                          textAlign: 'right',
+                          minHeight: '28px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end'
+                        }}>
+                          {formatCurrency(inputs.simpleInvestments || 0)}
                         </div>
                       </div>
                       <div>
@@ -1319,6 +1302,112 @@ export default function MobileFireSimulatorView({
                           </div>
                         )}
                       </div>
+                      {/* Life Profile Summary Row on Mobile */}
+                      {(() => {
+                        const lifeProfile = inputs.lifeProfile || {};
+                        const household = lifeProfile.household || {};
+                        const home = lifeProfile.home || {};
+                        const children = lifeProfile.children || [];
+                        const debts = lifeProfile.debts || [];
+
+                        let profileCount = 0;
+                        if (household.status && household.status !== 'single') profileCount++;
+                        if (home.status && home.status === 'own') profileCount++;
+                        if (children.length > 0) profileCount += children.length;
+                        if (debts.length > 0) profileCount += debts.length;
+
+                        return (
+                          <div 
+                            onClick={() => {
+                              setLifeProfileTab('household');
+                              setIsLifeProfileOpen(true);
+                            }}
+                            className="life-profile-situation-row"
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.2rem',
+                              padding: '0.35rem 0.5rem',
+                              background: 'var(--bg-tertiary, rgba(255, 255, 255, 0.02))',
+                              border: '1px dashed var(--border-color)',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              marginTop: '0.65rem',
+                              transition: 'background 0.2s, border-color 0.2s',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                💼 Life Profile <span style={{ color: 'var(--text-tertiary)', fontWeight: 'normal' }}>({profileCount})</span>
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 'bold' }}>Edit →</span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.15rem' }}>
+                              {household.status && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '4px',
+                                  background: 'rgba(168, 85, 247, 0.1)',
+                                  color: '#a855f7',
+                                  border: '1px solid rgba(168, 85, 247, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  {household.status === 'married' ? '💍 Married' : household.status === 'partnered' ? '💍 Partnered' : '👤 Single'}
+                                </span>
+                              )}
+                              {home.status && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '4px',
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  color: '#10b981',
+                                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  {home.status === 'own' ? '🏠 Home' : '🏢 Renting'}
+                                </span>
+                              )}
+                              {children.length > 0 && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '4px',
+                                  background: 'rgba(234, 179, 8, 0.1)',
+                                  color: '#eab308',
+                                  border: '1px solid rgba(234, 179, 8, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  👶 {children.length} {children.length === 1 ? 'Child' : 'Children'}
+                                </span>
+                              )}
+                              {debts.length > 0 && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '4px',
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  💳 {debts.length} {debts.length === 1 ? 'Debt' : 'Debts'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -3028,6 +3117,15 @@ export default function MobileFireSimulatorView({
           onClose={() => setShowImprovementModal(false)}
         />
       )}
+
+      <LifeProfileModal
+        isOpen={isLifeProfileOpen}
+        onClose={() => setIsLifeProfileOpen(false)}
+        inputs={inputs}
+        updateInput={updateInput}
+        initialTab={lifeProfileTab}
+        isMobile={true}
+      />
 
       {notification && (() => {
         const isSuccess = notification.startsWith('✓');

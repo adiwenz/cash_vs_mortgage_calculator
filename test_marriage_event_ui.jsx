@@ -20,9 +20,17 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
   const navigateToStep2 = () => {
     render(<FireSimulator />);
     
-    // Set starting savings/investments to 100k so retirement is sustainable for the single user
-    const currentSavingsInput = screen.getByPlaceholderText('e.g. 250000');
-    fireEvent.change(currentSavingsInput, { target: { value: '100000' } });
+    // Set starting savings/investments to 100k via the Life Profile modal
+    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
+    fireEvent.click(totalAssetsRow);
+    
+    const brokerageLabel = screen.getByText('📈 Taxable Brokerage');
+    const parent = brokerageLabel.parentElement;
+    const input = parent.querySelector('input');
+    fireEvent.change(input, { target: { value: '100000' } });
+    
+    const saveButton = screen.getByRole('button', { name: /Save Profile/i });
+    fireEvent.click(saveButton);
 
     // Click "Start Planning" to go to Step 2
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];

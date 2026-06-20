@@ -23,7 +23,8 @@ import {
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
   applyBalancedAdjustment,
-  syncBudgetDetails
+  syncBudgetDetails,
+  buildEffectiveSimulationInputs
 } from './calculators/fire/index.js';
 
 // Deep imports for legacy compatibility (Option B)
@@ -90,5 +91,6 @@ export {
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
   applyBalancedAdjustment,
-  syncBudgetDetails
+  syncBudgetDetails,
+  buildEffectiveSimulationInputs
 };
