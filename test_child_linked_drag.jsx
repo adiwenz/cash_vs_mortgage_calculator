@@ -24,10 +24,6 @@ describe('Child Event Linked Dragging Regression Test', () => {
     // Click "Build My Life Plan" to go to Step 2
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
-
-    // Expand Advanced Detail accordion
-    const advancedTrigger = screen.getAllByRole('button', { name: /Advanced Detail/i })[0];
-    fireEvent.click(advancedTrigger);
   };
 
   test('Simulating click-hold/dragging of child start event preserves linked span without duplicating', async () => {

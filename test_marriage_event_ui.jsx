@@ -27,10 +27,6 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Click "Start Planning" to go to Step 2
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
-
-    // Expand Advanced Detail accordion
-    const advancedTrigger = screen.getAllByRole('button', { name: /Advanced Detail/i })[0];
-    fireEvent.click(advancedTrigger);
   };
 
   // Helper to find input/select elements by nearby label text

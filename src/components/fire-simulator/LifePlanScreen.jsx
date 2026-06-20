@@ -302,7 +302,6 @@ export default function LifePlanScreen({
   const [showAssets, setShowAssets] = useState(true);
   const [showDebt, setShowDebt] = useState(true);
   const [showNetWorth, setShowNetWorth] = useState(true);
-  const [expandedAdvancedDetail, setExpandedAdvancedDetail] = useState(false);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
   const [debugTab, setDebugTab] = useState('assumptions'); // 'assumptions', 'balances', 'readiness', 'drawdowns', 'timeline', 'export'
   const [copiedRaw, setCopiedRaw] = useState(false);
@@ -438,6 +437,7 @@ export default function LifePlanScreen({
               setEditingCondition={setEditingCondition}
               handleRemoveCurrentCondition={handleRemoveCurrentCondition}
               setIsCurrentSituationModalOpen={setIsCurrentSituationModalOpen}
+              onOpenAdvancedSettings={() => uiState?.setIsAdvancedSettingsModalOpen?.(true)}
             />
             
             {/* Action Cards Container */}
@@ -1482,188 +1482,6 @@ export default function LifePlanScreen({
                       );
                     })()}
       
-                    {/* Advanced Detail Collapsible Accordion (Simulation Assumptions) */}
-                    <div className="glass-card" style={{ padding: '1.25rem 1.5rem' }}>
-                      <button
-                        type="button"
-                        className="collapsible-trigger-btn"
-                        onClick={() => setExpandedAdvancedDetail(!expandedAdvancedDetail)}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '1rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                      >
-                        <span style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                          ⚙️ Advanced Detail
-                        </span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{expandedAdvancedDetail ? 'Hide ▲' : 'Show Details ▼'}</span>
-                      </button>
-                      
-                      {expandedAdvancedDetail && (
-                        <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                            <div className="input-wrapper">
-                              <span className="input-name">Pre-Retire Return (%)</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%' }}
-                                value={inputs.expectedReturn}
-                                step="0.1"
-                                onChange={(e) => updateInput('expectedReturn', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="input-wrapper">
-                              <span className="input-name">Post-Retire Return (%)</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%' }}
-                                value={inputs.postRetirementReturn !== undefined ? inputs.postRetirementReturn : inputs.expectedReturn}
-                                step="0.1"
-                                onChange={(e) => updateInput('postRetirementReturn', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="input-wrapper">
-                              <span className="input-name">Cash Return Rate (%)</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%' }}
-                                value={inputs.cashReturnRate !== undefined ? inputs.cashReturnRate : 2.0}
-                                step="0.1"
-                                onChange={(e) => updateInput('cashReturnRate', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="input-wrapper">
-                              <span className="input-name">Inflation Rate (%)</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%' }}
-                                value={inputs.inflationRate}
-                                step="0.1"
-                                onChange={(e) => updateInput('inflationRate', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="input-wrapper" style={{ position: 'relative' }}>
-                              <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span className="input-name">Lifestyle Upgrades (%)</span>
-                                <span className="tooltip-icon">?</span>
-                                <span className="tooltip-text">
-                                  At 0%, your spending only increases with inflation. Increase this if you plan to upgrade your lifestyle over time (spending grows faster than inflation).
-                                </span>
-                              </div>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%', marginTop: '0.15rem' }}
-                                value={inputs.lifestyleUpgrades !== undefined ? inputs.lifestyleUpgrades : 0}
-                                step="0.1"
-                                min="0"
-                                max="100"
-                                onChange={(e) => updateInput('lifestyleUpgrades', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <div className="input-wrapper">
-                              <span className="input-name">SWR (%)</span>
-                              <input
-                                type="number"
-                                className="input-number-box"
-                                style={{ width: '100%' }}
-                                value={inputs.swr}
-                                step="0.1"
-                                onChange={(e) => updateInput('swr', parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                          </div>
-      
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                              <input
-                                type="checkbox"
-                                checked={inputs.includeTaxes}
-                                onChange={(e) => updateInput('includeTaxes', e.target.checked)}
-                              />
-                              Include Taxes (U.S. Federal Progressive)
-                            </label>
-                            {inputs.includeTaxes && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                                <div className="input-wrapper" style={{ maxWidth: '300px' }}>
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Filing Status</span>
-                                  <select
-                                    className="input-number-box"
-                                    style={{ width: '100%', fontSize: '0.75rem', padding: '0.25rem', textAlign: 'left' }}
-                                    value={inputs.filingStatus || 'single'}
-                                    onChange={(e) => updateInput('filingStatus', e.target.value)}
-                                  >
-                                    <option value="single">Single Filer</option>
-                                    <option value="married">Married Filing Jointly</option>
-                                  </select>
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
-                                  ℹ️ Taxes are calculated using progressive brackets (10% to 37%) and standard deductions ($16,100 Single / $32,200 Married for 2026), inflated annually.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-      
-                          {/* Healthcare & Medicare Bridge */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                              <input
-                                type="checkbox"
-                                checked={inputs.enableHealthcareModel !== false}
-                                onChange={(e) => updateInput('enableHealthcareModel', e.target.checked)}
-                              />
-                              🏥 Enable Healthcare & Medicare Bridge
-                            </label>
-                            {inputs.enableHealthcareModel !== false && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                                  <div className="input-wrapper">
-                                    <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                      <span className="input-name">Pre-Medicare Cost ($/yr)</span>
-                                      <span className="tooltip-icon">?</span>
-                                      <span className="tooltip-text">
-                                        Estimated annual cost of private health insurance (ACA/COBRA) if you retire before age 65.
-                                      </span>
-                                    </div>
-                                    <input
-                                      type="number"
-                                      className="input-number-box"
-                                      style={{ width: '100%', marginTop: '0.15rem' }}
-                                      value={inputs.preMedicarePremium !== undefined ? inputs.preMedicarePremium : 10000}
-                                      step="500"
-                                      onChange={(e) => updateInput('preMedicarePremium', parseFloat(e.target.value) || 0)}
-                                    />
-                                  </div>
-                                  <div className="input-wrapper">
-                                    <div className="tooltip-container" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                      <span className="input-name">Medicare Cost ($/yr)</span>
-                                      <span className="tooltip-icon">?</span>
-                                      <span className="tooltip-text">
-                                        Estimated annual cost of Medicare premiums and out-of-pocket costs after age 65.
-                                      </span>
-                                    </div>
-                                    <input
-                                      type="number"
-                                      className="input-number-box"
-                                      style={{ width: '100%', marginTop: '0.15rem' }}
-                                      value={inputs.medicarePremium !== undefined ? inputs.medicarePremium : 4000}
-                                      step="200"
-                                      onChange={(e) => updateInput('medicarePremium', parseFloat(e.target.value) || 0)}
-                                    />
-                                  </div>
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: '0.15rem 0 0 0', lineHeight: '1.3' }}>
-                                  ℹ️ Pre-Medicare costs apply from retirement age until age 65. Medicare eligibility starts at age 65. Both are adjusted for inflation.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-      
-
-                        </div>
-                      )}
-                    </div>
                   </div>
       
                 </div>

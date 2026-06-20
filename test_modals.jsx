@@ -24,9 +24,9 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const buildBtn = screen.getAllByRole('button', { name: /Start Planning/i })[0];
     fireEvent.click(buildBtn);
 
-    // Expand Advanced Detail accordion (which is visible in Step 2)
-    const advancedTrigger = screen.getAllByRole('button', { name: /Advanced Detail/i })[0];
-    fireEvent.click(advancedTrigger);
+    // Open Advanced Settings modal from Current Situation card
+    const showDetailsBtn = screen.getAllByRole('button', { name: /Show Details/i })[0];
+    fireEvent.click(showDetailsBtn);
     
     // Enable taxes so that Step 4 of the Marriage wizard (Taxes) is shown
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -41,6 +41,10 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     if (taxCheckbox && !taxCheckbox.checked) {
       fireEvent.click(taxCheckbox);
     }
+
+    // Save changes to close the modal
+    const saveBtn = screen.getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
   };
 
   const navigateToStep2WithTimeline = () => {

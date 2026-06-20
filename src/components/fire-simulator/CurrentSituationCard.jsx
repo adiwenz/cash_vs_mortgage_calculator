@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { formatCurrency, clampAgeValue, clampMoneyValue, clampPercentageValue } from './helpers';
-import CurrentConditionsPanel from './CurrentConditionsPanel';
 import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 
 export default function CurrentSituationCard({
@@ -11,9 +10,10 @@ export default function CurrentSituationCard({
   lastNonZeroSavingsRateRef,
   setEditingCondition,
   handleRemoveCurrentCondition,
-  setIsCurrentSituationModalOpen
+  setIsCurrentSituationModalOpen,
+  onOpenAdvancedSettings
 }) {
-  const [showDetails, setShowDetails] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
 
@@ -289,13 +289,13 @@ export default function CurrentSituationCard({
       </div>
 
 
-      {/* Show Details Toggle */}
+      {/* Show Details Trigger */}
       <button
         type="button"
         style={{
           background: 'none',
           border: 'none',
-          color: 'var(--text-secondary)',
+          color: isHovered ? 'var(--primary)' : 'var(--text-secondary)',
           fontSize: '0.75rem',
           fontWeight: '600',
           cursor: 'pointer',
@@ -304,29 +304,15 @@ export default function CurrentSituationCard({
           marginTop: '0.2rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '3px'
+          gap: '3px',
+          transition: 'color var(--transition-fast, 0.2s)'
         }}
-        onClick={() => setShowDetails(!showDetails)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={onOpenAdvancedSettings}
       >
-        {showDetails ? 'Show Less ▴' : 'Show Details ▾'}
+        Show Details ▾
       </button>
-
-      {/* Expanded Details Sub-Panel */}
-      {showDetails && (
-        <div style={{ 
-          marginTop: '0.25rem', 
-          borderTop: '1px solid var(--border-color)', 
-          paddingTop: '0.5rem',
-          maxHeight: '180px',
-          overflowY: 'auto'
-        }}>
-          <CurrentConditionsPanel
-            inputs={inputs}
-            setEditingCondition={setEditingCondition}
-            handleRemoveCurrentCondition={handleRemoveCurrentCondition}
-          />
-        </div>
-      )}
     </div>
   );
 }

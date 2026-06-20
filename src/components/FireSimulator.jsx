@@ -20,6 +20,7 @@ import './FireSimulator.css';
 export default function FireSimulator() {
   const [activeStep, setActiveStep] = useState(1);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [isAdvancedSettingsModalOpen, setIsAdvancedSettingsModalOpen] = useState(false);
 
   // 1. Responsive View Detection
   const { isMobile } = useResponsiveFireView();
@@ -94,7 +95,8 @@ export default function FireSimulator() {
       budgetController.isBudgetModalOpen ||
       recommendationController.showImprovementModal ||
       editingEvent ||
-      eventController.editingCondition
+      eventController.editingCondition ||
+      isAdvancedSettingsModalOpen
     ) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -107,7 +109,8 @@ export default function FireSimulator() {
     budgetController.isBudgetModalOpen,
     recommendationController.showImprovementModal,
     editingEvent,
-    eventController.editingCondition
+    eventController.editingCondition,
+    isAdvancedSettingsModalOpen
   ]);
 
   // View Models Compilation
@@ -262,13 +265,16 @@ export default function FireSimulator() {
     handleRemoveCurrentCondition: eventController.handleRemoveCurrentCondition,
     notification: eventController.notification,
     setNotification: eventController.setNotification,
-    isMobile
+    isMobile,
+    isAdvancedSettingsModalOpen,
+    setIsAdvancedSettingsModalOpen
   }), [
     activeStep,
     simulationController.displayMode,
     simulationController.setDisplayMode,
     eventController,
-    isMobile
+    isMobile,
+    isAdvancedSettingsModalOpen
   ]);
 
   return isMobile ? (

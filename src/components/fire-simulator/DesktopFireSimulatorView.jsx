@@ -11,6 +11,8 @@ import HouseRebalanceModal from './HouseRebalanceModal';
 import BudgetModal from './BudgetModal';
 import SavingsDetailsModal from './SavingsDetailsModal';
 import { CurrentConditionModal } from './CurrentConditionsPanel';
+import AdvancedSettingsModal from './AdvancedSettingsModal';
+
 
 const getPaceBadgeStyles = (pace) => {
   if (pace === 'Aggressive') {
@@ -176,7 +178,9 @@ export default function DesktopFireSimulatorView({
     handleRemoveCurrentCondition,
     notification,
     setNotification,
-    isMobile
+    isMobile,
+    isAdvancedSettingsModalOpen,
+    setIsAdvancedSettingsModalOpen
   } = uiState;
 
   const [optionsExpanded, setOptionsExpanded] = useState(false);
@@ -265,6 +269,13 @@ export default function DesktopFireSimulatorView({
           simulation={simulation}
           uiState={uiState}
           onClose={() => setShowImprovementModal(false)}
+        />
+      )}
+
+      {isAdvancedSettingsModalOpen && (
+        <AdvancedSettingsModal
+          scenario={scenario}
+          onClose={() => setIsAdvancedSettingsModalOpen(false)}
         />
       )}
 
