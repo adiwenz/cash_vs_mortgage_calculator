@@ -375,10 +375,10 @@ export default function ProjectionGraph({
     });
   }, [timelineEvents, chartData, draggingInfo]);
 
-  const topMargin = isMobile ? 55 : 85;
+  const topMargin = isMobile ? 55 : 78;
 
   return (
-    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '300px', cursor: 'crosshair', width: '100%', position: 'relative' }}>
+    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '265px', cursor: 'crosshair', width: '100%', position: 'relative' }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}

@@ -621,7 +621,7 @@ export default function LifePlanScreen({
             />
             
             {/* Action Cards Container */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%' }}>
               
               {/* 1. Set Budget Card */}
               <button 
@@ -630,7 +630,7 @@ export default function LifePlanScreen({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '0.85rem 1rem',
+                  padding: '0.7rem 0.9rem',
                   background: 'linear-gradient(135deg, var(--success-light) 0%, var(--bg-secondary) 100%)',
                   border: '1px solid var(--border)',
                   borderRadius: '12px',
@@ -644,25 +644,25 @@ export default function LifePlanScreen({
                 }}
                 className="action-card-hover"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                   <div style={{
-                    width: '36px',
-                    height: '36px',
+                    width: '30px',
+                    height: '30px',
                     borderRadius: '8px',
                     background: 'var(--success-light)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '1.2rem'
+                    fontSize: '1.05rem'
                   }}>
                     💼
                   </div>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Set Budget</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Track income, expenses, and savings</div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: '700', color: 'var(--text-primary)' }}>Set Budget</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Track income, expenses, and savings</div>
                   </div>
                 </div>
-                <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>&rsaquo;</div>
               </button>
 
               {/* 2. Add Life Decision Card */}
@@ -672,7 +672,7 @@ export default function LifePlanScreen({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '0.85rem 1rem',
+                    padding: '0.7rem 0.9rem',
                     background: 'linear-gradient(135deg, var(--primary-light) 0%, var(--bg-secondary) 100%)',
                     border: '1px solid var(--border)',
                     borderRadius: '12px',
@@ -684,26 +684,26 @@ export default function LifePlanScreen({
                   }}
                   className="action-card-hover"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
+                      width: '30px',
+                      height: '30px',
                       borderRadius: '8px',
                       background: 'var(--primary-light)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem',
+                      fontSize: '1.05rem',
                       color: 'var(--primary)'
                     }}>
                       ➕
                     </div>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Life Decision</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Plan future events</div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Life Decision</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Plan future events</div>
                     </div>
                   </div>
-                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>&rsaquo;</div>
                 </div>
 
                 {activePopover === 'decision' && (
@@ -732,14 +732,14 @@ export default function LifePlanScreen({
                       { type: 'careerChange', label: '💼 Career Change' },
                       { type: 'move', label: '📍 Move / Relocate' },
                       { 
-                        type: 'retire', 
-                        label: '🏖 Retire', 
-                        disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
+                         type: 'retire', 
+                         label: '🏖 Retire', 
+                         disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
                       },
                       { 
-                        type: 'socialSecurity', 
-                        label: '💰 Social Security', 
-                        disabled: inputs.includeSocialSecurity !== false 
+                         type: 'socialSecurity', 
+                         label: '💰 Social Security', 
+                         disabled: inputs.includeSocialSecurity !== false 
                       },
                       { type: 'pension', label: '📜 Pension' },
                       { type: 'rentalIncome', label: '🏢 Rental Income' },
@@ -788,7 +788,7 @@ export default function LifePlanScreen({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '0.85rem 1rem',
+                    padding: '0.7rem 0.9rem',
                     background: 'linear-gradient(135deg, var(--secondary-light) 0%, var(--bg-secondary) 100%)',
                     border: '1px solid var(--border)',
                     borderRadius: '12px',
@@ -800,26 +800,26 @@ export default function LifePlanScreen({
                   }}
                   className="action-card-hover"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
+                      width: '30px',
+                      height: '30px',
                       borderRadius: '8px',
                       background: 'var(--secondary-light)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem',
+                      fontSize: '1.05rem',
                       color: 'var(--secondary)'
                     }}>
                       💳
                     </div>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Borrowing</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Include loans and debt</div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: '700', color: 'var(--text-primary)' }}>Add Borrowing</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Include loans and debt</div>
                     </div>
                   </div>
-                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.2rem', fontWeight: 'bold' }}>&rsaquo;</div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '1.1rem', fontWeight: 'bold' }}>&rsaquo;</div>
                 </div>
 
                 {activePopover === 'borrowing' && (
@@ -882,14 +882,14 @@ export default function LifePlanScreen({
                 className="btn-secondary"
                 style={{
                   width: '100%',
-                  height: '36px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '0.8rem',
                   fontWeight: '700',
                   boxSizing: 'border-box',
-                  marginTop: '0.5rem'
+                  marginTop: '0.4rem'
                 }}
                 onClick={() => {
                   setDebugTab('assumptions');
@@ -917,10 +917,10 @@ export default function LifePlanScreen({
 
             {/* Projection Graph */}
             {validation.errors.length === 0 && (
-              <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       Wealth Journey
                       <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
                         <span className="toggle-tooltip-icon">i</span>
@@ -929,7 +929,7 @@ export default function LifePlanScreen({
                         </span>
                       </span>
                     </h3>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
                   </div>
                   <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>

@@ -94,7 +94,7 @@ export default function OutcomeHeroCard({
   }
 
   // Fixed tree position and scale, dynamic environmental progress values
-  const treeTransform = 'translate(218px, 98.25px) scale(3)';
+  const treeTransform = 'translate(218px, 98.25px) scale(2.8)';
   const sunOpacity = 0.55 + (readinessScore * 0.45);
   const hillSaturation = 75 + (readinessScore * 25);
   const showTreeGlow = planStatus === 'comfortable';
@@ -108,7 +108,7 @@ export default function OutcomeHeroCard({
         alignItems: 'stretch',
         justifyContent: 'space-between',
         padding: 0, // padding handled inside flex blocks for overflow styling
-        marginBottom: '0.5rem',
+        marginBottom: '0.45rem',
         background: `linear-gradient(135deg, ${gradientStart} 0%, var(--bg-card) 100%)`,
         border: `1px solid ${borderColor}`,
         borderRadius: '16px',
@@ -124,11 +124,11 @@ export default function OutcomeHeroCard({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
-          padding: '0.75rem 1.25rem',
+          padding: '0.6rem 1.1rem',
           flex: '1 1 50%',
           minWidth: 0,
           boxSizing: 'border-box',
-          gap: '0.3rem',
+          gap: '0.25rem',
           justifyContent: 'center'
         }}
       >
@@ -158,7 +158,7 @@ export default function OutcomeHeroCard({
             display: 'inline-flex', 
             alignItems: 'center', 
             gap: '0.35rem',
-            padding: '0.2rem 0.6rem',
+            padding: '0.18rem 0.55rem',
             borderRadius: '999px',
             backgroundColor: 'rgba(255, 255, 255, 0.08)',
             border: '1px solid var(--border-color)',
@@ -179,11 +179,11 @@ export default function OutcomeHeroCard({
         {/* 2. Large Age Number */}
         <div 
           style={{ 
-            fontSize: '3.2rem', 
+            fontSize: '2.9rem', 
             fontWeight: '900', 
             fontFamily: 'var(--font-heading)',
             color: accentColor,
-            lineHeight: '1.05',
+            lineHeight: '1.0',
             letterSpacing: '-0.03em',
             margin: 0
           }}
@@ -194,7 +194,7 @@ export default function OutcomeHeroCard({
         {/* 3. Plain-English Explanation */}
         <p 
           style={{ 
-            fontSize: '0.82rem', 
+            fontSize: '0.8rem', 
             fontWeight: '500',
             color: 'var(--text-secondary)',
             margin: 0,
@@ -243,7 +243,7 @@ export default function OutcomeHeroCard({
           alignItems: 'center',
           justifyContent: 'center',
           boxSizing: 'border-box',
-          minWidth: '220px',
+          minWidth: '205px',
           borderLeft: '1px solid var(--border-color)',
           background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.05))'
         }}
@@ -254,7 +254,7 @@ export default function OutcomeHeroCard({
             width: '100%', 
             height: '100%', 
             display: 'block',
-            minHeight: '120px'
+            minHeight: '105px'
           }}
         >
           <defs>
