@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, Fragment } from 'react';
 import { formatCurrency, isEditableEvent, getEventIcon } from './helpers';
 import { ChildCostsBuckets } from './ChildImpactModal';
 import CurrentSituationCard from './CurrentSituationCard';
-import OutcomeHeroCard from './OutcomeHeroCard';
+import GoalHeroCard from './GoalHeroCard';
 import ProjectionGraph from './ProjectionGraph';
 import { propPIAmount } from '../../simulatorMathUtils';
 import { getSocialSecurityFactor, getProfileFromInputs, getEventsFromInputs, buildSimulationDebugSnapshot } from '../../fireCalculations';
@@ -809,336 +809,330 @@ export default function LifePlanScreen({
 
           {/* Right Column */}
           <div className="desktop-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
-            
-            <OutcomeHeroCard
-              readyAge={displayedResults.retirementReadyAge}
-              targetRetirementAge={displayedResults.targetRetirementAge}
-              planStatus={displayedResults.retirementOutcome}
-              runOutAge={displayedResults.runOutAge}
-              onViewRecommendations={() => setShowImprovementModal(true)}
-              hasRecommendations={improvementPlan?.rankedPlan?.length > 0}
-              currentAge={inputs.currentAge}
+            <GoalHeroCard
+              currentAge={Number(inputs.currentAge) || 35}
+              targetRetirementAge={Number(inputs.targetRetirementAge) || 65}
+              projectedRetirementAge={displayedResults.retirementReadyAge}
+              status={displayedResults.retirementOutcome}
+              onTargetAgeChange={(newAge) => commitEventAgeChange({ type: 'retire' }, newAge)}
             />
 
-
-
             {/* Projection Graph */}
-            {validation.errors.length === 0 && (
-              <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px', position: 'relative', zIndex: isGraphClusterExpanded ? 100 : 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      Wealth Journey
-                      <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
-                        <span className="toggle-tooltip-icon">i</span>
-                        <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
-                          Shows values at the start of the fiscal year.
-                        </span>
+        {validation.errors.length === 0 && (
+          <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px', position: 'relative', zIndex: isGraphClusterExpanded ? 100 : 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  Wealth Journey
+                  <span className="toggle-tooltip-container" onClick={(e) => e.stopPropagation()}>
+                    <span className="toggle-tooltip-icon">i</span>
+                    <span className="toggle-tooltip-text" style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                      Shows values at the start of the fiscal year.
+                    </span>
+                  </span>
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={showAssets}
+                    onChange={(e) => setShowAssets(e.target.checked)}
+                    style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={showDebt}
+                    onChange={(e) => setShowDebt(e.target.checked)}
+                    style={{ accentColor: '#ef4444', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={showNetWorth}
+                    onChange={(e) => setShowNetWorth(e.target.checked)}
+                    style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
+                </label>
+              </div>
+            </div>
+            
+            <ProjectionGraph
+              chartData={chartData}
+              inputs={inputs}
+              displayedResults={displayedResults}
+              showAssets={showAssets}
+              showDebt={showDebt}
+              showNetWorth={showNetWorth}
+              setSelectedYear={setSelectedYear}
+              timelineEvents={timelineEvents}
+              selectedMilestone={selectedMilestone}
+              onSelectMilestone={handleSelectMilestone}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
+              handleNodeDragStart={handleNodeDragStart}
+              dragOccurredRef={dragOccurredRef}
+              isMobile={false}
+              draggingInfo={draggingInfo}
+              onClusterExpandedChange={setIsGraphClusterExpanded}
+            />
+
+            {/* Selected Event details card */}
+            {selectedMilestone && (
+              <div 
+                className="selected-event-details-card" 
+                style={{
+                  marginTop: '1rem',
+                  padding: '1rem 1.25rem',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  animation: 'fadeIn 0.2s ease-in-out'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '1.4rem' }}>{getEventIcon(selectedMilestone)}</span>
+                    <div>
+                      <div style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                        {selectedMilestone.type === 'today' ? 'Today' : selectedMilestone.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedMilestone.title || selectedMilestone.label)}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--primary-light, #a5b4fc)' }}>
+                        Age {Math.floor(selectedMilestone.age)}
                       </span>
-                    </h3>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                      <input
-                        type="checkbox"
-                        checked={showAssets}
-                        onChange={(e) => setShowAssets(e.target.checked)}
-                        style={{ accentColor: '#10b981', cursor: 'pointer' }}
-                      />
-                      <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                      <input
-                        type="checkbox"
-                        checked={showDebt}
-                        onChange={(e) => setShowDebt(e.target.checked)}
-                        style={{ accentColor: '#ef4444', cursor: 'pointer' }}
-                      />
-                      <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                      <input
-                        type="checkbox"
-                        checked={showNetWorth}
-                        onChange={(e) => setShowNetWorth(e.target.checked)}
-                        style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
-                      />
-                      <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
-                    </label>
-                  </div>
+                  {selectedMilestone.type === 'socialSecurity' ? (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          fontSize: '0.75rem',
+                          height: '30px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onClick={() => {
+                          if (setScenarios) {
+                            setScenarios(prev => prev.map(scen => {
+                              if (scen.id !== currentScenarioId) return scen;
+                              const nextEvents = (scen.inputs.lifeEvents || []).map(e => 
+                                e.type === 'socialSecurity' ? { ...e, enabled: false } : e
+                              );
+                              const updatedInputs = {
+                                ...scen.inputs,
+                                includeSocialSecurity: false,
+                                lifeEvents: nextEvents
+                              };
+                              if (updatedInputs.socialSecurity) {
+                                updatedInputs.socialSecurity = {
+                                  ...updatedInputs.socialSecurity,
+                                  enabled: false
+                                };
+                              }
+                              return {
+                                ...scen,
+                                inputs: updatedInputs
+                              };
+                            }));
+                          }
+                          handleSelectMilestone(null);
+                        }}
+                      >
+                        ❌ Remove Social Security
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          fontSize: '0.75rem',
+                          height: '30px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                      >
+                        ✏️ Edit Social Security
+                      </button>
+                    </div>
+                  ) : (
+                    isEditableEvent(selectedMilestone) && (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          fontSize: '0.75rem',
+                          height: '30px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onClick={() => handleEditRoadmapEvent(selectedMilestone)}
+                      >
+                        ✏️ Edit Decision
+                      </button>
+                    )
+                  )}
                 </div>
                 
-                <ProjectionGraph
-                  chartData={chartData}
-                  inputs={inputs}
-                  displayedResults={displayedResults}
-                  showAssets={showAssets}
-                  showDebt={showDebt}
-                  showNetWorth={showNetWorth}
-                  setSelectedYear={setSelectedYear}
-                  timelineEvents={timelineEvents}
-                  selectedMilestone={selectedMilestone}
-                  onSelectMilestone={handleSelectMilestone}
-                  handleEditRoadmapEvent={handleEditRoadmapEvent}
-                  handleNodeDragStart={handleNodeDragStart}
-                  dragOccurredRef={dragOccurredRef}
-                  isMobile={false}
-                  draggingInfo={draggingInfo}
-                  onClusterExpandedChange={setIsGraphClusterExpanded}
-                />
+                <p style={{ margin: '0.25rem 0', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  {selectedMilestone.description}
+                </p>
 
-                {/* Selected Event details card */}
-                {selectedMilestone && (
-                  <div 
-                    className="selected-event-details-card" 
-                    style={{
-                      marginTop: '1rem',
-                      padding: '1rem 1.25rem',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                      animation: 'fadeIn 0.2s ease-in-out'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <span style={{ fontSize: '1.4rem' }}>{getEventIcon(selectedMilestone)}</span>
-                        <div>
-                          <div style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-                            {selectedMilestone.type === 'today' ? 'Today' : selectedMilestone.type === 'lifeExpectancy' ? 'Life Expectancy' : (selectedMilestone.title || selectedMilestone.label)}
-                          </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--primary-light, #a5b4fc)' }}>
-                            Age {Math.floor(selectedMilestone.age)}
+                {(() => {
+                  const details = [];
+                  if (selectedMilestone.type === 'buyHouse') {
+                    const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
+                    if (asset) {
+                      details.push({ label: 'Purchase Price', value: formatCurrency(asset.purchasePrice || asset.homePrice || 0) });
+                      details.push({ label: 'Down Payment', value: formatCurrency(asset.downPayment || 0) });
+                      if (asset.purchaseType !== 'cash') {
+                        const annualPI = propPIAmount(asset);
+                        details.push({ label: 'Monthly Payment (P&I)', value: formatCurrency(annualPI / 12) });
+                        details.push({ label: 'Mortgage Rate', value: `${asset.mortgageRate || 6.5}%` });
+                      }
+                    }
+                  } else if (selectedMilestone.type === 'sellHouse') {
+                    const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
+                    if (asset) {
+                      details.push({ label: 'Property Name', value: asset.name });
+                      details.push({ label: 'Appreciation Rate', value: `${asset.appreciationRate || 3.0}%` });
+                    }
+                  } else if (selectedMilestone.type === 'haveChild') {
+                    const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                    if (ev) {
+                      details.push({ label: 'Child Name', value: ev.childName || 'Child' });
+                      details.push({ label: 'Support Term', value: `${ev.includeCollege ? 22 : 18} years` });
+                      details.push({ label: 'College Funding', value: ev.includeCollege ? 'Yes' : 'No' });
+                    }
+                  } else if (selectedMilestone.type === 'marriage') {
+                    details.push({ label: 'Spouse Income', value: `${formatCurrency(selectedMilestone.spouseIncome)}/yr` });
+                    details.push({ label: 'Savings Rate', value: `${selectedMilestone.savingsRate || 0}%` });
+                    if (selectedMilestone.includeWeddingCost) {
+                      details.push({ label: 'Wedding Cost', value: formatCurrency(selectedMilestone.weddingCost) });
+                    }
+                  } else if (selectedMilestone.type === 'socialSecurity') {
+                    const ss = displayedResults.socialSecurityDetails;
+                    const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity') || inputs.socialSecurity;
+                    const isCalculated = ssEv ? ssEv.useEarnings === true : false;
+                    
+                    details.push({ label: 'Claiming Age', value: `${ss ? ss.claimAge : (ssEv?.claimingAge || 67)}` });
+                    if (ss) {
+                      if (ss.isEligible) {
+                        details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
+                        details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
+                      } else {
+                        details.push({ label: 'Monthly Benefit', value: '$0 (Not Eligible)' });
+                        details.push({ label: 'Annual Benefit', value: '$0 (Not Eligible)' });
+                      }
+                    }
+                    
+                    details.push({ 
+                      label: 'Filing Status', 
+                      value: inputs.filingStatus === 'married' ? 'Married Filing Jointly' : 'Single' 
+                    });
+                    
+                    if (inputs.filingStatus === 'married') {
+                      const spouseMember = inputs.householdMembers?.find(m => m.id === 'spouse');
+                      const spouseClaimAge = spouseMember?.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67;
+                      const spouseSS = displayedResults.spouseSocialSecurityDetails;
+                      details.push({
+                        label: 'Spouse Claim Age',
+                        value: `${spouseClaimAge}`
+                      });
+                      if (spouseSS) {
+                        details.push({
+                          label: 'Spouse Benefit',
+                          value: `${formatCurrency(spouseSS.monthlyBenefit)}/mo`
+                        });
+                      }
+                    }
+
+                    details.push({ 
+                      label: 'Calculation Type', 
+                      value: isCalculated ? 'Calculated (AIME)' : 'User-entered (Fixed)' 
+                    });
+                  } else if (selectedMilestone.type === 'sabbatical') {
+                    const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                    if (ev) {
+                      details.push({ label: 'End Age', value: `Age ${ev.endAge}` });
+                      details.push({ label: 'Income Reduction', value: `${ev.incomeReduction}%` });
+                    }
+                  } else if (selectedMilestone.type === 'college') {
+                    const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                    if (ev) {
+                      details.push({ label: 'Tuition Cost', value: `${formatCurrency(ev.tuitionCost)}/yr` });
+                      details.push({ label: 'Duration', value: `${ev.duration || 4} years` });
+                    }
+                  } else if (selectedMilestone.type === 'windfall') {
+                    const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                    if (ev) {
+                      details.push({ label: 'Amount', value: formatCurrency(ev.amount) });
+                    }
+                  } else if (selectedMilestone.type === 'borrowing') {
+                    const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
+                    if (ev) {
+                      details.push({ label: 'Initial Balance', value: formatCurrency(ev.balance) });
+                      details.push({ label: 'Interest Rate', value: `${ev.interestRate}%` });
+                      details.push({ label: 'Min Monthly Payment', value: `${formatCurrency(ev.minPayment)}/mo` });
+                    }
+                  }
+
+                  if (details.length === 0) return null;
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      {details.map((d, i) => (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {d.label}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700', marginTop: '0.1rem' }}>
+                            {d.value}
                           </span>
                         </div>
-                      </div>
-                      {selectedMilestone.type === 'socialSecurity' ? (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            className="btn-danger"
-                            style={{
-                              padding: '0.3rem 0.8rem',
-                              fontSize: '0.75rem',
-                              height: '30px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              margin: 0
-                            }}
-                            onClick={() => {
-                              if (setScenarios) {
-                                setScenarios(prev => prev.map(scen => {
-                                  if (scen.id !== currentScenarioId) return scen;
-                                  const nextEvents = (scen.inputs.lifeEvents || []).map(e => 
-                                    e.type === 'socialSecurity' ? { ...e, enabled: false } : e
-                                  );
-                                  const updatedInputs = {
-                                    ...scen.inputs,
-                                    includeSocialSecurity: false,
-                                    lifeEvents: nextEvents
-                                  };
-                                  if (updatedInputs.socialSecurity) {
-                                    updatedInputs.socialSecurity = {
-                                      ...updatedInputs.socialSecurity,
-                                      enabled: false
-                                    };
-                                  }
-                                  return {
-                                    ...scen,
-                                    inputs: updatedInputs
-                                  };
-                                }));
-                              }
-                              handleSelectMilestone(null);
-                            }}
-                          >
-                            ❌ Remove Social Security
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            style={{
-                              padding: '0.3rem 0.8rem',
-                              fontSize: '0.75rem',
-                              height: '30px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              margin: 0
-                            }}
-                            onClick={() => handleEditRoadmapEvent(selectedMilestone)}
-                          >
-                            ✏️ Edit Social Security
-                          </button>
-                        </div>
-                      ) : (
-                        isEditableEvent(selectedMilestone) && (
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            style={{
-                              padding: '0.3rem 0.8rem',
-                              fontSize: '0.75rem',
-                              height: '30px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              margin: 0
-                            }}
-                            onClick={() => handleEditRoadmapEvent(selectedMilestone)}
-                          >
-                            ✏️ Edit Decision
-                          </button>
-                        )
-                      )}
+                      ))}
                     </div>
-                    
-                    <p style={{ margin: '0.25rem 0', fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      {selectedMilestone.description}
-                    </p>
-
-                    {(() => {
-                      const details = [];
-                      if (selectedMilestone.type === 'buyHouse') {
-                        const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
-                        if (asset) {
-                          details.push({ label: 'Purchase Price', value: formatCurrency(asset.purchasePrice || asset.homePrice || 0) });
-                          details.push({ label: 'Down Payment', value: formatCurrency(asset.downPayment || 0) });
-                          if (asset.purchaseType !== 'cash') {
-                            const annualPI = propPIAmount(asset);
-                            details.push({ label: 'Monthly Payment (P&I)', value: formatCurrency(annualPI / 12) });
-                            details.push({ label: 'Mortgage Rate', value: `${asset.mortgageRate || 6.5}%` });
-                          }
-                        }
-                      } else if (selectedMilestone.type === 'sellHouse') {
-                        const asset = inputs.houseAssets?.find(h => h.id === selectedMilestone.houseId);
-                        if (asset) {
-                          details.push({ label: 'Property Name', value: asset.name });
-                          details.push({ label: 'Appreciation Rate', value: `${asset.appreciationRate || 3.0}%` });
-                        }
-                      } else if (selectedMilestone.type === 'haveChild') {
-                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
-                        if (ev) {
-                          details.push({ label: 'Child Name', value: ev.childName || 'Child' });
-                          details.push({ label: 'Support Term', value: `${ev.includeCollege ? 22 : 18} years` });
-                          details.push({ label: 'College Funding', value: ev.includeCollege ? 'Yes' : 'No' });
-                        }
-                      } else if (selectedMilestone.type === 'marriage') {
-                        details.push({ label: 'Spouse Income', value: `${formatCurrency(selectedMilestone.spouseIncome)}/yr` });
-                        details.push({ label: 'Savings Rate', value: `${selectedMilestone.savingsRate || 0}%` });
-                        if (selectedMilestone.includeWeddingCost) {
-                          details.push({ label: 'Wedding Cost', value: formatCurrency(selectedMilestone.weddingCost) });
-                        }
-                      } else if (selectedMilestone.type === 'socialSecurity') {
-                        const ss = displayedResults.socialSecurityDetails;
-                        const ssEv = inputs.lifeEvents?.find(e => e.type === 'socialSecurity') || inputs.socialSecurity;
-                        const isCalculated = ssEv ? ssEv.useEarnings === true : false;
-                        
-                        details.push({ label: 'Claiming Age', value: `${ss ? ss.claimAge : (ssEv?.claimingAge || 67)}` });
-                        if (ss) {
-                          if (ss.isEligible) {
-                            details.push({ label: 'Monthly Benefit', value: `${formatCurrency(ss.monthlyBenefit)}/mo` });
-                            details.push({ label: 'Annual Benefit', value: `${formatCurrency(ss.annualBenefit)}/yr` });
-                          } else {
-                            details.push({ label: 'Monthly Benefit', value: '$0 (Not Eligible)' });
-                            details.push({ label: 'Annual Benefit', value: '$0 (Not Eligible)' });
-                          }
-                        }
-                        
-                        details.push({ 
-                          label: 'Filing Status', 
-                          value: inputs.filingStatus === 'married' ? 'Married Filing Jointly' : 'Single' 
-                        });
-                        
-                        if (inputs.filingStatus === 'married') {
-                          const spouseMember = inputs.householdMembers?.find(m => m.id === 'spouse');
-                          const spouseClaimAge = spouseMember?.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67;
-                          const spouseSS = displayedResults.spouseSocialSecurityDetails;
-                          details.push({
-                            label: 'Spouse Claim Age',
-                            value: `${spouseClaimAge}`
-                          });
-                          if (spouseSS) {
-                            details.push({
-                              label: 'Spouse Benefit',
-                              value: `${formatCurrency(spouseSS.monthlyBenefit)}/mo`
-                            });
-                          }
-                        }
-
-                        details.push({ 
-                          label: 'Calculation Type', 
-                          value: isCalculated ? 'Calculated (AIME)' : 'User-entered (Fixed)' 
-                        });
-                      } else if (selectedMilestone.type === 'sabbatical') {
-                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
-                        if (ev) {
-                          details.push({ label: 'End Age', value: `Age ${ev.endAge}` });
-                          details.push({ label: 'Income Reduction', value: `${ev.incomeReduction}%` });
-                        }
-                      } else if (selectedMilestone.type === 'college') {
-                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
-                        if (ev) {
-                          details.push({ label: 'Tuition Cost', value: `${formatCurrency(ev.tuitionCost)}/yr` });
-                          details.push({ label: 'Duration', value: `${ev.duration || 4} years` });
-                        }
-                      } else if (selectedMilestone.type === 'windfall') {
-                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
-                        if (ev) {
-                          details.push({ label: 'Amount', value: formatCurrency(ev.amount) });
-                        }
-                      } else if (selectedMilestone.type === 'borrowing') {
-                        const ev = inputs.lifeEvents?.find(e => e.id === selectedMilestone.originalId);
-                        if (ev) {
-                          details.push({ label: 'Initial Balance', value: formatCurrency(ev.balance) });
-                          details.push({ label: 'Interest Rate', value: `${ev.interestRate}%` });
-                          details.push({ label: 'Min Monthly Payment', value: `${formatCurrency(ev.minPayment)}/mo` });
-                        }
-                      }
-
-                      if (details.length === 0) return null;
-
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                          {details.map((d, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                {d.label}
-                              </span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700', marginTop: '0.1rem' }}>
-                                {d.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {displayedResults.yearsWithLimitsReached > 0 && (
-                  <div style={{
-                    marginTop: '0.25rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    fontSize: '0.7rem',
-                    color: 'var(--text-secondary)'
-                  }}>
-                    <span>ℹ️</span>
-                    <span style={{ lineHeight: '1.3' }}>
-                      Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
-                    </span>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
+            {displayedResults.yearsWithLimitsReached > 0 && (
+              <div style={{
+                marginTop: '0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.7rem',
+                color: 'var(--text-secondary)'
+              }}>
+                <span>ℹ️</span>
+                <span style={{ lineHeight: '1.3' }}>
+                  Retirement account limits were reached in <strong>{displayedResults.yearsWithLimitsReached} years</strong> of the simulation. <strong>{formatCurrency(displayedResults.totalRedirectedSavings)}</strong> of additional savings were automatically invested in <strong>{displayedResults.redirectedToCash ? 'cash accounts' : 'taxable brokerage accounts'}</strong>.
+                </span>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
+          </div> {/* closing desktop-right-column */}
+        </div> {/* closing desktop-dashboard-grid */}
         {validation.errors.length === 0 && (
           <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginTop: '1rem', marginBottom: '1rem', borderRadius: '16px' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1155,7 +1149,6 @@ export default function LifePlanScreen({
             />
           </div>
         )}
-
                 <div className="roadmap-grid-layout">
                   
                   {/* Left Column: Plan Story */}

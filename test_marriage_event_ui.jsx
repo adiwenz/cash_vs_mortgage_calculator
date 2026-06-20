@@ -184,8 +184,9 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     const timelineLabel = screen.getAllByText(/Get Married/i);
     expect(timelineLabel.length).toBeGreaterThanOrEqual(2);
 
-    // Verify new retirement age is displayed in the outcome hero
-    expect(screen.getByText(new RegExp(`Work Optional at Age ${afterRetAge}`, 'i'))).toBeDefined();
+    // Verify new retirement age is displayed in the results area of GoalHeroCard
+    const resultsContainer = screen.getByText(/You can stop working at/i).closest('div');
+    expect(resultsContainer.textContent).toContain(String(afterRetAge));
 
     // Click the Set Budget button to open the budget modal directly
     const setBudgetBtn = screen.getByRole('button', { name: /Set Budget/i });
@@ -247,9 +248,10 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     });
 
     const getWorkOptionalAge = () => {
-      const heroText = screen.getByText(/Work Optional at Age/i).textContent;
-      const match = heroText.match(/Age\s+(\d+)/i);
-      if (!match) throw new Error(`Could not find age in text: ${heroText}`);
+      const labelElement = screen.getByText(/You can stop working at/i);
+      const container = labelElement.closest('div');
+      const match = container.textContent.match(/stop working at\s*(\d+)/i) || container.textContent.match(/(\d+)\s*years old/i);
+      if (!match) throw new Error(`Could not find age in text: ${container.textContent}`);
       return parseInt(match[1], 10);
     };
 
