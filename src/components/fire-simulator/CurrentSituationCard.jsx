@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { formatCurrency } from './helpers';
+import { formatCurrency, clampAgeValue, clampMoneyValue, clampPercentageValue } from './helpers';
 import CurrentConditionsPanel from './CurrentConditionsPanel';
 import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 
@@ -131,6 +131,10 @@ export default function CurrentSituationCard({
             value={inputs.currentAge === null ? '' : inputs.currentAge}
             placeholder="e.g. 35"
             onChange={(e) => handleFieldChange('currentAge', e.target.value)}
+            onBlur={(e) => {
+              const clamped = clampAgeValue(e.target.value);
+              handleStep1Change('currentAge', clamped);
+            }}
           />
         </div>
 
@@ -160,8 +164,15 @@ export default function CurrentSituationCard({
               onFocus={() => {
                 setActiveSavingsRate(simpleSavingsRate);
               }}
-              onBlur={() => {
+              onBlur={(e) => {
                 setActiveSavingsRate(null);
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleIncome', clamped);
+                if (clamped !== null) {
+                  const rate = simpleSavingsRate;
+                  const newExpenses = Math.round(clamped * (1 - rate / 100));
+                  handleStep1Change('simpleExpenses', newExpenses);
+                }
               }}
               onChange={(e) => handleFieldChange('simpleIncome', e.target.value)}
             />
@@ -191,6 +202,10 @@ export default function CurrentSituationCard({
               }}
               value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
               onChange={(e) => handleFieldChange('simpleExpenses', e.target.value)}
+              onBlur={(e) => {
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleExpenses', clamped);
+              }}
             />
           </div>
         </div>
@@ -219,6 +234,10 @@ export default function CurrentSituationCard({
               value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
               placeholder="e.g. 250000"
               onChange={(e) => handleFieldChange('simpleInvestments', e.target.value)}
+              onBlur={(e) => {
+                const clamped = clampMoneyValue(e.target.value);
+                handleStep1Change('simpleInvestments', clamped);
+              }}
             />
           </div>
         </div>
@@ -263,13 +282,26 @@ export default function CurrentSituationCard({
               }}
               value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
               placeholder="e.g. 20"
-              onBlur={() => setSavingsRateOverride(null)}
+              onFocus={() => setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate))}
               onChange={(e) => handleSavingsRateChange(e.target.value)}
+              onBlur={(e) => {
+                setSavingsRateOverride(null);
+                const clamped = clampPercentageValue(e.target.value);
+                if (clamped !== null) {
+                  if (lastNonZeroSavingsRateRef) {
+                    lastNonZeroSavingsRateRef.current = clamped;
+                  }
+                  const income = Number(inputs.simpleIncome) || 0;
+                  const newExpenses = Math.round(income * (1 - clamped / 100));
+                  handleStep1Change('simpleExpenses', newExpenses);
+                }
+              }}
             />
             <span style={{ position: 'absolute', right: '4px', color: 'var(--success)', fontSize: '0.82rem', fontWeight: 'bold' }}>%</span>
           </div>
         </div>
       </div>
+
 
       {/* Show Details Toggle */}
       <button

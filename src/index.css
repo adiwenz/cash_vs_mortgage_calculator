@@ -1138,3 +1138,16 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
   }
 }
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.summary-label {
+  flex: 1;
+  min-width: 0;
+}
+.summary-value {
+  flex-shrink: 0;
+}
