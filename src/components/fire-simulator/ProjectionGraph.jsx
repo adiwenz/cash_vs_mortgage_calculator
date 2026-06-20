@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { formatCurrency, formatYAxis, getEventIcon, isFinancialEvent, getEventMarkerPosition, isEditableEvent } from './helpers';
 
@@ -282,11 +282,18 @@ export default function ProjectionGraph({
   handleNodeDragStart,
   dragOccurredRef,
   isMobile = false,
-  draggingInfo = null
+  draggingInfo = null,
+  onClusterExpandedChange
 }) {
   const chartContainerRef = useRef(null);
   const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
   const [expandedCluster, setExpandedCluster] = useState(null);
+
+  useEffect(() => {
+    if (onClusterExpandedChange) {
+      onClusterExpandedChange(!!expandedCluster);
+    }
+  }, [expandedCluster, onClusterExpandedChange]);
 
   const tooltipPos = useMemo(() => {
     if (!activeTooltipCoord || !chartContainerRef.current) return undefined;
@@ -362,7 +369,7 @@ export default function ProjectionGraph({
   const topMargin = isMobile ? 55 : 78;
 
   return (
-    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '265px', cursor: 'crosshair', width: '100%', position: 'relative' }}>
+    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '265px', cursor: 'crosshair', width: '100%', position: 'relative', zIndex: expandedCluster ? 100 : 'auto' }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
