@@ -25,7 +25,8 @@ vi.mock('recharts', () => {
     ReferenceDot: ({ shape, x, y, ...props }) => {
       // Re-create Recharts behavior where shape is called with coordinate props
       if (typeof shape === 'function') {
-        return shape({ cx: 200, cy: 150, ...props });
+        const cyVal = (y !== undefined && y < 1000) ? y : 150;
+        return shape({ cx: 200, cy: cyVal, ...props });
       }
       return null;
     }
@@ -186,6 +187,115 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     circles = retirementBadge.querySelectorAll('circle');
     expect(circles.length).toBe(2);
     expect(circles[0].getAttribute('fill')).toBe('rgba(22, 163, 74, 0.18)');
+  });
+
+  test('Stack of events that fits without overflowing is fully rendered', () => {
+    const multipleEventsSameAge = [
+      {
+        age: 36,
+        type: 'buyHouse',
+        title: 'Buy House',
+        description: 'Buy house 1',
+        icon: '🏠',
+        originalId: 'event-1'
+      },
+      {
+        age: 36,
+        type: 'haveChild',
+        title: 'Have Child',
+        description: 'Have a baby',
+        icon: '👶',
+        originalId: 'event-2'
+      },
+      {
+        age: 36,
+        type: 'college',
+        title: 'College Funding',
+        description: 'Send to college',
+        icon: '🎓',
+        originalId: 'event-3'
+      }
+    ];
+
+    const { container } = render(
+      <ProjectionGraph
+        chartData={chartData}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showAssets={true}
+        showDebt={true}
+        showNetWorth={true}
+        setSelectedYear={vi.fn()}
+        timelineEvents={multipleEventsSameAge}
+        isMobile={false}
+      />
+    );
+
+    // Since cy = 150, the top event lane is lane 2 (y_2 = 150 - 100 = 50). Top edge: 50 - 12.5 = 37.5 >= 0.
+    // It fits, so all 3 event badges should be rendered.
+    const badges = container.querySelectorAll('.custom-chart-badge');
+    expect(badges.length).toBe(3);
+
+    // No "+" collapse badge should be present
+    const rects = container.querySelectorAll('rect');
+    expect(rects.length).toBe(0); // since none is collapsed, no rect badges are rendered
+  });
+
+  test('Stack of events that overflows is collapsed into a single icon with +N badge', () => {
+    // We pass y = 50 in chartData so that ReferenceDot receives y = 50 as cy.
+    const customChartData = [
+      { age: 35, netWorth: 100000, assets: 100000, debt: 0 },
+      { age: 36, netWorth: 50, assets: 120000, debt: 0 } // netWorth is 50, so y = 50
+    ];
+
+    const multipleEventsSameAge = [
+      {
+        age: 36,
+        type: 'buyHouse',
+        title: 'Buy House',
+        description: 'Buy house 1',
+        icon: '🏠',
+        originalId: 'event-1'
+      },
+      {
+        age: 36,
+        type: 'haveChild',
+        title: 'Have Child',
+        description: 'Have a baby',
+        icon: '👶',
+        originalId: 'event-2'
+      }
+    ];
+
+    const { container } = render(
+      <ProjectionGraph
+        chartData={customChartData}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showAssets={true}
+        showDebt={true}
+        showNetWorth={true}
+        setSelectedYear={vi.fn()}
+        timelineEvents={multipleEventsSameAge}
+        isMobile={false}
+      />
+    );
+
+    // At cy = 50:
+    // Lane 0: 50 - 36 = 14 (fits)
+    // Lane 1: 50 - 68 = -18 (overflows: -18 - 12.5 = -30.5 < 0)
+    // The stack goes over, so it collapses.
+    // Only lane 0 is rendered (1 badge group).
+    const badges = container.querySelectorAll('.custom-chart-badge');
+    expect(badges.length).toBe(1);
+
+    // It should render a badge rect with "+1"
+    const rects = container.querySelectorAll('rect');
+    expect(rects.length).toBeGreaterThan(0); // badge rect (and possibly badge glow rect)
+    
+    // The text should contain "+1"
+    const texts = Array.from(container.querySelectorAll('text')).map(el => el.textContent);
+    expect(texts).toContain('+1');
   });
 });
 
