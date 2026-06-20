@@ -46,6 +46,13 @@ import { projectYearlyBalancesStage } from './pipeline/projectYearlyBalances.js'
 import { computeReadinessStage } from './pipeline/computeReadiness.js';
 import { formatSimulationResultStage } from './pipeline/formatSimulationResult.js';
 
+import {
+  calculateRetireSoonerOptions,
+  applySaveMoreAdjustment,
+  applyEarnMoreAdjustment,
+  applyBalancedAdjustment
+} from './retireSooner.js';
+
 export {
   getActiveChildrenCountAtAge,
   getSocialSecurityFactor,
@@ -65,7 +72,11 @@ export {
   getPhaseChangeExplanations,
   projectYearlyBalances,
   computeRetirementResult,
-  buildSimulationDebugSnapshot
+  buildSimulationDebugSnapshot,
+  calculateRetireSoonerOptions,
+  applySaveMoreAdjustment,
+  applyEarnMoreAdjustment,
+  applyBalancedAdjustment
 };
 
 // getSavingsPriority is now defined and exported from fireCalculations.js for legacy compatibility
