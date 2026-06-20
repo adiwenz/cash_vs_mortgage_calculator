@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
-import { formatCurrency, formatYAxis, getEventIcon, isFinancialEvent, getEventMarkerPosition } from './helpers';
+import { formatCurrency, formatYAxis, getEventIcon, isFinancialEvent, getEventMarkerPosition, isEditableEvent } from './helpers';
 
 const CustomEventMarker = (props) => {
   const {
@@ -251,53 +251,17 @@ const CustomEventMarker = (props) => {
 
       {/* 6. Collapse count badge (+N) on the right side */}
       {stackGoesOver && stackIndex === 0 && (
-        <g>
-          {/* Badge Glow effect */}
-          {(isRetirement || isSelected || isHovered) && (
-            <rect
-              x={badgeX - 4}
-              y={currentY - badgeH / 2 - 4}
-              width={badgeW + 8}
-              height={badgeH + 8}
-              rx={(badgeH + 8) / 2}
-              fill={
-                isHovered
-                  ? (isRetirement ? 'rgba(22, 163, 74, 0.4)' : 'rgba(30, 58, 95, 0.4)')
-                  : isSelected
-                    ? (isRetirement ? 'rgba(22, 163, 74, 0.3)' : 'rgba(30, 58, 95, 0.3)')
-                    : 'rgba(22, 163, 74, 0.18)'
-              }
-              filter="blur(3px)"
-              style={transitionStyle}
-            />
-          )}
-
-          {/* Badge Rect */}
-          <rect
-            x={badgeX}
-            y={currentY - badgeH / 2}
-            width={badgeW}
-            height={badgeH}
-            rx={badgeH / 2}
-            fill={badgeFill}
-            stroke={badgeStroke}
-            strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1.5}
-            style={transitionStyle}
-          />
-
-          {/* Badge Text */}
-          <text
-            x={badgeX + badgeW / 2}
-            y={currentY + (isMobile ? 3.5 : 4)}
-            textAnchor="middle"
-            fontSize={isMobile ? "9px" : "10px"}
-            fontWeight="bold"
-            fill={badgeTextColor}
-            style={{ ...transitionStyle, userSelect: 'none' }}
-          >
-            {countText}
-          </text>
-        </g>
+        <text
+          x={targetX + currentR * 0.55}
+          y={currentY + currentR + 3}
+          textAnchor="start"
+          fontSize={isMobile ? "9px" : "10px"}
+          fontWeight="bold"
+          fill={badgeTextColor}
+          style={{ ...transitionStyle, userSelect: 'none' }}
+        >
+          {countText}
+        </text>
       )}
     </g>
   );
@@ -736,29 +700,31 @@ export default function ProjectionGraph({
                         {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedCluster(null);
-                        if (handleEditRoadmapEvent) {
-                          handleEditRoadmapEvent(evt);
-                        }
-                      }}
-                      style={{
-                        padding: '0.35rem 0.75rem',
-                        borderRadius: '8px',
-                        background: 'var(--primary-light)',
-                        color: 'var(--primary)',
-                        border: 'none',
-                        fontWeight: '600',
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                        flexShrink: 0
-                      }}
-                    >
-                      Edit
-                    </button>
+                    {isEditableEvent(evt) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCluster(null);
+                          if (handleEditRoadmapEvent) {
+                            handleEditRoadmapEvent(evt);
+                          }
+                        }}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '8px',
+                          background: 'var(--primary-light)',
+                          color: 'var(--primary)',
+                          border: 'none',
+                          fontWeight: '600',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          flexShrink: 0
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

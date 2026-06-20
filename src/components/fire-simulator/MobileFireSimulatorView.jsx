@@ -423,49 +423,17 @@ const CustomEventMarker = (props) => {
 
       {/* 6. Collapse count badge (+N) on the right side */}
       {stackGoesOver && stackIndex === 0 && (
-        <g>
-          {/* Badge Glow effect */}
-          {(isRetirement || isSelected) && (
-            <rect
-              x={badgeX - 4}
-              y={y - badgeH / 2 - 4}
-              width={badgeW + 8}
-              height={badgeH + 8}
-              rx={(badgeH + 8) / 2}
-              fill={
-                isSelected
-                  ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
-                  : 'rgba(16, 185, 129, 0.18)'
-              }
-              filter="blur(3px)"
-            />
-          )}
-
-          {/* Badge Rect */}
-          <rect
-            x={badgeX}
-            y={y - badgeH / 2}
-            width={badgeW}
-            height={badgeH}
-            rx={badgeH / 2}
-            fill={badgeFill}
-            stroke={badgeStroke}
-            strokeWidth={isSelected ? 1.5 : 1}
-          />
-
-          {/* Badge Text */}
-          <text
-            x={badgeX + badgeW / 2}
-            y={y + (isMobile ? 3.5 : 4)}
-            textAnchor="middle"
-            fontSize={isMobile ? "9px" : "10px"}
-            fontWeight="bold"
-            fill={badgeTextColor}
-            style={{ userSelect: 'none' }}
-          >
-            {countText}
-          </text>
-        </g>
+        <text
+          x={targetX + r * 0.55}
+          y={y + r + 3}
+          textAnchor="start"
+          fontSize={isMobile ? "9px" : "10px"}
+          fontWeight="bold"
+          fill={badgeTextColor}
+          style={{ userSelect: 'none' }}
+        >
+          {countText}
+        </text>
       )}
     </g>
   );
@@ -3269,28 +3237,30 @@ export default function MobileFireSimulatorView({
                       {evt.type === 'today' ? 'Today' : evt.type === 'lifeExpectancy' ? 'Life Expectancy' : (evt.title || evt.label)}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpandedClusterEvents(null);
-                      if (handleEditRoadmapEvent) {
-                        handleEditRoadmapEvent(evt);
-                      }
-                    }}
-                    style={{
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '8px',
-                      background: 'var(--primary-light)',
-                      color: 'var(--primary)',
-                      border: 'none',
-                      fontWeight: '600',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      flexShrink: 0
-                    }}
-                  >
-                    Edit
-                  </button>
+                  {isEditableEvent(evt) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedClusterEvents(null);
+                        if (handleEditRoadmapEvent) {
+                          handleEditRoadmapEvent(evt);
+                        }
+                      }}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '8px',
+                        background: 'var(--primary-light)',
+                        color: 'var(--primary)',
+                        border: 'none',
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -289,10 +289,6 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     const badges = container.querySelectorAll('.custom-chart-badge');
     expect(badges.length).toBe(1);
 
-    // It should render a badge rect with "+1"
-    const rects = container.querySelectorAll('rect');
-    expect(rects.length).toBeGreaterThan(0); // badge rect (and possibly badge glow rect)
-    
     // The text should contain "+1"
     const texts = Array.from(container.querySelectorAll('text')).map(el => el.textContent);
     expect(texts).toContain('+1');
