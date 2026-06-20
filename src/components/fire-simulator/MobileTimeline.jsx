@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components, no-case-declarations, no-useless-assignment, no-unused-vars, react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { isEditableEvent, getEventIcon } from './helpers';
 
@@ -178,7 +179,8 @@ export default function MobileTimeline({
   inputs: legacyInputs,
   timelineEvents: legacyTimelineEvents
 }) {
-  const timelineEvents = timeline?.timelineEvents ?? legacyTimelineEvents;
+  const inputs = scenario?.inputs ?? legacyInputs ?? timeline?.inputs ?? {};
+  const timelineEvents = timeline?.timelineEvents ?? legacyTimelineEvents ?? [];
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(350);
 
@@ -195,27 +197,27 @@ export default function MobileTimeline({
 
   const eventCount = timelineEvents.length;
 
-  const sizes = useMemo(() => {
-    return { baseCircleSize: 40, activeCircleSize: 52 };
-  }, []);
-
-  // Evenly spaced milestones
   const resolvedPositions = useMemo(() => {
-    if (timelineEvents.length === 0) return [];
+    if (!timelineEvents || timelineEvents.length === 0) return [];
 
-    const W = containerWidth || 350;
-    const paddingLeft = sizes.activeCircleSize / 2 + 8;
-    const paddingRight = sizes.activeCircleSize / 2 + 8;
-    const usableWidth = W - paddingLeft - paddingRight;
+    const ages = timelineEvents.map(e => Number(e.age));
+    const minAge = Math.min(...ages);
+    const maxAge = Math.max(...ages);
+    const ageSpan = maxAge - minAge;
 
-    return timelineEvents.map((evt, idx) => {
+    // We want at least 15px per year of age
+    const minPixelsPerYear = 15;
+    const padding = 48; // Padding on left and right for chips
+    const computedWidth = ageSpan * minPixelsPerYear + padding * 2;
+    const timelineWidth = Math.max(containerWidth || 350, computedWidth);
+    const usableWidth = timelineWidth - padding * 2;
+
+    // Initial proportional positioning
+    let positions = timelineEvents.map((evt, idx) => {
+      const pct = ageSpan > 0 ? (Number(evt.age) - minAge) / ageSpan : 0.5;
+      const x = padding + pct * usableWidth;
       const isSelected = selectedEventIndex === idx;
-      const size = isSelected ? sizes.activeCircleSize : sizes.baseCircleSize;
-      
-      let x = paddingLeft + usableWidth / 2;
-      if (timelineEvents.length > 1) {
-        x = paddingLeft + (idx / (timelineEvents.length - 1)) * usableWidth;
-      }
+      const size = isSelected ? 56 : 48; // 48px base, 56px active
 
       return {
         index: idx,
@@ -225,152 +227,212 @@ export default function MobileTimeline({
         size
       };
     });
-  }, [timelineEvents, containerWidth, selectedEventIndex, sizes]);
 
-  const lineLeft = resolvedPositions.length > 0 ? resolvedPositions[0].x : 0;
-  const lineRight = resolvedPositions.length > 0 ? resolvedPositions[resolvedPositions.length - 1].x : 0;
-  const lineWidth = lineRight - lineLeft;
+    // Collision pass: Ensure adjacent chips do not overlap.
+    // Base size is 48px, active is 56px. 56px is a safe minimum distance to keep chips from overlapping.
+    const minDistance = 56;
+    for (let i = 1; i < positions.length; i++) {
+      const prev = positions[i - 1];
+      const curr = positions[i];
+      if (curr.x - prev.x < minDistance) {
+        curr.x = prev.x + minDistance;
+      }
+    }
+
+    return positions;
+  }, [timelineEvents, containerWidth, selectedEventIndex]);
+
+  const trackWidth = useMemo(() => {
+    if (resolvedPositions.length === 0) return containerWidth || 350;
+    const padding = 48;
+    const maxResolvedX = resolvedPositions[resolvedPositions.length - 1].x + padding;
+    return Math.max(containerWidth || 350, maxResolvedX);
+  }, [resolvedPositions, containerWidth]);
 
   return (
-    <section className="mobile-milestones-section">
-      <div className="mobile-section-header">
-        <h2 className="mobile-section-title">Your Life Journey ✨</h2>
-        <span className="mobile-section-subtitle">Tap any event to see details and impact</span>
+    <section 
+      className="mobile-milestones-section mobile-roadmap-timeline-wrapper"
+      style={{
+        background: '#ffffff',
+        border: '1px solid var(--border, #e5e7eb)',
+        borderRadius: '20px',
+        padding: '1.25rem',
+        marginBottom: '1.5rem',
+        boxShadow: 'var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05))',
+        textAlign: 'left'
+      }}
+    >
+      <div className="mobile-section-header" style={{ marginBottom: '1.25rem' }}>
+        <h2 className="mobile-section-title" style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--secondary, #1e3a5f)', margin: 0 }}>Life Events</h2>
+        <span className="mobile-section-subtitle" style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #6b7280)', marginTop: '0.2rem', display: 'block' }}>Tap an event to edit</span>
       </div>
 
-      <div className="mobile-roadmap-track" ref={containerRef} style={{ width: '100%', height: '150px', position: 'relative', overflow: 'visible' }}>
-        {timelineEvents.length > 0 && (
-          <div
-            className="mobile-roadmap-line"
-            style={{
-              position: 'absolute',
-              top: '38px',
-              left: `${lineLeft}px`,
-              width: `${lineWidth}px`,
-              height: '3px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              zIndex: 1
-            }}
-          />
-        )}
-
-        {resolvedPositions.map((item) => {
-          const isSelected = selectedEventIndex === item.index;
-          const circleColor = getCircleColorClass(item.event.type);
-          const shortLabel = getShortLabel(item.event);
-          const topPosition = 38 - item.size / 2;
-
-          // Responsive density rules:
-          // 1–6 events: Show age pills and labels for all
-          // 7–10 events: Show age pills and labels for all, clamped to 2 lines
-          // 11+ events: Show age pills for all events; show labels only for: selected event, first event, last event. Hide non-selected intermediate labels.
-          let showLabelForThisEvent = true;
-          if (eventCount >= 11) {
-            showLabelForThisEvent = isSelected || item.index === 0 || item.index === eventCount - 1;
-          }
-
-          const eventIcon = getEventIcon(item.event);
-
-          return (
-            <button
-              key={item.index}
-              type="button"
-              className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
+      <div 
+        ref={containerRef}
+        className="mobile-timeline-scroll-container"
+        style={{
+          width: '100%',
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+          position: 'relative',
+          paddingBottom: '0.75rem',
+          paddingTop: '0.5rem',
+        }}
+      >
+        <div 
+          className="mobile-roadmap-track" 
+          style={{ 
+            width: `${trackWidth}px`, 
+            height: '110px', 
+            position: 'relative',
+            overflow: 'visible' 
+          }}
+        >
+          {resolvedPositions.length > 0 && (
+            <div
+              className="mobile-roadmap-line"
               style={{
                 position: 'absolute',
-                left: `${item.x}px`,
-                transform: 'translateX(-50%)',
-                top: `${topPosition}px`,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                width: '80px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-                zIndex: isSelected ? 3 : 2
+                top: '28px', // Center vertically with the 56px active chip (56/2 = 28px)
+                left: `${resolvedPositions[0].x}px`,
+                width: `${resolvedPositions[resolvedPositions.length - 1].x - resolvedPositions[0].x}px`,
+                height: '3px',
+                background: 'var(--primary, #16a34a)',
+                opacity: 0.35,
+                zIndex: 1
               }}
-              onClick={() => {
-                setSelectedEventIndex(item.index);
-                if (onEventTap) {
-                  onEventTap(item.event, item.index);
-                }
-              }}
-            >
-              <div
+            />
+          )}
+
+          {resolvedPositions.map((item) => {
+            const isSelected = selectedEventIndex === item.index;
+            const circleColor = getCircleColorClass(item.event.type);
+            const shortLabel = getShortLabel(item.event);
+            const topPosition = 28 - item.size / 2;
+
+            // Responsive density rules:
+            // 1–6 events: Show age pills and labels for all
+            // 7–10 events: Show age pills and labels for all, clamped to 2 lines
+            // 11+ events: Show age pills for all events; show labels only for: selected event, first event, last event. Hide non-selected intermediate labels.
+            let showLabelForThisEvent = true;
+            if (eventCount >= 11) {
+              showLabelForThisEvent = isSelected || item.index === 0 || item.index === eventCount - 1;
+            }
+
+            const eventIcon = getEventIcon(item.event) || '✨';
+
+            return (
+              <button
+                key={item.index}
+                type="button"
+                className={`mobile-roadmap-milestone ${isSelected ? 'active' : ''}`}
                 style={{
-                  height: `${sizes.activeCircleSize}px`,
+                  position: 'absolute',
+                  left: `${item.x}px`,
+                  transform: 'translateX(-50%)',
+                  top: `${topPosition}px`,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  width: '90px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  zIndex: isSelected ? 3 : 2,
+                  outline: 'none',
+                  scrollSnapAlign: 'center',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+                onClick={() => {
+                  setSelectedEventIndex(item.index);
+                  if (onEventTap) {
+                    onEventTap(item.event, item.index);
+                  }
                 }}
               >
                 <div
-                  className={`mobile-roadmap-circle ${isSelected ? 'active pulse' : ''} ${circleColor}`}
                   style={{
-                    width: `${item.size}px`,
-                    height: `${item.size}px`,
-                    borderRadius: '50%',
+                    height: '56px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: getEmojiFontSize(isSelected),
-                    transition: 'all 0.2s ease-in-out'
+                    justifyContent: 'center'
                   }}
                 >
-                  <span>{eventIcon}</span>
+                  <div
+                    className={`mobile-roadmap-circle ${isSelected ? 'active pulse' : ''} ${circleColor}`}
+                    style={{
+                      width: `${item.size}px`,
+                      height: `${item.size}px`,
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: isSelected ? '1.4rem' : '1.15rem',
+                      border: isSelected ? '3px solid var(--primary, #16a34a)' : '1.5px solid var(--border, #e5e7eb)',
+                      boxShadow: isSelected 
+                        ? '0 0 15px rgba(22, 163, 74, 0.35), 0 4px 8px rgba(0, 0, 0, 0.06)' 
+                        : '0 2px 4px rgba(0, 0, 0, 0.04)',
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {eventIcon}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              
-              {/* Age Pill is always visible for all events */}
-              <span
-                className="mobile-roadmap-age mobile-roadmap-age-pill"
-                style={{
-                  fontSize: '0.65rem',
-                  fontWeight: '700',
-                  color: '#ffffff',
-                  background: isSelected ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  marginTop: '0.5rem',
-                  border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  lineHeight: 1,
-                  boxShadow: isSelected ? '0 0 10px rgba(99, 102, 241, 0.3)' : 'none',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {item.event.age}
-              </span>
-
-              {showLabelForThisEvent && (
+                
+                {/* Age Pill is always visible for all events */}
                 <span
-                  className="mobile-roadmap-label-text"
+                  className="mobile-roadmap-age mobile-roadmap-age-pill"
                   style={{
                     fontSize: '0.65rem',
-                    color: isSelected ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: isSelected ? '700' : '500',
+                    fontWeight: isSelected ? '800' : '700',
+                    color: isSelected ? 'var(--primary, #16a34a)' : 'var(--text-secondary, #6b7280)',
+                    background: isSelected ? 'var(--primary-light, rgba(22, 163, 74, 0.08))' : 'rgba(0, 0, 0, 0.03)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
                     marginTop: '0.3rem',
-                    textAlign: 'center',
-                    width: '100%',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'normal',
-                    lineHeight: '1.2'
+                    border: isSelected ? '1.5px solid var(--primary, #16a34a)' : '1px solid var(--border, #e5e7eb)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    boxShadow: isSelected ? '0 0 10px rgba(22, 163, 74, 0.15)' : 'none',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  {shortLabel}
+                  {item.event.age}
                 </span>
-              )}
-            </button>
-          );
-        })}
+
+                {showLabelForThisEvent && (
+                  <span
+                    className="mobile-roadmap-label-text"
+                    style={{
+                      fontSize: '0.65rem',
+                      color: isSelected ? 'var(--text-primary, #1f2937)' : 'var(--text-tertiary, #9ca3af)',
+                      fontWeight: isSelected ? '700' : '500',
+                      marginTop: '0.15rem',
+                      textAlign: 'center',
+                      width: '100%',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'normal',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {shortLabel}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

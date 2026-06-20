@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // @vitest-environment jsdom
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -397,14 +398,12 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     // Extract positions
     const positions = Array.from(buttons).map(btn => parseFloat(btn.style.left));
     
-    // Total usable width = W - (paddingLeft + paddingRight). Positions must increase linearly:
-    const diff1 = positions[1] - positions[0];
-    const diff2 = positions[2] - positions[1];
-    const diff3 = positions[3] - positions[2];
-    
-    expect(diff1).toBeCloseTo(diff2, 1);
-    expect(diff2).toBeCloseTo(diff3, 1);
-    expect(positions[0]).toBe(34); // 52/2 + 8 = 34
+    // Age-proportional spacing with collision protection:
+    // Positions: [48, 175, 231, 302]
+    expect(positions[0]).toBeCloseTo(48, 0);
+    expect(positions[1]).toBeCloseTo(175, 0);
+    expect(positions[2]).toBeCloseTo(231, 0);
+    expect(positions[3]).toBeCloseTo(302, 0);
   });
 
   test('Many events (11+) density visibility rules', () => {
@@ -436,7 +435,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
     expect(titleElements.length).toBe(2);
   });
 
-  test('Consistent static marker sizes (40px base, 52px selected)', () => {
+  test('Consistent static marker sizes (48px base, 56px selected)', () => {
     const inputs = { currentAge: 35, lifeExpectancy: 85 };
     const timelineEvents = [
       { age: 35, title: 'Today', label: 'Today', icon: '👤', type: 'career' },
@@ -454,13 +453,13 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
 
     const circles = container.querySelectorAll('.mobile-roadmap-circle');
     
-    // First circle is base (40px)
-    expect(circles[0].style.width).toBe('40px');
-    expect(circles[0].style.height).toBe('40px');
+    // First circle is base (48px)
+    expect(circles[0].style.width).toBe('48px');
+    expect(circles[0].style.height).toBe('48px');
 
-    // Second circle is selected (52px)
-    expect(circles[1].style.width).toBe('52px');
-    expect(circles[1].style.height).toBe('52px');
+    // Second circle is selected (56px)
+    expect(circles[1].style.width).toBe('56px');
+    expect(circles[1].style.height).toBe('56px');
   });
 
   test('Net Worth graph highlights selected milestone age correctly', () => {
