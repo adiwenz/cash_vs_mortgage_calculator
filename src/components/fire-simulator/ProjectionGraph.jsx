@@ -147,7 +147,7 @@ const CustomEventMarker = (props) => {
       {/* 1. Vertical connector line from (marker.x, marker.y) to (marker.x, currentY + currentR) */}
       <path
         d={`M ${targetX} ${marker.y} L ${targetX} ${currentY + currentR}`}
-        stroke={isSelected || isHovered ? 'var(--primary)' : isMajorImpact ? 'var(--text-tertiary)' : 'var(--border-color)'}
+        stroke={isSelected || isHovered ? 'var(--primary)' : isMajorImpact ? 'var(--text-tertiary)' : 'var(--border)'}
         strokeWidth={isSelected || isHovered ? 2 : isMajorImpact ? 1.5 : 1}
         strokeDasharray={(isMajorImpact || isHovered) && !isSelected ? 'none' : '2 2'}
         fill="none"
@@ -162,10 +162,10 @@ const CustomEventMarker = (props) => {
           r={currentR + (isHovered ? 8 : 6)}
           fill={
             isHovered
-              ? (isRetirement ? 'rgba(16, 185, 129, 0.4)' : 'rgba(99, 102, 241, 0.4)')
+              ? (isRetirement ? 'rgba(22, 163, 74, 0.4)' : 'rgba(30, 58, 95, 0.4)')
               : isSelected
-                ? (isRetirement ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
-                : 'rgba(16, 185, 129, 0.18)'
+                ? (isRetirement ? 'rgba(22, 163, 74, 0.3)' : 'rgba(30, 58, 95, 0.3)')
+                : 'rgba(22, 163, 74, 0.18)'
           }
           filter="blur(3px)"
           style={transitionStyle}
@@ -190,9 +190,9 @@ const CustomEventMarker = (props) => {
         cx={targetX}
         cy={currentY}
         r={currentR}
-        fill={isSelected ? 'var(--primary)' : isHovered ? 'var(--primary-hover, #3730a3)' : isRetirement ? '#064e3b' : 'var(--bg-secondary, #ffffff)'}
-        stroke={isSelected || isHovered ? '#ffffff' : isRetirement ? 'var(--accent-emerald, #16a34a)' : 'var(--border-color)'}
-        strokeWidth={isSelected || isHovered ? 1.5 : 1}
+        fill="var(--bg-secondary)"
+        stroke={isHovered ? 'var(--primary-hover)' : 'var(--primary)'}
+        strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1.5}
         style={transitionStyle}
       />
 
@@ -440,7 +440,7 @@ export default function ProjectionGraph({
             type="monotone"
             dataKey="assets"
             name="Total Assets"
-            stroke="#10b981"
+            stroke="var(--asset)"
             strokeWidth={2}
             dot={false}
             hide={!showAssets}
@@ -449,7 +449,7 @@ export default function ProjectionGraph({
             type="monotone"
             dataKey="debt"
             name="Total Debt"
-            stroke="#ef4444"
+            stroke="var(--debt)"
             strokeWidth={2}
             dot={false}
             hide={!showDebt}
@@ -458,7 +458,7 @@ export default function ProjectionGraph({
             type="monotone"
             dataKey="netWorth"
             name="Net Worth"
-            stroke="#1e3a5f"
+            stroke="var(--net-worth)"
             strokeWidth={2.5}
             dot={false}
             hide={!showNetWorth}
@@ -496,7 +496,7 @@ export default function ProjectionGraph({
           {displayedResults.runOutAge && (
             <ReferenceLine
               x={displayedResults.runOutAge}
-              stroke="#ef4444"
+              stroke="var(--debt)"
               strokeDasharray="4 4"
               strokeWidth={1.5}
               label={{

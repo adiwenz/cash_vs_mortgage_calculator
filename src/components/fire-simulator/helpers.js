@@ -23,16 +23,16 @@ export const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirem
       return {
         label: 'Comfortable Plan',
         badge: '🟢 Comfortable',
-        color: 'var(--accent-emerald)',
-        bg: 'rgba(16, 185, 129, 0.1)',
+        color: 'var(--success)',
+        bg: 'var(--success-light)',
         desc: `Your projected assets remain positive through your life expectancy plus 10 years safety buffer (Age ${Number(lifeExpectancy || 85) + 10}).`
       };
     case 'sustainable':
       return {
         label: 'Sustainable Plan',
         badge: '🟡 Sustainable',
-        color: '#fbbf24',
-        bg: 'rgba(251, 191, 36, 0.1)',
+        color: 'var(--warning)',
+        bg: 'var(--warning-light)',
         desc: `Your projected assets remain positive through life expectancy (Age ${lifeExpectancy || 85}), but do not meet the 10-year safety buffer.`
       };
     case 'retirementGap':
@@ -47,8 +47,8 @@ export const getOutcomeDetails = (outcome, runOutAge, readinessCriteria, retirem
       return {
         label: 'Sustainable Plan',
         badge: '🟡 Sustainable',
-        color: '#fbbf24',
-        bg: 'rgba(251, 191, 36, 0.1)',
+        color: 'var(--warning)',
+        bg: 'var(--warning-light)',
         desc: 'Your projected assets remain positive through life expectancy. Your portfolio gradually declines but is projected to last.'
       };
   }
@@ -200,62 +200,62 @@ export const getPaceBadgeStyles = (savingsFocus) => {
   if (!savingsFocus) return {
     color: 'var(--text-secondary)',
     background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid var(--border-color)'
+    border: '1px solid var(--border)'
   };
   const focusLower = savingsFocus.toLowerCase();
   if (focusLower.includes('tip')) {
     return {
       color: 'var(--primary)',
-      background: 'rgba(99, 102, 241, 0.12)',
-      border: '1px solid rgba(99, 102, 241, 0.3)'
+      background: 'var(--primary-light)',
+      border: '1px solid rgba(22, 163, 74, 0.3)'
     };
   }
   if (focusLower.includes('steady')) {
     return {
-      color: '#10b981',
-      background: 'rgba(16, 185, 129, 0.12)',
-      border: '1px solid rgba(16, 185, 129, 0.3)'
+      color: 'var(--success)',
+      background: 'var(--success-light)',
+      border: '1px solid rgba(22, 163, 74, 0.3)'
     };
   }
   if (focusLower.includes('gentle') || focusLower.includes('work')) {
     return {
-      color: '#3b82f6',
-      background: 'rgba(59, 130, 246, 0.12)',
-      border: '1px solid rgba(59, 130, 246, 0.3)'
+      color: 'var(--secondary)',
+      background: 'var(--secondary-light)',
+      border: '1px solid rgba(30, 58, 95, 0.3)'
     };
   }
   if (focusLower.includes('balanced')) {
     return {
-      color: '#16a34a',
-      background: 'rgba(22, 163, 74, 0.12)',
+      color: 'var(--primary)',
+      background: 'var(--primary-light)',
       border: '1px solid rgba(22, 163, 74, 0.3)'
     };
   }
   if (focusLower.includes('moderate') || focusLower.includes('save')) {
     return {
-      color: '#f59e0b',
-      background: 'rgba(245, 158, 11, 0.12)',
+      color: 'var(--warning)',
+      background: 'var(--warning-light)',
       border: '1px solid rgba(245, 158, 11, 0.3)'
     };
   }
   if (focusLower.includes('earnings') || focusLower.includes('active') || focusLower.includes('earn')) {
     return {
-      color: '#1e3a5f',
-      background: 'rgba(30, 58, 95, 0.12)',
+      color: 'var(--secondary)',
+      background: 'var(--secondary-light)',
       border: '1px solid rgba(30, 58, 95, 0.3)'
     };
   }
   if (focusLower.includes('accelerated') || focusLower.includes('proactive') || focusLower.includes('dynamic')) {
     return {
-      color: '#ec4899',
-      background: 'rgba(236, 72, 153, 0.12)',
-      border: '1px solid rgba(236, 72, 153, 0.3)'
+      color: 'var(--danger)',
+      background: 'var(--danger-light)',
+      border: '1px solid rgba(220, 38, 38, 0.3)'
     };
   }
   return {
     color: 'var(--text-secondary)',
     background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid var(--border-color)'
+    border: '1px solid var(--border)'
   };
 };
 
@@ -461,7 +461,7 @@ export const getEventIcon = (evt) => {
     return ''; // neutral endpoint circle only
   }
   if (evt.type?.startsWith('retirementReady')) {
-    return '🎯';
+    return '🎉';
   }
   if (evt.type === 'retire') {
     return '🏖️';

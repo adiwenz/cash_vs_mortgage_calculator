@@ -548,7 +548,7 @@ export default function SavingsAllocator() {
               </div>
             </div>
 
-            <div className="checkbox-row" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+            <div className="checkbox-row" style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
               <label className="field-label-checkbox">
                 <input
                   type="checkbox"

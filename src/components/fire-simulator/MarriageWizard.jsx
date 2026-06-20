@@ -394,7 +394,7 @@ export default function MarriageWizard({
                 </div>
                 <div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Total Savings</div>
-                  <strong style={{ fontSize: '0.95rem', color: 'var(--accent-emerald)' }}>{formatCurrency(userAssets + spouseAssets)}</strong>
+                  <strong style={{ fontSize: '0.95rem', color: 'var(--success)' }}>{formatCurrency(userAssets + spouseAssets)}</strong>
                 </div>
               </div>
             </div>
@@ -574,8 +574,8 @@ export default function MarriageWizard({
 
                 {/* Funding Gap Calculation Display */}
                 {Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
-                  <div style={{ border: '1px solid var(--accent-orange)', backgroundColor: 'rgba(245, 158, 11, 0.08)', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.25rem' }}>
-                    <strong style={{ color: 'var(--accent-orange)' }}>⚠️ Funding Gap Identified</strong>
+                  <div style={{ border: '1px solid var(--warning)', backgroundColor: 'var(--warning-light)', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.25rem' }}>
+                    <strong style={{ color: 'var(--warning)' }}>⚠️ Funding Gap Identified</strong>
                     <span>
                       Wedding cost exceeds combined available savings by <strong>{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</strong>.
                     </span>
@@ -585,7 +585,7 @@ export default function MarriageWizard({
                       {(editingEvent.weddingFundingMethod || 'savings') === 'debt' && `Financing this wedding adds ${formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))} of debt. Your net worth may go negative until the debt is paid down.`}
                     </span>
                     {editingEvent.weddingFundingMethod === 'debt' && isNetWorthBelowZero && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', fontWeight: 'bold', marginTop: '0.15rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--warning)', fontWeight: 'bold', marginTop: '0.15rem' }}>
                         Your net worth is below $0 because the wedding debt is larger than your available assets.
                       </span>
                     )}
@@ -613,33 +613,33 @@ export default function MarriageWizard({
               </span>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Housing Shared</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '0.1rem' }}>
                     Estimated Savings: +50% of current housing cost
                   </div>
                 </div>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Utilities Shared</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '0.1rem' }}>
                     Estimated Savings: +25% of utilities budget
                   </div>
                 </div>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Internet Shared</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '0.1rem' }}>
                     Estimated Savings: +50% of internet budget
                   </div>
                 </div>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Streaming Shared</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '0.1rem' }}>
                     Estimated Savings: +50% of streaming budget
                   </div>
                 </div>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border-color)', gridColumn: 'span 2' }}>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>Household Goods Shared</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--success)', marginTop: '0.1rem' }}>
                     Estimated Savings: +10% of household goods budget
                   </div>
                 </div>
@@ -648,7 +648,7 @@ export default function MarriageWizard({
 
             {/* Savings Breakdown */}
             {estimates && estimates.savingsBreakdown && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                 <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>
                   Estimated Monthly Household Savings
                 </span>
@@ -656,27 +656,27 @@ export default function MarriageWizard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Housing</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.housing)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>+{formatCurrency(estimates.savingsBreakdown.housing)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Utilities</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.utilities)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>+{formatCurrency(estimates.savingsBreakdown.utilities)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Internet</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.internet)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>+{formatCurrency(estimates.savingsBreakdown.internet)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Streaming</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.streaming)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>+{formatCurrency(estimates.savingsBreakdown.streaming)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Other Shared</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>+{formatCurrency(estimates.savingsBreakdown.otherShared)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>+{formatCurrency(estimates.savingsBreakdown.otherShared)}/mo</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
                     <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>Total Savings</span>
-                    <strong style={{ color: 'var(--accent-emerald)', fontSize: '0.95rem' }}>
+                    <strong style={{ color: 'var(--success)', fontSize: '0.95rem' }}>
                       +{formatCurrency(estimates.savingsBreakdown.total)}/mo
                     </strong>
                   </div>
@@ -798,11 +798,11 @@ export default function MarriageWizard({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Combined Savings:</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(combinedSavings)}/mo</strong>
+                    <strong style={{ color: 'var(--success)' }}>{formatCurrency(combinedSavings)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Combined Spending:</span>
-                    <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(combinedSpendingVal / 12)}/mo</strong>
+                    <strong style={{ color: 'var(--danger)' }}>{formatCurrency(combinedSpendingVal / 12)}/mo</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Savings Rate:</span>
@@ -810,7 +810,7 @@ export default function MarriageWizard({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--primary)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Net Worth:</span>
-                    <strong style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(combinedAssets - combinedDebt)}</strong>
+                    <strong style={{ color: 'var(--success)' }}>{formatCurrency(combinedAssets - combinedDebt)}</strong>
                   </div>
                 </div>
               </div>
@@ -821,7 +821,7 @@ export default function MarriageWizard({
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Wedding Cost:</span>
-                  <strong style={{ color: 'var(--accent-rose)' }}>{formatCurrency(editingEvent.weddingCost || 0)}</strong>
+                  <strong style={{ color: 'var(--danger)' }}>{formatCurrency(editingEvent.weddingCost || 0)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Funding Method:</span>
@@ -833,7 +833,7 @@ export default function MarriageWizard({
                 </div>
                 {editingEvent.weddingFundingMethod === 'debt' && Number(editingEvent.weddingCost || 0) > (userAssets + spouseAssets) && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-rose)', fontWeight: 'bold' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)', fontWeight: 'bold' }}>
                       <span>Debt Created:</span>
                       <span>+{formatCurrency(Number(editingEvent.weddingCost || 0) - (userAssets + spouseAssets))}</span>
                     </div>
@@ -843,7 +843,7 @@ export default function MarriageWizard({
                   </>
                 )}
                 {isNetWorthBelowZero && (
-                  <div style={{ color: 'var(--accent-rose)', fontSize: '0.75rem', marginTop: '0.15rem', fontWeight: 'bold' }}>
+                  <div style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '0.15rem', fontWeight: 'bold' }}>
                     Your net worth is below $0 because the wedding debt is larger than your available assets.
                   </div>
                 )}
@@ -860,10 +860,10 @@ export default function MarriageWizard({
               </div>
               <div style={{
                 border: '1px solid',
-                borderColor: afterReadyAge && beforeReadyAge && afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : afterReadyAge && beforeReadyAge && afterReadyAge > beforeReadyAge ? 'var(--accent-rose)' : 'var(--border-color)',
+                borderColor: afterReadyAge && beforeReadyAge && afterReadyAge < beforeReadyAge ? 'var(--success)' : afterReadyAge && beforeReadyAge && afterReadyAge > beforeReadyAge ? 'var(--danger)' : 'var(--border)',
                 borderRadius: 'var(--radius-md)',
                 padding: '0.85rem',
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                background: 'linear-gradient(135deg, var(--secondary-light) 0%, var(--secondary-light) 100%)',
                 textAlign: 'center'
               }}>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>After Work Optional Age</span>
@@ -871,7 +871,7 @@ export default function MarriageWizard({
                   {afterReadyAge ? `Age ${afterReadyAge}` : 'Never Ready'}
                 </div>
                 {afterReadyAge && beforeReadyAge && afterReadyAge !== beforeReadyAge && (
-                  <div style={{ fontSize: '0.65rem', color: afterReadyAge < beforeReadyAge ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold', marginTop: '0.1rem' }}>
+                  <div style={{ fontSize: '0.65rem', color: afterReadyAge < beforeReadyAge ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold', marginTop: '0.1rem' }}>
                     {afterReadyAge < beforeReadyAge ? `Ready ${beforeReadyAge - afterReadyAge} years earlier! 🎉` : `Ready ${afterReadyAge - beforeReadyAge} years later`}
                   </div>
                 )}
@@ -887,7 +887,7 @@ export default function MarriageWizard({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {/* 1. Low Combined Spending Warning */}
               {combinedSpendingVal <= userSpendingPreRetirement && (
-                <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                <div style={{ border: '1px solid var(--danger)', backgroundColor: 'var(--danger-light)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                   <input
                     type="checkbox"
                     id="confirm-zero-spending-preview"
@@ -896,7 +896,7 @@ export default function MarriageWizard({
                     style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', marginTop: '0.1rem' }}
                   />
                   <label htmlFor="confirm-zero-spending-preview" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', margin: 0 }}>
-                    <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Low Combined Spending</strong>
+                    <strong style={{ color: 'var(--danger)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Low Combined Spending</strong>
                     I confirm that combined household spending after marriage is less than or equal to my single spending (meaning my spouse has no additional spending needs).
                   </label>
                 </div>
@@ -904,7 +904,7 @@ export default function MarriageWizard({
 
               {/* 2. Zero Partner Personal Spending Warning */}
               {partnerPersonalSpending === 0 && (
-                <div style={{ border: '1px solid var(--accent-rose)', backgroundColor: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                <div style={{ border: '1px solid var(--danger)', backgroundColor: 'var(--danger-light)', padding: '0.75rem', borderRadius: '6px', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                   <input
                     type="checkbox"
                     id="confirm-partner-zero-spending"
@@ -913,7 +913,7 @@ export default function MarriageWizard({
                     style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', marginTop: '0.1rem' }}
                   />
                   <label htmlFor="confirm-partner-zero-spending" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', margin: 0 }}>
-                    <strong style={{ color: 'var(--accent-rose)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Zero Partner Personal Spending</strong>
+                    <strong style={{ color: 'var(--danger)', display: 'block', marginBottom: '0.2rem' }}>⚠️ Warning: Zero Partner Personal Spending</strong>
                     I confirm that partner personal spending is set to $0/month.
                   </label>
                 </div>
@@ -942,9 +942,9 @@ export default function MarriageWizard({
                   style={{
                     alignSelf: 'center',
                     margin: 0,
-                    background: 'var(--accent-rose, #f43f5e)',
+                    background: 'var(--danger)',
                     color: '#fff',
-                    borderColor: 'var(--accent-rose, #f43f5e)',
+                    borderColor: 'var(--danger)',
                     cursor: 'pointer',
                     padding: '0.35rem 0.75rem',
                     borderRadius: '4px',
@@ -1023,7 +1023,7 @@ export default function MarriageWizard({
                 type="button"
                 className="btn-primary"
                 onClick={handleSaveEvent}
-                style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)', cursor: 'pointer' }}
+                style={{ alignSelf: 'center', margin: 0, padding: '0.4rem 1.2rem', fontWeight: 'bold', background: 'var(--success)', borderColor: 'var(--success)', cursor: 'pointer' }}
                 disabled={isStep4Invalid}
               >
                 Save Marriage Event

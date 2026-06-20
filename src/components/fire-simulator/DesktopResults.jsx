@@ -131,7 +131,7 @@ function LedgerRow({ row, formatCurrency }) {
   const isPos = row.type === 'positive';
   const isNeg = row.type === 'negative';
   const sign = isPos ? '+' : isNeg ? '-' : '';
-  const color = isPos ? 'var(--accent-emerald)' : isNeg ? 'var(--accent-rose)' : 'var(--text-secondary)';
+  const color = isPos ? 'var(--success)' : isNeg ? 'var(--danger)' : 'var(--text-secondary)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -146,7 +146,7 @@ function LedgerRow({ row, formatCurrency }) {
           padding: row.isSummary ? '0.3rem 0 0.15rem 0' : '0.15rem 0',
           borderRadius: '4px',
           transition: 'background-color 0.2s',
-          borderTop: row.isSummary ? '1px dashed var(--border-color)' : 'none',
+          borderTop: row.isSummary ? '1px dashed var(--border)' : 'none',
           marginTop: row.isSummary ? '0.2rem' : '0',
           fontWeight: row.isSummary ? '700' : 'normal'
         }}
@@ -161,7 +161,7 @@ function LedgerRow({ row, formatCurrency }) {
             </span>
           )}
         </div>
-        <strong style={{ color: row.isSummary ? (row.type === 'neutral' ? 'var(--text-primary)' : 'var(--accent-emerald)') : color }}>
+        <strong style={{ color: row.isSummary ? (row.type === 'neutral' ? 'var(--text-primary)' : 'var(--success)') : color }}>
           {sign}{formatCurrency(Math.abs(row.value))}
         </strong>
       </div>
@@ -500,9 +500,9 @@ export default function DesktopResults({
                   <span className="badge" style={{ 
                     fontSize: '0.75rem', 
                     padding: '0.2rem 0.6rem', 
-                    background: isWorking ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
-                    color: isWorking ? 'var(--primary)' : 'var(--accent-emerald)',
-                    border: `1px solid ${isWorking ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                    background: isWorking ? 'var(--secondary-light)' : 'var(--success-light)', 
+                    color: isWorking ? 'var(--secondary)' : 'var(--success)',
+                    border: `1px solid ${isWorking ? 'rgba(30, 58, 95, 0.25)' : 'rgba(22, 163, 74, 0.25)'}`,
                     borderRadius: '12px',
                     fontWeight: '600'
                   }}>
@@ -512,37 +512,37 @@ export default function DesktopResults({
 
                 {/* KPI Stats Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Net Worth</span>
-                    <strong style={{ fontSize: '1.05rem', color: yearData.netWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
+                    <strong style={{ fontSize: '1.05rem', color: yearData.netWorth < 0 ? 'var(--danger)' : 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.netWorth)}</strong>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Portfolio Value / Total Assets</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.assets)}</strong>
                   </div>
                   {yearData.debt > 0 && (
-                    <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                    <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Total Debt</span>
-                      <strong style={{ fontSize: '1.05rem', color: 'var(--accent-rose)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.debt)}</strong>
+                      <strong style={{ fontSize: '1.05rem', color: 'var(--danger)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.debt)}</strong>
                     </div>
                   )}
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Income</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>{formatCurrency(yearData.income)}</strong>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Annual Spending</span>
                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', display: 'block', marginTop: '0.25rem' }}>
                       {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
                     </strong>
                   </div>
-                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                       {yearData.withdrawals > 0 ? 'Withdrawals' : 'Net Savings'}
                     </span>
                     <strong style={{ 
                       fontSize: '1.05rem', 
-                      color: yearData.withdrawals > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)', 
+                      color: yearData.withdrawals > 0 ? 'var(--danger)' : 'var(--success)', 
                       display: 'block', 
                       marginTop: '0.25rem' 
                     }}>
@@ -655,7 +655,7 @@ export default function DesktopResults({
                         fontWeight: '700'
                       }}>
                         <span>Ending Net Worth:</span>
-                        <strong style={{ color: yearData.netWorthLedger.endingNetWorth < 0 ? 'var(--accent-rose)' : 'var(--text-primary)' }}>
+                        <strong style={{ color: yearData.netWorthLedger.endingNetWorth < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
                           {formatCurrency(yearData.netWorthLedger.endingNetWorth)}
                         </strong>
                       </div>
@@ -669,27 +669,27 @@ export default function DesktopResults({
                     📊 Cash Flow Details
                   </h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border)', paddingBottom: '0.25rem' }}>
                       <span>Base Annual Spending:</span>
                       <strong style={{ color: 'var(--text-primary)' }}>
                         {formatCurrency(Math.max(0, yearData.expenses - (yearData.taxes || 0) - (yearData.childCosts || 0)))}
                       </strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border)', paddingBottom: '0.25rem' }}>
                       <span>Child Costs:</span>
-                      <strong style={{ color: yearData.childCosts > 0 ? 'var(--accent-orange, #f59e0b)' : 'var(--text-primary)' }}>
+                      <strong style={{ color: yearData.childCosts > 0 ? 'var(--warning)' : 'var(--text-primary)' }}>
                         {formatCurrency(yearData.childCosts || 0)}
                       </strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border)', paddingBottom: '0.25rem' }}>
                       <span>Total Annual Spending:</span>
                       <strong style={{ color: 'var(--text-primary)' }}>
                         {formatCurrency(yearData.expenses - (yearData.taxes || 0))}
                       </strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border-color)', paddingBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', borderBottom: '1px dashed var(--border)', paddingBottom: '0.25rem' }}>
                       <span>Net Savings:</span>
-                      <strong style={{ color: yearData.withdrawals > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                      <strong style={{ color: yearData.withdrawals > 0 ? 'var(--danger)' : 'var(--success)' }}>
                         {yearData.withdrawals > 0 ? `-${formatCurrency(yearData.withdrawals)}` : `+${formatCurrency(yearData.savings)}`}
                       </strong>
                     </div>

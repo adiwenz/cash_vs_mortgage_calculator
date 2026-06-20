@@ -326,24 +326,24 @@ export default function CreditCardBehavior() {
 
   // Determine line colors based on color-blind setting
   const getLineColors = (key) => {
-    if (key === BEHAVIOR_KEYS.PAYOFF_IN_FULL) return '#22c55e';
+    if (key === BEHAVIOR_KEYS.PAYOFF_IN_FULL) return 'var(--success)';
     if (colorBlindMode) {
       switch (key) {
-        case BEHAVIOR_KEYS.PAYDOWN: return '#10b981'; // Emerald
-        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return '#2563eb';       // Blue
-        case BEHAVIOR_KEYS.CARRY_BALANCE: return '#ea580c';    // Orange
-        case BEHAVIOR_KEYS.INTEREST_TRAP: return '#dc2626';       // Bright Red
-        case BEHAVIOR_KEYS.BUDGET_GAP: return '#1e3a5f';  // Navy
-        default: return '#94a3b8';
+        case BEHAVIOR_KEYS.PAYDOWN: return 'var(--primary)';
+        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return 'var(--secondary)';
+        case BEHAVIOR_KEYS.CARRY_BALANCE: return 'var(--warning)';
+        case BEHAVIOR_KEYS.INTEREST_TRAP: return 'var(--danger)';
+        case BEHAVIOR_KEYS.BUDGET_GAP: return 'var(--secondary)';
+        default: return 'var(--text-secondary)';
       }
     } else {
       switch (key) {
-        case BEHAVIOR_KEYS.PAYDOWN: return '#10b981'; // Emerald
-        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return '#0ea5e9';       // Sky
-        case BEHAVIOR_KEYS.CARRY_BALANCE: return '#f59e0b';    // Amber
-        case BEHAVIOR_KEYS.INTEREST_TRAP: return '#f43f5e';       // Rose
-        case BEHAVIOR_KEYS.BUDGET_GAP: return '#1e3a5f';  // Navy
-        default: return '#64748b';
+        case BEHAVIOR_KEYS.PAYDOWN: return 'var(--primary)';
+        case BEHAVIOR_KEYS.SLOW_PAYDOWN: return 'var(--secondary)';
+        case BEHAVIOR_KEYS.CARRY_BALANCE: return 'var(--warning)';
+        case BEHAVIOR_KEYS.INTEREST_TRAP: return 'var(--danger)';
+        case BEHAVIOR_KEYS.BUDGET_GAP: return 'var(--secondary)';
+        default: return 'var(--text-secondary)';
       }
     }
   };
@@ -745,7 +745,7 @@ export default function CreditCardBehavior() {
                       type="monotone"
                       dataKey="Pay in Full"
                       name="Pay in Full"
-                      stroke="#22c55e"
+                      stroke="var(--success)"
                       strokeWidth={2.5}
                       strokeDasharray="4 4"
                       dot={false}
@@ -858,7 +858,7 @@ export default function CreditCardBehavior() {
                       type="monotone"
                       dataKey="Pay in Full NW"
                       name="Pay in Full"
-                      stroke="#22c55e"
+                      stroke="var(--success)"
                       strokeWidth={2.5}
                       strokeDasharray="4 4"
                       dot={false}

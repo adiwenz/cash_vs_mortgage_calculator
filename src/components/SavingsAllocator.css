@@ -262,15 +262,15 @@
 }
 
 .sum-badge.valid {
-  background: var(--accent-emerald-light);
-  color: var(--accent-emerald);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid rgba(22, 163, 74, 0.2);
 }
 
 .sum-badge.invalid {
-  background: var(--accent-rose-light);
-  color: var(--accent-rose);
-  border: 1px solid rgba(244, 63, 94, 0.2);
+  background: var(--danger-light);
+  color: var(--danger);
+  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .rebalance-btn {
@@ -529,15 +529,15 @@
 }
 
 .financial-data-table .data-val.green {
-  color: var(--accent-sky);
+  color: var(--primary);
 }
 
 .financial-data-table .data-val.emerald {
-  color: var(--accent-emerald);
+  color: var(--success);
 }
 
 .financial-data-table .table-row.total {
-  background: rgba(99, 102, 241, 0.05);
+  background: var(--secondary-light);
   font-weight: 800;
   font-size: 0.95rem;
 }
@@ -590,31 +590,31 @@
 }
 
 .error-alert {
-  background: var(--accent-rose-light);
-  border: 1px solid rgba(244, 63, 94, 0.15);
-  border-left: 4px solid var(--accent-rose);
+  background: var(--danger-light);
+  border: 1px solid rgba(220, 38, 38, 0.15);
+  border-left: 4px solid var(--danger);
 }
 
 .error-alert strong {
-  color: var(--accent-rose);
+  color: var(--danger);
 }
 
 .warn-alert {
-  background: var(--accent-amber-light);
+  background: var(--warning-light);
   border: 1px solid rgba(245, 158, 11, 0.15);
-  border-left: 4px solid var(--accent-amber);
+  border-left: 4px solid var(--warning);
 }
 
 .warn-alert strong {
-  color: var(--accent-amber);
+  color: var(--warning);
 }
 
 .success-alert {
-  background: var(--accent-emerald-light);
-  border: 1px solid rgba(16, 185, 129, 0.15);
-  border-left: 4px solid var(--accent-emerald);
+  background: var(--success-light);
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  border-left: 4px solid var(--success);
 }
 
 .success-alert strong {
-  color: var(--accent-emerald);
+  color: var(--success);
 }

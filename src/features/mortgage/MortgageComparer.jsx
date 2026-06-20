@@ -605,7 +605,7 @@ export default function MortgageComparer() {
                   color: '#ffffff',
                   fontSize: '0.95rem',
                   fontWeight: '600',
-                  border: '1px dashed var(--accent-rose)'
+                  border: '1px dashed var(--danger)'
                 }}
               >
                 <div>
@@ -1044,9 +1044,9 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDelete
                 height: '32px', 
                 padding: 0, 
                 fontSize: '0.85rem', 
-                background: 'rgba(244, 63, 94, 0.1)', 
-                borderColor: 'rgba(244, 63, 94, 0.2)',
-                color: 'var(--accent-rose)' 
+                background: 'var(--danger-light)', 
+                borderColor: 'rgba(220, 38, 38, 0.2)',
+                color: 'var(--danger)' 
               }}
             >
               🗑️
@@ -1067,12 +1067,12 @@ function ScenarioCard({ scenario, isExpanded, onExpandToggle, onChange, onDelete
       {scenario.errors.length > 0 && (
         <div 
           style={{ 
-            background: 'rgba(244, 63, 94, 0.05)', 
-            border: '1px solid var(--accent-rose)', 
+            background: 'var(--danger-light)', 
+            border: '1px solid var(--danger)', 
             borderRadius: '6px', 
             padding: '0.5rem 0.75rem', 
             fontSize: '0.75rem', 
-            color: 'var(--accent-rose)' 
+            color: 'var(--danger)' 
           }}
         >
           <ul style={{ margin: 0, paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>

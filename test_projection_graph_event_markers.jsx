@@ -120,7 +120,7 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     // Verify glow circle is rendered on hover and has intensified purple glow fill
     expect(circles.length).toBe(2);
     const glowCircle = circles[0];
-    expect(glowCircle.getAttribute('fill')).toBe('rgba(99, 102, 241, 0.4)');
+    expect(glowCircle.getAttribute('fill')).toBe('rgba(30, 58, 95, 0.4)');
 
     // Verify that NO HTML tooltip is rendered on hover
     expect(container.querySelector('.timeline-tooltip')).toBeNull();
@@ -157,7 +157,7 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     let circles = retirementBadge.querySelectorAll('circle');
     expect(circles.length).toBe(2);
     const glowCircle = circles[0];
-    expect(glowCircle.getAttribute('fill')).toBe('rgba(16, 185, 129, 0.18)');
+    expect(glowCircle.getAttribute('fill')).toBe('rgba(22, 163, 74, 0.18)');
 
     const mainCircle = circles[1];
     const initialR = parseFloat(mainCircle.getAttribute('r'));
@@ -176,7 +176,7 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     // Verify glow circle is still rendered and has intensified green glow fill
     expect(circles.length).toBe(2);
     const updatedGlowCircle = circles[0];
-    expect(updatedGlowCircle.getAttribute('fill')).toBe('rgba(16, 185, 129, 0.4)');
+    expect(updatedGlowCircle.getAttribute('fill')).toBe('rgba(22, 163, 74, 0.4)');
 
     // Trigger mouse leave
     fireEvent.mouseLeave(retirementBadge);
@@ -185,7 +185,7 @@ describe('ProjectionGraph Event Markers Sizing, Glow, Hover and Tooltip Behavior
     expect(retirementBadge.classList.contains('hovered')).toBe(false);
     circles = retirementBadge.querySelectorAll('circle');
     expect(circles.length).toBe(2);
-    expect(circles[0].getAttribute('fill')).toBe('rgba(16, 185, 129, 0.18)');
+    expect(circles[0].getAttribute('fill')).toBe('rgba(22, 163, 74, 0.18)');
   });
 });
 

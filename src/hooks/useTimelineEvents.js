@@ -400,33 +400,7 @@ export function useTimelineEvents(inputs, displayedResults) {
       });
     }
 
-    // Ensure Today event is always present
-    const hasToday = events.some(e => e.type === 'today');
-    if (!hasToday) {
-      events.push({
-        age: inp.currentAge,
-        title: 'Today',
-        label: 'Today',
-        icon: '',
-        type: 'today',
-        isMilestone: true,
-        description: `Your current situation and starting point (Age ${inp.currentAge}).`
-      });
-    }
 
-    // Ensure Life Expectancy event is always present
-    const hasLifeExp = events.some(e => e.type === 'lifeExpectancy');
-    if (!hasLifeExp) {
-      events.push({
-        age: inp.lifeExpectancy,
-        title: 'Life Expectancy',
-        label: 'Life Expectancy',
-        icon: '',
-        type: 'lifeExpectancy',
-        isMilestone: true,
-        description: `Your life expectancy horizon (Age ${inp.lifeExpectancy}).`
-      });
-    }
 
     // 4. Mathematical Milestones (e.g. debt payoffs)
     const calculationMilestones = calc.dynamicMilestones || [];

@@ -77,7 +77,7 @@ export default function MobileResults({
                 type="monotone"
                 dataKey="netWorth"
                 name="Net Worth"
-                stroke="#1e3a5f"
+                stroke="var(--net-worth)"
                 strokeWidth={2.5}
                 dot={false}
               />
@@ -89,7 +89,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="assets"
                   name="Assets"
-                  stroke="#10b981"
+                  stroke="var(--asset)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -97,7 +97,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="debt"
                   name="Debt"
-                  stroke="#f43f5e"
+                  stroke="var(--debt)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -110,7 +110,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="portfolio"
                   name="Portfolio Balance"
-                  stroke="#3b82f6"
+                  stroke="var(--asset)"
                   strokeWidth={2.5}
                   dot={false}
                 />
@@ -118,7 +118,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="fiNumber"
                   name="FI Target"
-                  stroke="#f59e0b"
+                  stroke="var(--target)"
                   strokeWidth={1.5}
                   strokeDasharray="4 4"
                   dot={false}
@@ -126,9 +126,9 @@ export default function MobileResults({
                 {activeResults.retirementReadyAge && (
                   <ReferenceLine
                     x={activeResults.retirementReadyAge}
-                    stroke="#10b981"
+                    stroke="var(--success)"
                     strokeWidth={1.5}
-                    label={{ value: `Age ${activeResults.retirementReadyAge} Ready`, fill: '#10b981', fontSize: 8, position: 'top' }}
+                    label={{ value: `Age ${activeResults.retirementReadyAge} Ready`, fill: 'var(--success)', fontSize: 8, position: 'top' }}
                   />
                 )}
               </>
@@ -140,7 +140,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="income"
                   name="Income"
-                  stroke="#0d9488"
+                  stroke="var(--income)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -148,7 +148,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="expenses"
                   name="Expenses"
-                  stroke="#f97316"
+                  stroke="var(--expense)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -156,7 +156,7 @@ export default function MobileResults({
                   type="monotone"
                   dataKey="taxes"
                   name="Taxes"
-                  stroke="#64748b"
+                  stroke="var(--tax)"
                   strokeWidth={1.5}
                   dot={false}
                 />

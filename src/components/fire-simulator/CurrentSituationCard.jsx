@@ -263,7 +263,7 @@ export default function CurrentSituationCard({
                 fontSize: '1.05rem',
                 padding: '0.15rem 0.55rem 0.15rem 0.35rem',
                 textAlign: 'right',
-                color: 'var(--accent-emerald)',
+                color: 'var(--success)',
                 background: 'transparent',
                 border: 'none',
                 borderBottom: '1px solid transparent',
@@ -276,7 +276,7 @@ export default function CurrentSituationCard({
               onChange={(e) => handleSavingsRateChange(e.target.value)}
               onBlur={() => setSavingsRateOverride(null)}
             />
-            <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.85rem', fontWeight: 'bold' }}>%</span>
+            <span style={{ position: 'absolute', right: '4px', color: 'var(--success)', fontSize: '0.85rem', fontWeight: 'bold' }}>%</span>
           </div>
         </div>
       </div>
