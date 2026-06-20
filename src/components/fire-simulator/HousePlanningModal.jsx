@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Info, Check, Briefcase, Home, ShieldAlert } from 'lucide-react';
 import { formatCurrency } from './helpers';
 import { runFireSimulation } from '../../fireCalculations';
+import { NumberInput } from '../ui/PlainInputs';
 import {
   calculateTotalCashRequired,
   calculateLiquidAssetsAtPurchaseAge,
@@ -423,10 +424,12 @@ export default function HousePlanningModal({
                   height: '40px'
                 }}>
                   <span style={{ color: '#64748b', marginRight: '0.5rem', fontSize: '0.95rem', fontWeight: '650' }}>$</span>
-                  <input
-                    type="text"
-                    value={priceInput}
-                    onChange={handlePriceChange}
+                  <NumberInput
+                    value={homePrice}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setHomePrice(val);
+                    }}
                     style={{
                       border: 'none',
                       background: 'none',

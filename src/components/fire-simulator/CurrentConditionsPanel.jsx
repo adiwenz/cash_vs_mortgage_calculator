@@ -1,4 +1,5 @@
 import { formatCurrency, getDefaultValuesForType } from './helpers';
+import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 
 export default function CurrentConditionsPanel({
   inputs,
@@ -254,8 +255,7 @@ export function CurrentConditionModal({
           {type !== 'child' && type !== 'obligation' && (
             <div className="input-wrapper">
               <span className="input-name">{valueLabel}</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingCondition.value || 0}
@@ -267,8 +267,7 @@ export function CurrentConditionModal({
           {/* Monthly Cost/Contribution */}
           <div className="input-wrapper">
             <span className="input-name">{amountLabel}</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingCondition.monthlyAmount || 0}
@@ -280,8 +279,7 @@ export function CurrentConditionModal({
           {/* Growth Rate / Interest Rate */}
           <div className="input-wrapper">
             <span className="input-name">{rateLabel}</span>
-            <input
-              type="number"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingCondition.rate || 0}
@@ -305,8 +303,7 @@ export function CurrentConditionModal({
           {/* End Age (Optional) */}
           <div className="input-wrapper">
             <span className="input-name">End Age (Optional)</span>
-            <input
-              type="number"
+            <NumberInput
               className="input-number-box"
               style={{ width: '100%' }}
               placeholder="e.g. 50 (lasts until age 50, empty if lifetime)"

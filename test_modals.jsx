@@ -169,11 +169,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(payoffAge.value).toBe('38');
     
     const payoffAmt = getInputByWrapperText(/Payoff Amount/i);
-    expect(payoffAmt.value).toBe('5000');
+    expect(payoffAmt.value).toBe('$5,000');
     
     // Modify payoff amount
     fireEvent.change(payoffAmt, { target: { value: '15000' } });
-    expect(payoffAmt.value).toBe('15000');
+    expect(payoffAmt.value).toBe('$15,000');
     
     // Save
     const saveBtn = screen.getByRole('button', { name: /Save Event/i });
@@ -198,7 +198,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(jobTitle.value).toBe('Senior Manager');
     
     const income = getInputByWrapperText(/New Annual Income/i);
-    expect(income.value).toBe('150000');
+    expect(income.value).toBe('$150,000');
     
     // Edit job title
     fireEvent.change(jobTitle, { target: { value: 'VP of Product' } });
@@ -228,16 +228,16 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Step 1: Partner Finances
     const spouseIncome = getInputByWrapperText(/Spouse Income/i);
-    expect(spouseIncome.value).toBe('50000'); // Defaults to User Income
+    expect(spouseIncome.value).toBe('$50,000'); // Defaults to User Income
     
     // Modify spouse income
     fireEvent.change(spouseIncome, { target: { value: '90000' } });
     
     // Modify Savings Rate to 100% to test Zero Partner Personal Spending warning
     const savingsRate = getInputByWrapperText(/Savings Rate/i);
-    expect(savingsRate.value).toBe('15'); // Defaults to User Savings Rate
+    expect(savingsRate.value).toBe('15%'); // Defaults to User Savings Rate
     fireEvent.change(savingsRate, { target: { value: '100' } });
-    expect(savingsRate.value).toBe('100');
+    expect(savingsRate.value).toBe('100%');
     
     // Click Next to Step 2 (Wedding)
     const nextBtn = screen.getByRole('button', { name: /Next/i });
@@ -250,7 +250,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     expect(weddingCheckbox.checked).toBe(true);
     
     const weddingCost = getInputByWrapperText(/Wedding Cost \(\$\)/i);
-    expect(weddingCost.value).toBe('20000');
+    expect(weddingCost.value).toBe('$20,000');
     
     // Click Next to Step 3 (Life Together)
     fireEvent.click(nextBtn);
@@ -280,7 +280,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Verify Housing stays the same price ($1,500)
     const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);
-    expect(housingInput.value).toBe('1500');
+    expect(housingInput.value).toBe('1,500');
     
     // Click Save Budget
     const saveBudgetBtn = screen.getByRole('button', { name: /Save Budget/i });

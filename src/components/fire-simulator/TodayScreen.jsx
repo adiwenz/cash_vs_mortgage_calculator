@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatCurrency } from './helpers';
+import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
 
 export default function TodayScreen({
   inputs,
@@ -48,7 +49,6 @@ export default function TodayScreen({
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.currentAge === null ? '' : inputs.currentAge}
                 placeholder="e.g. 35"
-                onClick={() => handleStep1Change('currentAge', null)}
                 onChange={(e) => {
                   const val = e.target.value;
                   handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
@@ -63,15 +63,13 @@ export default function TodayScreen({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
               <span className="input-name" style={{ fontSize: '1.05rem', margin: 0, color: 'var(--text-secondary)', fontWeight: '600' }}>Annual Income ($)</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                 placeholder="e.g. 120000"
-                onClick={() => {
+                onFocus={() => {
                   setActiveSavingsRate(simpleSavingsRate);
-                  handleStep1Change('simpleIncome', null);
                 }}
                 onBlur={() => {
                   setActiveSavingsRate(null);
@@ -106,15 +104,11 @@ export default function TodayScreen({
                   📊 Calculate from budget
                 </button>
               </div>
-              <input
-                type="number"
-                min="0"
-                max="100"
+              <PercentInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                 placeholder="e.g. 20"
-                onClick={() => setSavingsRateOverride('')}
                 onBlur={() => setSavingsRateOverride(null)}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -151,13 +145,11 @@ export default function TodayScreen({
                   ✏️ Details
                 </button>
               </div>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                 placeholder="e.g. 250000"
-                onClick={() => handleStep1Change('simpleInvestments', null)}
                 onChange={(e) => {
                   const val = e.target.value;
                   handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));

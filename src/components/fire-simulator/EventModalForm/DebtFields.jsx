@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../helpers';
+import { CurrencyInput, PercentInput } from '../../ui/PlainInputs';
 import { 
   BorrowingAgeWarning, 
   InterestTrapWarning, 
@@ -110,8 +111,7 @@ export default function DebtFields({
             <>
               <div className="input-wrapper">
                 <span className="input-name">Car Price ($)</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="input-number-box"
                   style={{ width: '100%' }}
                   value={editingEvent.purchasePrice !== undefined ? editingEvent.purchasePrice : ''}
@@ -120,8 +120,7 @@ export default function DebtFields({
               </div>
               <div className="input-wrapper">
                 <span className="input-name">Down Payment ($)</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="input-number-box"
                   style={{ width: '100%' }}
                   value={editingEvent.downPayment !== undefined ? editingEvent.downPayment : ''}
@@ -130,8 +129,7 @@ export default function DebtFields({
               </div>
               <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
                 <span className="input-name">Loan Amount / Starting Balance ($)</span>
-                <input
-                  type="number"
+                <CurrencyInput
                   className="input-number-box"
                   style={{ width: '100%' }}
                   value={editingEvent.balance}
@@ -142,8 +140,7 @@ export default function DebtFields({
           ) : (
             <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
               <span className="input-name">Starting Balance / Amount ($)</span>
-              <input
-                type="number"
+              <CurrencyInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingEvent.balance}
@@ -156,21 +153,16 @@ export default function DebtFields({
           {/* Interest Rate */}
           <div className="input-wrapper">
             <span className="input-name">Interest Rate (APR %)</span>
-            <input
-              type="number"
-              step="0.1"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.interestRate}
               onChange={(e) => setEditingEvent({ ...editingEvent, interestRate: parseFloat(e.target.value) || 0 })}
             />
           </div>
-
-          {/* Minimum Monthly Payment */}
           <div className="input-wrapper">
             <span className="input-name">Minimum Monthly Payment ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.minPayment}
@@ -276,8 +268,7 @@ export default function DebtFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Payoff Amount ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.amount}
@@ -338,8 +329,7 @@ export default function DebtFields({
           {/* Extra Payment */}
           <div className="input-wrapper">
             <span className="input-name">Extra Monthly Payoff Allocation ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.extraPayment}

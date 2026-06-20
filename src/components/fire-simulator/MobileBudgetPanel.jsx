@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatCurrency } from './helpers';
 import { getRetirementLimit } from '../../simulatorMathUtils';
+import { NumberInput } from '../ui/PlainInputs';
 
 export default function MobileBudgetPanel({
   inputs,
@@ -539,8 +540,7 @@ export default function MobileBudgetPanel({
                       ) : (
                         <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                           <span className="currency-symbol">$</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             className="input-number-box"
                             style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                             value={budgetExpenses[item.key] || 0}
@@ -578,8 +578,7 @@ export default function MobileBudgetPanel({
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{item.label}</span>
                     <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                       <span className="currency-symbol">$</span>
-                      <input
-                        type="number"
+                      <NumberInput
                         className="input-number-box"
                         style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                         value={budgetExpenses[item.key] || 0}
@@ -649,8 +648,7 @@ export default function MobileBudgetPanel({
                           </div>
                           <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                             <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                            <input
-                              type="number"
+                            <NumberInput
                               className="input-number-box"
                               style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                               value={budgetSavings[item.key] || 0}
@@ -700,8 +698,7 @@ export default function MobileBudgetPanel({
                               </div>
                               <div className="input-prefix-wrapper" style={{ width: '110px' }}>
                                 <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   className="input-number-box"
                                   style={{ width: '100%', textAlign: 'right', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
                                   value={budgetPartnerSavings[item.key] || 0}

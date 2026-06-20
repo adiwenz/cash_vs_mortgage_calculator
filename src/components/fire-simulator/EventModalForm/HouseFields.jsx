@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../helpers';
 import { LiquidAssetsWarning } from './EventValidationMessages';
+import { CurrencyInput, PercentInput, NumberInput } from '../../ui/PlainInputs';
 
 export default function HouseFields({
   type,
@@ -65,8 +66,7 @@ export default function HouseFields({
         <>
           <div className="input-wrapper">
             <span className="input-name">Purchase Age</span>
-            <input
-              type="number"
+            <NumberInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.purchaseAge}
@@ -75,8 +75,7 @@ export default function HouseFields({
           </div>
           <div className="input-wrapper">
             <span className="input-name">Home Price ($)</span>
-            <input
-              type="number"
+            <CurrencyInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.homePrice}
@@ -93,8 +92,7 @@ export default function HouseFields({
           </div>
           <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
             <span className="input-name">Down Payment (%)</span>
-            <input
-              type="number"
+            <PercentInput
               className="input-number-box"
               style={{ width: '100%' }}
               value={editingEvent.homePrice > 0 ? Math.round((editingEvent.downPayment / editingEvent.homePrice) * 100) : 20}
@@ -148,9 +146,7 @@ export default function HouseFields({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Mortgage Rate (%)</span>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.mortgageRate}
@@ -159,8 +155,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Loan Term (years)</span>
-                    <input
-                      type="number"
+                    <NumberInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.loanTerm}
@@ -169,8 +164,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Points / Fees ($)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.points}
@@ -179,8 +173,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Closing Costs (%)</span>
-                    <input
-                      type="number"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.closingCosts}
@@ -190,9 +183,7 @@ export default function HouseFields({
                   {editingEvent.downPayment < editingEvent.homePrice * 0.2 && (
                     <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
                       <span className="input-name">PMI Rate (% / year)</span>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <PercentInput
                         className="input-number-box"
                         style={{ width: '100%' }}
                         value={editingEvent.pmi}
@@ -214,9 +205,7 @@ export default function HouseFields({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Property Tax (% / year)</span>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.propertyTax}
@@ -225,9 +214,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Homeowners Insurance (% / year)</span>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.insurance}
@@ -236,8 +223,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">HOA Dues ($ / month)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.hoa}
@@ -246,9 +232,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Maintenance (% / year)</span>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.maintenance}
@@ -257,8 +241,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Renovation / Furnishing ($)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.renovationCost}
@@ -267,8 +250,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Utilities Increase ($ / month)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.utilitiesIncrease}
@@ -286,9 +268,7 @@ export default function HouseFields({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Home Appreciation (% / year)</span>
-                    <input
-                      type="number"
-                      step="0.1"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.appreciationRate}
@@ -297,8 +277,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Selling Cost (%)</span>
-                    <input
-                      type="number"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.sellingCost}
@@ -316,8 +295,7 @@ export default function HouseFields({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Current Rent ($ / month)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.currentRent}
@@ -326,9 +304,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Rent Growth (% / year)</span>
-                    <input
-                      type="number"
-                      step="0.1"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.rentGrowth}
@@ -337,8 +313,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
                     <span className="input-name">Renter's Insurance ($ / month)</span>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.renterInsurance}
@@ -373,9 +348,7 @@ export default function HouseFields({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="input-wrapper">
                     <span className="input-name">Investment Return (%)</span>
-                    <input
-                      type="number"
-                      step="0.1"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.investmentReturn}
@@ -384,9 +357,7 @@ export default function HouseFields({
                   </div>
                   <div className="input-wrapper">
                     <span className="input-name">Inflation Rate (%)</span>
-                    <input
-                      type="number"
-                      step="0.1"
+                    <PercentInput
                       className="input-number-box"
                       style={{ width: '100%' }}
                       value={editingEvent.inflation}
@@ -518,8 +489,7 @@ export default function HouseFields({
           <>
             <div className="input-wrapper">
               <span className="input-name">Sale Age</span>
-              <input
-                type="number"
+              <NumberInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingEvent.age}
@@ -534,9 +504,7 @@ export default function HouseFields({
             </div>
             <div className="input-wrapper">
               <span className="input-name">Selling Cost Rate (%)</span>
-              <input
-                type="number"
-                step="0.1"
+              <PercentInput
                 className="input-number-box"
                 style={{ width: '100%' }}
                 value={editingEvent.sellingCost}

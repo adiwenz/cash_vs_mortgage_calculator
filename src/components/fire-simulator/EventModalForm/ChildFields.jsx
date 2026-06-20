@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '../helpers';
+import { NumberInput } from '../../ui/PlainInputs';
 
 export default function ChildFields({
   editingEvent,
@@ -84,8 +85,7 @@ export default function ChildFields({
       {editingEvent.costMethod === 'custom' && (
         <div className="input-wrapper" style={{ gridColumn: 'span 2' }}>
           <span className="input-name">Custom Annual Child Cost ($)</span>
-          <input
-            type="number"
+          <NumberInput
             className="input-number-box"
             style={{ width: '100%' }}
             value={editingEvent.customAges0to4 !== undefined ? editingEvent.customAges0to4 : 15000}

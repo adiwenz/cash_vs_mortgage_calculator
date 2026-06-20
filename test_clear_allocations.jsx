@@ -48,7 +48,7 @@ describe('Clear Budget Allocations Feature', () => {
 
     // Housing starts at 1500
     const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);
-    expect(housingInput.value).toBe('1500');
+    expect(housingInput.value).toBe('1,500');
 
     // Click "Clear"
     const clearNeedsBtn = screen.getByRole('button', { name: /^Clear$/i });

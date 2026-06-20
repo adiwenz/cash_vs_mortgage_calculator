@@ -18,6 +18,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { getNormalizedPhases } from '../../fireCalculations';
 import MobileTimeline, { getRoadmapDetails } from './MobileTimeline';
 import OutcomeHeroCard from './OutcomeHeroCard';
+import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import ChildPlanningModal from './ChildPlanningModal';
@@ -1079,7 +1080,6 @@ export default function MobileFireSimulatorView({
                           }}
                           value={inputs.currentAge === null ? '' : inputs.currentAge}
                           placeholder="e.g. 35"
-                          onClick={() => handleStep1Change('currentAge', null)}
                           onChange={(e) => {
                             const val = e.target.value;
                             handleStep1Change('currentAge', val === '' ? null : (parseInt(val) || 0));
@@ -1090,8 +1090,7 @@ export default function MobileFireSimulatorView({
                         <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Income</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1106,9 +1105,8 @@ export default function MobileFireSimulatorView({
                             }}
                             value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                             placeholder="e.g. 120000"
-                            onClick={() => {
+                            onFocus={() => {
                               setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
-                              handleStep1Change('simpleIncome', null);
                             }}
                             onBlur={() => {
                               setActiveSavingsRate(null);
@@ -1130,8 +1128,7 @@ export default function MobileFireSimulatorView({
                         <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Spending</span>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1174,8 +1171,7 @@ export default function MobileFireSimulatorView({
                         </div>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                           <span style={{ position: 'absolute', left: '6px', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 'bold' }}>$</span>
-                          <input
-                            type="number"
+                          <CurrencyInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1190,7 +1186,6 @@ export default function MobileFireSimulatorView({
                             }}
                             value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                             placeholder="e.g. 250000"
-                            onClick={() => handleStep1Change('simpleInvestments', null)}
                             onChange={(e) => {
                               const val = e.target.value;
                               handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));
@@ -1219,10 +1214,7 @@ export default function MobileFireSimulatorView({
                           </button>
                         </div>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
+                          <PercentInput
                             className="input-number-box"
                             style={{
                               width: '100%',
@@ -1238,7 +1230,9 @@ export default function MobileFireSimulatorView({
                             }}
                             value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                             placeholder="e.g. 20"
-                            onClick={() => setSavingsRateOverride('')}
+                            onBlur={() => {
+                              setSavingsRateOverride(null);
+                            }}
                             onChange={(e) => {
                               const val = e.target.value;
                               setSavingsRateOverride(val);
@@ -1253,9 +1247,6 @@ export default function MobileFireSimulatorView({
                               const income = Number(inputs.simpleIncome) || 0;
                               const newExpenses = Math.round(income * (1 - clampedRate / 100));
                               handleStep1Change('simpleExpenses', newExpenses);
-                            }}
-                            onBlur={() => {
-                              setSavingsRateOverride(null);
                             }}
                           />
                           <span style={{ position: 'absolute', right: '4px', color: 'var(--accent-emerald)', fontSize: '0.75rem', fontWeight: 'bold' }}>%</span>

@@ -158,12 +158,28 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     for (const el of elements) {
       const wrapper = el.closest('.budget-input-row, .input-wrapper, .budget-input-row-container');
       if (wrapper) {
-        const input = wrapper.querySelector('input, select, textarea');
-        if (input) return input;
+        const input = wrapper.querySelector('input, select');
+        if (input && !input.readOnly) return input;
       }
     }
-    return null;
+    throw new Error(`Could not find input associated with text matching: ${textRegex}`);
   };
+
+  const parseVal = (input) => {
+    if (!input || !input.value) return 0;
+    return Number(input.value.replace(/[^\d.-]/g, ''));
+  };
+
+  test("Plan Screen displays correct initial starting state", async () => {
+    render(<FireSimulator />);
+    
+    // Check Current Situation card title
+    expect(screen.getAllByText(/Current Situation/i)[0]).toBeDefined();
+    
+    // Check baseline events on the timeline
+    expect(screen.getAllByText(/You're Set!/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Social Security/i).length).toBeGreaterThan(0);
+  });
 
   test('renders Borrowing dropdown and opens setup modal with correct defaults', async () => {
     navigateToStep2();
@@ -180,9 +196,9 @@ describe('Borrowing Events & Payoff Plans UI', () => {
 
     // Verify core fields are populated with defaults
     expect(getInputByWrapperText(/Friendly Name/i).value).toBe('Student Loan');
-    expect(Number(getInputByWrapperText(/Starting Balance \/ Amount/i).value)).toBe(30000);
-    expect(Number(getInputByWrapperText(/Interest Rate/i).value)).toBe(5);
-    expect(Number(getInputByWrapperText(/Minimum Monthly Payment/i).value)).toBe(318.2);
+    expect(parseVal(getInputByWrapperText(/Starting Balance \/ Amount/i))).toBe(30000);
+    expect(parseVal(getInputByWrapperText(/Interest Rate/i))).toBe(5);
+    expect(parseVal(getInputByWrapperText(/Minimum Monthly Payment/i))).toBe(318);
 
     // Verify compassionate copy is present
     expect(screen.getByText(/You're not stuck with this number/i)).toBeDefined();
@@ -204,17 +220,17 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     const downPaymentInput = getInputByWrapperText(/Down Payment/i);
     const loanAmountInput = getInputByWrapperText(/Loan Amount \/ Starting Balance/i);
 
-    expect(Number(carPriceInput.value)).toBe(25000);
-    expect(Number(downPaymentInput.value)).toBe(5000);
-    expect(Number(loanAmountInput.value)).toBe(20000);
+    expect(parseVal(carPriceInput)).toBe(25000);
+    expect(parseVal(downPaymentInput)).toBe(5000);
+    expect(parseVal(loanAmountInput)).toBe(20000);
 
     // Change car price, loan amount should update automatically
     fireEvent.change(carPriceInput, { target: { value: '30000' } });
-    expect(Number(loanAmountInput.value)).toBe(25000);
+    expect(parseVal(loanAmountInput)).toBe(25000);
 
     // Change down payment, loan amount should update automatically
     fireEvent.change(downPaymentInput, { target: { value: '10000' } });
-    expect(Number(loanAmountInput.value)).toBe(20000);
+    expect(parseVal(loanAmountInput)).toBe(20000);
 
     // Verify compassionate copy
     expect(screen.getByText(/Fixed 5-year auto loan term/i)).toBeDefined();

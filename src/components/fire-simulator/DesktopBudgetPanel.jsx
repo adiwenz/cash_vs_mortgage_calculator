@@ -1,5 +1,6 @@
 import { formatCurrency } from './helpers';
 import { getRetirementLimit } from '../../simulatorMathUtils';
+import { NumberInput } from '../ui/PlainInputs';
 
 export default function DesktopBudgetPanel({
   inputs,
@@ -772,8 +773,7 @@ export default function DesktopBudgetPanel({
                       {!isSpecialLocked ? (
                         <div className="input-prefix-wrapper" style={{ width: '100px' }}>
                           <span className="currency-symbol">$</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             className="input-number-box"
                             style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                             value={budgetExpenses[item.key] || 0}
@@ -852,8 +852,7 @@ export default function DesktopBudgetPanel({
                     <span className="breakdown-row-label">{item.label}</span>
                     <div className="input-prefix-wrapper" style={{ width: '100px' }}>
                       <span className="currency-symbol">$</span>
-                      <input
-                        type="number"
+                      <NumberInput
                         className="input-number-box"
                         style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                         value={budgetExpenses[item.key] || 0}
@@ -959,8 +958,7 @@ export default function DesktopBudgetPanel({
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
                             <div className="input-prefix-wrapper" style={{ width: '100px' }}>
                               <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                              <input
-                                type="number"
+                              <NumberInput
                                 className="input-number-box"
                                 style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                                 value={budgetSavings[item.key] || 0}
@@ -1022,8 +1020,7 @@ export default function DesktopBudgetPanel({
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
                                 <div className="input-prefix-wrapper" style={{ width: '100px' }}>
                                   <span className="currency-symbol">{savingsAllocMode === 'percentSurplus' ? '%' : '$'}</span>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     className="input-number-box"
                                     style={{ width: '100%', textAlign: 'right', padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
                                     value={budgetPartnerSavings[item.key] || 0}

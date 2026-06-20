@@ -73,11 +73,11 @@ describe('Mobile Budget Phase Editor', () => {
     expect(housingInput).toBeDefined();
     
     // Check initial value
-    expect(housingInput.value).toBe('1500');
+    expect(housingInput.value).toBe('1,500');
 
     // Edit value to 1800
     fireEvent.change(housingInput, { target: { value: '1800' } });
-    expect(housingInput.value).toBe('1800');
+    expect(housingInput.value).toBe('1,800');
 
     // Tapping Done closes the sheet
     const doneBtn = screen.getByRole('button', { name: /Done/i });
