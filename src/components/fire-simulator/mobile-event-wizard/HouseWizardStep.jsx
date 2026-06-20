@@ -38,7 +38,8 @@ export default function HouseWizardStep({
     setDraftEvent(prev => ({
       ...prev,
       homePrice: price,
-      downPayment: Math.round(price * pct)
+      downPayment: Math.round(price * pct),
+      isPriceTouched: true
     }));
   };
 
@@ -182,7 +183,6 @@ export default function HouseWizardStep({
         description="Do not replace rent with mortgage"
         checked={!!draftEvent.keepRent}
         onChange={(checked) => updateDraft('keepRent', checked)}
-        className="switch"
       />
     </>
   );
