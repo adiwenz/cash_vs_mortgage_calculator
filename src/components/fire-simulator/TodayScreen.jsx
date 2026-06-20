@@ -72,6 +72,7 @@ export default function TodayScreen({
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                 placeholder="e.g. 120000"
+                useCompact={true}
                 onFocus={() => {
                   setActiveSavingsRate(simpleSavingsRate);
                 }}
@@ -173,6 +174,7 @@ export default function TodayScreen({
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
                 placeholder="e.g. 250000"
+                useCompact={true}
                 onChange={(e) => {
                   const val = e.target.value;
                   handleStep1Change('simpleInvestments', val === '' ? null : (parseFloat(val) || 0));

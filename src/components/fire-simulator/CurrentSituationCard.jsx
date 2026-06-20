@@ -143,14 +143,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>💰 Annual Income</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
             <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -161,6 +160,7 @@ export default function CurrentSituationCard({
               }}
               value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
               placeholder="e.g. 120000"
+              useCompact={true}
               onFocus={() => {
                 setActiveSavingsRate(simpleSavingsRate);
               }}
@@ -184,14 +184,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🛒 Annual Spending</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
             <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -201,6 +200,7 @@ export default function CurrentSituationCard({
                 outline: 'none'
               }}
               value={inputs.simpleExpenses === null ? '' : inputs.simpleExpenses}
+              useCompact={true}
               onChange={(e) => handleFieldChange('simpleExpenses', e.target.value)}
               onBlur={(e) => {
                 const clamped = clampMoneyValue(e.target.value);
@@ -215,14 +215,13 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-secondary)' }}>🏦 Current Savings</span>
           <span style={{ flex: 1, borderBottom: '1px dotted rgba(255,255,255,0.08)', margin: '0 0.4rem', alignSelf: 'flex-end', marginBottom: '6px' }} />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '4px', color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: '600' }}>$</span>
             <CurrencyInput
               className="input-number-box borderless-input"
               style={{
                 width: '100px',
                 height: '25px',
                 fontSize: '0.98rem',
-                padding: '0.1rem 0.35rem 0.1rem 0.9rem',
+                padding: '0.1rem 0.35rem',
                 textAlign: 'right',
                 background: 'transparent',
                 border: 'none',
@@ -233,6 +232,7 @@ export default function CurrentSituationCard({
               }}
               value={inputs.simpleInvestments === null ? '' : inputs.simpleInvestments}
               placeholder="e.g. 250000"
+              useCompact={true}
               onChange={(e) => handleFieldChange('simpleInvestments', e.target.value)}
               onBlur={(e) => {
                 const clamped = clampMoneyValue(e.target.value);

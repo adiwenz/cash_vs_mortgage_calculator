@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import formatCompactCurrency from '../../utils/formatCompactCurrency';
 
 // Helper to format currency
 export const formatCurrency = (val) => {
@@ -44,6 +45,7 @@ export function CurrencyInput({
   className,
   style,
   placeholder,
+  useCompact,
   ...props
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -93,7 +95,11 @@ export function CurrencyInput({
     }
   };
 
-  const displayValue = isEditing ? localValue : formatCurrency(value);
+  const displayValue = isEditing 
+    ? localValue 
+    : (useCompact && value !== null && value !== undefined && value !== '' && Math.abs(Number(value)) >= 1000000
+        ? formatCompactCurrency(value) 
+        : formatCurrency(value));
 
   return (
     <input
@@ -189,6 +195,7 @@ export function NumberInput({
   className,
   style,
   placeholder,
+  useCompact,
   ...props
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -237,7 +244,11 @@ export function NumberInput({
     }
   };
 
-  const displayValue = isEditing ? localValue : formatNumber(value);
+  const displayValue = isEditing 
+    ? localValue 
+    : (useCompact && value !== null && value !== undefined && value !== '' && Math.abs(Number(value)) >= 1000000
+        ? formatCompactCurrency(value).replace('$', '') 
+        : formatNumber(value));
 
   return (
     <input
