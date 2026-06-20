@@ -3221,7 +3221,7 @@ export default function MobileFireSimulatorView({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
               {expandedClusterEvents.map((evt, idx) => (
                 <div 
-                  key={evt.originalId || `${evt.type}-${evt.age}-${idx}`}
+                  key={`${evt.originalId || evt.type}-${evt.age}-${idx}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

@@ -671,7 +671,7 @@ export default function ProjectionGraph({
 
                 {expandedCluster.events.map((evt, idx) => (
                   <div
-                    key={evt.originalId || `${evt.type}-${evt.age}-${idx}`}
+                    key={`${evt.originalId || evt.type}-${evt.age}-${idx}`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
