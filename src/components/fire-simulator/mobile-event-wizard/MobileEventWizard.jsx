@@ -9,7 +9,8 @@ import {
   calculateTotalCashRequired, 
   calculateLiquidAssetsAtPurchaseAge, 
   calculateCashShortfall,
-  getSimulatedRetirementAge
+  getSimulatedRetirementAge,
+  calculateMaxAffordableHomePrice
 } from '../houseAffordabilityUtils';
 import { hasResolvedRecommendationTradeoffs } from '../../../features/fire/recommendations/recommendationUtils.js';
 
@@ -97,14 +98,25 @@ export default function MobileEventWizard({
 
   // Local draft of editing event
   const [draftEvent, setDraftEvent] = useState(() => {
-    return editingEvent ? { ...editingEvent } : { type: 'selectType', isNew: true };
+    if (editingEvent) {
+      const isNewEvent = editingEvent.isNew !== false && (!editingEvent.id || editingEvent.isNew);
+      return {
+        ...editingEvent,
+        isPriceTouched: !isNewEvent
+      };
+    }
+    return { type: 'selectType', isNew: true };
   });
 
   // Sync draftEvent if editingEvent changes
   useEffect(() => {
     if (editingEvent) {
+      const isNewEvent = editingEvent.isNew !== false && (!editingEvent.id || editingEvent.isNew);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraftEvent({ ...editingEvent });
+      setDraftEvent({
+        ...editingEvent,
+        isPriceTouched: !isNewEvent
+      });
       const startAge = getStartAge(editingEvent, inputs.currentAge);
       const endAge = getEndAge(editingEvent, inputs.currentAge, inputs.lifeEvents);
       if (endAge && endAge > startAge && endAge < (inputs.lifeExpectancy || 85)) {
@@ -155,8 +167,42 @@ export default function MobileEventWizard({
 
   // Update specific fields of draft event
   const updateDraft = (key, val) => {
-    setDraftEvent(prev => ({ ...prev, [key]: val }));
+    setDraftEvent(prev => {
+      const updated = { ...prev, [key]: val };
+      if (key === 'homePrice') {
+        updated.isPriceTouched = true;
+      }
+      return updated;
+    });
   };
+
+  // Auto-update home price in Mobile Wizard when purchase age changes, until user touches/edits the price
+  useEffect(() => {
+    if (draftEvent && draftEvent.type === 'buyHouse' && !draftEvent.isPriceTouched) {
+      const aff = calculateMaxAffordableHomePrice(
+        inputs,
+        null,
+        null,
+        draftEvent,
+        baselineResults
+      );
+      if (aff.recommendedPrice !== draftEvent.homePrice) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setDraftEvent(prev => ({
+          ...prev,
+          homePrice: aff.recommendedPrice,
+          downPayment: Math.round(aff.recommendedPrice * 0.20)
+        }));
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    draftEvent?.purchaseAge,
+    draftEvent?.age,
+    draftEvent?.isPriceTouched,
+    inputs,
+    baselineResults
+  ]);
 
   // Define event types meta
   const eventTypes = [
@@ -208,6 +254,12 @@ export default function MobileEventWizard({
     } else {
       const baseDefaults = getDefaultEvent(type, { inputs, isMobile: true });
       defaults = { ...baseDefaults, isNew: true };
+      if (type === 'buyHouse') {
+        const aff = calculateMaxAffordableHomePrice(inputs, null, null, defaults, baselineResults);
+        defaults.homePrice = aff.recommendedPrice;
+        defaults.downPayment = Math.round(aff.recommendedPrice * 0.20);
+        defaults.isPriceTouched = false;
+      }
     }
 
     setDraftEvent(defaults);

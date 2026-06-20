@@ -64,7 +64,7 @@ export function getDefaultEvent(type, context = {}) {
       defaults = {
         ...defaults,
         type: 'buyHouse',
-        purchaseAge: 40,
+        purchaseAge: Math.min(85, curAge + 5),
         homePrice: 500000,
         downPayment: 100000,
         purchaseType: 'mortgage',

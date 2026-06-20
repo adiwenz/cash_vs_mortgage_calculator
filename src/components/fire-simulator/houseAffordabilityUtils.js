@@ -6,5 +6,7 @@ export {
   calculateCashAffordableHomePrice,
   calculateAdditionalCashNeeded,
   isCashAffordable,
-  getSimulatedRetirementAge
+  getSimulatedRetirementAge,
+  calculateMaxAffordableHomePrice
 } from '../../domain/housing/houseAffordability.js';
+

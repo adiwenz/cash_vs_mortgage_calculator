@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Info, Check, Briefcase, Home, ShieldAlert } from 'lucide-react';
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/purity */
+import { useState, useMemo, useEffect } from 'react';
 import { formatCurrency } from './helpers';
 import { runFireSimulation } from '../../fireCalculations';
 import {
   calculateTotalCashRequired,
   calculateLiquidAssetsAtPurchaseAge,
   getHousingCostForPrice,
-  grossUpIncome
+  grossUpIncome,
+  calculateMaxAffordableHomePrice
 } from '../../domain/housing/houseAffordability';
 import { getOldRentBeforePurchase } from '../../domain/housing/houseRecommendationSolver';
 
@@ -15,7 +16,6 @@ export default function HousePlanningModal({
   scenario,
   eventController,
   simulation,
-  uiState,
   onClose
 }) {
   const inputs = scenario?.inputs || {};
@@ -23,13 +23,38 @@ export default function HousePlanningModal({
   const handleSaveEvent = eventController?.handleSaveEvent;
   const handleDeleteEvent = eventController?.handleDeleteEvent;
 
-  const isMobile = uiState?.isMobile || false;
   const isNew = !editingEvent || !editingEvent.id || editingEvent.isNew;
+  const [isPriceTouched, setIsPriceTouched] = useState(!isNew);
 
   // Local state for Step 1
-  const [homePrice, setHomePrice] = useState(editingEvent?.homePrice !== undefined ? editingEvent.homePrice : 500000);
-  const [priceInput, setPriceInput] = useState((editingEvent?.homePrice !== undefined ? editingEvent.homePrice : 500000).toLocaleString());
-  const [purchaseAge, setPurchaseAge] = useState(editingEvent?.purchaseAge !== undefined ? editingEvent.purchaseAge : (inputs.currentAge || 35));
+  const [homePrice, setHomePrice] = useState(() => {
+    if (editingEvent && !editingEvent.isNew && editingEvent.id && editingEvent.homePrice !== undefined) {
+      return editingEvent.homePrice;
+    }
+    const defaultPurchaseAge = editingEvent?.purchaseAge !== undefined ? editingEvent.purchaseAge : Math.min(85, (inputs.currentAge || 35) + 5);
+    return calculateMaxAffordableHomePrice(
+      inputs,
+      null,
+      null,
+      { ...editingEvent, purchaseAge: defaultPurchaseAge },
+      simulation
+    ).recommendedPrice;
+  });
+  const [priceInput, setPriceInput] = useState(() => {
+    if (editingEvent && !editingEvent.isNew && editingEvent.id && editingEvent.homePrice !== undefined) {
+      return editingEvent.homePrice.toLocaleString();
+    }
+    const defaultPurchaseAge = editingEvent?.purchaseAge !== undefined ? editingEvent.purchaseAge : Math.min(85, (inputs.currentAge || 35) + 5);
+    const val = calculateMaxAffordableHomePrice(
+      inputs,
+      null,
+      null,
+      { ...editingEvent, purchaseAge: defaultPurchaseAge },
+      simulation
+    ).recommendedPrice;
+    return val.toLocaleString();
+  });
+  const [purchaseAge, setPurchaseAge] = useState(editingEvent?.purchaseAge !== undefined ? editingEvent.purchaseAge : Math.min(85, (inputs.currentAge || 35) + 5));
   const [downPaymentPct, setDownPaymentPct] = useState(
     editingEvent?.homePrice > 0 
       ? Math.round((editingEvent.downPayment / editingEvent.homePrice) * 100) 
@@ -56,10 +81,15 @@ export default function HousePlanningModal({
   // Synchronize on load/edit
   useEffect(() => {
     if (editingEvent) {
-      const price = editingEvent.homePrice !== undefined ? editingEvent.homePrice : 500000;
+      const isNewEvent = !editingEvent.id || editingEvent.isNew;
+      setIsPriceTouched(!isNewEvent);
+      const defaultPurchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : Math.min(85, (inputs.currentAge || 35) + 5);
+      const price = (!isNewEvent && editingEvent.homePrice !== undefined)
+        ? editingEvent.homePrice
+        : calculateMaxAffordableHomePrice(inputs, null, null, { ...editingEvent, purchaseAge: defaultPurchaseAge }, simulation).recommendedPrice;
       setHomePrice(price);
       setPriceInput(price.toLocaleString());
-      setPurchaseAge(editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (inputs.currentAge || 35));
+      setPurchaseAge(defaultPurchaseAge);
       setDownPaymentPct(
         editingEvent.homePrice > 0 
           ? Math.round((editingEvent.downPayment / editingEvent.homePrice) * 100) 
@@ -76,8 +106,31 @@ export default function HousePlanningModal({
     }
   }, [editingEvent]);
 
+  // Auto-update home price when purchase age or other parameters change, until user touches/edits the price
+  useEffect(() => {
+    if (!isPriceTouched) {
+      const aff = calculateMaxAffordableHomePrice(
+        inputs,
+        null,
+        null,
+        {
+          ...editingEvent,
+          downPaymentPct,
+          closingCosts,
+          mortgageRate,
+          loanTerm,
+          purchaseAge
+        },
+        simulation
+      );
+      setHomePrice(aff.recommendedPrice);
+      setPriceInput(aff.recommendedPrice.toLocaleString());
+    }
+  }, [purchaseAge, isPriceTouched, inputs, editingEvent, downPaymentPct, closingCosts, mortgageRate, loanTerm, simulation]);
+
   // Handle Home Price formatting
   const handlePriceChange = (e) => {
+    setIsPriceTouched(true);
     const cleanStr = e.target.value.replace(/[^0-9]/g, '');
     if (cleanStr === '') {
       setHomePrice(0);
@@ -124,42 +177,26 @@ export default function HousePlanningModal({
   }, [inputs, purchaseAge]);
 
   // Affordable Home Price Calculation
-  const affordableHomePrice = useMemo(() => {
-    const dpPct = downPaymentPct / 100;
-    const ccPct = closingCosts / 100;
-    
-    // 1) Cash limit: upfront cash required <= liquid assets
-    const denominator = dpPct + ccPct;
-    let cashLimit = Infinity;
-    if (denominator > 0) {
-      const fixedCosts = (editingEvent?.renovationCost || 0) + (editingEvent?.movingCosts || editingEvent?.movingCost || 3000);
-      cashLimit = Math.max(0, (liquidAssets - fixedCosts) / denominator);
-    }
+  const affordabilityData = useMemo(() => {
+    return calculateMaxAffordableHomePrice(
+      inputs,
+      null,
+      null,
+      {
+        ...editingEvent,
+        downPaymentPct,
+        closingCosts,
+        mortgageRate,
+        loanTerm,
+        purchaseAge
+      },
+      simulation
+    );
+  }, [inputs, editingEvent, downPaymentPct, closingCosts, mortgageRate, loanTerm, purchaseAge, simulation]);
 
-    // 2) Mortgage limit: monthly P&I = current rent
-    const rate = mortgageRate / 100;
-    const r = rate / 12;
-    const n = loanTerm * 12;
-    let factor = 0;
-    if (n > 0) {
-      if (r === 0) {
-        factor = 1 / n;
-      } else {
-        factor = (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-      }
-    }
-    
-    const pAndIFractionOfPrice = (1 - dpPct) * factor;
-    const rentToUse = oldHousingCost > 0 ? oldHousingCost : 1500;
-    const mortgageLimit = pAndIFractionOfPrice > 0 ? (rentToUse / pAndIFractionOfPrice) : Infinity;
-
-    const maxVal = Math.min(cashLimit, mortgageLimit);
-    const rounded = Math.round(Math.max(0, maxVal) / 5000) * 5000;
-    if (rounded <= 10000) {
-      return 275000; // default backup if liquid assets/rent are too low
-    }
-    return rounded;
-  }, [liquidAssets, downPaymentPct, closingCosts, mortgageRate, loanTerm, oldHousingCost, editingEvent]);
+  const affordableHomePrice = affordabilityData.recommendedPrice;
+  const cashAffordablePrice = affordabilityData.cashAffordablePrice;
+  const monthlyAffordablePrice = affordabilityData.monthlyAffordablePrice;
 
   // Shortfall & Raise Option B variables
   const shortfallAmount = useMemo(() => {
@@ -441,6 +478,26 @@ export default function HousePlanningModal({
                   />
                 </div>
               </div>
+              {oldHousingCost === 0 && (
+                <div style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  borderRadius: '12px',
+                  padding: '0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#b45309',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem',
+                  lineHeight: '1.4',
+                  marginTop: '-0.5rem'
+                }}>
+                  <span style={{ fontSize: '1rem' }}>⚠️</span>
+                  <div style={{ textAlign: 'left' }}>
+                    Rent is not set, so this estimate is based on available cash only. Add rent for a stronger monthly payment estimate.
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.25rem' }}>
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'flex-start', height: 'auto' }}>
@@ -709,13 +766,38 @@ export default function HousePlanningModal({
               <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0', lineHeight: '1.4', fontWeight: '500' }}>
                 You don’t currently have enough cash available for the down payment.
               </p>
-              <div style={{ background: '#f0fdf4', borderRadius: '16px', padding: '0.75rem 1rem', border: '1px solid #bbf7d0', marginTop: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: '600', display: 'block' }}>
-                  Finances support a home around:
-                </span>
-                <span style={{ fontSize: '1.8rem', fontWeight: '850', color: '#16a34a' }}>
-                  {formatCurrency(affordableHomePrice)}
-                </span>
+              <div style={{
+                background: 'rgba(248, 247, 244, 0.5)',
+                borderRadius: '16px',
+                padding: '1rem',
+                border: '1px solid #cbd5e1',
+                marginTop: '0.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>Suggested price based on cash available:</span>
+                  <strong style={{ color: '#1e293b' }}>{formatCurrency(cashAffordablePrice)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>Monthly payment limit:</span>
+                  <strong style={{ color: '#1e293b' }}>
+                    {oldHousingCost === 0 ? 'Unknown' : formatCurrency(monthlyAffordablePrice)}
+                  </strong>
+                </div>
+                <hr style={{ border: 0, borderTop: '1px solid #cbd5e1', margin: '0.25rem 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#16a34a' }}>Best affordable match:</span>
+                  <strong style={{ fontSize: '1.25rem', fontWeight: '850', color: '#16a34a' }}>
+                    {formatCurrency(affordableHomePrice)}
+                  </strong>
+                </div>
+                {oldHousingCost === 0 && (
+                  <span style={{ fontSize: '0.75rem', color: '#b45309', display: 'block', marginTop: '0.15rem', lineHeight: '1.3', textAlign: 'left' }}>
+                    ⚠️ Rent is not set, so this estimate is based on available cash only. Add rent for a stronger monthly payment estimate.
+                  </span>
+                )}
               </div>
             </div>
 

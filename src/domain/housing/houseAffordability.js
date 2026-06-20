@@ -1,4 +1,4 @@
-import { runFireSimulation } from '../../fireCalculations.js';
+import { runFireSimulation, getNormalizedPhases } from '../../fireCalculations.js';
 import { calculateUSTaxForModal } from '../../simulatorMathUtils.js';
 
 /**
@@ -29,13 +29,16 @@ export function calculateTotalCashRequired(event) {
 export function calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults) {
   const targetAge = Number(purchaseAge) || Number(inputs?.currentAge) || 35;
 
-  if (simulationResults && (simulationResults.nominalData || simulationResults.data)) {
-    const logs = simulationResults.nominalData || simulationResults.data;
-    const logBefore = logs.find(l => l.age === targetAge - 1);
-    if (logBefore) {
-      const cash = Number(logBefore.cashBalance) || 0;
-      const brokerage = Number(logBefore.brokerageBalance) || 0;
-      return cash + brokerage;
+  if (simulationResults) {
+    const results = simulationResults.baselineResults || simulationResults.activeResults || simulationResults;
+    if (results && (results.nominalData || results.data)) {
+      const logs = results.nominalData || results.data;
+      const logBefore = logs.find(l => l.age === targetAge - 1);
+      if (logBefore) {
+        const cash = Number(logBefore.cashBalance) || 0;
+        const brokerage = Number(logBefore.brokerageBalance) || 0;
+        return cash + brokerage;
+      }
     }
   }
 
@@ -261,4 +264,95 @@ export function grossUpIncome(netNeed, currentGrossIncome, filingStatus) {
   }
   return Math.round(grossRaise);
 }
+
+export function getOldRentBeforePurchase(originalInputs, purchaseAge) {
+  const phases = getNormalizedPhases(originalInputs);
+  if (phases && phases.length > 0) {
+    const sortedPhases = [...phases]
+      .filter(p => p.startAge < purchaseAge)
+      .sort((a, b) => b.startAge - a.startAge);
+    for (const phase of sortedPhases) {
+      const rent = phase.expenses && (phase.expenses.housing || phase.expenses.rent || 0);
+      if (rent > 0) return Number(rent) || 0;
+    }
+  }
+  if (originalInputs.budgetDetails?.expenses) {
+    const rent = originalInputs.budgetDetails.expenses.housing || originalInputs.budgetDetails.expenses.rent || 0;
+    if (rent > 0) return Number(rent) || 0;
+  }
+  return 0;
+}
+
+export function calculateMaxAffordableHomePrice(inputs, profile, activeBudget, activeBuyHouseEv, simulationResults) {
+  const buyHouseEv = activeBuyHouseEv || inputs?.lifeEvents?.find(e => e.type === 'buyHouse') || {};
+  const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || inputs?.currentAge || 35);
+  
+  // 1) Liquid assets
+  const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
+
+  // 2) Rent (current rent)
+  const rent = activeBudget?.expenses
+    ? Number(activeBudget.expenses.housing || activeBudget.expenses.rent || 0)
+    : getOldRentBeforePurchase(inputs, purchaseAge);
+
+  // 3) Down payment and closing costs percentages
+  let downPaymentPct = 20;
+  if (buyHouseEv.downPaymentPct !== undefined && buyHouseEv.downPaymentPct !== null) {
+    downPaymentPct = buyHouseEv.downPaymentPct;
+  } else if (buyHouseEv.homePrice > 0 && buyHouseEv.downPayment !== undefined) {
+    downPaymentPct = Math.round((buyHouseEv.downPayment / buyHouseEv.homePrice) * 100);
+  }
+
+  const closingCosts = Number(buyHouseEv.closingCosts !== undefined ? buyHouseEv.closingCosts : 3);
+  const mortgageRate = Number(buyHouseEv.mortgageRate !== undefined ? buyHouseEv.mortgageRate : 6.5);
+  const loanTerm = Number(buyHouseEv.loanTerm !== undefined ? buyHouseEv.loanTerm : 30);
+  const renovationCost = buyHouseEv.renovationCost !== undefined && buyHouseEv.renovationCost !== null ? Number(buyHouseEv.renovationCost) : 0;
+  const movingCosts = buyHouseEv.movingCosts !== undefined && buyHouseEv.movingCosts !== null ? Number(buyHouseEv.movingCosts) :
+                     (buyHouseEv.movingCost !== undefined && buyHouseEv.movingCost !== null ? Number(buyHouseEv.movingCost) : 3000);
+
+  const dpPct = downPaymentPct / 100;
+  const ccPct = closingCosts / 100;
+  
+  // Cash limit / Suggested price based on cash available
+  const denominator = dpPct + ccPct;
+  const fixedCosts = renovationCost + movingCosts;
+  const rawSuggestedPrice = denominator > 0 ? Math.max(0, (liquidAssets - fixedCosts) / denominator) : 0;
+  const suggestedPrice = Math.floor(rawSuggestedPrice / 1000) * 1000;
+
+  // Monthly payment limit
+  const rate = mortgageRate / 100;
+  const r = rate / 12;
+  const n = loanTerm * 12;
+  let factor = 0;
+  if (n > 0) {
+    if (r === 0) {
+      factor = 1 / n;
+    } else {
+      factor = (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    }
+  }
+  const pAndIFractionOfPrice = (1 - dpPct) * factor;
+  
+  let rawMonthlyPrice = null;
+  if (rent > 0) {
+    if (pAndIFractionOfPrice > 0) {
+      rawMonthlyPrice = rent / pAndIFractionOfPrice;
+    }
+  }
+  const monthlyAffordablePrice = rawMonthlyPrice == null ? null : Math.floor(Math.max(0, rawMonthlyPrice) / 1000) * 1000;
+
+  const rawRecommendedPrice = rawMonthlyPrice == null
+    ? rawSuggestedPrice
+    : Math.min(rawSuggestedPrice, rawMonthlyPrice);
+    
+  const recommendedPrice = Math.floor(Math.max(0, rawRecommendedPrice) / 1000) * 1000;
+
+  return {
+    suggestedPrice,
+    cashAffordablePrice: suggestedPrice, // alias for compatibility
+    monthlyAffordablePrice,
+    recommendedPrice
+  };
+}
+
 
