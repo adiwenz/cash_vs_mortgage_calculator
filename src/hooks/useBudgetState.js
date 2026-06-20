@@ -334,6 +334,7 @@ export function useBudgetState(
       
       newInputs.filingStatus = budgetFilingStatus;
       newInputs.hasCustomizedSavingsAllocation = true;
+      newInputs.hasCustomizedBudget = true;
       if (!newInputs.budgetDetails) newInputs.budgetDetails = {};
       newInputs.budgetDetails.hsaCoverage = budgetHsaCoverage;
       if (updatedDefaultTemplate) {

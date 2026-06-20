@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatCurrency, formatCompactCurrency, clampMoneyValue, clampPercentageValue } from './helpers';
 import { getRetirementLimit } from '../../simulatorMathUtils';
 import { NumberInput } from '../ui/PlainInputs';
+import { syncBudgetDetails } from '../../calculators/fire/index.js';
 
 export default function MobileBudgetPanel({
   inputs,
@@ -57,6 +58,7 @@ export default function MobileBudgetPanel({
   budgetScalingMode,
   handleToggleBudgetScalingMode
 }) {
+  const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   const [activeEditCategory, setActiveEditCategory] = useState(null); // 'needs', 'wants', 'savings', or null
 
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
@@ -89,6 +91,31 @@ export default function MobileBudgetPanel({
           ✖
         </button>
       </div>
+
+      {!inputs.hasCustomizedBudget && syncResult.autoReducedBudget === true && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '8px',
+          padding: '0.6rem 0.85rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          gap: '0.5rem',
+          alignItems: 'flex-start'
+        }}>
+          <span style={{ fontSize: '1rem', marginTop: '-0.1rem' }}>ℹ️</span>
+          <div>
+            <h5 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary, #3b82f6)' }}>
+              Modeling budget
+            </h5>
+            <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+              {syncResult.isFullSavingsRate
+                ? "This savings target uses your full monthly income, so Needs and Wants are shown as $0 for this projection."
+                : "Your savings target leaves less room for spending, so Wants were reduced first and Needs were reduced only as needed for this projection."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Swipeable Tabs for Budget Phases */}
       <h4 className="budget-phases-heading">Budget Phases</h4>

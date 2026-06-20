@@ -22,7 +22,8 @@ import {
   calculateRetireSoonerOptions,
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
-  applyBalancedAdjustment
+  applyBalancedAdjustment,
+  syncBudgetDetails
 } from './calculators/fire/index.js';
 
 // Deep imports for legacy compatibility (Option B)
@@ -88,5 +89,6 @@ export {
   calculateRetireSoonerOptions,
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
-  applyBalancedAdjustment
+  applyBalancedAdjustment,
+  syncBudgetDetails
 };
