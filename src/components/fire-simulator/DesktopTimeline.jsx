@@ -158,9 +158,9 @@ export default function DesktopTimeline({
             <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
           )}
           
-          <div className="timeline-row-content events-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: isExpanded ? '140px' : '45px', position: 'relative' }}>
+          <div className="timeline-row-content events-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: isExpanded ? '6.5rem' : '2.5rem', position: 'relative' }}>
             <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
-              <div className="events-axis-line" style={{ bottom: '16px', left: 0, right: 0 }} />
+              <div className="events-axis-line" style={{ bottom: '1rem', left: 0, right: 0 }} />
               
               {/* Today Pin */}
               {inputs.currentAge >= minAge && inputs.currentAge <= maxAge && (
@@ -168,7 +168,7 @@ export default function DesktopTimeline({
                   className="financial-milestone-wrapper today-pin"
                   style={{
                     left: `${((inputs.currentAge - minAge) / totalYears) * 100}%`,
-                    bottom: '16px',
+                    bottom: '1rem',
                     zIndex: 100
                   }}
                 >
@@ -222,7 +222,7 @@ export default function DesktopTimeline({
                 const isFinancial = isFinancialEvent(evt);
                 const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
 
-                const bottomPos = isExpanded ? (16 + (evt.stackIndex * 38)) : 16;
+                const bottomPos = isExpanded ? `${1 + (evt.stackIndex * 1.625)}rem` : '1rem';
 
                 if (isFinancial) {
                   return (
@@ -231,7 +231,7 @@ export default function DesktopTimeline({
                       className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
-                        bottom: `${bottomPos}px`
+                        bottom: bottomPos
                       }}
                       onMouseDown={(e) => handleNodeDragStart(e, evt)}
                       onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -281,7 +281,7 @@ export default function DesktopTimeline({
 
                       {/* Line connector down to axis */}
                       {isExpanded && evt.stackIndex > 0 && (
-                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
+                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 1.625}rem`, bottom: `-${evt.stackIndex * 1.625}rem`, left: '50%', transform: 'translateX(-50%)' }} />
                       )}
                     </div>
                   );
@@ -293,7 +293,7 @@ export default function DesktopTimeline({
                       className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
-                        bottom: `${bottomPos}px`
+                        bottom: bottomPos
                       }}
                       onMouseDown={(e) => handleNodeDragStart(e, evt)}
                       onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -364,7 +364,7 @@ export default function DesktopTimeline({
 
                       {/* Line connector down to axis */}
                       {isExpanded && evt.stackIndex > 0 && (
-                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
+                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 1.625}rem`, bottom: `-${evt.stackIndex * 1.625}rem`, left: '50%', transform: 'translateX(-50%)' }} />
                       )}
                     </div>
                   );
@@ -393,7 +393,7 @@ export default function DesktopTimeline({
             }}>
               Commitments
             </div>
-            <div className="timeline-row-content phases-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '36px', position: 'relative' }}>
+            <div className="timeline-row-content phases-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '1.75rem', position: 'relative' }}>
               <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
                 {activeCommitments.map(span => {
                   const startAge = Math.max(minAge, span.startAge);
@@ -446,7 +446,7 @@ export default function DesktopTimeline({
           ) : (
             <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
           )}
-          <div className="timeline-row-content axis-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '32px', position: 'relative' }}>
+          <div className="timeline-row-content axis-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '1.5rem', position: 'relative' }}>
             <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
               <div 
                 className="axis-line" 

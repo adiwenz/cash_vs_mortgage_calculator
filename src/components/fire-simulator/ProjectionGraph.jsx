@@ -169,7 +169,17 @@ export default function ProjectionGraph({
   const topMargin = isMobile ? 15 : 20;
 
   return (
-    <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '265px', cursor: 'crosshair', width: '100%', position: 'relative', zIndex: 'auto' }}>
+    <div 
+      ref={chartContainerRef} 
+      className="chart-container-inner timeline-track-inner chart-wrapper" 
+      style={{ 
+        height: isMobile ? '240px' : undefined, 
+        cursor: 'crosshair', 
+        width: '100%', 
+        position: 'relative', 
+        zIndex: 'auto' 
+      }}
+    >
       {!isMobile && isZoomed && (
         <button
           onClick={handleResetZoom}

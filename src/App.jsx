@@ -674,7 +674,7 @@ export default function App() {
           </div>
         </div>
       ) : activeTool === 'fireSimulator' ? (
-        <main style={{ marginTop: '1.5rem', width: '100%' }}>
+        <main style={{ marginTop: '1.5rem', width: '100%' }} className="app-main-content">
           <FireSimulator />
         </main>
       ) : activeTool === 'savingsAllocator' ? (

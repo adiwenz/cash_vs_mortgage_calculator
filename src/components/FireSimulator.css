@@ -3261,13 +3261,88 @@
 }
 
 /* Desktop Unified Planning Dashboard Grid */
+.current-situation-card {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+}
+
+.wealth-journey-card {
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
 @media (min-width: 1024px) {
+  .brand-logo-img {
+    height: 50px !important;
+  }
+
+  .brand-separator {
+    height: 32px !important;
+  }
+
+  .app-main-content {
+    margin-top: clamp(0.5rem, 1vh, 0.75rem) !important;
+  }
+
   .desktop-dashboard-grid {
     display: grid;
-    grid-template-columns: 340px 1fr;
-    gap: 1.25rem;
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
     align-items: start;
     width: 100%;
+  }
+
+  .desktop-right-column {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.4rem, 0.6vh, 0.6rem);
+    min-width: 0;
+  }
+
+  .goal-hero-card {
+    margin-bottom: 0 !important;
+  }
+
+  .goal-hero-left-panel {
+    padding: clamp(0.6rem, 1vh, 1.2rem) !important;
+  }
+
+  .goal-hero-right-content {
+    top: clamp(0.6rem, 1vh, 1.2rem) !important;
+    left: clamp(0.6rem, 1vh, 1.2rem) !important;
+    right: clamp(0.6rem, 1vh, 1.2rem) !important;
+  }
+
+  .goal-hero-right-panel {
+    min-height: 160px !important;
+  }
+
+  .goal-hero-input-box {
+    height: 60px !important;
+    font-size: 38px !important;
+  }
+
+  .wealth-journey-card {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(0.5rem, 0.8vh, 0.75rem) !important;
+    margin-bottom: 0 !important;
+  }
+
+  .chart-wrapper {
+    height: 15rem;
+    min-height: 14rem;
+  }
+
+  .timeline-section {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .current-situation-card {
+    padding: clamp(0.75rem, 1.2vh, 1.5rem) !important;
+    align-self: start;
   }
 }
 

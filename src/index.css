@@ -1178,7 +1178,7 @@ h1, h2, h3, h4, h5, h6 {
   flex: 0 0 40%;
   width: 40%;
   background: #ffffff;
-  padding: 1.5rem 2rem;
+  padding: clamp(0.75rem, 1.2vh, 1.5rem);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1246,9 +1246,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .goal-hero-right-content {
   position: absolute;
-  top: 1.5rem;
-  left: 1.75rem;
-  right: 1.75rem;
+  top: clamp(0.75rem, 1.2vh, 1.5rem);
+  left: clamp(0.75rem, 1.2vh, 1.5rem);
+  right: clamp(0.75rem, 1.2vh, 1.5rem);
   z-index: 10;
   display: flex;
   flex-direction: column;

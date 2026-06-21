@@ -328,7 +328,7 @@ export default function LifePlanScreen({
     65;
 
   const chartLayout = useMemo(() => {
-    const margin = { top: 20, right: 10, left: 10, bottom: 5 };
+    const margin = { top: 10, right: 10, left: 10, bottom: 5 };
     return {
       margin,
       yAxisWidth,
@@ -489,7 +489,7 @@ export default function LifePlanScreen({
           </div>
 
           {/* Right Column */}
-          <div className="desktop-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
+          <div className="desktop-right-column">
             {(() => {
               const lifeExpectancyVal = Number(inputs.lifeExpectancy) || 85;
               const hasSolvableRecommendations = !!(
@@ -518,7 +518,7 @@ export default function LifePlanScreen({
 
             {/* Projection Graph */}
         {validation.errors.length === 0 && (
-          <div className="glass-card" style={{ padding: '0.85rem 1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.55rem', borderRadius: '16px', position: 'relative', zIndex: isGraphClusterExpanded ? 100 : 'auto' }}>
+          <div className="glass-card wealth-journey-card" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.25rem, 0.6vh, 0.55rem)', borderRadius: '16px', position: 'relative', zIndex: isGraphClusterExpanded ? 100 : 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: '800', fontFamily: 'var(--font-heading)', margin: 0, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -558,17 +558,19 @@ export default function LifePlanScreen({
               chartLayout={chartLayout}
             />
 
-            <DesktopTimeline
-              inputs={inputs}
-              timelineEvents={timelineEvents}
-              editingEvent={editingEvent}
-              draggingInfo={draggingInfo}
-              dragOccurredRef={dragOccurredRef}
-              handleNodeDragStart={handleNodeDragStart}
-              handleEditRoadmapEvent={handleEditRoadmapEvent}
-              chartLayout={chartLayout}
-              activeDomain={zoomDomain ?? [Number(inputs.currentAge) || 35, Number(inputs.lifeExpectancy) || 85]}
-            />
+            <div className="timeline-section">
+              <DesktopTimeline
+                inputs={inputs}
+                timelineEvents={timelineEvents}
+                editingEvent={editingEvent}
+                draggingInfo={draggingInfo}
+                dragOccurredRef={dragOccurredRef}
+                handleNodeDragStart={handleNodeDragStart}
+                handleEditRoadmapEvent={handleEditRoadmapEvent}
+                chartLayout={chartLayout}
+                activeDomain={zoomDomain ?? [Number(inputs.currentAge) || 35, Number(inputs.lifeExpectancy) || 85]}
+              />
+            </div>
 
             {/* Selected Event details card */}
             {selectedMilestone && (

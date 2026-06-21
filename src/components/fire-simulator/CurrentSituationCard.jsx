@@ -108,19 +108,20 @@ export default function CurrentSituationCard({
   });
 
   return (
-    <div style={{
-      backgroundColor: '#ffffff',
-      border: '1px solid var(--border-color)',
-      borderRadius: '16px',
-      padding: '1.25rem 1.25rem',
-      display: 'flex',
-      flexDirection: 'column',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-      width: '100%',
-      height: '100%',
-      boxSizing: 'border-box',
-      gap: '0.75rem'
-    }}>
+    <div 
+      className="current-situation-card"
+      style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid var(--border-color)',
+        borderRadius: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+        width: '100%',
+        boxSizing: 'border-box',
+        gap: '0.75rem'
+      }}
+    >
       <style>{`
         .sidebar-navigation-row {
           outline: none;
@@ -533,7 +534,7 @@ export default function CurrentSituationCard({
               cursor: 'pointer',
               color: 'var(--text-secondary)',
               padding: '0.5rem 1rem',
-              marginTop: '0.5rem',
+              marginTop: 'auto',
               transition: 'all 0.2s',
               boxSizing: 'border-box'
             }}
