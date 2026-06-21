@@ -353,7 +353,7 @@ export default function LifePlanScreen({
   };
 
   const simpleSavingsRate = inputs.simpleIncome > 0
-    ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100)
+    ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100 * 10) / 10
     : 0;
 
 

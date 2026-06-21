@@ -21,7 +21,7 @@ export default function TodayScreen({
     const income = Number(inputs.simpleIncome) || 0;
     const expenses = Number(inputs.simpleExpenses) || 0;
     if (income <= 0) return 0;
-    return Math.round(((income - expenses) / income) * 100);
+    return Math.round(((income - expenses) / income) * 100 * 10) / 10;
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
 
   const hasUserEvents = useMemo(() => {
@@ -121,6 +121,7 @@ export default function TodayScreen({
                 style={{ width: '160px', textAlign: 'right', fontSize: '1.2rem', padding: '0.45rem 0.65rem' }}
                 value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                 placeholder="e.g. 20"
+                precision={1}
                 onFocus={() => setSavingsRateOverride(savingsRateOverride !== null ? savingsRateOverride : String(simpleSavingsRate))}
                 onChange={(e) => {
                   const val = e.target.value;

@@ -149,4 +149,30 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     // Verify Savings Rate is updated in the input
     expect(savingsInput.value).toBe('20%');
   });
+
+  test('verifies savings rate manual inputs with decimals and clamping behavior', async () => {
+    render(<FireSimulator />);
+
+    const textboxes = screen.getAllByRole('textbox');
+    const savingsInput = textboxes.find(i => i.value === '15%');
+    expect(savingsInput).toBeDefined();
+
+    // 1. Enter decimal value 12.5
+    fireEvent.focus(savingsInput);
+    fireEvent.change(savingsInput, { target: { value: '12.5' } });
+    fireEvent.blur(savingsInput);
+    expect(savingsInput.value).toBe('12.5%');
+
+    // 2. Enter decimal value with more than one decimal place: 12.54 should clamp/truncate to 12.5
+    fireEvent.focus(savingsInput);
+    fireEvent.change(savingsInput, { target: { value: '12.54' } });
+    fireEvent.blur(savingsInput);
+    expect(savingsInput.value).toBe('12.5%');
+
+    // 3. Enter decimal value with multiple decimal points: 12.3.4 should clamp to 12.3
+    fireEvent.focus(savingsInput);
+    fireEvent.change(savingsInput, { target: { value: '12.3.4' } });
+    fireEvent.blur(savingsInput);
+    expect(savingsInput.value).toBe('12.3%');
+  });
 });

@@ -187,6 +187,7 @@ export function PercentInput({
   className,
   style,
   placeholder,
+  precision,
   ...props
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -225,6 +226,10 @@ export function PercentInput({
       if (props.min !== undefined && parsedNum < props.min) {
         rawStr = String(props.min);
       }
+      if (precision !== undefined) {
+        const factor = Math.pow(10, precision);
+        rawStr = String(Math.round(parseFloat(rawStr) * factor) / factor);
+      }
     }
     if (onChange) {
       onChange(makeFakeEvent(rawStr, props.name));
@@ -237,6 +242,17 @@ export function PercentInput({
   const handleChange = (e) => {
     let val = e.target.value;
     let rawStr = parseRawString(val);
+
+    if (precision !== undefined) {
+      const parts = rawStr.split('.');
+      if (parts.length > 1) {
+        const integerPart = parts[0];
+        const decimalPart = parts.slice(1).join('').slice(0, precision);
+        rawStr = `${integerPart}.${decimalPart}`;
+        val = rawStr;
+      }
+    }
+
     const parsedNum = parseFloat(rawStr);
     if (Number.isFinite(parsedNum)) {
       if (props.max !== undefined && parsedNum > props.max) {

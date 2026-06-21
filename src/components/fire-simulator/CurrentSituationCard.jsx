@@ -31,7 +31,7 @@ export default function CurrentSituationCard({
     const income = Number(inputs.simpleIncome) || 0;
     const expenses = Number(inputs.simpleExpenses) || 0;
     if (income <= 0) return 0;
-    return Math.round(((income - expenses) / income) * 100);
+    return Math.round(((income - expenses) / income) * 100 * 10) / 10;
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
 
   const lifeProfile = inputs.lifeProfile || {};
@@ -264,6 +264,7 @@ export default function CurrentSituationCard({
           <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Savings Rate</span>
           <PercentInput
             value={simpleSavingsRate}
+            precision={1}
             onChange={(e) => {
               const val = Number(e.target.value) || 0;
               const income = Number(inputs.simpleIncome) || 0;

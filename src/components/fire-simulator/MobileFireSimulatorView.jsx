@@ -1026,7 +1026,7 @@ export default function MobileFireSimulatorView({
           const formatCompact = (val) => formatCompactCurrency(val);
 
           const simpleSavingsRate = inputs.simpleIncome 
-            ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) 
+            ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100 * 10) / 10 
             : 0;
 
           return (
@@ -1109,14 +1109,14 @@ export default function MobileFireSimulatorView({
                             value={inputs.simpleIncome === null ? '' : inputs.simpleIncome}
                             placeholder="e.g. 120000"
                             onFocus={() => {
-                              setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                              setActiveSavingsRate(inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100 * 10) / 10 : 0);
                             }}
                             onBlur={(e) => {
                               setActiveSavingsRate(null);
                               const clamped = clampMoneyValue(e.target.value);
                               handleStep1Change('simpleIncome', clamped);
                               if (clamped !== null && !inputs.hasCustomizedBudget) {
-                                const rate = inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0;
+                                const rate = inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100 * 10) / 10 : 0;
                                 const newExpenses = Math.round(clamped * (1 - rate / 100));
                                 handleStep1Change('simpleExpenses', newExpenses);
                               }
@@ -1126,7 +1126,7 @@ export default function MobileFireSimulatorView({
                               const newIncome = val === '' ? null : (parseFloat(val) || 0);
                               handleStep1Change('simpleIncome', newIncome);
                               if (newIncome !== null && !inputs.hasCustomizedBudget) {
-                                const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100) : 0);
+                                const rate = activeSavingsRate !== null ? activeSavingsRate : (inputs.simpleIncome ? Math.round(((inputs.simpleIncome - inputs.simpleExpenses) / inputs.simpleIncome) * 100 * 10) / 10 : 0);
                                 const newExpenses = Math.round(newIncome * (1 - rate / 100));
                                 handleStep1Change('simpleExpenses', newExpenses);
                               }
@@ -1231,6 +1231,7 @@ export default function MobileFireSimulatorView({
                             }}
                             disabled={inputs.hasCustomizedBudget}
                             max={100}
+                            precision={1}
                             value={savingsRateOverride !== null ? savingsRateOverride : simpleSavingsRate}
                             placeholder="e.g. 20"
                             onChange={(e) => {
