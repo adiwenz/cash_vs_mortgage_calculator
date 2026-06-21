@@ -31,13 +31,44 @@ export function useScenarioState() {
         };
 
         if (key === 'simpleIncome' || key === 'simpleExpenses') {
+          if (key === 'simpleIncome') {
+            const prevIncome = Number(scen.inputs.simpleIncome) || 0;
+            const prevExpenses = Number(scen.inputs.simpleExpenses) || 0;
+            const prevRate = prevIncome > 0 ? ((prevIncome - prevExpenses) / prevIncome) * 100 : 0;
+            const displayedSavingsRate = Math.min(100, Math.max(0, prevRate));
+            
+            const monthlyIncome = roundCurrency(value / 12);
+            const targetMonthlySavings = roundCurrency(monthlyIncome * (displayedSavingsRate / 100));
+            
+            const existingExpenses = scen.inputs.budgetDetails?.expenses || {};
+            let fixedRequiredTotal = 0;
+            const fixedRequiredKeys = ['housing', 'rent', 'mortgage', '🏠 Mortgage', 'healthcare', 'childcare', 'insurance'];
+            Object.keys(existingExpenses).forEach(k => {
+              if (fixedRequiredKeys.includes(k) || k.startsWith('debt_')) {
+                fixedRequiredTotal += Number(existingExpenses[k]) || 0;
+              }
+            });
+            fixedRequiredTotal = roundCurrency(fixedRequiredTotal);
+            
+            let targetSpending;
+            if (fixedRequiredTotal > monthlyIncome) {
+              targetSpending = fixedRequiredTotal;
+            } else if (fixedRequiredTotal + targetMonthlySavings > monthlyIncome) {
+              targetSpending = fixedRequiredTotal;
+            } else {
+              targetSpending = monthlyIncome - targetMonthlySavings;
+            }
+            
+            updatedInputs.simpleExpenses = roundCurrency(targetSpending * 12);
+          }
+
           // Always sync top-level budget details
-          const syncRes = syncBudgetDetails(
+          const syncResult = syncBudgetDetails(
             updatedInputs.simpleIncome,
             updatedInputs.simpleExpenses,
             updatedInputs.budgetDetails
           );
-          updatedInputs.budgetDetails = syncRes.budgetDetails;
+          updatedInputs.budgetDetails = syncResult.budgetDetails;
 
           // Reallocate all pre-retirement budget phases
           if (updatedInputs.budgetDetails.phases && updatedInputs.budgetDetails.phases.length > 0) {

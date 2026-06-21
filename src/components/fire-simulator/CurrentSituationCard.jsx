@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from './helpers';
 import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
+import { getNormalizedPhases } from '../../fireCalculations';
 
 export default function CurrentSituationCard({
   inputs,
@@ -31,8 +32,25 @@ export default function CurrentSituationCard({
     const income = Number(inputs.simpleIncome) || 0;
     const expenses = Number(inputs.simpleExpenses) || 0;
     if (income <= 0) return 0;
-    return Math.round(((income - expenses) / income) * 100 * 10) / 10;
+    const rate = ((income - expenses) / income) * 100;
+    return Math.min(100, Math.max(0, Math.round(rate * 10) / 10));
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
+
+  const currentPhase = useMemo(() => {
+    const phases = getNormalizedPhases(inputs);
+    const currentAge = Number(inputs.currentAge) || 35;
+    return phases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || phases[0];
+  }, [inputs]);
+
+  const currentPhaseShortfall = useMemo(() => {
+    return currentPhase ? currentPhase.monthlyBudgetShortfall || 0 : 0;
+  }, [currentPhase]);
+
+  const currentPhaseAnnualSpending = useMemo(() => {
+    if (!currentPhase) return 0;
+    const monthlySpending = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    return monthlySpending * 12;
+  }, [currentPhase]);
 
   const lifeProfile = inputs.lifeProfile || {};
   const household = lifeProfile.household || {};
@@ -95,12 +113,14 @@ export default function CurrentSituationCard({
       backgroundColor: '#ffffff',
       border: '1px solid var(--border-color)',
       borderRadius: '16px',
-      padding: '2rem 1.5rem',
+      padding: '1.25rem 1.25rem',
       display: 'flex',
       flexDirection: 'column',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
       width: '100%',
-      boxSizing: 'border-box'
+      height: '100%',
+      boxSizing: 'border-box',
+      gap: '0.75rem'
     }}>
       <style>{`
         .sidebar-navigation-row {
@@ -127,71 +147,72 @@ export default function CurrentSituationCard({
         }
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-        <span style={{ fontSize: '1.4rem' }}>🌱</span>
-        <h3 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
-          Your Situation
-        </h3>
-      </div>
+      {/* Header Section */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1.4rem' }}>🌱</span>
+          <h3 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>
+            Your Situation
+          </h3>
+        </div>
 
-      {/* Primary Profile Row */}
-      <div 
-        onClick={() => onOpenLifeProfile('household')}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontSize: '16px',
-          fontWeight: '500',
-          color: 'var(--text-primary)',
-          cursor: 'pointer',
-          marginBottom: '2rem',
-          flexWrap: 'wrap'
-        }}
-      >
-        <span>{inputs.currentAge || 35}</span>
-        <span style={{ color: 'var(--text-tertiary)' }}>•</span>
-        <span style={{
-          fontSize: '0.85rem',
-          padding: '0.2rem 0.5rem',
-          borderRadius: '9999px',
-          background: '#f3e8ff',
-          color: '#7e22ce',
-          fontWeight: '600'
-        }}>
-          {household.status === 'married' ? 'Married' : household.status === 'partnered' ? 'Partnered' : 'Single'}
-        </span>
-        <span style={{ color: 'var(--text-tertiary)' }}>•</span>
-        <span style={{
-          fontSize: '0.85rem',
-          padding: '0.2rem 0.5rem',
-          borderRadius: '9999px',
-          background: '#dcfce7',
-          color: '#15803d',
-          fontWeight: '600'
-        }}>
-          {home.status === 'own' ? 'Homeowner' : 'Renting'}
-        </span>
-        {children.length > 0 && (
-          <>
-            <span style={{ color: 'var(--text-tertiary)' }}>•</span>
-            <span style={{
-              fontSize: '0.85rem',
-              padding: '0.2rem 0.5rem',
-              borderRadius: '9999px',
-              background: '#fef9c3',
-              color: '#a16207',
-              fontWeight: '600'
-            }}>
-              {children.length} {children.length === 1 ? 'Child' : 'Children'}
-            </span>
-          </>
-        )}
+        {/* Primary Profile Row */}
+        <div 
+          onClick={() => onOpenLifeProfile('household')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '16px',
+            fontWeight: '500',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            flexWrap: 'wrap'
+          }}
+        >
+          <span>{inputs.currentAge || 35}</span>
+          <span style={{ color: 'var(--text-tertiary)' }}>•</span>
+          <span style={{
+            fontSize: '0.85rem',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '9999px',
+            background: '#f3e8ff',
+            color: '#7e22ce',
+            fontWeight: '600'
+          }}>
+            {household.status === 'married' ? 'Married' : household.status === 'partnered' ? 'Partnered' : 'Single'}
+          </span>
+          <span style={{ color: 'var(--text-tertiary)' }}>•</span>
+          <span style={{
+            fontSize: '0.85rem',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '9999px',
+            background: '#dcfce7',
+            color: '#15803d',
+            fontWeight: '600'
+          }}>
+            {home.status === 'own' ? 'Homeowner' : 'Renting'}
+          </span>
+          {children.length > 0 && (
+            <>
+              <span style={{ color: 'var(--text-tertiary)' }}>•</span>
+              <span style={{
+                fontSize: '0.85rem',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '9999px',
+                background: '#fef9c3',
+                color: '#a16207',
+                fontWeight: '600'
+              }}>
+                {children.length} {children.length === 1 ? 'Child' : 'Children'}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Financial Snapshot */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {/* Annual Income */}
         <div 
           style={{
@@ -287,13 +308,44 @@ export default function CurrentSituationCard({
             }}
           />
         </div>
+
+        {/* Spending (budget) */}
+        <div 
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0.25rem 0.5rem',
+            margin: '0 -0.5rem',
+            borderRadius: '8px',
+            opacity: 0.65
+          }}
+        >
+          <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Spending (budget)</span>
+          <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+            {formatCurrency(currentPhaseAnnualSpending)}
+          </span>
+        </div>
+
+        {/* Shortfall */}
+        {currentPhaseShortfall > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0.25rem 0.5rem', margin: '0 -0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '15px', color: 'var(--accent-rose, #ef4444)', fontWeight: '600' }}>Shortfall</span>
+              <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--accent-rose, #ef4444)' }}>
+                -{formatCurrency(Math.round(currentPhaseShortfall))}/mo
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary, #9ca3af)', fontWeight: '400', textAlign: 'right' }}>
+              Based on your current budget and required expenses.
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Section Divider */}
-      <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.5rem 0 1rem 0' }} />
-
       {/* Actions Section */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.25rem 0' }} />
         {/* Set Budget */}
         <div style={{ position: 'relative' }}>
           <button

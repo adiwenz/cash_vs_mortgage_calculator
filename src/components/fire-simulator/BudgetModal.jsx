@@ -231,6 +231,7 @@ export default function BudgetModal({
     ? calculateUSTaxForModal(combinedIncome * 12, preTaxDeductionsAnnual, filingStatusForModal)
     : 0;
   const monthlyTax = roundCurrency(annualTax / 12);
+  const takeHomeIncome = inputs.includeTaxes ? (combinedIncome - monthlyTax) : combinedIncome;
   
   const userSavingsMonthly = savingsAllocMode === 'percentSurplus'
     ? roundCurrency(surplusMonthly * (totalUserAllocationPct / 100))
@@ -449,9 +450,13 @@ export default function BudgetModal({
 
 
 
-  const activeSavingsRate = combinedIncome > 0 
-    ? Math.round((activeSavings / combinedIncome) * 100) 
-    : 0;
+  const isSpendingExceedingIncome = totalExpensesMonthly > takeHomeIncome;
+  const activeSavingsRate = isSpendingExceedingIncome
+    ? 0
+    : (combinedIncome > 0 
+       ? Math.min(100, Math.max(0, Math.round((activeSavings / combinedIncome) * 100))) 
+       : 0);
+  const budgetShortfall = isSpendingExceedingIncome ? roundCurrency(totalExpensesMonthly - takeHomeIncome) : 0;
 
   const getEventDetails = (idOrType) => {
     const le = (inputs.lifeEvents || []).find(e => e.id === idOrType || e.type === idOrType);
@@ -707,7 +712,6 @@ export default function BudgetModal({
     return 'theme-working-standard'; // Indigo / Blue
   };
 
-  const takeHomeIncome = inputs.includeTaxes ? (combinedIncome - monthlyTax) : combinedIncome;
   const totalAllocated = needsTotal + wantsTotal + activeSavings;
   const remainingBalance = takeHomeIncome - totalAllocated;
   const panelProps = {
@@ -778,7 +782,8 @@ export default function BudgetModal({
     handleClearWants,
     handleClearSavings,
     budgetScalingMode,
-    handleToggleBudgetScalingMode
+    handleToggleBudgetScalingMode,
+    budgetShortfall
   };
 
   return (

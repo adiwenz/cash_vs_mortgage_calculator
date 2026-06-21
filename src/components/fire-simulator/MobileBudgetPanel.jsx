@@ -56,7 +56,8 @@ export default function MobileBudgetPanel({
   handleClearSavings,
   handleToggleSavingsAllocMode,
   budgetScalingMode,
-  handleToggleBudgetScalingMode
+  handleToggleBudgetScalingMode,
+  budgetShortfall
 }) {
   const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   const [activeEditCategory, setActiveEditCategory] = useState(null); // 'needs', 'wants', 'savings', or null
@@ -310,8 +311,10 @@ export default function MobileBudgetPanel({
                 </span>
               </div>
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              {remainingBalance < 0 ? 'Over budget' : 'Unallocated surplus'}
+            <div style={{ fontSize: '0.72rem', color: budgetShortfall > 0 ? 'var(--accent-rose, #ef4444)' : 'var(--text-secondary)', fontWeight: budgetShortfall > 0 ? 'bold' : 'normal' }}>
+              {budgetShortfall > 0 
+                ? `Budget Shortfall: ${formatCurrency(budgetShortfall)}/mo` 
+                : (remainingBalance < 0 ? 'Over budget' : 'Unallocated surplus')}
             </div>
           </div>
         </div>

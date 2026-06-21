@@ -1066,6 +1066,16 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       totalSavingsMonthly = userSavingsSum + partnerSavingsSum;
     }
 
+    const totalSpending = Object.values(resolvedExpenses).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const derivedSavingsRate = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) * 100 : 0;
+    let displayedSavingsRate = Math.min(100, Math.max(0, Math.round(derivedSavingsRate * 100) / 100));
+    let monthlyBudgetShortfall = Math.max(0, roundCurrency(totalSpending + totalSavingsMonthly - resolvedIncome));
+    
+    if (totalSpending > resolvedIncome) {
+      displayedSavingsRate = 0;
+      monthlyBudgetShortfall = roundCurrency(totalSpending - resolvedIncome);
+    }
+
     const expenseRatio = resolvedIncome > 0 ? (totalExpensesMonthly / resolvedIncome) : 0;
     const savingsRatio = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) : 0;
 
@@ -1137,7 +1147,11 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       spouseSavingsRate,
       spouseCash,
       spouseInvestments,
-      spouseRetirement
+      spouseRetirement,
+      displayedSavingsRate,
+      derivedSavingsRate,
+      savingsRate: Math.max(0, derivedSavingsRate),
+      monthlyBudgetShortfall
     });
   }
 
@@ -1408,97 +1422,176 @@ export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDet
   const income = Number(simpleIncome) || 0;
   const expenses = Number(simpleExpenses) || 0;
   const monthlyIncome = roundCurrency(income / 12);
-  const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
-  const targetSavings = roundCurrency(monthlyIncome * (savingsRate / 100));
-  const targetSpending = Math.max(0, roundCurrency(monthlyIncome - targetSavings));
+  // The input savings rate
+  const inputSavingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+  const rate = Math.min(100, Math.max(0, inputSavingsRate));
+  const targetSavings = roundCurrency(monthlyIncome * (rate / 100));
 
-  const baseNeeds = { housing: 1500, utilities: 300, food: 400, transportation: 400, healthcare: 300 };
-  const baseWants = { diningOut: 200, leisure: 300, misc: 142 };
-  const baseNeedsTotal = 2900;
-  const baseWantsTotal = 642;
-
+  // The target spending requested
+  let targetSpending = roundCurrency(expenses / 12);
+  
+  if (targetSpending <= monthlyIncome) {
+    targetSpending = roundCurrency(monthlyIncome - targetSavings);
+  }
+  
   const existingExpenses = currentBudgetDetails.expenses || {};
-
-  const needs = {};
-  let existingNeedsSum = 0;
-  Object.keys(baseNeeds).forEach(k => {
-    needs[k] = existingExpenses[k] !== undefined ? Number(existingExpenses[k]) : baseNeeds[k];
-    existingNeedsSum += needs[k];
-  });
-
+  
+  // Classify expenses
+  const wantsKeys = ['diningOut', 'leisure', 'misc'];
+  const flexibleNeedsKeys = ['food', 'transportation', 'utilities'];
+  const fixedRequiredKeys = ['housing', 'rent', 'mortgage', '🏠 Mortgage', 'healthcare', 'childcare', 'insurance'];
+  
   const wants = {};
-  let existingWantsSum = 0;
-  Object.keys(baseWants).forEach(k => {
-    wants[k] = existingExpenses[k] !== undefined ? Number(existingExpenses[k]) : baseWants[k];
-    existingWantsSum += wants[k];
+  const flexibleNeeds = {};
+  const fixedRequired = {};
+  
+  Object.keys(existingExpenses).forEach(k => {
+    const val = Number(existingExpenses[k]) || 0;
+    if (fixedRequiredKeys.includes(k) || k.startsWith('debt_')) {
+      fixedRequired[k] = val;
+    } else if (wantsKeys.includes(k)) {
+      wants[k] = val;
+    } else if (flexibleNeedsKeys.includes(k)) {
+      flexibleNeeds[k] = val;
+    } else {
+      flexibleNeeds[k] = val;
+    }
   });
 
+  // Ensure default base values if wants or flexible needs are empty/missing
+  const baseWants = { diningOut: 200, leisure: 300, misc: 142 };
+  const baseWantsTotal = 642;
+  const baseFlexibleNeeds = { food: 400, transportation: 400, utilities: 300 };
+  const baseFlexibleNeedsTotal = 1100;
+  const baseFixedRequired = { housing: 1500, healthcare: 300 };
+
+  Object.keys(baseWants).forEach(k => {
+    if (wants[k] === undefined) {
+      wants[k] = baseWants[k];
+    }
+  });
+  Object.keys(baseFlexibleNeeds).forEach(k => {
+    if (flexibleNeeds[k] === undefined) {
+      flexibleNeeds[k] = baseFlexibleNeeds[k];
+    }
+  });
+  Object.keys(baseFixedRequired).forEach(k => {
+    if (fixedRequired[k] === undefined) {
+      fixedRequired[k] = baseFixedRequired[k];
+    }
+  });
+  
+  const fixedRequiredTotal = roundCurrency(Object.values(fixedRequired).reduce((sum, v) => sum + v, 0));
+  const wantsTotal = roundCurrency(Object.values(wants).reduce((sum, v) => sum + v, 0));
+  const flexibleNeedsTotal = roundCurrency(Object.values(flexibleNeeds).reduce((sum, v) => sum + v, 0));
+  
+  let finalExpenses = { ...fixedRequired };
+  let finalSavingsAmount = targetSavings;
+  let budgetShortfall = 0;
+  
   let reducedWants = false;
   let reducedNeeds = false;
   let autoReducedBudget = false;
-  const isFullSavingsRate = (savingsRate === 100);
-
-  if (targetSpending === 0) {
-    Object.keys(needs).forEach(k => { needs[k] = 0; });
-    Object.keys(wants).forEach(k => { wants[k] = 0; });
-    reducedWants = (existingWantsSum > 0);
-    reducedNeeds = (existingNeedsSum > 0);
+  const isFullSavingsRate = (monthlyIncome > 0 && targetSavings / monthlyIncome >= 0.999);
+  
+  if (fixedRequiredTotal > monthlyIncome) {
+    finalSavingsAmount = 0;
+    budgetShortfall = roundCurrency(fixedRequiredTotal - monthlyIncome);
+    
+    Object.keys(wants).forEach(k => { finalExpenses[k] = 0; });
+    Object.keys(flexibleNeeds).forEach(k => { finalExpenses[k] = 0; });
+    
+    reducedWants = (wantsTotal > 0);
+    reducedNeeds = (flexibleNeedsTotal > 0);
     autoReducedBudget = reducedWants || reducedNeeds;
-  } else if (targetSpending < existingNeedsSum) {
-    Object.keys(wants).forEach(k => { wants[k] = 0; });
-    reducedWants = (existingWantsSum > 0);
-    reducedNeeds = true;
-    autoReducedBudget = true;
-
-    if (existingNeedsSum > 0) {
-      const scale = targetSpending / existingNeedsSum;
-      Object.keys(needs).forEach(k => { needs[k] = roundCurrency(needs[k] * scale); });
-    } else {
-      Object.keys(baseNeeds).forEach(k => {
-        needs[k] = roundCurrency(targetSpending * (baseNeeds[k] / baseNeedsTotal));
-      });
-    }
-    // Adjust rounding error
-    const currentSum = Object.values(needs).reduce((sum, val) => sum + val, 0);
-    const diff = roundCurrency(targetSpending - currentSum);
-    if (diff !== 0) {
-      needs.housing = Math.max(0, roundCurrency((needs.housing || 0) + diff));
-    }
+  } else if (fixedRequiredTotal + targetSavings > monthlyIncome) {
+    finalSavingsAmount = roundCurrency(monthlyIncome - fixedRequiredTotal);
+    budgetShortfall = 0;
+    
+    Object.keys(wants).forEach(k => { finalExpenses[k] = 0; });
+    Object.keys(flexibleNeeds).forEach(k => { finalExpenses[k] = 0; });
+    
+    reducedWants = (wantsTotal > 0);
+    reducedNeeds = (flexibleNeedsTotal > 0);
+    autoReducedBudget = reducedWants || reducedNeeds;
   } else {
-    const targetWants = roundCurrency(targetSpending - existingNeedsSum);
-    if (targetWants < existingWantsSum) {
-      reducedWants = true;
+    // We have enough room for both fixedRequiredTotal and targetSavings.
+    // Calculate if we have budget shortfall from target spending exceeding income
+    if (targetSpending > monthlyIncome) {
+      budgetShortfall = roundCurrency(targetSpending - monthlyIncome);
+    }
+    
+    const remainingForSpending = roundCurrency(targetSpending - fixedRequiredTotal);
+    
+    if (remainingForSpending < flexibleNeedsTotal) {
+      Object.keys(wants).forEach(k => { finalExpenses[k] = 0; });
+      reducedWants = (wantsTotal > 0);
+      reducedNeeds = true;
       autoReducedBudget = true;
-    }
-
-    if (existingWantsSum > 0) {
-      const scale = targetWants / existingWantsSum;
-      Object.keys(wants).forEach(k => { wants[k] = roundCurrency(wants[k] * scale); });
+      
+      if (flexibleNeedsTotal > 0) {
+        const scale = remainingForSpending / flexibleNeedsTotal;
+        Object.keys(flexibleNeeds).forEach(k => {
+          finalExpenses[k] = roundCurrency(flexibleNeeds[k] * scale);
+        });
+        
+        const currentSum = Object.keys(flexibleNeeds).reduce((sum, k) => sum + finalExpenses[k], 0);
+        const diff = roundCurrency(remainingForSpending - currentSum);
+        if (diff !== 0) {
+          const keyToAdjust = finalExpenses.food !== undefined ? 'food' : Object.keys(flexibleNeeds)[0];
+          if (keyToAdjust) {
+            finalExpenses[keyToAdjust] = Math.max(0, roundCurrency(finalExpenses[keyToAdjust] + diff));
+          }
+        }
+      }
     } else {
-      Object.keys(baseWants).forEach(k => {
-        wants[k] = roundCurrency(targetWants * (baseWants[k] / baseWantsTotal));
+      Object.keys(flexibleNeeds).forEach(k => {
+        finalExpenses[k] = flexibleNeeds[k];
       });
-    }
-    // Adjust rounding error
-    const currentSum = Object.values(wants).reduce((sum, val) => sum + val, 0);
-    const diff = roundCurrency(targetWants - currentSum);
-    if (diff !== 0) {
-      wants.leisure = Math.max(0, roundCurrency((wants.leisure || 0) + diff));
+      
+      const remainingForWants = roundCurrency(remainingForSpending - flexibleNeedsTotal);
+      if (remainingForWants < wantsTotal) {
+        reducedWants = true;
+        autoReducedBudget = true;
+        
+        if (wantsTotal > 0) {
+          const scale = remainingForWants / wantsTotal;
+          Object.keys(wants).forEach(k => {
+            finalExpenses[k] = roundCurrency(wants[k] * scale);
+          });
+          const currentSum = Object.keys(wants).reduce((sum, k) => sum + finalExpenses[k], 0);
+          const diff = roundCurrency(remainingForWants - currentSum);
+          if (diff !== 0) {
+            finalExpenses.leisure = Math.max(0, roundCurrency((finalExpenses.leisure || 0) + diff));
+          }
+        }
+      } else {
+        if (wantsTotal > 0) {
+          const scale = remainingForWants / wantsTotal;
+          Object.keys(wants).forEach(k => {
+            finalExpenses[k] = roundCurrency(wants[k] * scale);
+          });
+          const currentSum = Object.keys(wants).reduce((sum, k) => sum + finalExpenses[k], 0);
+          const diff = roundCurrency(remainingForWants - currentSum);
+          if (diff !== 0) {
+            finalExpenses.leisure = Math.max(0, roundCurrency((finalExpenses.leisure || 0) + diff));
+          }
+        }
+      }
     }
   }
-
-  const mergedExpenses = { ...existingExpenses, ...needs, ...wants };
-  Object.keys(mergedExpenses).forEach(k => {
-    if (k.startsWith('debt_') || k === 'childcare') return;
-    if (isNaN(mergedExpenses[k])) mergedExpenses[k] = 0;
+  
+  Object.keys(finalExpenses).forEach(k => {
+    if (k.startsWith('debt_') || k === 'childcare' || k === '🏠 Mortgage' || k === 'mortgage') return;
+    if (isNaN(finalExpenses[k])) finalExpenses[k] = 0;
   });
-
+  
   const newSavings = {
     trad401k: 0,
     rothIra: 0,
     tradIra: 0,
     hsa: 0,
-    brokerage: targetSavings,
+    brokerage: finalSavingsAmount,
     checking: 0,
     hysa: 0,
     emergency: 0,
@@ -1519,10 +1612,13 @@ export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDet
     other: 0
   };
 
+  const derivedSavingsRate = monthlyIncome > 0 ? (finalSavingsAmount / monthlyIncome) * 100 : 0;
+  const displayedSavingsRate = Math.min(100, Math.max(0, Math.round(derivedSavingsRate * 100) / 100));
+
   return {
     budgetDetails: {
       ...currentBudgetDetails,
-      expenses: mergedExpenses,
+      expenses: finalExpenses,
       savings: newSavings,
       partnerSavings: newPartnerSavings,
       savingsAllocMode: 'fixed'
@@ -1530,6 +1626,11 @@ export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDet
     autoReducedBudget,
     reducedWants,
     reducedNeeds,
-    isFullSavingsRate
+    isFullSavingsRate,
+    budgetShortfall,
+    derivedSavingsRate,
+    displayedSavingsRate,
+    savingsRate: Math.max(0, derivedSavingsRate),
+    monthlyBudgetShortfall: budgetShortfall
   };
 }
