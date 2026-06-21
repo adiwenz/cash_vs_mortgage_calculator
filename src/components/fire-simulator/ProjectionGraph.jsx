@@ -291,11 +291,7 @@ export default function ProjectionGraph({
 
   const maxNetWorth = useMemo(() => {
     if (!chartData || chartData.length === 0) return 0;
-    return Math.max(...chartData.map(d => Math.max(
-      Math.abs(d.netWorth ?? 0),
-      Math.abs(d.assets ?? 0),
-      Math.abs(d.debt ?? 0)
-    )));
+    return Math.max(...chartData.map(d => Math.abs(d.netWorth ?? 0)));
   }, [chartData]);
 
   const yAxisWidth =
@@ -442,24 +438,6 @@ export default function ProjectionGraph({
               }
               return null;
             }}
-          />
-          <Line
-            type="monotone"
-            dataKey="assets"
-            name="Total Assets"
-            stroke="var(--asset)"
-            strokeWidth={2}
-            dot={false}
-            hide={!showAssets}
-          />
-          <Line
-            type="monotone"
-            dataKey="debt"
-            name="Total Debt"
-            stroke="var(--debt)"
-            strokeWidth={2}
-            dot={false}
-            hide={!showDebt}
           />
           <Line
             type="monotone"

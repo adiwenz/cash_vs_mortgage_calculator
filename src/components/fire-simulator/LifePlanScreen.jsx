@@ -303,8 +303,8 @@ export default function LifePlanScreen({
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [isLifeProfileOpen, setIsLifeProfileOpen] = useState(false);
   const [lifeProfileTab, setLifeProfileTab] = useState('household');
-  const [showAssets, setShowAssets] = useState(true);
-  const [showDebt, setShowDebt] = useState(true);
+  const [showAssets, setShowAssets] = useState(false);
+  const [showDebt, setShowDebt] = useState(false);
   const [showNetWorth, setShowNetWorth] = useState(true);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
   const [debugTab, setDebugTab] = useState('assumptions'); // 'assumptions', 'balances', 'readiness', 'drawdowns', 'timeline', 'export'
@@ -850,35 +850,6 @@ export default function LifePlanScreen({
                   </span>
                 </h3>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
-              </div>
-              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={showAssets}
-                    onChange={(e) => setShowAssets(e.target.checked)}
-                    style={{ accentColor: '#10b981', cursor: 'pointer' }}
-                  />
-                  <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={showDebt}
-                    onChange={(e) => setShowDebt(e.target.checked)}
-                    style={{ accentColor: '#ef4444', cursor: 'pointer' }}
-                  />
-                  <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={showNetWorth}
-                    onChange={(e) => setShowNetWorth(e.target.checked)}
-                    style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
-                  />
-                  <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
-                </label>
               </div>
             </div>
             

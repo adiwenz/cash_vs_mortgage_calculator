@@ -146,35 +146,6 @@ export default function DesktopResults({
               </h3>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Updates live • Click chart to view detailed benchmarks below</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                <input
-                  type="checkbox"
-                  checked={showAssets}
-                  onChange={(e) => setShowAssets(e.target.checked)}
-                  style={{ accentColor: '#10b981', cursor: 'pointer' }}
-                />
-                <span style={{ color: '#10b981', fontWeight: '700' }}>Assets (Green)</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                <input
-                  type="checkbox"
-                  checked={showDebt}
-                  onChange={(e) => setShowDebt(e.target.checked)}
-                  style={{ accentColor: '#ef4444', cursor: 'pointer' }}
-                />
-                <span style={{ color: '#ef4444', fontWeight: '700' }}>Debt (Red)</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-secondary)' }}>
-                <input
-                  type="checkbox"
-                  checked={showNetWorth}
-                  onChange={(e) => setShowNetWorth(e.target.checked)}
-                  style={{ accentColor: '#1e3a5f', cursor: 'pointer' }}
-                />
-                <span style={{ color: '#1e3a5f', fontWeight: '700' }}>Net Worth (Navy)</span>
-              </label>
-            </div>
           </div>
           <div className="chart-container-inner" style={{ height: '240px', cursor: 'crosshair' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -220,24 +191,7 @@ export default function DesktopResults({
                     return null;
                   }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="assets"
-                  name="Total Assets"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                  hide={!showAssets}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="debt"
-                  name="Total Debt"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  dot={false}
-                  hide={!showDebt}
-                />
+
                 <Line
                   type="monotone"
                   dataKey="netWorth"

@@ -141,42 +141,7 @@ export default function GoalHeroCard({
       );
     } else {
       readinessScore = 1.0;
-      if (projectedAgeNum < targetRetirementAge) {
-        const diff = targetRetirementAge - projectedAgeNum;
-        statusBadge = (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '999px',
-            fontSize: '0.85rem',
-            fontWeight: '700',
-            backgroundColor: 'var(--success-light, rgba(22, 163, 74, 0.1))',
-            color: 'var(--success, #16a34a)',
-            border: '1px solid rgba(22, 163, 74, 0.2)'
-          }}>
-            {diff} {diff === 1 ? 'year' : 'years'} earlier than your goal
-          </div>
-        );
-      } else {
-        statusBadge = (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '999px',
-            fontSize: '0.85rem',
-            fontWeight: '700',
-            backgroundColor: 'var(--success-light, rgba(22, 163, 74, 0.1))',
-            color: 'var(--success, #16a34a)',
-            border: '1px solid rgba(22, 163, 74, 0.2)'
-          }}>
-            You're on track
-          </div>
-        );
-      }
+      statusBadge = null;
     }
   }
 

@@ -78,7 +78,7 @@ describe('GoalHeroCard Component Redesign', () => {
       />
     );
 
-    expect(screen.getByText('2 years earlier than your goal')).toBeDefined();
+    expect(screen.queryByText("You're on track")).toBeNull();
 
     // Rerender with on track (equal)
     rerender(
@@ -94,7 +94,7 @@ describe('GoalHeroCard Component Redesign', () => {
       />
     );
 
-    expect(screen.getByText("You're on track")).toBeDefined();
+    expect(screen.queryByText("You're on track")).toBeNull();
   });
 
   test('Shows encouragement state when projectedRetirementAge is null/Infinity/greater than lifeExpectancy (State B)', () => {
