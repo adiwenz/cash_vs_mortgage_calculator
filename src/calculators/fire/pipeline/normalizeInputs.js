@@ -226,7 +226,7 @@ export function normalizeInputsStage(inputs) {
     incomeList = incomeList
       .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'))
       .map(inc => {
-        if (inc.id.startsWith('simple-inc-worksave')) {
+        if (!isAdvanced && (inc.id.startsWith('simple-inc-worksave') || inc.id === 'inc-1')) {
           return { ...inc, startAge: currentAge };
         }
         return inc;
@@ -247,7 +247,7 @@ export function normalizeInputsStage(inputs) {
     spendingPhases = spendingPhases
       .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'))
       .map(p => {
-        if (p.id.startsWith('simple-spend-worksave')) {
+        if (!isAdvanced && (p.id.startsWith('simple-spend-worksave') || p.id === 'spend-1')) {
           return { ...p, startAge: currentAge };
         }
         return p;

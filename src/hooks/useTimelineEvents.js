@@ -30,7 +30,8 @@ export function useTimelineEvents(inputs, displayedResults) {
     if (!inp || !calc) return [];
 
     // 1. Income Phases
-    inp.incomeList.forEach(inc => {
+    const incomeList = calc.incomeList || inp.incomeList;
+    incomeList.forEach(inc => {
       if (inc.isDerived) {
         return;
       }
@@ -60,7 +61,8 @@ export function useTimelineEvents(inputs, displayedResults) {
     });
 
     // 2. Spending Phases
-    inp.spendingPhases.forEach(phase => {
+    const spendingPhases = calc.spendingPhases || inp.spendingPhases;
+    spendingPhases.forEach(phase => {
       if (phase.isDerived) {
         return;
       }
