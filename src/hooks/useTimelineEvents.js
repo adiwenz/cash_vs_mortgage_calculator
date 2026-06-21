@@ -55,6 +55,7 @@ export function useTimelineEvents(inputs, displayedResults) {
           label: inc.name,
           icon: '💼',
           type: 'career',
+          isPromotion: isIncrease,
           description: `Started career phase "${inc.name}" earning ${isIncrease ? 'an extra ' : ''}${formatCurrency(amountVal)}/year (raises: ${(inc.growthRate * 100).toFixed(1)}%).`
         });
       }

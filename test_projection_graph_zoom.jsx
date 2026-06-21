@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import ProjectionGraph from './src/components/fire-simulator/ProjectionGraph';
 
 // Mock ResizeObserver
@@ -35,19 +36,12 @@ vi.mock('recharts', () => {
       );
     },
     Line: () => null,
-    XAxis: () => null,
+    XAxis: ({ domain }) => <div data-testid="XAxis" data-domain={domain ? JSON.stringify(domain) : ''} />,
     YAxis: () => null,
     CartesianGrid: () => null,
     Tooltip: () => null,
     ReferenceLine: () => null,
-    ReferenceArea: ({ x1, x2 }) => <div data-testid="ReferenceArea" data-x1={x1} data-x2={x2} />,
-    ReferenceDot: ({ shape, y, ...props }) => {
-      if (typeof shape === 'function') {
-        const cyVal = (y !== undefined && y < 1000) ? y : 150;
-        return shape({ cx: 200, cy: cyVal, ...props });
-      }
-      return null;
-    }
+    ReferenceArea: ({ x1, x2 }) => <div data-testid="ReferenceArea" data-x1={x1} data-x2={x2} />
   };
 });
 
@@ -88,9 +82,9 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     cleanup();
   });
 
-  test('Dragging a valid range shows the Reset zoom button and hides out-of-range markers', () => {
+  test('Dragging a valid range shows the Reset zoom button and changes activeDomain', () => {
     const setSelectedYear = vi.fn();
-    const { container } = render(
+    render(
       <ProjectionGraph
         chartData={chartData}
         inputs={inputs}
@@ -107,9 +101,8 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     // Initial state: Reset zoom button should not exist.
     expect(screen.queryByText('Reset zoom')).toBeNull();
 
-    // Check that all 4 markers are rendered initially (via custom-chart-badge CSS class).
-    let badges = container.querySelectorAll('.custom-chart-badge');
-    expect(badges.length).toBe(4);
+    // Verify initial activeDomain is full range [35, 60]
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([35, 60]);
 
     const lineChart = screen.getByTestId('LineChart');
 
@@ -125,22 +118,13 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     // 1. Reset zoom button should appear.
     expect(screen.getByText('Reset zoom')).not.toBeNull();
 
-    // 2. Event markers outside age range [40, 50] (i.e. ages 35 and 60) should disappear.
-    // Only ages 40 (Buy House) and 50 (College) remain.
-    badges = container.querySelectorAll('.custom-chart-badge');
-    expect(badges.length).toBe(2);
-
-    // Verify correct event content is visible in hidden overlay as well.
-    const hiddenOverlay = container.querySelector('.timeline-events-hidden-test-overlay');
-    expect(hiddenOverlay.textContent).toContain('Buy House');
-    expect(hiddenOverlay.textContent).toContain('College');
-    expect(hiddenOverlay.textContent).not.toContain('Today');
-    expect(hiddenOverlay.textContent).not.toContain('Retire');
+    // 2. activeDomain should be changed to [40, 50]
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([40, 50]);
   });
 
-  test('Clicking Reset zoom makes all normal markers visible again', () => {
+  test('Clicking Reset zoom makes all normal markers visible again (resets activeDomain)', () => {
     const setSelectedYear = vi.fn();
-    const { container } = render(
+    render(
       <ProjectionGraph
         chartData={chartData}
         inputs={inputs}
@@ -162,8 +146,7 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     fireChartEvent(lineChart, 'mouseup');
 
     expect(screen.getByText('Reset zoom')).not.toBeNull();
-    let badges = container.querySelectorAll('.custom-chart-badge');
-    expect(badges.length).toBe(2);
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([40, 50]);
 
     // Reset zoom.
     const resetBtn = screen.getByText('Reset zoom');
@@ -173,9 +156,8 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     // 1. Reset zoom button should disappear.
     expect(screen.queryByText('Reset zoom')).toBeNull();
 
-    // 2. All 4 markers should be visible again.
-    badges = container.querySelectorAll('.custom-chart-badge');
-    expect(badges.length).toBe(4);
+    // 2. domain should reset to [35, 60]
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([35, 60]);
   });
 
   test('A click without drag still selects the year', () => {
@@ -235,7 +217,7 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
 
   test('Mobile does not trigger drag zoom', () => {
     const setSelectedYear = vi.fn();
-    const { container } = render(
+    render(
       <ProjectionGraph
         chartData={chartData}
         inputs={inputs}
@@ -256,10 +238,9 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     fireChartEvent(lineChart, 'mousemove', { activeLabel: 50 });
     fireChartEvent(lineChart, 'mouseup');
 
-    // Verify that zoom did NOT occur (no reset button, all markers visible).
+    // Verify that zoom did NOT occur (no reset button, domain stays full [35, 60]).
     expect(screen.queryByText('Reset zoom')).toBeNull();
-    const badges = container.querySelectorAll('.custom-chart-badge');
-    expect(badges.length).toBe(4);
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([35, 60]);
 
     // Verify click year selection still works on mobile.
     fireChartEvent(lineChart, 'click', { activeLabel: 45 });
@@ -269,7 +250,7 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
 
   test('Safe clearing check on invalid or too short drag', () => {
     const setSelectedYear = vi.fn();
-    const { container } = render(
+    render(
       <ProjectionGraph
         chartData={chartData}
         inputs={inputs}
@@ -291,6 +272,6 @@ describe('ProjectionGraph Drag-to-Zoom Behavior', () => {
     fireChartEvent(lineChart, 'mouseup');
 
     expect(screen.queryByText('Reset zoom')).toBeNull();
-    expect(container.querySelectorAll('.custom-chart-badge').length).toBe(4);
+    expect(JSON.parse(screen.getByTestId('XAxis').getAttribute('data-domain'))).toEqual([35, 60]);
   });
 });

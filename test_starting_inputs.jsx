@@ -23,7 +23,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     expect(screen.getByText('Your Situation')).toBeDefined();
 
     // Verify primary profile row inline badges
-    expect(screen.getByText('35')).toBeDefined();
+    expect(screen.getAllByText('35')[0]).toBeDefined();
     expect(screen.getByText('Single')).toBeDefined();
     expect(screen.getByText('Renting')).toBeDefined();
 
@@ -45,7 +45,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     render(<FireSimulator />);
 
     // Click profile row text '35'
-    fireEvent.click(screen.getByText('35'));
+    fireEvent.click(screen.getAllByText('35')[0]);
 
     // Verify Life Profile modal is open
     expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();

@@ -492,16 +492,22 @@ export const getEventIcon = (evt) => {
     return ''; // neutral endpoint circle only
   }
   if (evt.type?.startsWith('retirementReady')) {
-    return '🎉';
+    return '✓';
   }
   if (evt.type === 'retire') {
-    return '🏖️';
+    return '⭐';
   }
   if (evt.type === 'socialSecurity') {
-    return '💰';
+    return '🎂';
   }
   if (evt.type === 'medicareEligibility') {
     return '🏥';
+  }
+  if (evt.isPromotion || evt.type === 'promotion') {
+    return '📈';
+  }
+  if (evt.icon === '🏖️' || evt.icon === '🏖' || evt.type === 'retirement') {
+    return '🏖';
   }
   return evt.icon || '';
 };

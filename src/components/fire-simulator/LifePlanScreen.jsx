@@ -313,6 +313,30 @@ export default function LifePlanScreen({
   const [activePopover, setActivePopover] = useState(null);
   const [showAdvancedEvents, setShowAdvancedEvents] = useState(false);
   const [isGraphClusterExpanded, setIsGraphClusterExpanded] = useState(false);
+  const [zoomDomain, setZoomDomain] = useState(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  const maxNetWorth = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 0;
+    return Math.max(...chartData.map(d => Math.abs(d.netWorth ?? 0)));
+  }, [chartData]);
+
+  const yAxisWidth =
+    maxNetWorth >= 1e15 ? 95 :
+    maxNetWorth >= 1e12 ? 90 :
+    maxNetWorth >= 1e9 ? 75 :
+    65;
+
+  const chartLayout = useMemo(() => {
+    const margin = { top: 20, right: 10, left: 10, bottom: 5 };
+    return {
+      margin,
+      yAxisWidth,
+      leftPlotOffset: yAxisWidth + margin.left,
+      rightPlotOffset: margin.right,
+    };
+  }, [yAxisWidth]);
+
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -527,6 +551,23 @@ export default function LifePlanScreen({
               isMobile={false}
               draggingInfo={draggingInfo}
               onClusterExpandedChange={setIsGraphClusterExpanded}
+              zoomDomain={zoomDomain}
+              setZoomDomain={setZoomDomain}
+              isZoomed={isZoomed}
+              setIsZoomed={setIsZoomed}
+              chartLayout={chartLayout}
+            />
+
+            <DesktopTimeline
+              inputs={inputs}
+              timelineEvents={timelineEvents}
+              editingEvent={editingEvent}
+              draggingInfo={draggingInfo}
+              dragOccurredRef={dragOccurredRef}
+              handleNodeDragStart={handleNodeDragStart}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
+              chartLayout={chartLayout}
+              activeDomain={zoomDomain ?? [Number(inputs.currentAge) || 35, Number(inputs.lifeExpectancy) || 85]}
             />
 
             {/* Selected Event details card */}
@@ -779,22 +820,7 @@ export default function LifePlanScreen({
 
           </div> {/* closing desktop-right-column */}
         </div> {/* closing desktop-dashboard-grid */}
-        {validation.errors.length === 0 && (
-          <div className="glass-card" style={{ padding: '1.25rem 1.5rem', marginTop: '1rem', marginBottom: '1rem', borderRadius: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              🗺️ Timeline View
-            </h3>
-            <DesktopTimeline
-              inputs={inputs}
-              timelineEvents={timelineEvents}
-              editingEvent={editingEvent}
-              draggingInfo={draggingInfo}
-              dragOccurredRef={dragOccurredRef}
-              handleNodeDragStart={handleNodeDragStart}
-              handleEditRoadmapEvent={handleEditRoadmapEvent}
-            />
-          </div>
-        )}
+
                 <div className="roadmap-grid-layout">
                   
                   {/* Left Column: Plan Story */}

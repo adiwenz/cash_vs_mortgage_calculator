@@ -860,7 +860,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     });
 
     // Find the career/promotion milestone icon
-    const promoTextNode = screen.getAllByText('💼 Career Phase: Promotion (Liam)')[0];
+    const promoTextNode = screen.getAllByText('📈 Career Phase: Promotion (Liam)')[0];
     const promoNode = promoTextNode.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
     expect(promoNode).not.toBeNull();
 

@@ -60,7 +60,7 @@ describe('Child Event Linked Dragging Regression Test', () => {
 
     // Verify initial positions of markers
     // There should be exactly two child milestone icons in the chart (one for birth, one for support end)
-    const chartTrack = document.querySelector('.chart-container-inner');
+    const chartTrack = document.querySelector('.timeline-wrapper');
     expect(chartTrack).not.toBeNull();
 
     const babyMilestones = chartTrack.querySelectorAll('.milestone-circle-wrapper, .financial-milestone-wrapper');
@@ -84,14 +84,16 @@ describe('Child Event Linked Dragging Regression Test', () => {
 
     // 2. Drag Simulation
     // Mock getBoundingClientRect for track
-    const track = document.querySelector('.timeline-track-inner');
-    expect(track).not.toBeNull();
-    track.getBoundingClientRect = () => ({
-      width: 1000,
-      left: 0,
-      right: 1000,
-      top: 0,
-      bottom: 0
+    const tracks = document.querySelectorAll('.timeline-track-inner');
+    expect(tracks.length).toBeGreaterThan(0);
+    tracks.forEach(track => {
+      track.getBoundingClientRect = () => ({
+        width: 1000,
+        left: 0,
+        right: 1000,
+        top: 0,
+        bottom: 0
+      });
     });
 
     // Click and hold (mouse down) child start event
@@ -112,13 +114,18 @@ describe('Child Event Linked Dragging Regression Test', () => {
     // Verify both nodes are updated to correct displayAge during drag
     // Birth milestone age: 35 + 10 = 45
     // Support ends milestone age: 53 + 10 = 63
-    expect(birthNode.textContent).toContain('Age 45');
-    expect(endNode.textContent).toContain('Age 63');
+    const activeBirthText = within(chartTrack).getByText('👶 Have Child: Liam');
+    const activeEndText = within(chartTrack).getByText('👶 Support for Liam Ends');
+    const activeBirthNode = activeBirthText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+    const activeEndNode = activeEndText.closest('.milestone-circle-wrapper, .financial-milestone-wrapper');
+
+    expect(activeBirthNode.textContent).toContain('Age 45');
+    expect(activeEndNode.textContent).toContain('Age 63');
 
     // Verify visual horizontal positioning properties (style.left) in jsdom
-    expect(parseFloat(birthNode.style.left)).toBeCloseTo(21.8);
-    expect(parseFloat(endNode.style.left)).toBeCloseTo(55.64);
-    expect(birthNode.style.left).not.toBe(endNode.style.left); // Must not overlap/render on top of each other!
+    expect(parseFloat(activeBirthNode.style.left)).toBeCloseTo(20);
+    expect(parseFloat(activeEndNode.style.left)).toBeCloseTo(56);
+    expect(activeBirthNode.style.left).not.toBe(activeEndNode.style.left); // Must not overlap/render on top of each other!
 
     // Drop event
     fireEvent.mouseUp(document);

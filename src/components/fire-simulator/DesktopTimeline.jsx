@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import { getActiveChildrenCountAtAge, propPIAmount } from '../../simulatorMathUtils';
-import { formatCurrency, isEditableEvent, isFinancialEvent, formatCompactCurrency } from './helpers';
+import { formatCurrency, isEditableEvent, isFinancialEvent, formatCompactCurrency, getEventIcon } from './helpers';
 
 export default function DesktopTimeline({
   inputs,
@@ -8,9 +9,25 @@ export default function DesktopTimeline({
   draggingInfo,
   dragOccurredRef,
   handleNodeDragStart,
-  handleEditRoadmapEvent
+  handleEditRoadmapEvent,
+  chartLayout: propsChartLayout,
+  activeDomain
 }) {
-  const totalYears = inputs.lifeExpectancy - inputs.currentAge;
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const isExpanded = localIsExpanded;
+
+  // Default fallback if not provided (e.g. in test rendering)
+  const chartLayout = propsChartLayout || {
+    margin: { top: 20, right: 10, left: 10, bottom: 5 },
+    yAxisWidth: 65,
+    leftPlotOffset: 75,
+    rightPlotOffset: 10
+  };
+
+  const minAge = activeDomain ? activeDomain[0] : inputs.currentAge;
+  const maxAge = activeDomain ? activeDomain[1] : inputs.lifeExpectancy;
+  const totalYears = maxAge - minAge;
+
   if (totalYears <= 0) return null;
 
   // Compile active commitments (homeownership, childcare, marriage, etc.)
@@ -91,44 +108,88 @@ export default function DesktopTimeline({
   }
 
   return (
-    <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0 }}>
-      <div className="timeline-grid" style={{ minWidth: '850px' }}>
+    <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0, padding: '0.5rem 0' }}>
+      {/* Expand/Collapse Toggle Header */}
+      <div 
+        onClick={() => setLocalIsExpanded(!isExpanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          cursor: 'pointer',
+          fontSize: '0.75rem',
+          fontWeight: '700',
+          color: 'var(--text-secondary)',
+          userSelect: 'none',
+          marginBottom: '0.25rem',
+          marginLeft: `${chartLayout.leftPlotOffset}px`,
+          width: 'fit-content',
+          transition: 'color 150ms ease'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+      >
+        <span>Timeline</span>
+        <span>{isExpanded ? '▼' : '▶'}</span>
+      </div>
+
+      <div className="timeline-grid" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: isExpanded ? '0.75rem' : '0.25rem' }}>
         
         {/* Layer 1: MILESTONES / EVENTS */}
-        <div className="timeline-row">
-          <div className="timeline-row-label">
-            <span style={{ fontWeight: 700 }}>Events</span>
-          </div>
-          <div className="timeline-row-content events-row-content">
-            <div className="timeline-track-inner">
-              <div className="events-axis-line" />
+        <div className="timeline-row" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: 'none' }}>
+          {isExpanded ? (
+            <div style={{ 
+              width: `${chartLayout.leftPlotOffset}px`, 
+              minWidth: `${chartLayout.leftPlotOffset}px`, 
+              paddingRight: '12px', 
+              textAlign: 'right', 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              alignItems: 'center',
+              fontSize: '0.7rem', 
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.05em'
+            }}>
+              Events
+            </div>
+          ) : (
+            <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
+          )}
+          
+          <div className="timeline-row-content events-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: isExpanded ? '140px' : '45px', position: 'relative' }}>
+            <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <div className="events-axis-line" style={{ bottom: '16px', left: 0, right: 0 }} />
               
               {/* Today Pin */}
-              <div
-                className="financial-milestone-wrapper today-pin"
-                style={{
-                  left: '0%',
-                  bottom: '16px',
-                  zIndex: 100
-                }}
-              >
-                <div 
-                  className="financial-milestone-dot today-dot" 
-                  style={{ 
-                    background: 'var(--primary, #6366f1)', 
-                    color: '#fff', 
-                    fontSize: '0.62rem', 
-                    padding: '0.12rem 0.35rem', 
-                    borderRadius: '4px', 
-                    height: 'auto', 
-                    width: 'auto', 
-                    fontWeight: '800',
-                    boxShadow: 'var(--shadow-sm)'
+              {inputs.currentAge >= minAge && inputs.currentAge <= maxAge && (
+                <div
+                  className="financial-milestone-wrapper today-pin"
+                  style={{
+                    left: `${((inputs.currentAge - minAge) / totalYears) * 100}%`,
+                    bottom: '16px',
+                    zIndex: 100
                   }}
                 >
-                  📍 TODAY
+                  <div 
+                    className="financial-milestone-dot today-dot" 
+                    style={{ 
+                      background: 'var(--primary, #6366f1)', 
+                      color: '#fff', 
+                      fontSize: '0.62rem', 
+                      padding: '0.12rem 0.35rem', 
+                      borderRadius: '4px', 
+                      height: 'auto', 
+                      width: 'auto', 
+                      fontWeight: '800',
+                      boxShadow: 'var(--shadow-sm)'
+                    }}
+                  >
+                    📍 TODAY
+                  </div>
                 </div>
-              </div>
+              )}
 
               {timelineEvents.map((evt, idx) => {
                 const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
@@ -154,9 +215,14 @@ export default function DesktopTimeline({
                   }
                   return evt.age;
                 })();
-                const percent = totalYears > 0 ? ((displayAge - inputs.currentAge) / totalYears) * 100 : 0;
+
+                if (displayAge < minAge || displayAge > maxAge) return null;
+
+                const percent = totalYears > 0 ? ((displayAge - minAge) / totalYears) * 100 : 0;
                 const isFinancial = isFinancialEvent(evt);
                 const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
+
+                const bottomPos = isExpanded ? (16 + (evt.stackIndex * 38)) : 16;
 
                 if (isFinancial) {
                   return (
@@ -165,7 +231,7 @@ export default function DesktopTimeline({
                       className={`financial-milestone-wrapper ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
-                        bottom: `${16 + (evt.stackIndex * 38)}px`
+                        bottom: `${bottomPos}px`
                       }}
                       onMouseDown={(e) => handleNodeDragStart(e, evt)}
                       onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -180,13 +246,13 @@ export default function DesktopTimeline({
                       }}
                     >
                       <div className="financial-milestone-dot">
-                        {evt.icon}
+                        {getEventIcon(evt)}
                       </div>
 
                       {/* Tooltip on hover */}
                       <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
                         <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                          {evt.icon} {evt.title}
+                          {getEventIcon(evt)} {evt.title}
                         </div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
                           <div>Age {Math.floor(displayAge)} • {evt.description}</div>
@@ -214,21 +280,20 @@ export default function DesktopTimeline({
                       </div>
 
                       {/* Line connector down to axis */}
-                      {evt.stackIndex > 0 && (
+                      {isExpanded && evt.stackIndex > 0 && (
                         <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
                       )}
                     </div>
                   );
                 } else {
                   const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
-                  const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
                   return (
                     <div
                       key={idx}
                       className={`milestone-circle-wrapper ${wrapperClass} ${isDraggingThis ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
                         left: `${percent}%`,
-                        bottom: `${16 + (evt.stackIndex * 38)}px`
+                        bottom: `${bottomPos}px`
                       }}
                       onMouseDown={(e) => handleNodeDragStart(e, evt)}
                       onTouchStart={(e) => handleNodeDragStart(e, evt)}
@@ -243,13 +308,13 @@ export default function DesktopTimeline({
                       }}
                     >
                       <div className="milestone-glow-circle">
-                        {evt.icon}
+                        {getEventIcon(evt)}
                       </div>
 
                       {/* Tooltip on hover */}
                       <div className={`timeline-tooltip ${percent < 20 ? 'align-left' : percent > 80 ? 'align-right' : ''}`}>
                         <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                          {evt.icon} {evt.title}
+                          {getEventIcon(evt)} {evt.title}
                         </div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
                           <div>Age {Math.floor(displayAge)} • {evt.description}</div>
@@ -298,7 +363,7 @@ export default function DesktopTimeline({
                       </div>
 
                       {/* Line connector down to axis */}
-                      {evt.stackIndex > 0 && (
+                      {isExpanded && evt.stackIndex > 0 && (
                         <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 38}px`, bottom: `-${evt.stackIndex * 38}px`, left: '50%', transform: 'translateX(-50%)' }} />
                       )}
                     </div>
@@ -310,59 +375,138 @@ export default function DesktopTimeline({
         </div>
 
         {/* Layer 2: DECISION PHASES (MARRIAGE, CHILDCARE, HOMEOWNERSHIP) */}
-        <div className="timeline-row phases-row">
-          <div className="timeline-row-label">
-            <span style={{ fontWeight: 700 }}>Commitments</span>
-          </div>
-          <div className="timeline-row-content phases-row-content">
-            <div className="timeline-track-inner" style={{ height: '36px' }}>
-              {activeCommitments.map(span => {
-                const startPercent = Math.max(0, ((span.startAge - inputs.currentAge) / totalYears) * 100);
-                const endPercent = Math.min(100, ((span.endAge - inputs.currentAge) / totalYears) * 100);
-                const widthPercent = Math.max(2, endPercent - startPercent);
+        {isExpanded && activeCommitments.length > 0 && (
+          <div className="timeline-row phases-row" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: 'none' }}>
+            <div style={{ 
+              width: `${chartLayout.leftPlotOffset}px`, 
+              minWidth: `${chartLayout.leftPlotOffset}px`, 
+              paddingRight: '12px', 
+              textAlign: 'right', 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              alignItems: 'center',
+              fontSize: '0.7rem', 
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.05em'
+            }}>
+              Commitments
+            </div>
+            <div className="timeline-row-content phases-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '36px', position: 'relative' }}>
+              <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
+                {activeCommitments.map(span => {
+                  const startAge = Math.max(minAge, span.startAge);
+                  const endAge = Math.min(maxAge, span.endAge);
+                  if (startAge >= endAge || endAge <= minAge || startAge >= maxAge) return null;
 
-                return (
-                  <div
-                    key={span.id}
-                    className={span.className}
-                    style={{
-                      left: `${startPercent}%`,
-                      width: `${widthPercent}%`
-                    }}
-                  >
-                    <span className="commitment-text">
-                      {span.emoji} {span.label} (Ages {Math.floor(span.startAge)}–{Math.floor(span.endAge)})
-                    </span>
-                  </div>
-                );
-              })}
+                  const startPercent = Math.max(0, ((startAge - minAge) / totalYears) * 100);
+                  const endPercent = Math.min(100, ((endAge - minAge) / totalYears) * 100);
+                  const widthPercent = Math.max(2, endPercent - startPercent);
+
+                  return (
+                    <div
+                      key={span.id}
+                      className={span.className}
+                      style={{
+                        left: `${startPercent}%`,
+                        width: `${widthPercent}%`
+                      }}
+                    >
+                      <span className="commitment-text">
+                        {span.emoji} {span.label} (Ages {Math.floor(span.startAge)}–{Math.floor(span.endAge)})
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Layer 3: AXIS LABELS */}
-        <div className="timeline-row axis-row" style={{ borderBottom: 'none' }}>
-          <div className="timeline-row-label" style={{ visibility: 'hidden' }}>Age</div>
-          <div className="timeline-row-content axis-row-content">
-            <div className="timeline-track-inner" style={{ height: '24px' }}>
-              <div className="axis-line" />
+        <div className="timeline-row axis-row" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: 'none' }}>
+          {isExpanded ? (
+            <div style={{ 
+              width: `${chartLayout.leftPlotOffset}px`, 
+              minWidth: `${chartLayout.leftPlotOffset}px`, 
+              paddingRight: '12px', 
+              textAlign: 'right', 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              alignItems: 'center',
+              fontSize: '0.7rem', 
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.05em'
+            }}>
+              Age
+            </div>
+          ) : (
+            <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
+          )}
+          <div className="timeline-row-content axis-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: '32px', position: 'relative' }}>
+            <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <div 
+                className="axis-line" 
+                style={{ 
+                  position: 'absolute', 
+                  top: '0px', 
+                  left: 0, 
+                  right: 0, 
+                  height: '1px', 
+                  background: 'var(--border-color)' 
+                }} 
+              />
               {(() => {
                 const labels = [];
                 const step = totalYears > 30 ? 5 : 2;
-                const roundedStart = Math.ceil(inputs.currentAge / step) * step;
+                const roundedStart = Math.ceil(minAge / step) * step;
                 
-                for (let age = roundedStart; age <= inputs.lifeExpectancy; age += step) {
-                  const percent = ((age - inputs.currentAge) / totalYears) * 100;
+                for (let age = roundedStart; age <= maxAge; age += step) {
+                  const percent = ((age - minAge) / totalYears) * 100;
+                  const isMajorTick = age % 10 === 0;
                   labels.push(
-                    <div key={age} className="axis-label-tick" style={{ left: `${percent}%` }}>
-                      <div className="tick-mark" />
-                      <span className="tick-label-text">Age {age}</span>
+                    <div 
+                      key={age} 
+                      className="timeline-tick-new" 
+                      style={{ left: `${percent}%`, top: '0px' }}
+                    >
+                      <div 
+                        className="timeline-tick-mark-new" 
+                        style={{
+                          height: isMajorTick ? '8px' : '4px',
+                          background: isMajorTick ? 'var(--text-secondary, #4b5563)' : 'var(--border-color)',
+                          opacity: isMajorTick ? 1 : 0.8
+                        }}
+                      />
+                      <span 
+                        className="timeline-tick-label-new"
+                        style={{
+                          fontWeight: isMajorTick ? '700' : '600',
+                          color: isMajorTick ? 'var(--text-secondary)' : 'var(--text-tertiary)',
+                          fontSize: '0.7rem',
+                          marginTop: '2px',
+                          display: 'block'
+                        }}
+                      >
+                        {age}
+                      </span>
                     </div>
                   );
                 }
                 return labels;
               })()}
             </div>
+          </div>
+        </div>
+
+        {/* Centered Age Label row below the ticks */}
+        <div style={{ display: 'flex', width: '100%', marginTop: '0.15rem' }}>
+          <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
+          <div style={{ flexGrow: 1, marginRight: `${chartLayout.rightPlotOffset}px`, textAlign: 'center', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-tertiary)' }}>
+            Age
           </div>
         </div>
 
