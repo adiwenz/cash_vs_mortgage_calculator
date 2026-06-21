@@ -71,7 +71,8 @@ export default function DesktopBudgetPanel({
   handleClearWants,
   handleClearSavings,
   budgetScalingMode,
-  handleToggleBudgetScalingMode
+  handleToggleBudgetScalingMode,
+  budgetShortfall
 }) {
   const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
@@ -566,7 +567,12 @@ export default function DesktopBudgetPanel({
 
           {/* Status Banner */}
           <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
-            {Math.abs(remainingBalance) <= 1 ? (
+            {budgetShortfall > 0 ? (
+              <div style={{ fontSize: '0.8rem', color: 'var(--accent-rose, #ef4444)', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem 1rem', borderRadius: '6px', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span style={{ color: 'var(--accent-rose, #ef4444)', fontSize: '0.9rem' }}>⚠️ Budget Shortfall: {formatCurrency(budgetShortfall)}/mo</span>
+                <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Required obligations exceed your monthly income. Wants and flexible Needs have been reduced to $0.</span>
+              </div>
+            ) : Math.abs(remainingBalance) <= 1 ? (
               <div style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.5rem 0.75rem', borderRadius: '6px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 ✅ You’re on track. You’re saving {activeSavingsRate}% of your income.
               </div>
