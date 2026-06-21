@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
-import { calculateUSTaxForModal, getRetirementLimit, capMonthlyContribution } from '../../simulatorMathUtils';
+import { calculateUSTaxForModal, getRetirementLimit, capMonthlyContribution, roundCurrency } from '../../simulatorMathUtils';
 import { formatCurrency } from './helpers';
 import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 import DesktopBudgetPanel from './DesktopBudgetPanel';
@@ -127,7 +127,7 @@ export default function BudgetModal({
 
   const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
   const isMarriedMode = isBudgetOpenFromMarriageWizard ? true : (activePhaseObj ? !!activePhaseObj.isMarried : !!marriageEvent);
-  const partnerMonthlyIncome = isMarriedMode ? Math.round(Number(marriageEvent?.spouseIncome || activePhaseObj?.spouseIncome || 0) / 12) : 0;
+  const partnerMonthlyIncome = isMarriedMode ? roundCurrency(Number(marriageEvent?.spouseIncome || activePhaseObj?.spouseIncome || 0) / 12) : 0;
   const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
 
   const totalExpensesMonthly = Object.values(budgetExpenses).reduce((sum, val) => sum + val, 0);
@@ -171,9 +171,9 @@ export default function BudgetModal({
     if (isRetirementPhase) {
       baseSalaryMonthly = activePhaseObj.ssMonthlyIncome || 0;
     } else if (rawIncomeItem) {
-      baseSalaryMonthly = Math.round(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
+      baseSalaryMonthly = roundCurrency(rawIncomeItem.frequency === 'monthly' ? Number(rawIncomeItem.amount) : Number(rawIncomeItem.amount) / 12);
     } else {
-      baseSalaryMonthly = Math.round((Number(inputs.simpleIncome) || 50000) / 12);
+      baseSalaryMonthly = roundCurrency((Number(inputs.simpleIncome) || 50000) / 12);
     }
     activeChildBoost = Math.max(0, budgetMonthlyIncome - baseSalaryMonthly);
   }
@@ -194,13 +194,13 @@ export default function BudgetModal({
   const filingStatusForModal = isMarriedMode ? (marriageEvent.filingStatus || 'jointly') : budgetFilingStatus;
 
   const est401kMonthly = savingsAllocMode === 'percentSurplus' 
-    ? Math.round(surplusMonthly * ((budgetSavings.trad401k || 0) / 100)) 
+    ? roundCurrency(surplusMonthly * ((budgetSavings.trad401k || 0) / 100)) 
     : (budgetSavings.trad401k || 0);
   const estTradIraMonthly = savingsAllocMode === 'percentSurplus' 
-    ? Math.round(surplusMonthly * ((budgetSavings.tradIra || 0) / 100)) 
+    ? roundCurrency(surplusMonthly * ((budgetSavings.tradIra || 0) / 100)) 
     : (budgetSavings.tradIra || 0);
   const estHsaMonthly = savingsAllocMode === 'percentSurplus' 
-    ? Math.round(surplusMonthly * ((budgetSavings.hsa || 0) / 100)) 
+    ? roundCurrency(surplusMonthly * ((budgetSavings.hsa || 0) / 100)) 
     : (budgetSavings.hsa || 0);
 
   const limit401k = getRetirementLimit('401k', userAge, filingStatusForModal);
@@ -213,9 +213,9 @@ export default function BudgetModal({
   let preTaxDeductionsAnnual = capped401k + cappedTradIra + cappedHsa;
 
   if (isMarriedMode) {
-    const estPartner401k = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.trad401k || 0) / 100)) : (budgetPartnerSavings.trad401k || 0);
-    const estPartnerTradIra = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.tradIra || 0) / 100)) : (budgetPartnerSavings.tradIra || 0);
-    const estPartnerHsa = savingsAllocMode === 'percentSurplus' ? Math.round(surplusMonthly * ((budgetPartnerSavings.hsa || 0) / 100)) : (budgetPartnerSavings.hsa || 0);
+    const estPartner401k = savingsAllocMode === 'percentSurplus' ? roundCurrency(surplusMonthly * ((budgetPartnerSavings.trad401k || 0) / 100)) : (budgetPartnerSavings.trad401k || 0);
+    const estPartnerTradIra = savingsAllocMode === 'percentSurplus' ? roundCurrency(surplusMonthly * ((budgetPartnerSavings.tradIra || 0) / 100)) : (budgetPartnerSavings.tradIra || 0);
+    const estPartnerHsa = savingsAllocMode === 'percentSurplus' ? roundCurrency(surplusMonthly * ((budgetPartnerSavings.hsa || 0) / 100)) : (budgetPartnerSavings.hsa || 0);
 
     const partnerLimit401k = getRetirementLimit('401k', spouseAge, filingStatusForModal);
     const partnerLimitTradIra = getRetirementLimit('traditionalIRA', spouseAge, filingStatusForModal);
@@ -230,15 +230,15 @@ export default function BudgetModal({
   const annualTax = inputs.includeTaxes
     ? calculateUSTaxForModal(combinedIncome * 12, preTaxDeductionsAnnual, filingStatusForModal)
     : 0;
-  const monthlyTax = Math.round(annualTax / 12);
+  const monthlyTax = roundCurrency(annualTax / 12);
   
   const userSavingsMonthly = savingsAllocMode === 'percentSurplus'
-    ? Math.round(surplusMonthly * (totalUserAllocationPct / 100))
+    ? roundCurrency(surplusMonthly * (totalUserAllocationPct / 100))
     : Object.values(budgetSavings).reduce((sum, val) => sum + val, 0);
 
   const partnerSavingsMonthly = isMarriedMode 
     ? (savingsAllocMode === 'percentSurplus'
-       ? Math.round(surplusMonthly * (totalPartnerAllocationPct / 100))
+       ? roundCurrency(surplusMonthly * (totalPartnerAllocationPct / 100))
        : Object.values(budgetPartnerSavings).reduce((sum, val) => sum + val, 0))
     : 0;
 
@@ -348,7 +348,7 @@ export default function BudgetModal({
           const val = newPartnerSavings[key] || 0;
           if (val > 0) {
             const reduceAmount = Math.min(val, deficitAmount);
-            newPartnerSavings[key] = Math.max(0, Math.round(val - reduceAmount));
+            newPartnerSavings[key] = Math.max(0, roundCurrency(val - reduceAmount));
             deficitAmount -= reduceAmount;
             if (deficitAmount <= 0) break;
           }
@@ -359,7 +359,7 @@ export default function BudgetModal({
           const currentVal = newSavings[key] || 0;
           if (currentVal > 0) {
             const reduceAmount = Math.min(currentVal, deficitAmount);
-            newSavings[key] = Math.max(0, Math.round(currentVal - reduceAmount));
+            newSavings[key] = Math.max(0, roundCurrency(currentVal - reduceAmount));
             deficitAmount -= reduceAmount;
             if (deficitAmount <= 0) break;
           }
@@ -425,9 +425,9 @@ export default function BudgetModal({
     const factor = Math.max(0, (wantsTotal - deficit) / wantsTotal);
     setBudgetExpenses(prev => ({
       ...prev,
-      leisure: Math.round((prev.leisure || 0) * factor),
-      diningOut: Math.round((prev.diningOut || 0) * factor),
-      misc: Math.round((prev.misc || 0) * factor)
+      leisure: roundCurrency((prev.leisure || 0) * factor),
+      diningOut: roundCurrency((prev.diningOut || 0) * factor),
+      misc: roundCurrency((prev.misc || 0) * factor)
     }));
   };
 

@@ -67,7 +67,7 @@ describe('Clear Budget Allocations Feature', () => {
 
     // Dining Out starts at 200
     const diningOutInput = getInputByWrapperText(/Dining Out/i);
-    expect(diningOutInput.value).toBe('200');
+    expect(diningOutInput.value).toBe('199.90');
 
     // Click "Clear"
     const clearWantsBtn = screen.getByRole('button', { name: /^Clear$/i });

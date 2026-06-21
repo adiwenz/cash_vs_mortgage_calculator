@@ -20,7 +20,7 @@ try {
   const needsSum1 = (exp1.housing || 0) + (exp1.utilities || 0) + (exp1.food || 0) + (exp1.transportation || 0) + (exp1.healthcare || 0);
 
   expect(needsSum1).toBe(2900);
-  expect(wantsSum1).toBe(434);
+  expect(Math.round(wantsSum1 * 100) / 100).toBe(433.34);
   expect(sync1.autoReducedBudget).toBe(true);
   expect(sync1.reducedWants).toBe(true);
   expect(sync1.reducedNeeds).toBe(false);
@@ -38,7 +38,7 @@ try {
   const needsSum2 = (exp2.housing || 0) + (exp2.utilities || 0) + (exp2.food || 0) + (exp2.transportation || 0) + (exp2.healthcare || 0);
 
   expect(wantsSum2).toBe(0);
-  expect(needsSum2).toBe(2083);
+  expect(Math.round(needsSum2 * 100) / 100).toBe(2083.33);
   expect(sync2.autoReducedBudget).toBe(true);
   expect(sync2.reducedWants).toBe(true);
   expect(sync2.reducedNeeds).toBe(true);
@@ -58,7 +58,7 @@ try {
 
   expect(wantsSum3).toBe(0);
   expect(needsSum3).toBe(0);
-  expect(savingsSum3).toBe(4167);
+  expect(Math.round(savingsSum3 * 100) / 100).toBe(4166.67);
   expect(sync3.autoReducedBudget).toBe(true);
   expect(sync3.isFullSavingsRate).toBe(true);
   console.log('✅ Test Case 3 passed: 100% savings sets Needs/Wants to $0.');

@@ -282,7 +282,7 @@ describe('Budget Phases Financial States', () => {
     const age41 = results.nominalData.find(d => d.age === 41);
     const age42 = results.nominalData.find(d => d.age === 42);
 
-    expect(Math.round(age39.income)).toBe(56280);
+    expect(Math.round(age39.income)).toBe(56275);
     expect(Math.round(age40.income)).toBe(150000);
     expect(Math.round(age41.income)).toBe(154500);
     expect(Math.round(age42.income)).toBe(159135);

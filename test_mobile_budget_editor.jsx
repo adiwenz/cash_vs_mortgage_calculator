@@ -98,7 +98,7 @@ describe('Mobile Budget Phase Editor', () => {
 
     const leisureWrapper = screen.getByText('Leisure & Travel');
     const leisureInput = leisureWrapper.closest('div').querySelector('input');
-    expect(leisureInput.value).toBe('300');
+    expect(leisureInput.value).toBe('299.84');
     fireEvent.change(leisureInput, { target: { value: '500' } });
     
     // Tap Done
@@ -109,7 +109,7 @@ describe('Mobile Budget Phase Editor', () => {
       expect(screen.queryByRole('heading', { name: /Wants Allocation/i })).toBeNull();
     });
     
-    expect(screen.getAllByText('$842/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$841.83/mo')[0]).toBeDefined();
 
     // Tapping Savings opens Savings fixed sheet
     const savingsRow = screen.getByText('Brokerage, cash, retirement');
@@ -146,7 +146,7 @@ describe('Mobile Budget Phase Editor', () => {
     fireEvent.click(editBtnRef);
 
     expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
-    expect(screen.getAllByText('$842/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$841.83/mo')[0]).toBeDefined();
     expect(screen.getAllByText('$1,000/mo')[0]).toBeDefined();
 
     // Now test Cancel functionality

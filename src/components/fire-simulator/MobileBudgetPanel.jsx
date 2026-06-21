@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatCurrency, formatCompactCurrency, clampMoneyValue, clampPercentageValue } from './helpers';
-import { getRetirementLimit } from '../../simulatorMathUtils';
+import { getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
 import { NumberInput } from '../ui/PlainInputs';
 import { syncBudgetDetails } from '../../calculators/fire/index.js';
 
@@ -64,10 +64,10 @@ export default function MobileBudgetPanel({
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
   const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
   const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
-    ? Math.round(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
+    ? roundCurrency(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
     : (budgetSavings.brokerage || 0);
   const estPartnerBrokerageMonthly = savingsAllocMode === 'percentSurplus'
-    ? Math.round(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
+    ? roundCurrency(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
     : (budgetPartnerSavings.brokerage || 0);
 
   return (

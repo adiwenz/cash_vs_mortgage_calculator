@@ -3,12 +3,19 @@ import formatCompactCurrency, { formatCompactFinancial } from '../../utils/forma
 export { formatCompactCurrency, formatCompactFinancial };
 
 export const formatCurrency = (val) => {
+  if (val === null || val === undefined || isNaN(val) || val === '') return '';
+  const numVal = Number(val);
+  const rounded = Math.round(numVal * 100) / 100;
+  const hasCents = rounded % 1 !== 0;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0
-  }).format(val);
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0
+  }).format(rounded);
 };
+
+export const formatBudgetCurrency = formatCurrency;
 
 export const clampMoneyValue = (val) => {
   if (val === null || val === undefined || val === '') return null;

@@ -39,6 +39,30 @@ const makeFakeEvent = (value, name) => ({
   }
 });
 
+export function formatBudgetCurrency(val) {
+  if (val === null || val === undefined || isNaN(val) || val === '') return '';
+  const numVal = Number(val);
+  const rounded = Math.round(numVal * 100) / 100;
+  const hasCents = rounded % 1 !== 0;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0
+  }).format(rounded);
+}
+
+export const formatBudgetNumber = (val) => {
+  if (val === null || val === undefined || isNaN(val) || val === '') return '';
+  const numVal = Number(val);
+  const rounded = Math.round(numVal * 100) / 100;
+  const hasCents = rounded % 1 !== 0;
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0
+  }).format(rounded);
+};
+
 export function CurrencyInput({
   value,
   onChange,
@@ -51,6 +75,7 @@ export function CurrencyInput({
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState('');
   const [prevValue, setPrevValue] = useState(value);
+  const [isPasting, setIsPasting] = useState(false);
 
   if (value !== prevValue) {
     setPrevValue(value);
@@ -75,9 +100,21 @@ export function CurrencyInput({
 
   const handleBlur = (e) => {
     setIsEditing(false);
-    const parsed = parseRawString(localValue);
+    let rawStr = parseRawString(localValue);
+    const parsedNum = parseFloat(rawStr);
+    if (Number.isFinite(parsedNum)) {
+      const rounded = Math.round(parsedNum * 100) / 100;
+      if (rounded % 1 === 0) {
+        rawStr = rounded.toString();
+      } else {
+        rawStr = rounded.toFixed(2);
+      }
+    } else {
+      rawStr = '';
+    }
+    setLocalValue(rawStr);
     if (onChange) {
-      onChange(makeFakeEvent(parsed, props.name));
+      onChange(makeFakeEvent(rawStr, props.name));
     }
     if (props.onBlur) {
       props.onBlur(e);
@@ -86,11 +123,30 @@ export function CurrencyInput({
 
   const handleChange = (e) => {
     const val = e.target.value;
+    
+    // Allow digits, a single decimal point, and at most 2 digits after the decimal point
+    const isValidPattern = /^-?\d*\.?\d*$/.test(val);
+    if (!isValidPattern) return;
+
+    const hasThreeOrMoreDecimals = /\.\d{3,}$/.test(val);
+    const prevHasTwoDecimals = /\.\d{2}$/.test(localValue);
+    const isLengthDiffOne = Math.abs(val.length - localValue.length) === 1;
+    const isTyping = isLengthDiffOne && prevHasTwoDecimals;
+
+    if (hasThreeOrMoreDecimals && isTyping && !isPasting) {
+      return;
+    }
+
     setLocalValue(val);
     const parsed = parseRawString(val);
     if (onChange) {
       onChange(makeFakeEvent(parsed, props.name));
     }
+  };
+
+  const handlePaste = () => {
+    setIsPasting(true);
+    setTimeout(() => setIsPasting(false), 0);
   };
 
   const handleKeyDown = (e) => {
@@ -106,7 +162,7 @@ export function CurrencyInput({
     ? localValue 
     : (useCompact && value !== null && value !== undefined && value !== '' && Math.abs(Number(value)) >= 1000000
         ? formatCompactCurrency(value) 
-        : formatCurrency(value));
+        : formatBudgetCurrency(value));
 
   return (
     <input
@@ -119,6 +175,7 @@ export function CurrencyInput({
       onFocus={handleFocus}
       onBlur={handleBlur}
       onChange={handleChange}
+      onPaste={handlePaste}
       onKeyDown={handleKeyDown}
     />
   );
@@ -236,6 +293,7 @@ export function NumberInput({
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState('');
   const [prevValue, setPrevValue] = useState(value);
+  const [isPasting, setIsPasting] = useState(false);
 
   if (value !== prevValue) {
     setPrevValue(value);
@@ -260,9 +318,21 @@ export function NumberInput({
 
   const handleBlur = (e) => {
     setIsEditing(false);
-    const parsed = parseRawString(localValue);
+    let rawStr = parseRawString(localValue);
+    const parsedNum = parseFloat(rawStr);
+    if (Number.isFinite(parsedNum)) {
+      const rounded = Math.round(parsedNum * 100) / 100;
+      if (rounded % 1 === 0) {
+        rawStr = rounded.toString();
+      } else {
+        rawStr = rounded.toFixed(2);
+      }
+    } else {
+      rawStr = '';
+    }
+    setLocalValue(rawStr);
     if (onChange) {
-      onChange(makeFakeEvent(parsed, props.name));
+      onChange(makeFakeEvent(rawStr, props.name));
     }
     if (props.onBlur) {
       props.onBlur(e);
@@ -271,11 +341,30 @@ export function NumberInput({
 
   const handleChange = (e) => {
     const val = e.target.value;
+    
+    // Allow digits, a single decimal point, and at most 2 digits after the decimal point
+    const isValidPattern = /^-?\d*\.?\d*$/.test(val);
+    if (!isValidPattern) return;
+
+    const hasThreeOrMoreDecimals = /\.\d{3,}$/.test(val);
+    const prevHasTwoDecimals = /\.\d{2}$/.test(localValue);
+    const isLengthDiffOne = Math.abs(val.length - localValue.length) === 1;
+    const isTyping = isLengthDiffOne && prevHasTwoDecimals;
+
+    if (hasThreeOrMoreDecimals && isTyping && !isPasting) {
+      return;
+    }
+
     setLocalValue(val);
     const parsed = parseRawString(val);
     if (onChange) {
       onChange(makeFakeEvent(parsed, props.name));
     }
+  };
+
+  const handlePaste = () => {
+    setIsPasting(true);
+    setTimeout(() => setIsPasting(false), 0);
   };
 
   const handleKeyDown = (e) => {
@@ -291,7 +380,7 @@ export function NumberInput({
     ? localValue 
     : (useCompact && value !== null && value !== undefined && value !== '' && Math.abs(Number(value)) >= 1000000
         ? formatCompactCurrency(value).replace('$', '') 
-        : formatNumber(value));
+        : formatBudgetNumber(value));
 
   return (
     <input
@@ -304,6 +393,7 @@ export function NumberInput({
       onFocus={handleFocus}
       onBlur={handleBlur}
       onChange={handleChange}
+      onPaste={handlePaste}
       onKeyDown={handleKeyDown}
     />
   );

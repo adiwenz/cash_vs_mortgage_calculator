@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs';
 import { syncBudgetDetails } from '../../../calculators/fire/index.js';
+import { roundCurrency } from '../../../simulatorMathUtils';
 
 export function useScenarioState() {
   const [scenarios, setScenarios] = useState([
@@ -55,7 +56,7 @@ export function useScenarioState() {
 
               const newP = {
                 ...p,
-                income: Math.round(phaseIncome / 12),
+                income: roundCurrency(phaseIncome / 12),
                 expenses: syncedPhase.budgetDetails.expenses,
                 savings: syncedPhase.budgetDetails.savings,
                 partnerSavings: syncedPhase.budgetDetails.partnerSavings,

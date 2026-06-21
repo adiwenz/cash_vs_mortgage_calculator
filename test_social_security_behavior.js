@@ -202,9 +202,9 @@ try {
   ssEvCalc.useEarnings = true;
 
   const resultsCalc = runFireSimulation(inputsCalculated);
-  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
+  expect(resultsCalc.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.57, 0);
   const age67Calc = resultsCalc.deflatedData.find(d => d.age === 67);
-  expect(age67Calc.income).toBeCloseTo(24951.84, -1);
+  expect(age67Calc.income).toBeCloseTo(24950.57, -1);
 
   // 6c. Increasing income increases AIME and Social Security benefit
   const inputsHigherIncome = getMappedDefaultInputs();
@@ -220,7 +220,7 @@ try {
   // PIA = 1286 * 0.90 + (7749 - 1286) * 0.32 + (8333 - 7749) * 0.15 = 1157.4 + 2068.16 + 87.60 = $3313.16/mo
   // Annual benefit = 3313.16 * 12 = $39,757.92
   expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeGreaterThan(resultsCalc.socialSecurityDetails.annualBenefit);
-  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(39757.92, 0);
+  expect(resultsHigher.socialSecurityDetails.annualBenefit).toBeCloseTo(39758.51, 0);
 
   // 6d. Decreasing working years below 10 makes SS disappear
   const inputsFewYears = getMappedDefaultInputs();
@@ -261,7 +261,7 @@ try {
   // AIME = 50,000 / 12 = 4,166.67.
   // PIA at 67 = 1,157.40 + 0.32 * (4,166.67 - 1,286) = 1,157.40 + 921.81 = 2,079.21.
   // At claim age 67, annual benefit = 2,079.32 * 12 = 24,951.84.
-  expect(resultsAS.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
+  expect(resultsAS.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.57, 0);
   expect(resultsAS.socialSecurityDetails.workingYears).toBe(43);
 
   // 6g. Test fallback yearStartedWorking
@@ -273,7 +273,7 @@ try {
   ssEvYS.yearStartedWorking = currentYear - 13; 
 
   const resultsYS = runFireSimulation(inputsYearStarted);
-  expect(resultsYS.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
+  expect(resultsYS.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.57, 0);
   expect(resultsYS.socialSecurityDetails.workingYears).toBe(43);
 
   console.log('✅ Simulation Integration passed.');

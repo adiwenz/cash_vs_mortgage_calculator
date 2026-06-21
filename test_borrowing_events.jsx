@@ -198,7 +198,7 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     expect(getInputByWrapperText(/Friendly Name/i).value).toBe('Student Loan');
     expect(parseVal(getInputByWrapperText(/Starting Balance \/ Amount/i))).toBe(30000);
     expect(parseVal(getInputByWrapperText(/Interest Rate/i))).toBe(5);
-    expect(parseVal(getInputByWrapperText(/Minimum Monthly Payment/i))).toBe(318);
+    expect(parseVal(getInputByWrapperText(/Minimum Monthly Payment/i))).toBe(318.2);
 
     // Verify compassionate copy is present
     expect(screen.getByText(/You're not stuck with this number/i)).toBeDefined();

@@ -1,5 +1,5 @@
 import { formatCurrency, formatCompactCurrency, clampMoneyValue, clampPercentageValue } from './helpers';
-import { getRetirementLimit } from '../../simulatorMathUtils';
+import { getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
 import { NumberInput, CurrencyInput } from '../ui/PlainInputs';
 import { syncBudgetDetails } from '../../calculators/fire/index.js';
 
@@ -76,11 +76,11 @@ export default function DesktopBudgetPanel({
   const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   const totalExpensesMonthly = Object.values(budgetExpenses || {}).reduce((sum, val) => sum + val, 0);
   const surplusMonthly = Math.max(0, combinedIncome - totalExpensesMonthly);
-  const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
-    ? Math.round(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
+   const estBrokerageMonthly = savingsAllocMode === 'percentSurplus'
+    ? roundCurrency(surplusMonthly * ((budgetSavings.brokerage || 0) / 100))
     : (budgetSavings.brokerage || 0);
   const estPartnerBrokerageMonthly = savingsAllocMode === 'percentSurplus'
-    ? Math.round(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
+    ? roundCurrency(surplusMonthly * ((budgetPartnerSavings.brokerage || 0) / 100))
     : (budgetPartnerSavings.brokerage || 0);
 
   return (
@@ -446,7 +446,7 @@ export default function DesktopBudgetPanel({
           <div className="budget-summary-section" style={{ background: 'var(--bg-primary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1.5rem' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Gross Annual Income</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Monthly Income</span>
                 <CurrencyInput
                   style={{
                     fontSize: '1.2rem',
@@ -459,10 +459,10 @@ export default function DesktopBudgetPanel({
                     borderRadius: '6px',
                     boxSizing: 'border-box'
                   }}
-                  value={budgetMonthlyIncome * 12}
+                  value={budgetMonthlyIncome}
                   onChange={(e) => {
                     const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                    setBudgetMonthlyIncome(Math.round(val / 12));
+                    setBudgetMonthlyIncome(val);
                   }}
                 />
               </div>

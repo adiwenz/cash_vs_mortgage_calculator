@@ -49,7 +49,7 @@ try {
 
   const resultsAge = runFireSimulation(inputsAge);
   expect(resultsAge.socialSecurityDetails.workingYears).toBe(43); // 13 pre + 30 post
-  expect(resultsAge.socialSecurityDetails.annualBenefit).toBeCloseTo(24951.84, 0);
+  expect(resultsAge.socialSecurityDetails.annualBenefit).toBeCloseTo(24950.57, 0);
   console.log('✅ ageStartedWorking prepends past income correctly and updates benefits.');
 
   console.log('✅ test_social_security_start_age passed.');

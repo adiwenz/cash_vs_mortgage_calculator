@@ -1,4 +1,4 @@
-import { getActiveChildrenCountAtAge } from '../../simulatorMathUtils.js';
+import { getActiveChildrenCountAtAge, roundCurrency } from '../../simulatorMathUtils.js';
 import {
   getSocialSecurityFactor,
   getIncomeHistory,
@@ -303,14 +303,14 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
 
   // Standard defaults representing the standard work phase
   let standardIncome = (profile.simpleIncome !== undefined && profile.simpleIncome !== null && profile.simpleIncome !== '')
-    ? Math.round(Number(profile.simpleIncome) / 12)
-    : 4167;
+    ? roundCurrency(Number(profile.simpleIncome) / 12)
+    : 4166.67;
   let standardExpenses = profile.budgetDetails?.expenses ? { ...profile.budgetDetails.expenses } : {};
   let standardSavings = profile.budgetDetails?.savings ? { ...profile.budgetDetails.savings } : {};
   let standardPartnerSavings = profile.budgetDetails?.partnerSavings ? { ...profile.budgetDetails.partnerSavings } : {};
   let standardSavingsAllocMode = profile.budgetDetails?.savingsAllocMode || 'fixed';
 
-  if (profile.hasCustomizedBudget === false) {
+  if (profile.hasCustomizedBudget === false && !profile.hasCustomizedSavingsAllocation) {
     const syncRes = syncBudgetDetails(profile.simpleIncome, profile.simpleExpenses, profile.budgetDetails);
     standardExpenses = syncRes.budgetDetails.expenses;
     standardSavings = syncRes.budgetDetails.savings;
@@ -323,7 +323,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     const totalInc = standardIncome;
     let needsTotal, wantsTotal, savingsTotal;
     if (profile.simpleExpenses !== undefined && profile.simpleExpenses !== null && profile.simpleExpenses !== '') {
-      const expTotal = Number(profile.simpleExpenses) / 12;
+      const expTotal = roundCurrency(Number(profile.simpleExpenses) / 12);
       const pctSum = (defaultTemplate.needsPct ?? 50) + (defaultTemplate.wantsPct ?? 30);
       needsTotal = pctSum > 0 ? expTotal * ((defaultTemplate.needsPct ?? 50) / pctSum) : expTotal;
       wantsTotal = pctSum > 0 ? expTotal * ((defaultTemplate.wantsPct ?? 30) / pctSum) : 0;
@@ -335,21 +335,21 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     }
 
     standardExpenses = {
-      housing: Math.round(needsTotal * (40 / 78)),
-      utilities: Math.round(needsTotal * (10 / 78)),
-      food: Math.round(needsTotal * (10 / 78)),
-      transportation: Math.round(needsTotal * (10 / 78)),
-      healthcare: Math.round(needsTotal * (8 / 78)),
-      diningOut: Math.round(wantsTotal * (5 / 22)),
-      leisure: Math.round(wantsTotal * (8 / 22)),
-      misc: Math.round(wantsTotal * (9 / 22))
+      housing: roundCurrency(needsTotal * (40 / 78)),
+      utilities: roundCurrency(needsTotal * (10 / 78)),
+      food: roundCurrency(needsTotal * (10 / 78)),
+      transportation: roundCurrency(needsTotal * (10 / 78)),
+      healthcare: roundCurrency(needsTotal * (8 / 78)),
+      diningOut: roundCurrency(wantsTotal * (5 / 22)),
+      leisure: roundCurrency(wantsTotal * (8 / 22)),
+      misc: roundCurrency(wantsTotal * (9 / 22))
     };
     const sumVal = Object.values(standardExpenses).reduce((a, b) => a + b, 0);
-    const diff = Math.round(needsTotal + wantsTotal) - sumVal;
-    standardExpenses.misc = (standardExpenses.misc || 0) + diff;
+    const diff = roundCurrency(needsTotal + wantsTotal) - sumVal;
+    standardExpenses.misc = roundCurrency((standardExpenses.misc || 0) + diff);
 
     standardSavings = {
-      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: Math.round(savingsTotal), checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
+      trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: roundCurrency(savingsTotal), checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
     };
     standardPartnerSavings = {
       trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0
@@ -543,15 +543,15 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
         if (currentSum > 0) {
           const scale = targetMonthly / currentSum;
           nonDebtKeys.forEach(k => {
-            baseExpenses[k] = Math.round(baseExpenses[k] * scale);
+            baseExpenses[k] = roundCurrency(baseExpenses[k] * scale);
           });
           const newSum = nonDebtKeys.reduce((sum, k) => sum + (baseExpenses[k] || 0), 0);
-          const diff = Math.round(targetMonthly) - newSum;
+          const diff = roundCurrency(targetMonthly) - newSum;
           if (diff !== 0) {
-            baseExpenses.misc = Math.max(0, (baseExpenses.misc || 0) + diff);
+            baseExpenses.misc = Math.max(0, roundCurrency((baseExpenses.misc || 0) + diff));
           }
         } else {
-          baseExpenses.misc = Math.round(targetMonthly);
+          baseExpenses.misc = roundCurrency(targetMonthly);
         }
       }
     }
@@ -569,10 +569,10 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
 
     activeIncomes.forEach(inc => {
       if (inc.incomeChangeType === 'increaseByAmount') {
-        const increaseMonthly = Math.round((Number(inc.salaryIncrease) || 0) / 12);
+        const increaseMonthly = roundCurrency((Number(inc.salaryIncrease) || 0) / 12);
         baseIncome += increaseMonthly;
       } else {
-        baseIncome = Math.round(inc.frequency === 'monthly' ? Number(inc.amount) : Number(inc.amount) / 12);
+        baseIncome = roundCurrency(inc.frequency === 'monthly' ? Number(inc.amount) : Number(inc.amount) / 12);
       }
       growthRate = (inc.growthRate !== undefined && inc.growthRate !== null && inc.growthRate !== '') ? Number(inc.growthRate) : 0.03;
     });
@@ -580,13 +580,13 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     const sabbatical = enabledEvents.find(ev => ev.type === 'sabbatical' && start >= ev.startAge && start < ev.endAge);
     if (sabbatical) {
       const reduction = Number(sabbatical.incomeReduction) || 0;
-      baseIncome = Math.round(Math.max(0, baseIncome * (1 - reduction / 100)));
+      baseIncome = roundCurrency(Math.max(0, baseIncome * (1 - reduction / 100)));
     }
 
     const baristaFire = enabledEvents.find(ev => ev.type === 'baristaFire' && start >= Number(ev.startAge));
     if (baristaFire) {
       const partTimeInc = Number(baristaFire.partTimeIncome) || 0;
-      baseIncome = Math.round(partTimeInc / 12);
+      baseIncome = roundCurrency(partTimeInc / 12);
       growthRate = 0.03;
     }
 
@@ -615,7 +615,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
         if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
           const baseBenefit = Number(spouseMember.spouseEstimatedSocialSecurityBenefit);
           const factor = getSocialSecurityFactor(spouseClaimAge);
-          partnerSSMonthlyIncome = Math.round(baseBenefit * factor);
+          partnerSSMonthlyIncome = roundCurrency(baseBenefit * factor);
         } else if (spouseMember.income > 0) {
           const spouseRetAge = spouseMember.desiredRetirementAge !== undefined && spouseMember.desiredRetirementAge !== null
             ? Number(spouseMember.desiredRetirementAge)
@@ -626,12 +626,12 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
             incomeHistory: spouseIncomeHistory,
             claimAge: spouseClaimAge
           });
-          partnerSSMonthlyIncome = Math.round(spouseSSCalc.monthlyBenefit);
+          partnerSSMonthlyIncome = roundCurrency(spouseSSCalc.monthlyBenefit);
         }
       }
 
       if (!isPartnerRetiredInPhase) {
-        spouseIncome = Math.round(spouseMember ? (Number(spouseMember.income) || 0) / 12 : (Number(marriageEvent.spouseIncome) || 0) / 12);
+        spouseIncome = roundCurrency(spouseMember ? (Number(spouseMember.income) || 0) / 12 : (Number(marriageEvent.spouseIncome) || 0) / 12);
         spouseIncomeGrowthRate = spouseMember
           ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
           : (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0);
@@ -648,26 +648,26 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
 
       if (!loadedCustomChildcare && start < targetRetirementAge) {
         if (marriageEvent.combinedSpendingAfterMarriage) {
-          const combExp = Math.round(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
+          const combExp = roundCurrency(Number(marriageEvent.combinedSpendingAfterMarriage) / 12);
           baseExpenses = {
-            housing: Math.round(combExp * (40 / 78)),
-            utilities: Math.round(combExp * (10 / 78)),
-            food: Math.round(combExp * (10 / 78)),
-            transportation: Math.round(combExp * (10 / 78)),
-            healthcare: Math.round(combExp * (8 / 78)),
-            diningOut: Math.round(combExp * (5 / 22)),
-            leisure: Math.round(combExp * (8 / 22)),
-            misc: Math.round(combExp * (9 / 22))
+            housing: roundCurrency(combExp * (40 / 78)),
+            utilities: roundCurrency(combExp * (10 / 78)),
+            food: roundCurrency(combExp * (10 / 78)),
+            transportation: roundCurrency(combExp * (10 / 78)),
+            healthcare: roundCurrency(combExp * (8 / 78)),
+            diningOut: roundCurrency(combExp * (5 / 22)),
+            leisure: roundCurrency(combExp * (8 / 22)),
+            misc: roundCurrency(combExp * (9 / 22))
           };
           const sumVal = Object.values(baseExpenses).reduce((a, b) => a + b, 0);
-          const diff = combExp - sumVal;
-          baseExpenses.misc += diff;
+          const diff = roundCurrency(combExp - sumVal);
+          baseExpenses.misc = roundCurrency((baseExpenses.misc || 0) + diff);
         } else if (i === 0 || !phases[i - 1].isMarried) {
-          const spousePersonal = Math.round(spouseIncome * (1 - spouseSavingsRate / 100));
+          const spousePersonal = roundCurrency(spouseIncome * (1 - spouseSavingsRate / 100));
           const lifestyle = Number(marriageEvent.lifestyleAdjustment || 0);
           const housing = Number(marriageEvent.housingSavings || 0);
-          baseExpenses.misc = (baseExpenses.misc || 0) + spousePersonal + lifestyle;
-          baseExpenses.housing = Math.max(0, (baseExpenses.housing || 0) + housing);
+          baseExpenses.misc = roundCurrency((baseExpenses.misc || 0) + spousePersonal + lifestyle);
+          baseExpenses.housing = Math.max(0, roundCurrency((baseExpenses.housing || 0) + housing));
         }
       }
     }
@@ -678,7 +678,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       const retireEv = enabledEvents.find(e => e.type === 'retire' && e.enabled !== false);
       const pct = (retireEv?.spendingPercent !== undefined ? Number(retireEv.spendingPercent) : 70) / 100;
       Object.keys(resolvedExpenses).forEach(k => {
-        resolvedExpenses[k] = Math.round(resolvedExpenses[k] * pct);
+        resolvedExpenses[k] = roundCurrency(resolvedExpenses[k] * pct);
       });
     }
 
@@ -693,7 +693,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     if (childCount > 0) {
       const monthlyChildCosts = calculateYearlyChildCosts(start, enabledEvents, profile, currentAge, [], 1) / 12;
       if (monthlyChildCosts > 0) {
-        resolvedExpenses['childcare'] = Math.round(monthlyChildCosts * childCostsScale);
+        resolvedExpenses['childcare'] = roundCurrency(monthlyChildCosts * childCostsScale);
       }
     }
 
@@ -879,13 +879,13 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           
           if (!keepRent) {
             if (!housingOverwritten) {
-              resolvedExpenses.housing = Math.round(nonMortgageCosts);
+              resolvedExpenses.housing = roundCurrency(nonMortgageCosts);
               housingOverwritten = true;
             } else {
-              resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
+              resolvedExpenses.housing = (resolvedExpenses.housing || 0) + roundCurrency(nonMortgageCosts);
             }
           } else {
-            resolvedExpenses.housing = (resolvedExpenses.housing || 0) + Math.round(nonMortgageCosts);
+            resolvedExpenses.housing = (resolvedExpenses.housing || 0) + roundCurrency(nonMortgageCosts);
           }
           
           if (!isCash) {
@@ -901,7 +901,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
                 const monthlyPayment = r === 0 ? loanAmount / n : loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
                 annualPI = monthlyPayment * 12;
               }
-              resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + Math.round(annualPI / 12);
+              resolvedExpenses['🏠 Mortgage'] = (resolvedExpenses['🏠 Mortgage'] || 0) + roundCurrency(annualPI / 12);
             }
           }
         }
@@ -939,16 +939,16 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     }
 
     if (isMarried && start < targetRetirementAge) {
-      const spouseSavingsTotal = Math.round(spouseIncome * (spouseSavingsRate / 100));
+      const spouseSavingsTotal = roundCurrency(spouseIncome * (spouseSavingsRate / 100));
       const partnerSavingsTotal = Object.values(basePartnerSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
       if (spouseSavingsTotal > 0 && partnerSavingsTotal === 0) {
         const userTotalSavings = Object.values(baseSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
         if (userTotalSavings > 0) {
           Object.keys(baseSavings).forEach(key => {
-            basePartnerSavings[key] = Math.round(spouseSavingsTotal * ((Number(baseSavings[key]) || 0) / userTotalSavings));
+            basePartnerSavings[key] = roundCurrency(spouseSavingsTotal * ((Number(baseSavings[key]) || 0) / userTotalSavings));
           });
           const newPartnerTotal = Object.values(basePartnerSavings).reduce((sum, v) => sum + v, 0);
-          const diff = spouseSavingsTotal - newPartnerTotal;
+          const diff = roundCurrency(spouseSavingsTotal - newPartnerTotal);
           if (diff !== 0) {
             let maxKey = 'brokerage';
             Object.keys(basePartnerSavings).forEach(key => {
@@ -956,7 +956,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
                 maxKey = key;
               }
             });
-            basePartnerSavings[maxKey] = Math.max(0, basePartnerSavings[maxKey] + diff);
+            basePartnerSavings[maxKey] = Math.max(0, roundCurrency(basePartnerSavings[maxKey] + diff));
           }
         } else {
           basePartnerSavings.brokerage = spouseSavingsTotal;
@@ -1407,10 +1407,10 @@ export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {
 export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDetails = {}) {
   const income = Number(simpleIncome) || 0;
   const expenses = Number(simpleExpenses) || 0;
-  const monthlyIncome = Math.round(income / 12);
+  const monthlyIncome = roundCurrency(income / 12);
   const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
-  const targetSavings = Math.round(monthlyIncome * (savingsRate / 100));
-  const targetSpending = Math.max(0, monthlyIncome - targetSavings);
+  const targetSavings = roundCurrency(monthlyIncome * (savingsRate / 100));
+  const targetSpending = Math.max(0, roundCurrency(monthlyIncome - targetSavings));
 
   const baseNeeds = { housing: 1500, utilities: 300, food: 400, transportation: 400, healthcare: 300 };
   const baseWants = { diningOut: 200, leisure: 300, misc: 142 };
@@ -1452,20 +1452,20 @@ export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDet
 
     if (existingNeedsSum > 0) {
       const scale = targetSpending / existingNeedsSum;
-      Object.keys(needs).forEach(k => { needs[k] = Math.round(needs[k] * scale); });
+      Object.keys(needs).forEach(k => { needs[k] = roundCurrency(needs[k] * scale); });
     } else {
       Object.keys(baseNeeds).forEach(k => {
-        needs[k] = Math.round(targetSpending * (baseNeeds[k] / baseNeedsTotal));
+        needs[k] = roundCurrency(targetSpending * (baseNeeds[k] / baseNeedsTotal));
       });
     }
     // Adjust rounding error
     const currentSum = Object.values(needs).reduce((sum, val) => sum + val, 0);
-    const diff = targetSpending - currentSum;
+    const diff = roundCurrency(targetSpending - currentSum);
     if (diff !== 0) {
-      needs.housing = Math.max(0, (needs.housing || 0) + diff);
+      needs.housing = Math.max(0, roundCurrency((needs.housing || 0) + diff));
     }
   } else {
-    const targetWants = targetSpending - existingNeedsSum;
+    const targetWants = roundCurrency(targetSpending - existingNeedsSum);
     if (targetWants < existingWantsSum) {
       reducedWants = true;
       autoReducedBudget = true;
@@ -1473,17 +1473,17 @@ export function syncBudgetDetails(simpleIncome, simpleExpenses, currentBudgetDet
 
     if (existingWantsSum > 0) {
       const scale = targetWants / existingWantsSum;
-      Object.keys(wants).forEach(k => { wants[k] = Math.round(wants[k] * scale); });
+      Object.keys(wants).forEach(k => { wants[k] = roundCurrency(wants[k] * scale); });
     } else {
       Object.keys(baseWants).forEach(k => {
-        wants[k] = Math.round(targetWants * (baseWants[k] / baseWantsTotal));
+        wants[k] = roundCurrency(targetWants * (baseWants[k] / baseWantsTotal));
       });
     }
     // Adjust rounding error
     const currentSum = Object.values(wants).reduce((sum, val) => sum + val, 0);
-    const diff = targetWants - currentSum;
+    const diff = roundCurrency(targetWants - currentSum);
     if (diff !== 0) {
-      wants.leisure = Math.max(0, (wants.leisure || 0) + diff);
+      wants.leisure = Math.max(0, roundCurrency((wants.leisure || 0) + diff));
     }
   }
 

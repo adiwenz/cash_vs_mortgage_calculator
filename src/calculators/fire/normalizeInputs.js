@@ -24,6 +24,7 @@ export function getProfileFromInputs(inputs) {
     lifeExpectancy,
     targetRetirementAge,
     hasCustomizedSavingsAllocation,
+    hasCustomizedBudget: !!inputs.hasCustomizedBudget,
     expectedReturn: Math.min(0.25, Math.max(0, parseNum(inputs.expectedReturn, 7) / 100)),
     postRetirementReturn: Math.min(0.15, Math.max(0, inputs.postRetirementReturn !== undefined
       ? parseNum(inputs.postRetirementReturn, 0) / 100

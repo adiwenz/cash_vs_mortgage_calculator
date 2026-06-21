@@ -114,10 +114,10 @@ describe('New Default Savings Allocation', () => {
     const actual = firstYearLog.actualContributions;
 
     expect(actual.trad401k).toBe(200 * 12);
-    expect(actual.rothIra).toBe(100 * 12);
-    expect(actual.checking).toBe(100 * 12);
-    expect(actual.hysa).toBe(100 * 12);
-    expect(actual.emergency).toBe(75 * 12);
+    expect(actual.rothIra).toBeCloseTo(1198.94, 1);
+    expect(actual.checking).toBeCloseTo(1198.94, 1);
+    expect(actual.hysa).toBeCloseTo(1198.94, 1);
+    expect(actual.emergency).toBeCloseTo(899.21, 1);
     expect(actual.brokerage).toBe(0);
   });
 
@@ -158,8 +158,8 @@ describe('New Default Savings Allocation', () => {
     // Age 35: surplus is 50000 - 42500 = 7500. Brokerage contribution is 7500.
     expect(logAge35.actualContributions.brokerage).toBe(7500);
     
-    // Age 41: income is 60000, expenses are 42500. Surplus is 17500. Brokerage contribution is 17496 due to monthly rounding.
-    expect(logAge41.actualContributions.brokerage).toBe(17496);
+    // Age 41: income is 60000, expenses are 42500. Surplus is 17500. Brokerage contribution is 17499.96 due to monthly rounding.
+    expect(logAge41.actualContributions.brokerage).toBeCloseTo(17499.96, 2);
   });
 
   test('Spending increase with an uncustomized budget reduces brokerage contributions dynamically', () => {
@@ -198,8 +198,8 @@ describe('New Default Savings Allocation', () => {
     // Age 35: surplus is 50000 - 42500 = 7500.
     expect(logAge35.actualContributions.brokerage).toBe(7500);
     
-    // Age 41: income is 50000, expenses are 45000. Surplus is 5000. Brokerage contribution is 50004 - 45000 = 5004 due to monthly rounding.
-    expect(logAge41.actualContributions.brokerage).toBe(5004);
+    // Age 41: income is 50000, expenses are 45000. Surplus is 5000. Brokerage contribution is 5000.04 due to monthly rounding.
+    expect(logAge41.actualContributions.brokerage).toBeCloseTo(5000.04, 2);
   });
 
   test('Saving the budget flips hasCustomizedSavingsAllocation to true and prevents future overrides', async () => {

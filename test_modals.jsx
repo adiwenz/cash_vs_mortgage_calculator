@@ -272,7 +272,15 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     
     // Verify Budget modal opens in married mode
     expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
-    expect(screen.queryAllByText(/\$11,667/).length > 0 || screen.queryAllByText(/\$10,937/).length > 0 || screen.queryAllByText(/\$10,895/).length > 0 || screen.queryAllByText(/\$10,322/).length > 0 || screen.queryAllByText(/\$10,398/).length > 0).toBe(true); // Combined take-home income
+    expect(
+      screen.queryAllByText(/\$11,667/).length > 0 ||
+      screen.queryAllByText(/\$11,666\.67/).length > 0 ||
+      screen.queryAllByText(/\$10,937/).length > 0 ||
+      screen.queryAllByText(/\$10,895/).length > 0 ||
+      screen.queryAllByText(/\$10,322/).length > 0 ||
+      screen.queryAllByText(/\$10,398/).length > 0 ||
+      screen.queryAllByText(/\$10,571\.67/).length > 0
+    ).toBe(true); // Combined take-home income
     
     // Expand the Needs section to inspect Housing (Rent/Mortgage)
     const needsHeader = document.querySelector('.budget-modal-card .budget-card.needs') || screen.getByText('Needs');

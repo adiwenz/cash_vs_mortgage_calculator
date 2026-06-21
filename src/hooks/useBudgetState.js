@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases } from '../fireCalculations';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
+import { roundCurrency } from '../simulatorMathUtils';
 
 export function useBudgetState(
   scenarios,
@@ -115,7 +116,7 @@ export function useBudgetState(
         };
         
         const housingVal = userExpenses.housing !== undefined ? Number(userExpenses.housing) : 1500;
-        const partnerMonthlySpend = Math.round(estimates.partnerTakeHomeRemaining / 12);
+        const partnerMonthlySpend = roundCurrency(estimates.partnerTakeHomeRemaining / 12);
         const nonHousingCats = ['utilities', 'food', 'diningOut', 'transportation', 'healthcare', 'leisure', 'misc'];
         const userNonHousingTotal = nonHousingCats.reduce((sum, cat) => sum + (Number(userExpenses[cat]) || 0), 0);
         
@@ -126,12 +127,12 @@ export function useBudgetState(
           const spouseCatSpend = userNonHousingTotal > 0
             ? remainingToDistribute * ((Number(userExpenses[cat]) || 0) / userNonHousingTotal)
             : remainingToDistribute / nonHousingCats.length;
-          tempExpenses[cat] = Math.round(spouseCatSpend);
+          tempExpenses[cat] = roundCurrency(spouseCatSpend);
         });
         
         estimatedExpenses = tempExpenses;
         
-        const spouseMonthlySavings = Math.round(estimates.partnerSavings / 12);
+        const spouseMonthlySavings = roundCurrency(estimates.partnerSavings / 12);
         const userSavings = inp.budgetDetails?.savings || {};
         const userTotalSavings = Object.values(userSavings).reduce((sum, v) => sum + (Number(v) || 0), 0);
         
@@ -142,11 +143,11 @@ export function useBudgetState(
         
         if (userTotalSavings > 0) {
           Object.keys(userSavings).forEach(key => {
-            estimatedPartnerSavings[key] = Math.round(spouseMonthlySavings * ((Number(userSavings[key]) || 0) / userTotalSavings));
+            estimatedPartnerSavings[key] = roundCurrency(spouseMonthlySavings * ((Number(userSavings[key]) || 0) / userTotalSavings));
           });
           
           const partnerTotalSavings = Object.values(estimatedPartnerSavings).reduce((sum, v) => sum + v, 0);
-          const diff = spouseMonthlySavings - partnerTotalSavings;
+          const diff = roundCurrency(spouseMonthlySavings - partnerTotalSavings);
           if (diff !== 0) {
             let maxKey = 'brokerage';
             Object.keys(estimatedPartnerSavings).forEach(key => {
@@ -154,12 +155,12 @@ export function useBudgetState(
                 maxKey = key;
               }
             });
-            estimatedPartnerSavings[maxKey] = Math.max(0, estimatedPartnerSavings[maxKey] + diff);
+            estimatedPartnerSavings[maxKey] = Math.max(0, roundCurrency(estimatedPartnerSavings[maxKey] + diff));
           }
         } else {
           const trad401kAlloc = Math.min(1958, spouseMonthlySavings);
           estimatedPartnerSavings.trad401k = trad401kAlloc;
-          estimatedPartnerSavings.checking = Math.max(0, spouseMonthlySavings - trad401kAlloc);
+          estimatedPartnerSavings.checking = Math.max(0, roundCurrency(spouseMonthlySavings - trad401kAlloc));
         }
       }
     }
@@ -203,7 +204,7 @@ export function useBudgetState(
       
       setBudgetMonthlySpending(Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0));
       const totalSavings = startPhase.savingsAllocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, startPhase.income - Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
+        ? roundCurrency(Math.max(0, startPhase.income - Object.values(startPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
         : Object.values(startPhase.savings).reduce((sum, val) => sum + val, 0);
       setBudgetMonthlySavings(totalSavings);
     }
@@ -249,7 +250,7 @@ export function useBudgetState(
       setBudgetMonthlySpending(Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0));
       
       const totalSavings = nextPhase.savingsAllocMode === 'percentSurplus'
-        ? Math.round(Math.max(0, nextPhase.income - Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(nextPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
+        ? roundCurrency(Math.max(0, nextPhase.income - Object.values(nextPhase.expenses).reduce((sum, val) => sum + val, 0)) * (Object.values(nextPhase.savings).reduce((sum, val) => sum + val, 0) / 100))
         : Object.values(nextPhase.savings).reduce((sum, val) => sum + val, 0);
       setBudgetMonthlySavings(totalSavings);
     }
@@ -292,11 +293,11 @@ export function useBudgetState(
       const newSavings = {};
       Object.keys(budgetSavings).forEach(key => {
         const val = budgetSavings[key] || 0;
-        newSavings[key] = Math.round(estimatedSurplus * (val / 100));
+        newSavings[key] = roundCurrency(estimatedSurplus * (val / 100));
       });
       
       const newSum = Object.values(newSavings).reduce((sum, val) => sum + val, 0);
-      const diff = estimatedSurplus - newSum;
+      const diff = roundCurrency(estimatedSurplus - newSum);
       if (diff !== 0) {
         const keys = Object.keys(newSavings);
         let maxKey = 'brokerage';
@@ -305,7 +306,7 @@ export function useBudgetState(
             maxKey = k;
           }
         });
-        newSavings[maxKey] = Math.max(0, newSavings[maxKey] + diff);
+        newSavings[maxKey] = Math.max(0, roundCurrency(newSavings[maxKey] + diff));
       }
       setBudgetSavings(newSavings);
     }
@@ -530,7 +531,7 @@ export function useBudgetState(
               userSpendingPreRetirement = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
             }
           }
-          const spousePersonalSpending = Math.round(Math.max(0, currentPhaseExpensesAnnual - userSpendingPreRetirement - (prev.housingCost !== undefined ? Number(prev.housingCost) : -6000)) / 12);
+          const spousePersonalSpending = roundCurrency(Math.max(0, currentPhaseExpensesAnnual - userSpendingPreRetirement - (prev.housingCost !== undefined ? Number(prev.housingCost) : -6000)) / 12);
           return {
             ...prev,
             combinedSpendingAfterMarriage: currentPhaseExpensesAnnual,

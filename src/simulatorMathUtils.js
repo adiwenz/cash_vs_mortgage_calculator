@@ -492,3 +492,8 @@ export function getRetirementLimit(accountKey, age, filingStatus = 'single') {
   return getAnnualContributionLimit(accountKey, age, filingStatus);
 }
 
+export function roundCurrency(val) {
+  return Math.round((Number(val) || 0) * 100) / 100;
+}
+
+

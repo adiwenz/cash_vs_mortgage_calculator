@@ -111,10 +111,10 @@ describe('Simulation Pipeline Golden Tests', () => {
     const inputs = getMappedDefaultInputs();
     const results = runFireSimulation(inputs);
     expect(results.retirementReadyAge).toBe(64);
-    expect(results.fiNumber).toBeCloseTo(296985.84, 1);
+    expect(results.fiNumber).toBeCloseTo(297096.14, 1);
     expect(results.retirementOutcome).toBe('comfortable');
     const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
-    expect(age65Nw).toBeCloseTo(307338.90, 1);
+    expect(age65Nw).toBeCloseTo(307198.60, 1);
   });
 
   test('6. Regression: Scenario B (Home Purchase) matches golden snapshot', () => {
@@ -141,7 +141,7 @@ describe('Simulation Pipeline Golden Tests', () => {
     expect(results.retirementReadyAge).toBe(75);
     expect(results.retirementOutcome).toBe('retirementGap');
     const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
-    expect(age65Nw).toBeCloseTo(141144.22, 1);
+    expect(age65Nw).toBeCloseTo(140929.66, 1);
   });
 
   test('7. Regression: Scenario C (Marriage) matches golden snapshot', () => {
@@ -163,7 +163,7 @@ describe('Simulation Pipeline Golden Tests', () => {
     expect(results.retirementReadyAge).toBe(78);
     expect(results.retirementOutcome).toBe('retirementGap');
     const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
-    expect(age65Nw).toBeCloseTo(231192.58, 1);
+    expect(age65Nw).toBeCloseTo(231070.32, 1);
   });
 
   test('8. Regression: Scenario D (Debt) matches golden snapshot', () => {
@@ -184,6 +184,6 @@ describe('Simulation Pipeline Golden Tests', () => {
     expect(results.retirementReadyAge).toBe(64);
     expect(results.retirementOutcome).toBe('comfortable');
     const age65Nw = results.data.find(d => d.age === 65)?.netWorth;
-    expect(age65Nw).toBeCloseTo(305278.97, 1);
+    expect(age65Nw).toBeCloseTo(305138.66, 1);
   });
 });

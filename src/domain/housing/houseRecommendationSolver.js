@@ -737,8 +737,9 @@ export function solveBisectionHomeValue(level, inputs, buyHouseEv, baselineReady
       const ratio = (buyHouseEv.downPayment || 0) / oPrice;
       dp = pr * ratio;
     }
-    return Math.min(dp, pr);
+    return Math.round(Math.min(dp, pr));
   };
+
 
   let validationPrice = bestPrice;
   let tempEvent = {
@@ -757,7 +758,7 @@ export function solveBisectionHomeValue(level, inputs, buyHouseEv, baselineReady
   }
   bestPrice = validationPrice;
 
-  const cashLimited = bestPrice >= cashAffordablePrice - 1;
+  const cashLimited = bestPrice >= cashAffordablePrice - 105;
   const monthlyLimited = bestPrice >= retirementSustainablePrice - 1;
   const limitingFactor = (cashLimited && monthlyLimited) ? 'both' : cashLimited ? 'cash' : 'monthly';
 

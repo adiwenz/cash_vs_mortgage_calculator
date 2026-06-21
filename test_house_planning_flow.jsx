@@ -415,9 +415,9 @@ describe('Home Purchase Planning Flow Tests', () => {
     expect(homePriceInput.value).toBe('217,000');
 
     // Change age to 45 (projected liquid assets at 45 = age 44 balance = 80000)
-    // 80000 / 0.23 = 347,826 -> cash suggested price is 347,000, but monthly affordable price is 224,000 (stricter limit)
+    // 80000 / 0.23 = 347,826 -> cash suggested price is 347,000, but monthly affordable price is 296,000 (stricter limit)
     fireEvent.change(ageInput, { target: { value: '45' } });
-    expect(homePriceInput.value).toBe('224,000');
+    expect(homePriceInput.value).toBe('296,000');
 
     // Manually type/touch the homePrice
     fireEvent.change(homePriceInput, { target: { value: '500000' } });

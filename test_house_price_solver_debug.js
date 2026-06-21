@@ -56,8 +56,8 @@ describe('House Price Solver Audits and Scenario Verification', () => {
 
     // Verify rent (base housing) is replaced by homeownership non-mortgage costs
     // Rent was 1500. Expected non-mortgage costs = (300k * 1.1% + 300k * 0.35% + 300k * 1.0%)/12 + 100 + 50 = (3300 + 1050 + 3000)/12 + 150 = 612.5 + 150 = 762.5 -> round to 763
-    expect(postPurchasePhase.expenses.housing).toBe(763);
-    expect(postPurchasePhase.expenses['🏠 Mortgage']).toBe(1517); // 240k mortgage @ 6.5% is 1516.89 -> 1517
+    expect(postPurchasePhase.expenses.housing).toBe(762.5);
+    expect(postPurchasePhase.expenses['🏠 Mortgage']).toBe(1516.96); // 240k mortgage @ 6.5% is 1516.96
 
     // Verify nominalData at age 42 has exactly these expenses scaled
     const log42 = results.nominalData.find(d => d.age === 42);
