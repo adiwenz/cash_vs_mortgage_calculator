@@ -63,8 +63,7 @@ export default function CurrentSituationCard({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    height: '60px',
-    padding: '0 0.5rem',
+    padding: '1rem 0.5rem',
     background: '#ffffff',
     border: 'none',
     borderBottom: '1px solid rgba(0,0,0,0.05)',
@@ -516,37 +515,37 @@ export default function CurrentSituationCard({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Debug button (DEV environment only) */}
-      {showDebugButton && (
-        <button
-          type="button"
-          style={{
-            width: '100%',
-            height: '36px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.8rem',
-            fontWeight: '700',
-            background: 'none',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-            marginTop: '1.5rem',
-            transition: 'all 0.2s',
-            boxSizing: 'border-box'
-          }}
-          onClick={() => {
-            setDebugTab('assumptions');
-            setShowDebugDrawer(true);
-          }}
-        >
-          ⚙️ Debug
-        </button>
-      )}
+        {/* Debug button (DEV environment only) */}
+        {showDebugButton && (
+          <button
+            type="button"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.8rem',
+              fontWeight: '700',
+              background: 'none',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              padding: '0.5rem 1rem',
+              marginTop: '0.5rem',
+              transition: 'all 0.2s',
+              boxSizing: 'border-box'
+            }}
+            onClick={() => {
+              setDebugTab('assumptions');
+              setShowDebugDrawer(true);
+            }}
+          >
+            ⚙️ Debug
+          </button>
+        )}
+      </div>
     </div>
   );
 }
