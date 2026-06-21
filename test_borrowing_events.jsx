@@ -139,7 +139,7 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     render(<FireSimulator />);
     
     // Check Current Situation card title
-    expect(screen.getAllByText(/Current Situation/i)[0]).toBeDefined();
+    expect(screen.getAllByText(/Situation/i)[0]).toBeDefined();
     
     // Check baseline events on the timeline
     expect(screen.getAllByText(/You're Set!/i).length).toBeGreaterThan(0);
@@ -174,7 +174,7 @@ describe('Borrowing Events & Payoff Plans UI', () => {
     render(<FireSimulator />);
     
     // Check Current Situation card title
-    expect(screen.getAllByText(/Current Situation/i)[0]).toBeDefined();
+    expect(screen.getAllByText(/Situation/i)[0]).toBeDefined();
     
     // Check baseline events on the timeline
     expect(screen.getAllByText(/You're Set!/i).length).toBeGreaterThan(0);

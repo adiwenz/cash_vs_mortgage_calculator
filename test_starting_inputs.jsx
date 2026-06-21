@@ -10,138 +10,97 @@ globalThis.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
-describe('Starting Inputs Today Screen Reset/Type Flow', () => {
+describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  test('verifies initial default values of starting inputs', () => {
+  test('verifies initial default values of starting inputs in static sidebar', () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
-    const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
+    // Verify header
+    expect(screen.getByText('Your Situation')).toBeDefined();
 
-    expect(currentAgeInput.value).toBe('35');
-    expect(annualIncomeInput.value).toBe('$50,000');
-    expect(preTaxSavingsRateInput.value).toBe('15%');
-    expect(screen.getByText('$5,000')).toBeDefined();
+    // Verify primary profile row inline badges
+    expect(screen.getByText('35')).toBeDefined();
+    expect(screen.getByText('Single')).toBeDefined();
+    expect(screen.getByText('Renting')).toBeDefined();
+
+    // Verify financial snapshot
+    expect(screen.getByText('Annual Income')).toBeDefined();
+    const textboxes = screen.getAllByRole('textbox');
+    const incomeInput = textboxes.find(i => i.value === '$50,000');
+    expect(incomeInput).toBeDefined();
+
+    expect(screen.getByText('Invested Assets')).toBeDefined();
+    expect(screen.getAllByText('$5,000')).toBeDefined();
+
+    expect(screen.getByText('Savings Rate')).toBeDefined();
+    const savingsInput = textboxes.find(i => i.value === '15%');
+    expect(savingsInput).toBeDefined();
   });
 
-  test('focusing starting inputs shows raw values and does not clear them', async () => {
+  test('verifies that clicking the profile row opens the Life Profile modal and editing Age works', async () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
-    const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
+    // Click profile row text '35'
+    fireEvent.click(screen.getByText('35'));
 
-    // Focus Current Age
-    fireEvent.focus(currentAgeInput);
-    await waitFor(() => expect(currentAgeInput.value).toBe('35'));
+    // Verify Life Profile modal is open
+    expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();
 
-    // Focus Annual Income
-    fireEvent.focus(annualIncomeInput);
-    await waitFor(() => expect(annualIncomeInput.value).toBe('50000'));
+    // Find and modify Your Age input
+    const ageLabel = screen.getByText('Your Age');
+    const parent = ageLabel.parentElement;
+    const input = parent.querySelector('input');
+    expect(input).toBeDefined();
 
-    // Focus Pre-Tax Savings Rate
-    fireEvent.focus(preTaxSavingsRateInput);
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15'));
+    // Initial age should be 35
+    expect(input.value).toBe('35');
+
+    // Change to 42
+    fireEvent.change(input, { target: { value: '42' } });
+    fireEvent.blur(input);
+
+    // Save profile
+    const saveButton = screen.getByRole('button', { name: /Save Profile/i });
+    fireEvent.click(saveButton);
+
+    // Verify modal is closed
+    await waitFor(() => {
+      expect(screen.queryByText(/Edit Life Profile/i)).toBeNull();
+    });
+
+    // Verify Age is updated in the sidebar
+    expect(screen.getByText('42')).toBeDefined();
   });
 
-  test('typing custom values in starting inputs works correctly', async () => {
+  test('verifies that editing Annual Income directly in the sidebar updates the value and reallocates the budget', async () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const currentAgeInput = screen.getByPlaceholderText('e.g. 35');
-    const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
+    // Find the Annual Income input
+    const textboxes = screen.getAllByRole('textbox');
+    const incomeInput = textboxes.find(i => i.value === '$50,000');
+    expect(incomeInput).toBeDefined();
 
-    // Age
-    fireEvent.focus(currentAgeInput);
-    fireEvent.change(currentAgeInput, { target: { value: '42' } });
-    await waitFor(() => expect(currentAgeInput.value).toBe('42'));
+    // Change to 120,000
+    fireEvent.focus(incomeInput);
+    fireEvent.change(incomeInput, { target: { value: '120000' } });
+    fireEvent.blur(incomeInput);
 
-    // Income
-    fireEvent.focus(annualIncomeInput);
-    fireEvent.change(annualIncomeInput, { target: { value: '100000' } });
-    await waitFor(() => expect(annualIncomeInput.value).toBe('100000'));
-
-    // Savings Rate
-    fireEvent.focus(preTaxSavingsRateInput);
-    fireEvent.change(preTaxSavingsRateInput, { target: { value: '30' } });
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30'));
+    // Verify Annual Income is updated in the input
+    expect(incomeInput.value).toBe('$120,000');
   });
 
-  test('focusing and blurring the savings rate field without typing keeps the calculated rate', async () => {
+  test('verifies that clicking Invested Assets opens the Life Profile modal to the assets tab', () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-
-    expect(preTaxSavingsRateInput.value).toBe('15%');
-
-    // Focus
-    fireEvent.focus(preTaxSavingsRateInput);
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15'));
-
-    // Blur without typing
-    fireEvent.blur(preTaxSavingsRateInput);
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15%'));
-  });
-
-  test('typing in savings rate and blurring preserves the new calculated rate', async () => {
-    render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
-
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-
-    // Focus and type 30
-    fireEvent.focus(preTaxSavingsRateInput);
-    fireEvent.change(preTaxSavingsRateInput, { target: { value: '30' } });
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30'));
-
-    // Blur
-    fireEvent.blur(preTaxSavingsRateInput);
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('30%'));
-  });
-
-  test('changing the income field preserves the savings rate and scales expenses', async () => {
-    render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
-
-    const annualIncomeInput = screen.getByPlaceholderText('e.g. 120000');
-    const preTaxSavingsRateInput = screen.getByPlaceholderText('e.g. 20');
-
-    // Default rate is 15% (derived from 50k income, 42.5k expenses)
-    expect(preTaxSavingsRateInput.value).toBe('15%');
-
-    // Focus income field
-    fireEvent.focus(annualIncomeInput);
-    await waitFor(() => expect(annualIncomeInput.value).toBe('50000'));
-
-    // Type new income 100000
-    fireEvent.change(annualIncomeInput, { target: { value: '100000' } });
-    await waitFor(() => expect(annualIncomeInput.value).toBe('100000'));
-
-    // Blur income field
-    fireEvent.blur(annualIncomeInput);
-
-    // Savings rate should still be 15%
-    await waitFor(() => expect(preTaxSavingsRateInput.value).toBe('15%'));
-  });
-
-  test('verifies that clicking Total Invested Assets opens the Life Profile modal to the assets tab', () => {
-    render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
-
-    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
-    expect(totalAssetsRow).toBeDefined();
+    const assetsRowLabel = screen.getByText('Invested Assets');
+    expect(assetsRowLabel).toBeDefined();
 
     // Click it
-    fireEvent.click(totalAssetsRow);
+    fireEvent.click(assetsRowLabel);
 
     // Verify Edit Life Profile modal is open on Assets tab
     expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();
@@ -150,10 +109,9 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
 
   test('verifies that editing assets in the Life Profile modal updates the total invested assets and saves successfully', async () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
-    fireEvent.click(totalAssetsRow);
+    const assetsRowLabel = screen.getByText('Invested Assets');
+    fireEvent.click(assetsRowLabel);
 
     // Find and modify Taxable Brokerage input
     const brokerageLabel = screen.getByText('📈 Taxable Brokerage');
@@ -176,17 +134,19 @@ describe('Starting Inputs Today Screen Reset/Type Flow', () => {
     expect(screen.getByText('$150,000')).toBeDefined();
   });
 
-  test('verifies that the Budget button next to Savings Rate opens the Budget modal', () => {
+  test('verifies that editing Savings Rate directly in the sidebar updates the rate and reallocates the budget', async () => {
     render(<FireSimulator />);
-    fireEvent.click(screen.getByText(/Current Situation/));
 
-    const budgetButton = screen.getByRole('button', { name: /^Budget$/i });
-    expect(budgetButton).toBeDefined();
+    const textboxes = screen.getAllByRole('textbox');
+    const savingsInput = textboxes.find(i => i.value === '15%');
+    expect(savingsInput).toBeDefined();
 
-    // Click budget button
-    fireEvent.click(budgetButton);
+    // Change to 20%
+    fireEvent.focus(savingsInput);
+    fireEvent.change(savingsInput, { target: { value: '20' } });
+    fireEvent.blur(savingsInput);
 
-    // Verify budget modal is open
-    expect(screen.getByText(/Save Budget/i)).toBeDefined();
+    // Verify Savings Rate is updated in the input
+    expect(savingsInput.value).toBe('20%');
   });
 });

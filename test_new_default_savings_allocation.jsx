@@ -227,6 +227,6 @@ describe('New Default Savings Allocation', () => {
     fireEvent.click(saveBudgetBtn);
 
     // Verify we are back on the main dashboard
-    expect(screen.getByText(/Your Current Situation/i)).toBeDefined();
+    expect(screen.getByText(/Your Situation/i)).toBeDefined();
   });
 });

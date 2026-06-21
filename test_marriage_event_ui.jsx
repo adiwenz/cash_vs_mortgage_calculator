@@ -21,7 +21,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     render(<FireSimulator />);
     
     // Set starting savings/investments to 100k via the Life Profile modal
-    const totalAssetsRow = screen.getByText('🏦 Total Invested Assets');
+    const totalAssetsRow = screen.getByText('Invested Assets');
     fireEvent.click(totalAssetsRow);
     
     const brokerageLabel = screen.getByText('📈 Taxable Brokerage');

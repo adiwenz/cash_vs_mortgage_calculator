@@ -739,6 +739,7 @@ export default function BudgetModal({
     setIsHovering,
     defaultTemplate,
     budgetMonthlyIncome,
+    setBudgetMonthlyIncome,
     budgetExpenses,
     setBudgetExpenses,
     budgetSavings,

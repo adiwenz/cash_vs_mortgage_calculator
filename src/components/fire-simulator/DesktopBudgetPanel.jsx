@@ -1,6 +1,6 @@
 import { formatCurrency, formatCompactCurrency, clampMoneyValue, clampPercentageValue } from './helpers';
 import { getRetirementLimit } from '../../simulatorMathUtils';
-import { NumberInput } from '../ui/PlainInputs';
+import { NumberInput, CurrencyInput } from '../ui/PlainInputs';
 import { syncBudgetDetails } from '../../calculators/fire/index.js';
 
 export default function DesktopBudgetPanel({
@@ -32,6 +32,7 @@ export default function DesktopBudgetPanel({
   setIsHovering,
   defaultTemplate,
   budgetMonthlyIncome,
+  setBudgetMonthlyIncome,
   budgetExpenses,
   setBudgetExpenses,
   budgetSavings,
@@ -444,6 +445,27 @@ export default function DesktopBudgetPanel({
           {/* Income & Allocation Progress Panel */}
           <div className="budget-summary-section" style={{ background: 'var(--bg-primary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1.5rem' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Gross Annual Income</span>
+                <CurrencyInput
+                  style={{
+                    fontSize: '1.2rem',
+                    fontWeight: 'bold',
+                    padding: '0.2rem 0.4rem',
+                    width: '120px',
+                    color: 'var(--text-primary)',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxSizing: 'border-box'
+                  }}
+                  value={budgetMonthlyIncome * 12}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                    setBudgetMonthlyIncome(Math.round(val / 12));
+                  }}
+                />
+              </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly Salary (Net)</span>
                 <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{formatCurrency(takeHomeIncome)}</span>

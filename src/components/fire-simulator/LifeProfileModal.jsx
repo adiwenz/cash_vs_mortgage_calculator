@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
-import { formatCurrency } from './helpers';
+import { formatCurrency, clampAgeValue } from './helpers';
 
 export default function LifeProfileModal({
   isOpen,
@@ -26,10 +26,12 @@ export default function LifeProfileModal({
 
   // Local state for profile edits prior to saving
   const [localProfile, setLocalProfile] = useState(defaultProfile);
+  const [localAge, setLocalAge] = useState(inputs.currentAge || 35);
 
   // Sync state with inputs when modal opens
   useEffect(() => {
     if (isOpen) {
+      setLocalAge(inputs.currentAge || 35);
       const merged = JSON.parse(JSON.stringify({
         ...defaultProfile,
         ...(inputs.lifeProfile || {})
@@ -174,6 +176,10 @@ export default function LifeProfileModal({
     // Update simpleInvestments in inputs to keep it synced
     updateInput('simpleInvestments', totalAssets);
 
+    // Update currentAge in inputs
+    const clampedAge = clampAgeValue(localAge);
+    updateInput('currentAge', clampedAge !== null ? clampedAge : 35);
+
     // Also sync raw assets object just in case other panels expect it
     const legacyAssets = {
       cash: Number(localProfile.assets.cash || 0),
@@ -242,17 +248,34 @@ export default function LifeProfileModal({
             <div className="life-profile-tab-content-panel">
               {activeTab === 'household' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div className="life-profile-form-group">
-                    <label className="life-profile-label-bold">Relationship Status</label>
-                    <select
-                      className="life-profile-select-field"
-                      value={localProfile.household.status}
-                      onChange={(e) => updateHouseholdField('status', e.target.value)}
-                    >
-                      <option value="single">Single</option>
-                      <option value="married">Married</option>
-                      <option value="partnered">Partnered</option>
-                    </select>
+                  <div className="life-profile-row-two-col">
+                    <div className="life-profile-form-group">
+                      <label className="life-profile-label-bold">Your Age</label>
+                      <NumberInput
+                        className="life-profile-input-field"
+                        value={localAge === null ? '' : localAge}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLocalAge(val === '' ? '' : parseInt(val, 10));
+                        }}
+                        onBlur={(e) => {
+                          const clamped = clampAgeValue(e.target.value);
+                          setLocalAge(clamped !== null ? clamped : 35);
+                        }}
+                      />
+                    </div>
+                    <div className="life-profile-form-group">
+                      <label className="life-profile-label-bold">Relationship Status</label>
+                      <select
+                        className="life-profile-select-field"
+                        value={localProfile.household.status}
+                        onChange={(e) => updateHouseholdField('status', e.target.value)}
+                      >
+                        <option value="single">Single</option>
+                        <option value="married">Married</option>
+                        <option value="partnered">Partnered</option>
+                      </select>
+                    </div>
                   </div>
 
                   {(localProfile.household.status === 'married' || localProfile.household.status === 'partnered') && (

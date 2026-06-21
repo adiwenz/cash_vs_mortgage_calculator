@@ -29,13 +29,69 @@ export function useScenarioState() {
           [key]: value
         };
 
-        if (updatedInputs.hasCustomizedBudget === false && (key === 'simpleIncome' || key === 'simpleExpenses')) {
+        if (key === 'simpleIncome' || key === 'simpleExpenses') {
+          // Always sync top-level budget details
           const syncRes = syncBudgetDetails(
             updatedInputs.simpleIncome,
             updatedInputs.simpleExpenses,
             updatedInputs.budgetDetails
           );
           updatedInputs.budgetDetails = syncRes.budgetDetails;
+
+          // Reallocate all pre-retirement budget phases
+          if (updatedInputs.budgetDetails.phases && updatedInputs.budgetDetails.phases.length > 0) {
+            updatedInputs.budgetDetails.phases = updatedInputs.budgetDetails.phases.map(p => {
+              if (p.type === 'retire') return p;
+
+              // Scale income and expenses for this phase based on the ratio
+              const phaseIncome = (Number(p.income) || 0) * 12 || Number(updatedInputs.simpleIncome);
+              const phaseExpenses = (Number(updatedInputs.simpleExpenses) / Number(updatedInputs.simpleIncome || 1)) * phaseIncome;
+
+              const syncedPhase = syncBudgetDetails(
+                phaseIncome,
+                phaseExpenses,
+                p
+              );
+
+              const newP = {
+                ...p,
+                income: Math.round(phaseIncome / 12),
+                expenses: syncedPhase.budgetDetails.expenses,
+                savings: syncedPhase.budgetDetails.savings,
+                partnerSavings: syncedPhase.budgetDetails.partnerSavings,
+                savingsAllocMode: syncedPhase.budgetDetails.savingsAllocMode
+              };
+
+              // Recalculate expense/savings ratios and category ratios
+              const resolvedIncome = Number(newP.income) || 0;
+              const totalExpensesMonthly = Object.keys(newP.expenses)
+                .filter(k => !k.startsWith('debt_'))
+                .reduce((sum, k) => sum + (Number(newP.expenses[k]) || 0), 0);
+
+              const userSavingsSum = Object.values(newP.savings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+              const partnerSavingsSum = Object.values(newP.partnerSavings || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+              const totalSavingsMonthly = userSavingsSum + partnerSavingsSum;
+
+              newP.expenseRatio = resolvedIncome > 0 ? (totalExpensesMonthly / resolvedIncome) : 0;
+              newP.savingsRatio = resolvedIncome > 0 ? (totalSavingsMonthly / resolvedIncome) : 0;
+
+              newP.categoryRatios = {};
+              if (resolvedIncome > 0) {
+                Object.keys(newP.expenses).forEach(k => {
+                  newP.categoryRatios[k] = (Number(newP.expenses[k]) || 0) / resolvedIncome;
+                });
+                Object.keys(newP.savings || {}).forEach(k => {
+                  newP.categoryRatios[`savings_${k}`] = (Number(newP.savings[k]) || 0) / resolvedIncome;
+                });
+                Object.keys(newP.partnerSavings || {}).forEach(k => {
+                  newP.categoryRatios[`partnerSavings_${k}`] = (Number(newP.partnerSavings[k]) || 0) / resolvedIncome;
+                });
+              }
+
+              return newP;
+            });
+          }
         }
 
         return {
