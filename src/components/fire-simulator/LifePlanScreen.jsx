@@ -809,13 +809,31 @@ export default function LifePlanScreen({
 
           {/* Right Column */}
           <div className="desktop-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
-            <GoalHeroCard
-              currentAge={Number(inputs.currentAge) || 35}
-              targetRetirementAge={Number(inputs.targetRetirementAge) || 65}
-              projectedRetirementAge={displayedResults.retirementReadyAge}
-              status={displayedResults.retirementOutcome}
-              onTargetAgeChange={(newAge) => commitEventAgeChange({ type: 'retire' }, newAge)}
-            />
+            {(() => {
+              const lifeExpectancyVal = Number(inputs.lifeExpectancy) || 85;
+              const hasSolvableRecommendations = !!(
+                improvementPlan?.rankedPlan?.some(plan =>
+                  Number.isFinite(plan.readyAge) &&
+                  plan.readyAge <= lifeExpectancyVal
+                ) ||
+                improvementPlan?.rankedPlan?.some(plan =>
+                  (Number.isFinite(plan.yearsImprovement) && plan.yearsImprovement > 0) ||
+                  (Number.isFinite(plan.yearsImproved) && plan.yearsImproved > 0)
+                )
+              );
+              return (
+                <GoalHeroCard
+                  currentAge={Number(inputs.currentAge) || 35}
+                  targetRetirementAge={Number(inputs.targetRetirementAge) || 65}
+                  projectedRetirementAge={displayedResults.retirementReadyAge}
+                  lifeExpectancy={lifeExpectancyVal}
+                  hasSolvableRecommendations={hasSolvableRecommendations}
+                  status={displayedResults.retirementOutcome}
+                  onTargetAgeChange={(newAge) => commitEventAgeChange({ type: 'retire' }, newAge)}
+                  isRetirementSuccessful={displayedResults.isRetirementSuccessful}
+                />
+              );
+            })()}
 
             {/* Projection Graph */}
         {validation.errors.length === 0 && (

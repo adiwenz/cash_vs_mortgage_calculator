@@ -136,11 +136,50 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   const baseActiveLoansSum = (profile.debtList || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
   const initialDebtSum = baseActiveLoansSum + customDebtsSum;
 
+  const currentInvestedAssets = (Number(assets.cash) || 0) +
+                       (Number(assets.emergencyFund) || 0) +
+                       (Number(assets.brokerage) || 0) +
+                       (Number(assets.trad401k) || 0) +
+                       (Number(assets.tradIra) || 0) +
+                       (Number(assets.rothIra) || 0) +
+                       (Number(assets.hsa) || 0) +
+                       (Number(assets.other) || 0) +
+                       customAssetsStartingValue;
+
+  const simpleIncome = Number(profile.simpleIncome) || 0;
+  const simpleExpenses = Number(profile.simpleExpenses) || 0;
+  const annualSavings = simpleIncome - simpleExpenses;
+
+  let retirementIncomeSourcesInTodayDollarsGuard = 0;
+  enabledEvents.forEach(ev => {
+    if (['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type)) {
+      let monthlyBenefit = Number(ev.monthlyBenefit) || 0;
+      if (ev.type === 'socialSecurity') {
+        monthlyBenefit = socialSecurityDetails.monthlyBenefit;
+      }
+      retirementIncomeSourcesInTodayDollarsGuard += monthlyBenefit * 12;
+    }
+  });
+
+  const retireEv = events.find(e => e.type === 'retire' && e.enabled !== false);
+  const retSpendingPercent = (retireEv?.spendingPercent !== undefined
+    ? Number(retireEv.spendingPercent)
+    : 70) / 100;
+  const retirementSpending = simpleExpenses * retSpendingPercent;
+
+  const hasGuaranteedFutureRetirementIncome = retirementIncomeSourcesInTodayDollarsGuard >= retirementSpending;
+
+  const shouldSkipSearch = profile.skipReadyAgeSearch || (
+    currentInvestedAssets <= 0 && 
+    annualSavings <= 0 && 
+    !hasGuaranteedFutureRetirementIncome
+  );
+
   let retirementReadyAgeSWR = null;
   let retirementReadyAgeComfortable = null;
   let retirementReadyAgeSurvival = null;
 
-  if (!profile.skipReadyAgeSearch) {
+  if (!shouldSkipSearch) {
     let lowSWR = currentAge;
     let highSWR = maxLifeExpectancy;
     while (lowSWR <= highSWR) {
@@ -288,6 +327,7 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     fiAge: retirementReadyAge,
     yearsToFI: retirementReadyAge !== null ? Math.max(0, retirementReadyAge - currentAge) : null,
     retirementReadyAge: retirementReadyAge,
+    isRetirementSuccessful: retirementReadyAge !== null && retirementReadyAge !== undefined,
     retirementReadyTarget: retirementReadyTarget,
     retirementReadyTargetNoSS: retirementReadyTargetNoSS,
     retirementReadyTargetComfortable,
