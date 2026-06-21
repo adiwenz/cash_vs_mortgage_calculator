@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ReferenceArea } from 'recharts';
 import { formatCurrency, formatCompactFinancial, getEventIcon, isFinancialEvent, getEventMarkerPosition, isEditableEvent } from './helpers';
 
 const CustomEventMarker = (props) => {
@@ -289,6 +289,79 @@ export default function ProjectionGraph({
   const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
   const [expandedCluster, setExpandedCluster] = useState(null);
 
+  const [refAreaLeft, setRefAreaLeft] = useState(null);
+  const [refAreaRight, setRefAreaRight] = useState(null);
+  const [zoomDomain, setZoomDomain] = useState(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const zoomDragOccurredRef = useRef(false);
+
+  const getActiveAge = (e) => {
+    const age = Number(e?.activeLabel);
+    return Number.isFinite(age) ? age : null;
+  };
+
+  const handleMouseDown = (e) => {
+    if (isMobile) return;
+    const age = getActiveAge(e);
+    if (age !== null) {
+      setRefAreaLeft(age);
+      setRefAreaRight(age);
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isMobile) return;
+    if (refAreaLeft !== null) {
+      const age = getActiveAge(e);
+      if (age !== null) {
+        setRefAreaRight(age);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (isMobile) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
+    if (refAreaLeft == null || refAreaRight == null || refAreaLeft === refAreaRight) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
+
+    let left = refAreaLeft;
+    let right = refAreaRight;
+    if (left > right) {
+      [left, right] = [right, left];
+    }
+
+    if (right - left >= 1) {
+      setZoomDomain([left, right]);
+      setIsZoomed(true);
+      zoomDragOccurredRef.current = true;
+    }
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  };
+
+  const handleResetZoom = (e) => {
+    e.stopPropagation();
+    setZoomDomain(null);
+    setIsZoomed(false);
+  };
+
+  const handleChartClick = (data) => {
+    if (zoomDragOccurredRef.current) {
+      zoomDragOccurredRef.current = false;
+      return;
+    }
+    if (data && data.activeLabel) {
+      setSelectedYear(Number(data.activeLabel));
+    }
+  };
+
   const maxNetWorth = useMemo(() => {
     if (!chartData || chartData.length === 0) return 0;
     return Math.max(...chartData.map(d => Math.abs(d.netWorth ?? 0)));
@@ -329,6 +402,20 @@ export default function ProjectionGraph({
   }, [activeTooltipCoord, isMobile]);
 
 
+
+  const fullMinAge = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 0;
+    return Math.min(...chartData.map(d => d.age));
+  }, [chartData]);
+
+  const fullMaxAge = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 100;
+    return Math.max(...chartData.map(d => d.age));
+  }, [chartData]);
+
+  const activeDomain = useMemo(() => {
+    return zoomDomain ?? [fullMinAge, fullMaxAge];
+  }, [zoomDomain, fullMinAge, fullMaxAge]);
 
   // Align event ages to the closest discrete age point in chartData to lookup Net Worth coordinate
   const referenceDotsData = useMemo(() => {
@@ -377,14 +464,56 @@ export default function ProjectionGraph({
     });
   }, [timelineEvents, chartData, draggingInfo]);
 
+  const visibleReferenceDots = useMemo(() => {
+    return referenceDotsData.filter(d => d.x >= activeDomain[0] && d.x <= activeDomain[1]);
+  }, [referenceDotsData, activeDomain]);
+
   const topMargin = isMobile ? 55 : 78;
 
   return (
     <div ref={chartContainerRef} className="chart-container-inner timeline-track-inner" style={{ height: isMobile ? '240px' : '265px', cursor: 'crosshair', width: '100%', position: 'relative', zIndex: expandedCluster ? 100 : 'auto' }}>
+      {!isMobile && isZoomed && (
+        <button
+          onClick={handleResetZoom}
+          className="reset-zoom-btn"
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            zIndex: 50,
+            padding: '0.4rem 0.8rem',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            borderRadius: '8px',
+            background: 'var(--bg-secondary, #ffffff)',
+            color: 'var(--text-primary, #1f2937)',
+            border: '1px solid var(--border, #e5e7eb)',
+            cursor: 'pointer',
+            boxShadow: 'var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05))',
+            transition: 'all 150ms ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg-tertiary, #f3f4f6)';
+            e.currentTarget.style.borderColor = 'var(--primary, #2563eb)';
+            e.currentTarget.style.color = 'var(--primary, #2563eb)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--bg-secondary, #ffffff)';
+            e.currentTarget.style.borderColor = 'var(--border, #e5e7eb)';
+            e.currentTarget.style.color = 'var(--text-primary, #1f2937)';
+          }}
+        >
+          Reset zoom
+        </button>
+      )}
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
           margin={{ top: topMargin, right: 10, left: 10, bottom: 5 }}
+          onMouseDown={handleMouseDown}
           onMouseMove={(e) => {
             if (e && e.activeCoordinate) {
               setActiveTooltipCoord({
@@ -394,15 +523,15 @@ export default function ProjectionGraph({
             } else {
               setActiveTooltipCoord(null);
             }
+            handleMouseMove(e);
           }}
           onMouseLeave={() => {
             setActiveTooltipCoord(null);
+            setRefAreaLeft(null);
+            setRefAreaRight(null);
           }}
-          onClick={(data) => {
-            if (data && data.activeLabel) {
-              setSelectedYear(Number(data.activeLabel));
-            }
-          }}
+          onMouseUp={handleMouseUp}
+          onClick={handleChartClick}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis
@@ -410,7 +539,19 @@ export default function ProjectionGraph({
             stroke="var(--text-tertiary)"
             fontFamily="var(--font-body)"
             fontSize={10}
+            type="number"
+            domain={activeDomain}
+            allowDataOverflow
           />
+          {refAreaLeft !== null && refAreaRight !== null && (
+            <ReferenceArea
+              x1={refAreaLeft}
+              x2={refAreaRight}
+              strokeOpacity={0.3}
+              fill="var(--primary)"
+              fillOpacity={0.15}
+            />
+          )}
           <YAxis
             stroke="var(--text-tertiary)"
             fontFamily="var(--font-body)"
@@ -453,7 +594,7 @@ export default function ProjectionGraph({
           {(() => {
             // Group reference dots by their mapped age (x) and assign stacking information
             const grouped = {};
-            referenceDotsData.forEach(d => {
+            visibleReferenceDots.forEach(d => {
               if (!grouped[d.x]) {
                 grouped[d.x] = [];
               }
@@ -597,6 +738,10 @@ export default function ProjectionGraph({
             }
             return evt.age;
           })();
+
+          if (displayAge < activeDomain[0] || displayAge > activeDomain[1]) {
+            return null;
+          }
 
           const eventIcon = getEventIcon(evt);
           const totalYears = inputs ? inputs.lifeExpectancy - inputs.currentAge : 50;
