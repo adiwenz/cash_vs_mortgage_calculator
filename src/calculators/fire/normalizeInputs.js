@@ -46,7 +46,7 @@ export function getProfileFromInputs(inputs) {
     assets: inputs.assets || {},
     budgetDetails: inputs.budgetDetails || {},
     skipReadyAgeSearch: inputs.skipReadyAgeSearch,
-    readinessCriteria: inputs.readinessCriteria || 'lastsComfortable',
+    readinessCriteria: 'lastsLifeExp',
     allocationRules: inputs.allocationRules || [],
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],

@@ -441,42 +441,16 @@ export function useTimelineEvents(inputs, displayedResults) {
     });
 
     // 5. FIRE Milestones
-    if (inp.readinessCriteria === 'lastsLifeExp') {
-      if (calc.retirementReadyAgeSurvival) {
-        events.push({
-          age: calc.retirementReadyAgeSurvival,
-          title: `You're Set!`,
-          label: `You're Set!`,
-          icon: '🎯',
-          type: 'retirementReadySurvival',
-          isMilestone: true,
-          description: `This milestone marks the first year where the portfolio can sustainably support spending.`
-        });
-      }
-    } else if (inp.readinessCriteria === 'lastsComfortable') {
-      if (calc.retirementReadyAgeComfortable) {
-        events.push({
-          age: calc.retirementReadyAgeComfortable,
-          title: `You're Set!`,
-          label: `You're Set!`,
-          icon: '🎯',
-          type: 'retirementReadyComfortable',
-          isMilestone: true,
-          description: `This milestone marks the first year where the portfolio can sustainably support spending.`
-        });
-      }
-    } else {
-      if (calc.retirementReadyAgeSWR) {
-        events.push({
-          age: calc.retirementReadyAgeSWR,
-          title: `You're Set!`,
-          label: `You're Set!`,
-          icon: '🎯',
-          type: 'retirementReadySWR',
-          isMilestone: true,
-          description: `This milestone marks the first year where the portfolio can sustainably support spending.`
-        });
-      }
+    if (calc.retirementReadyAgeSurvival) {
+      events.push({
+        age: calc.retirementReadyAgeSurvival,
+        title: `You're Set!`,
+        label: `You're Set!`,
+        icon: '🎯',
+        type: 'retirementReadySurvival',
+        isMilestone: true,
+        description: `This milestone marks the first year where the portfolio can sustainably support spending.`
+      });
     }
 
     if (calc.coastAge) {

@@ -2560,30 +2560,9 @@ export default function MobileFireSimulatorView({
               </div>
             </div>
 
-            {/* Advanced Configuration */}
             <div className="mobile-card" style={{ textAlign: 'left' }}>
               <div className="mobile-details-group-title">🛠️ Advanced Configuration</div>
-              
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '1rem' }}>
-                <div className="mobile-input-row-align-start">
-                  <div className="mobile-input-label-col">
-                    <span className="mobile-input-title">Readiness Criteria</span>
-                    <span className="mobile-input-desc">What determines a successful plan</span>
-                  </div>
-                  <div className="mobile-input-box-wrapper">
-                    <select
-                      className="mobile-input-box"
-                      style={{ textAlign: 'left', paddingRight: '0.2rem', fontSize: '0.75rem' }}
-                      value={inputs.readinessCriteria || 'lastsComfortable'}
-                      onChange={(e) => updateInput('readinessCriteria', e.target.value)}
-                    >
-                      <option value="lastsLifeExp">Sustainable (Lasts Life Exp)</option>
-                      <option value="lastsComfortable">Comfortable (Life Exp + 10 yrs)</option>
-                      <option value="lastsIndefinitely">SWR Capital Preservation</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div className="mobile-input-row">
                   <label className="mobile-checkbox-label">
                     <input

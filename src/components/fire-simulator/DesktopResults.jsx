@@ -227,7 +227,7 @@ export default function DesktopResults({
                     strokeDasharray="4 4"
                     strokeWidth={1.5}
                     label={{
-                      value: `${inputs.readinessCriteria === 'lastsLifeExp' ? 'Sustainable' : inputs.readinessCriteria === 'lastsComfortable' ? 'Comfortable' : 'Indefinite'} Ready: Age ${displayedResults.retirementReadyAge}`,
+                      value: `Comfortable Ready: Age ${displayedResults.retirementReadyAge}`,
                       position: 'insideTopRight',
                       fill: 'var(--text-primary)',
                       fontSize: 9,

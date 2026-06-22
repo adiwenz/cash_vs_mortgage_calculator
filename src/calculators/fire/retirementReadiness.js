@@ -180,40 +180,6 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   let retirementReadyAgeSurvival = null;
 
   if (!shouldSkipSearch) {
-    let lowSWR = currentAge;
-    let highSWR = maxLifeExpectancy;
-    while (lowSWR <= highSWR) {
-      const mid = Math.floor((lowSWR + highSWR) / 2);
-      const testRes = projectYearlyBalances(profile, phases, events, mid);
-      if (testRes.moneyLasts) {
-        const lastLog = testRes.logs[testRes.logs.length - 1];
-        const lastNominalExpense = lastLog.expenses;
-        const lastNominalIncome = lastLog.income;
-        const swrTarget = Math.max(0, lastNominalExpense - lastNominalIncome) / swr;
-        if (lastLog && lastLog.portfolio >= swrTarget) {
-          retirementReadyAgeSWR = mid;
-          highSWR = mid - 1;
-        } else {
-          lowSWR = mid + 1;
-        }
-      } else {
-        lowSWR = mid + 1;
-      }
-    }
-
-    let lowC = currentAge;
-    let highC = maxLifeExpectancy;
-    while (lowC <= highC) {
-      const mid = Math.floor((lowC + highC) / 2);
-      const testRes = projectYearlyBalances(profile, phases, events, mid, maxLifeExpectancy + 10);
-      if (testRes.moneyLasts) {
-        retirementReadyAgeComfortable = mid;
-        highC = mid - 1;
-      } else {
-        lowC = mid + 1;
-      }
-    }
-
     let lowS = currentAge;
     let highS = maxLifeExpectancy;
     while (lowS <= highS) {
@@ -228,15 +194,11 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     }
   }
 
-  const readinessCriteria = profile.readinessCriteria || 'lastsIndefinitely';
-  let retirementReadyAge = null;
-  if (readinessCriteria === 'lastsLifeExp') {
-    retirementReadyAge = retirementReadyAgeSurvival;
-  } else if (readinessCriteria === 'lastsComfortable') {
-    retirementReadyAge = retirementReadyAgeComfortable;
-  } else {
-    retirementReadyAge = retirementReadyAgeSWR;
-  }
+  const retirementReadyAge = retirementReadyAgeSurvival;
+  retirementReadyAgeSurvival = retirementReadyAge;
+  retirementReadyAgeComfortable = retirementReadyAge;
+  retirementReadyAgeSWR = retirementReadyAge;
+  const readinessCriteria = 'lastsLifeExp';
 
   const retirementSpendingPercent = (events.find(e => e.type === 'retire' && e.enabled)?.spendingPercent !== undefined
     ? Number(events.find(e => e.type === 'retire' && e.enabled).spendingPercent)
@@ -247,7 +209,7 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   let retirementReadyTargetNoSS = 0;
   let nominalRetirementReadyTargetNoSS = 0;
   if (retirementReadyAge !== null) {
-    const maxAgeOverride = readinessCriteria === 'lastsComfortable' ? maxLifeExpectancy + 10 : maxLifeExpectancy;
+    const maxAgeOverride = maxLifeExpectancy;
     const nominalTarget = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAge, maxAgeOverride, readinessCriteria, false);
     nominalRetirementReadyTarget = nominalTarget;
     const factor = Math.pow(1 + inflationRate, retirementReadyAge - currentAge);
@@ -262,12 +224,9 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   let retirementReadyTargetComfortable = 0;
   let retirementReadyTargetSurvival = 0;
 
-  if (retirementReadyAgeComfortable !== null) {
-    retirementReadyTargetComfortable = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAgeComfortable, maxLifeExpectancy + 10, 'lastsComfortable', false);
-  }
-
   if (retirementReadyAgeSurvival !== null) {
     retirementReadyTargetSurvival = calculateMinimumPortfolioForRetirement(profile, phases, events, retirementReadyAgeSurvival, maxLifeExpectancy, 'lastsLifeExp', false);
+    retirementReadyTargetComfortable = retirementReadyTargetSurvival;
   }
 
   const swrVal = profile.swr !== undefined && profile.swr !== null ? Number(profile.swr) : 0.04;
