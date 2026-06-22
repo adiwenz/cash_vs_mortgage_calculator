@@ -47,18 +47,18 @@ describe('Mobile Budget Phase Editor', () => {
     fireEvent.click(editBtn);
     
     // Assert Modal is Open
-    expect(screen.getByRole('heading', { name: /Working Budget/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Current Budget/i })).toBeDefined();
 
     // Verify copy
-    expect(screen.getByText(/Tap Needs, Wants, or Savings to edit this phase./i)).toBeDefined();
+    expect(screen.getByText(/Tap Needs, Wants, or Savings & Investing rings to view and edit details./i)).toBeDefined();
 
     // Verify breakdown card labels and headers are visible
     // Tapping Needs opens fixed category sheet
-    const needsRow = screen.getByText('Housing, food, healthcare');
-    fireEvent.click(needsRow);
+    const needsRing = screen.getByText('Needs', { exact: true }).closest('.budget-card');
+    fireEvent.click(needsRing);
 
     // Verify the category sheet header is visible
-    expect(screen.getByRole('heading', { name: /Needs Allocation/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Needs/i })).toBeDefined();
 
     // Find an input field inside the sheet (e.g. Housing)
     const housingWrapper = screen.getByText('Housing (Rent/Mortgage)');
@@ -79,16 +79,16 @@ describe('Mobile Budget Phase Editor', () => {
 
     // Verify Needs Allocation sheet is closed (heading no longer visible)
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Needs Allocation/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Needs/i })).toBeNull();
     });
 
-    // Check that Needs total on the main panel updated live (needsTotal = 1500 -> 1800, so +300. original needs total: 1500+300+400+400+300 = 2900. New: 3200)
-    expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
+    // Check that Needs total on the main panel updated live (needsTotal = 1500 -> 1800, so +300. original needs total: 2900. New: 3200)
+    expect(screen.getAllByText('$3,200')[0]).toBeDefined();
 
     // Tapping Wants opens Wants fixed sheet
-    const wantsRow = screen.getByText('Dining, travel, fun');
-    fireEvent.click(wantsRow);
-    expect(screen.getByRole('heading', { name: /Wants Allocation/i })).toBeDefined();
+    const wantsRing = screen.getByText('Wants', { exact: true }).closest('.budget-card');
+    fireEvent.click(wantsRing);
+    expect(screen.getByRole('heading', { name: /Wants/i })).toBeDefined();
 
     const leisureWrapper = screen.getByText('Leisure & Travel');
     const leisureInput = leisureWrapper.closest('div').querySelector('input');
@@ -100,18 +100,18 @@ describe('Mobile Budget Phase Editor', () => {
     fireEvent.click(doneBtn2);
     
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Wants Allocation/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Wants/i })).toBeNull();
     });
     
-    expect(screen.getAllByText('$841.83/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$841.83')[0]).toBeDefined();
 
     // Tapping Savings opens Savings fixed sheet
-    const savingsRow = screen.getByText('Brokerage, cash, retirement');
-    fireEvent.click(savingsRow);
-    expect(screen.getByRole('heading', { name: /Savings Allocation/i })).toBeDefined();
+    const savingsRing = screen.getByText('Savings', { exact: true }).closest('.budget-card');
+    fireEvent.click(savingsRing);
+    expect(screen.getByRole('heading', { name: /Savings & Investing/i })).toBeDefined();
 
-    const brokerageWrapper = screen.getByText('Taxable Brokerage');
-    const brokerageRow = brokerageWrapper.closest('div').parentElement;
+    const brokerageWrapper = screen.getByText('Brokerage');
+    const brokerageRow = brokerageWrapper.closest('.breakdown-row');
     const brokerageInput = brokerageRow.querySelector('input');
     expect(brokerageInput.value).toBe('625');
     fireEvent.change(brokerageInput, { target: { value: '1000' } });
@@ -121,10 +121,10 @@ describe('Mobile Budget Phase Editor', () => {
     fireEvent.click(doneBtn3);
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Savings Allocation/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Savings & Investing/i })).toBeNull();
     });
 
-    expect(screen.getAllByText('$1,000/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$1,000')[0]).toBeDefined();
 
     // Save Budget persists changes
     const saveBudgetBtn = screen.getByRole('button', { name: /Save Budget/i });
@@ -132,20 +132,20 @@ describe('Mobile Budget Phase Editor', () => {
 
     // Verify modal is closed
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Working Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Current Budget/i })).toBeNull();
     });
 
     // Re-open budget modal to verify values persisted
     const editBtnRef = await screen.findByText('Edit Budget');
     fireEvent.click(editBtnRef);
 
-    expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
-    expect(screen.getAllByText('$841.83/mo')[0]).toBeDefined();
-    expect(screen.getAllByText('$1,000/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$3,200')[0]).toBeDefined();
+    expect(screen.getAllByText('$841.83')[0]).toBeDefined();
+    expect(screen.getAllByText('$1,000')[0]).toBeDefined();
 
     // Now test Cancel functionality
-    const needsRowRef = screen.getByText('Housing, food, healthcare');
-    fireEvent.click(needsRowRef);
+    const needsRingRef = screen.getByText('Needs', { exact: true }).closest('.budget-card');
+    fireEvent.click(needsRingRef);
     
     const housingWrapperRef = screen.getByText('Housing (Rent/Mortgage)');
     const housingInputRef = housingWrapperRef.closest('div').querySelector('input');
@@ -159,13 +159,13 @@ describe('Mobile Budget Phase Editor', () => {
     fireEvent.click(cancelBtn);
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Working Budget/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Current Budget/i })).toBeNull();
     });
 
     // Re-open to verify it was NOT saved (should still be 3200, not 3400)
     const editBtnRef2 = await screen.findByText('Edit Budget');
     fireEvent.click(editBtnRef2);
 
-    expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
+    expect(screen.getAllByText('$3,200')[0]).toBeDefined();
   });
 });

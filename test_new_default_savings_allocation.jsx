@@ -209,13 +209,9 @@ describe('New Default Savings Allocation', () => {
     const budgetBtn = screen.getByRole('button', { name: /Set Budget|Calculate from budget/i });
     fireEvent.click(budgetBtn);
 
-    // Expand the Savings section
-    const savingsCard = document.querySelector('.budget-modal-card .budget-card.save') || screen.getAllByText(/Save & Invest/i)[0];
-    fireEvent.click(savingsCard);
-
-    // Click Edit Savings to enable inputs
-    const editSavingsLink = screen.getByText(/Edit Savings/i);
-    fireEvent.click(editSavingsLink);
+    // Select the Savings & Investing category ring
+    const savingsRing = screen.getAllByText(/Savings & Investing/i)[0].closest('.budget-card');
+    fireEvent.click(savingsRing);
 
     // Change checking account savings to 50
     const checkingAccInput = getInputByWrapperText(/Checking Account/i);

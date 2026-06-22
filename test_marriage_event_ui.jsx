@@ -188,10 +188,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
     // Expand Savings section
-    fireEvent.click(document.querySelector('.budget-card.save'));
-
-    // Click Edit Savings to enable inputs
-    fireEvent.click(screen.getByText(/Edit Savings/i));
+    fireEvent.click(screen.getAllByText(/Savings & Investing/i)[0].closest('.budget-card'));
 
     // Verify partner savings allocations match user's exactly:
     // User's default budgetDetails.savings has trad401k=200, rothIra=100, hsa=50, checking=100, hysa=100, emergency=75
@@ -254,11 +251,9 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     fireEvent.click(screen.getAllByRole('button', { name: /Set Budget/i })[0]);
     expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
-    // Expand Needs section
-    fireEvent.click(document.querySelector('.budget-modal-card .budget-card.needs') || screen.getByText('Needs'));
-
-    // Click Edit Needs to enable inputs
-    fireEvent.click(screen.getByText(/Edit Needs/i));
+    // Select the Needs category ring
+    const needsRing = screen.getAllByText(/Needs/i)[0].closest('.budget-card');
+    fireEvent.click(needsRing);
 
     // Increase household spending: Housing Rent/Mortgage
     const housingInput = getInputByWrapperText(/Housing \(Rent\/Mortgage\)/i);

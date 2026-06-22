@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
 import { calculateUSTaxForModal, getRetirementLimit, capMonthlyContribution, roundCurrency } from '../../simulatorMathUtils';
-import { formatCurrency } from './helpers';
+import { 
+  formatCurrency,
+  getTimelineAges,
+  getEventsForAge,
+  getAppliedEventsThroughAge,
+  getBudgetForAge,
+  getCategoryBreakdown,
+  getChangesFromToday 
+} from './helpers';
 import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 import DesktopBudgetPanel from './DesktopBudgetPanel';
 import MobileBudgetPanel from './MobileBudgetPanel';
@@ -34,7 +42,7 @@ export default function BudgetModal({
   budgetHsaCoverage: legacyBudgetHsaCoverage,
   setBudgetHsaCoverage: legacySetBudgetHsaCoverage,
   budgetFilingStatus: legacyBudgetFilingStatus,
-  setBudgetFilingStatus: legacySetFilingStatus,
+  setBudgetFilingStatus: legacySetBudgetFilingStatus,
   budgetMonthlySpending: legacyBudgetMonthlySpending,
   setBudgetMonthlySpending: legacySetBudgetMonthlySpending,
   setBudgetMonthlySavings: legacySetBudgetMonthlySavings,
@@ -64,13 +72,65 @@ export default function BudgetModal({
   const budgetHsaCoverage = budgetController?.budgetHsaCoverage ?? legacyBudgetHsaCoverage;
   const setBudgetHsaCoverage = budgetController?.setBudgetHsaCoverage ?? legacySetBudgetHsaCoverage;
   const budgetFilingStatus = budgetController?.budgetFilingStatus ?? legacyBudgetFilingStatus;
-  const setBudgetFilingStatus = budgetController?.setBudgetFilingStatus ?? legacySetFilingStatus;
+  const setBudgetFilingStatus = budgetController?.setBudgetFilingStatus ?? legacySetBudgetFilingStatus;
   const budgetMonthlySpending = budgetController?.budgetMonthlySpending ?? legacyBudgetMonthlySpending;
   const setBudgetMonthlySpending = budgetController?.setBudgetMonthlySpending ?? legacySetBudgetMonthlySpending;
   const setBudgetMonthlySavings = budgetController?.setBudgetMonthlySavings ?? legacySetBudgetMonthlySavings;
   const pendingImprovement = budgetController?.pendingImprovement ?? legacyPendingImprovement;
   const handleCloseBudgetModal = budgetController?.handleCloseBudgetModal ?? legacyHandleCloseBudgetModal;
   const handleSaveBudget = budgetController?.handleSaveBudget ?? legacyHandleSaveBudget;
+
+  const [selectedBudgetAge, setSelectedBudgetAge] = useState(inputs.currentAge || 35);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  
+  const handleSelectBudgetAge = (newAge) => {
+    const newPhase = normalizedPhases.find(p => newAge >= p.startAge && newAge < p.endAge)
+                     || normalizedPhases[0];
+    if (newPhase && newPhase.id !== activeBudgetPhase) {
+      handleSwitchBudgetPhase(newPhase.id);
+    }
+    setSelectedBudgetAge(newAge);
+  };
+
+  const handleLockedRowClick = (row) => {
+    if (!row.isLocked) return;
+    let eventObj = null;
+    if (row.eventId) {
+      eventObj = (inputs.lifeEvents || []).find(e => e.id === row.eventId);
+    }
+    if (!eventObj && row.eventType) {
+      eventObj = (inputs.lifeEvents || []).find(e => e.type === row.eventType && e.enabled);
+    }
+
+    if (eventObj) {
+      if (eventController?.handleEditRoadmapEvent) {
+        eventController.handleEditRoadmapEvent(eventObj);
+      }
+      handleCloseBudgetModal();
+    } else if (row.eventType) {
+      if (eventController?.handleCreateEvent) {
+        eventController.handleCreateEvent(row.eventType);
+      }
+      handleCloseBudgetModal();
+    }
+  };
+
+  const handleAddEvent = (eventType) => {
+    let type = '';
+    if (eventType === 'Marriage') type = 'marriage';
+    else if (eventType === 'Child') type = 'child';
+    else if (eventType === 'Home Purchase') type = 'buyHouse';
+    else if (eventType === 'Borrowing') type = 'debt';
+    else if (eventType === 'Income Change / Promotion') type = 'careerChange';
+    else if (eventType === 'Windfall') type = 'windfall';
+    else if (eventType === 'Retirement / Social Security') type = 'socialSecurity';
+
+    if (eventController?.handleCreateEvent && type) {
+      eventController.handleCreateEvent(type);
+    }
+    handleCloseBudgetModal();
+  };
+
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [activeBreakdownTab, setActiveBreakdownTab] = useState('needs');
   const [isEditingNeeds, setIsEditingNeeds] = useState(false);
@@ -520,7 +580,30 @@ export default function BudgetModal({
     return { name: idOrType, icon: '❓', type: idOrType };
   };
 
-  const modalTitle = activePhaseObj ? `${activePhaseObj.label} Budget` : 'Work Phase Budget';
+  let modalTitle = '';
+  if (selectedBudgetAge === inputs.currentAge) {
+    modalTitle = `Current Budget (Age ${inputs.currentAge})`;
+  } else {
+    const events = getEventsForAge(inputs, selectedBudgetAge);
+    const majorEvents = events.filter(e => e.type !== 'today');
+    if (majorEvents.length === 1) {
+      let eventName = '';
+      const e = majorEvents[0];
+      if (e.type === 'haveChild') eventName = 'Child';
+      else if (e.type === 'marriage') eventName = 'Marriage';
+      else if (e.type === 'buyHouse') eventName = 'Home Purchase';
+      else if (e.type === 'windfall') eventName = 'Windfall';
+      else if (e.type === 'careerChange' || e.type === 'promotion') eventName = 'Promotion';
+      else if (e.type === 'retire') eventName = 'Retirement';
+      else eventName = e.name || e.type;
+
+      modalTitle = `Budget After ${eventName} (Age ${selectedBudgetAge})`;
+    } else if (majorEvents.length > 1) {
+      modalTitle = `Budget After Life Changes (Age ${selectedBudgetAge})`;
+    } else {
+      modalTitle = `Budget at Age ${selectedBudgetAge}`;
+    }
+  }
 
   const getPopoverDetails = () => {
     if (!activePhaseObj) return { activeEvents: [], phaseChanges: [] };
@@ -786,7 +869,17 @@ export default function BudgetModal({
     handleClearSavings,
     budgetScalingMode,
     handleToggleBudgetScalingMode,
-    budgetShortfall
+    budgetShortfall,
+
+    // Redesigned timeline properties
+    selectedBudgetAge,
+    setSelectedBudgetAge,
+    handleSelectBudgetAge,
+    selectedCategory,
+    setSelectedCategory,
+    handleLockedRowClick,
+    handleAddEvent,
+    eventController
   };
 
   return (
@@ -801,7 +894,7 @@ export default function BudgetModal({
         }
       `}</style>
       <div 
-        className={isMobile ? "budget-modal-card redesigned modal-content mobile-full" : `budget-modal-card redesigned modal-content ${showBreakdown ? 'with-breakdown' : ''}`}
+        className={isMobile ? "budget-modal-card redesigned modal-content mobile-full" : "budget-modal-card redesigned modal-content with-breakdown"}
         onClick={(e) => e.stopPropagation()}
         style={isMobile ? { maxWidth: '100%', width: '100%', height: '100%', borderRadius: 0, margin: 0 } : undefined}
       >
