@@ -15,6 +15,18 @@ export const formatCurrency = (val) => {
   }).format(rounded);
 };
 
+export const formatAnnualSummaryCurrency = (val) => {
+  if (val === null || val === undefined || isNaN(val) || val === '') return '';
+  const numVal = Number(val);
+  const rounded = Math.round(numVal);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(rounded);
+};
+
 export const formatBudgetCurrency = formatCurrency;
 
 export const clampMoneyValue = (val) => {
