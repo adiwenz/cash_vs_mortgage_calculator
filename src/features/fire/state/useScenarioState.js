@@ -17,6 +17,12 @@ export function useScenarioState() {
         const cloned = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
         cloned.targetRetirementAge = 50;
         cloned.lifeEvents = cloned.lifeEvents.map(e => e.type === 'retire' ? { ...e, age: 50 } : e);
+        cloned.incomeList = (cloned.incomeList || []).map(inc => {
+          if (inc.endAge === 65) {
+            return { ...inc, endAge: 50 };
+          }
+          return inc;
+        });
         return cloned;
       })()
     }
@@ -194,11 +200,13 @@ export function useScenarioState() {
   };
 
   const commitEventAgeChange = (evt, newAge, currentScenarioId) => {
-    const oldAge = evt.age;
-    if (newAge === oldAge) return;
+    const eventAge = evt.age;
 
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
+
+      const oldAge = eventAge !== undefined ? eventAge : scen.inputs.targetRetirementAge;
+      if (newAge === oldAge) return scen;
 
       const newInputs = { ...scen.inputs };
 

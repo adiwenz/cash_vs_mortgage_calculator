@@ -210,7 +210,8 @@ export default function LifePlanScreen({
   handleOpenSavingsDetails: legacyHandleOpenSavingsDetails,
   lastNonZeroSavingsRateRef: legacyLastNonZeroSavingsRateRef,
   setEditingCondition: legacySetEditingCondition,
-  handleRemoveCurrentCondition: legacyHandleRemoveCurrentCondition
+  handleRemoveCurrentCondition: legacyHandleRemoveCurrentCondition,
+  commitEventAgeChange: legacyCommitEventAgeChange
 }) {
   const inputs = scenario?.inputs ?? legacyInputs;
   const updateInput = scenario?.updateInput ?? legacyUpdateInput;
@@ -233,6 +234,7 @@ export default function LifePlanScreen({
   const handleNodeDragStart = timeline?.handleNodeDragStart ?? legacyHandleNodeDragStart;
   const draggingInfo = timeline?.draggingInfo ?? legacyDraggingInfo;
   const dragOccurredRef = timeline?.dragOccurredRef ?? legacyDragOccurredRef;
+  const commitEventAgeChange = timeline?.commitEventAgeChange ?? legacyCommitEventAgeChange;
 
   const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
   const handleCreateEvent = eventController?.handleCreateEvent ?? legacyHandleCreateEvent;

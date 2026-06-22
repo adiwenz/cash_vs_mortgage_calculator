@@ -26,6 +26,7 @@ export const retirementEventHandler = {
     const retireAge = normalizeEventAge(editingEvent.age, newInputs.targetRetirementAge || 65);
     const spendingPercent = normalizePercent(editingEvent.spendingPercent, 70);
 
+    const oldAge = inputs.targetRetirementAge || 65;
     newInputs.targetRetirementAge = retireAge;
     
     if (!newInputs.lifeEvents) {
@@ -44,6 +45,14 @@ export const retirementEventHandler = {
     
     newInputs.lifeEvents.push(retireEvObj);
 
+    // Sync career incomes in incomeList
+    newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+      if (inc.endAge === oldAge) {
+        return { ...inc, endAge: retireAge };
+      }
+      return inc;
+    });
+
     result.updatedInputs = newInputs;
     result.savedEvent = retireEvObj;
     return result;
@@ -53,7 +62,9 @@ export const retirementEventHandler = {
     const newInputs = cloneInputs(inputs);
     const deletedEvents = [];
 
-    newInputs.targetRetirementAge = newInputs.lifeExpectancy || 85;
+    const oldAge = inputs.targetRetirementAge || 65;
+    const retireAge = newInputs.lifeExpectancy || 85;
+    newInputs.targetRetirementAge = retireAge;
 
     if (newInputs.lifeEvents) {
       newInputs.lifeEvents = newInputs.lifeEvents.filter(e => {
@@ -64,6 +75,14 @@ export const retirementEventHandler = {
         return true;
       });
     }
+
+    // Sync career incomes in incomeList
+    newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+      if (inc.endAge === oldAge) {
+        return { ...inc, endAge: retireAge };
+      }
+      return inc;
+    });
 
     const result = createStandardResult(newInputs, null);
     result.deletedEvents = deletedEvents;

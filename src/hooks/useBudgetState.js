@@ -439,6 +439,7 @@ export function useBudgetState(
       });
 
       if (pendingImprovement) {
+        const oldRetAge = inputs.targetRetirementAge || 65;
         const { scenario } = pendingImprovement;
         if (scenario.type === 'workLonger') {
           const yearsDelay = scenario.value;
@@ -490,6 +491,14 @@ export function useBudgetState(
             return { ...ev, age: targetRetAge };
           }
           return ev;
+        });
+
+        // Sync career incomes in incomeList
+        newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
+          if (inc.endAge === oldRetAge) {
+            return { ...inc, endAge: targetRetAge };
+          }
+          return inc;
         });
       }
 
