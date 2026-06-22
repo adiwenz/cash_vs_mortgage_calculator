@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import ProjectionGraph from './src/components/fire-simulator/ProjectionGraph';
 import DesktopTimeline from './src/components/fire-simulator/DesktopTimeline';
@@ -33,7 +32,7 @@ vi.mock('recharts', () => {
     XAxis: () => null,
     YAxis: () => null,
     CartesianGrid: () => null,
-    Tooltip: ({ content, active, payload, label }) => {
+    Tooltip: ({ content }) => {
       // Allow testing tooltip rendering by invoking content
       if (typeof content === 'function') {
         return content({ active: true, payload: [{ name: 'Net Worth', value: 120000, stroke: '#10b981' }], label: 36 });
@@ -257,7 +256,7 @@ describe('ProjectionGraph and Timelines - Life Events Decoupling', () => {
 
   test('Existing graph line, tooltip, and click-to-select-year behavior remain functional', () => {
     const setSelectedYear = vi.fn();
-    const { getByTestId, container } = render(
+    const { getByTestId } = render(
       <ProjectionGraph
         chartData={chartData}
         inputs={inputs}
@@ -278,5 +277,111 @@ describe('ProjectionGraph and Timelines - Life Events Decoupling', () => {
     const lineChart = getByTestId('LineChart');
     fireEvent.click(lineChart);
     expect(setSelectedYear).toHaveBeenCalledWith(36);
+  });
+
+  test('Same-year events are grouped together, and neighboring ages are not grouped', () => {
+    // Events at the same rounded age (40) and neighboring age (41)
+    const testEvents = [
+      { age: 40.2, type: 'marriage', title: 'Wedding 1', originalId: 'evt-1' },
+      { age: 39.8, type: 'haveChild', title: 'Child 1', originalId: 'evt-2' }, // rounds to 40
+      { age: 40.9, type: 'buyHouse', title: 'Buy House 1', originalId: 'evt-3' }, // rounds to 41
+    ];
+
+    const { container } = render(
+      <DesktopTimeline
+        inputs={inputs}
+        timelineEvents={testEvents}
+        editingEvent={null}
+        draggingInfo={null}
+        dragOccurredRef={{ current: false }}
+        handleNodeDragStart={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    // Group 40 (evt-1 and evt-2) has 2 events, so it should stack vertically inline rather than rendering a summary marker
+    const summaryMarkers = container.querySelectorAll('.summary-group-marker');
+    expect(summaryMarkers.length).toBe(0);
+
+    // Verify both events in the group (and the neighboring event at 41) are rendered directly
+    const nonStackedMilestones = container.querySelectorAll('.timeline-track-inner > .milestone-circle-wrapper, .timeline-track-inner > .financial-milestone-wrapper');
+    const rootEvents = Array.from(nonStackedMilestones).filter(el => !el.classList.contains('today-pin'));
+    expect(rootEvents.length).toBe(3); // Wedding 1, Child 1, Buy House 1
+
+    // Marriage (Wedding 1) rank is higher than Child 1, so Wedding 1 is rendered at bottom 16px and Child 1 at 44px
+    const weddingEl = Array.from(rootEvents).find(el => el.textContent.includes('Wedding 1'));
+    const childEl = Array.from(rootEvents).find(el => el.textContent.includes('Child 1'));
+    expect(weddingEl).toBeDefined();
+    expect(childEl).toBeDefined();
+    expect(weddingEl.style.bottom).toBe('16px');
+    expect(childEl.style.bottom).toBe('44px');
+
+    // Now test a group of 3 events to verify it collapses into a summary marker showing "3"
+    const threeEvents = [
+      { age: 50, type: 'marriage', title: 'Wedding 2', originalId: 'evt-4' },
+      { age: 50, type: 'haveChild', title: 'Child 2', originalId: 'evt-5' },
+      { age: 50, type: 'buyHouse', title: 'Buy House 2', originalId: 'evt-6' }
+    ];
+
+    const { container: container3 } = render(
+      <DesktopTimeline
+        inputs={inputs}
+        timelineEvents={threeEvents}
+        editingEvent={null}
+        draggingInfo={null}
+        dragOccurredRef={{ current: false }}
+        handleNodeDragStart={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    const summaryMarkers3 = container3.querySelectorAll('.summary-group-marker');
+    expect(summaryMarkers3.length).toBe(1);
+    expect(summaryMarkers3[0].textContent).toContain('3');
+  });
+
+  test('Deterministic category sorting order is applied to stacked events', () => {
+    // Stack order rank: Marriage (1) -> Children (2) -> Housing (3) -> Career (4) -> Financial (5) -> Other (6)
+    const testEvents = [
+      { age: 40, type: 'buyHouse', title: 'Housing Event', icon: '🏠', originalId: 'evt-house' },
+      { age: 40, type: 'career', title: 'Career Event', icon: '💼', originalId: 'evt-career' },
+      { age: 40, type: 'marriage', title: 'Marriage Event', icon: '💍', originalId: 'evt-marriage' },
+      { age: 40, type: 'haveChild', title: 'Child Event', icon: '👶', originalId: 'evt-child' },
+      { age: 40, type: 'socialSecurity', title: 'SS Event', icon: '🎂', originalId: 'evt-ss' },
+      { age: 40, type: 'retire', title: 'Retire Event', icon: '🏖️', originalId: 'evt-retire' }
+    ];
+
+    const { container } = render(
+      <DesktopTimeline
+        inputs={inputs}
+        timelineEvents={testEvents}
+        editingEvent={null}
+        draggingInfo={null}
+        dragOccurredRef={{ current: false }}
+        handleNodeDragStart={vi.fn()}
+        handleEditRoadmapEvent={vi.fn()}
+      />
+    );
+
+    // Group 40 has 6 events. We click the summary marker to open the dialog.
+    const summaryMarker = container.querySelector('.summary-group-marker');
+    expect(summaryMarker).not.toBeNull();
+    fireEvent.click(summaryMarker);
+
+    // Get the dialog list container from document.body (since it's a portal)
+    const dialogList = document.body.querySelector('.timeline-event-dialog-list');
+    expect(dialogList).not.toBeNull();
+
+    // Verify dialog rows are sorted:
+    // Marriage -> Children -> Housing -> Career -> Financial -> Other
+    const dialogRows = dialogList.querySelectorAll('.timeline-event-dialog-row');
+    expect(dialogRows.length).toBe(6);
+
+    expect(dialogRows[0].textContent).toContain('Marriage Event');
+    expect(dialogRows[1].textContent).toContain('Child Event');
+    expect(dialogRows[2].textContent).toContain('Housing Event');
+    expect(dialogRows[3].textContent).toContain('Career Event');
+    expect(dialogRows[4].textContent).toContain('SS Event');
+    expect(dialogRows[5].textContent).toContain('Retire Event');
   });
 });

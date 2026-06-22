@@ -1,7 +1,7 @@
-import React, { useState, useRef, useLayoutEffect, useMemo, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getActiveChildrenCountAtAge, propPIAmount } from '../../simulatorMathUtils';
-import { formatCurrency, isEditableEvent, isFinancialEvent, formatCompactCurrency, getEventIcon } from './helpers';
+import { isEditableEvent, isFinancialEvent, formatCompactCurrency, getEventIcon } from './helpers';
 
 export default function DesktopTimeline({
   inputs,
@@ -17,15 +17,11 @@ export default function DesktopTimeline({
   const USE_PORTAL_TOOLTIPS = true;
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
   const isExpanded = localIsExpanded;
+  const [hoveredEventId, setHoveredEventId] = useState(null);
+  const [activeGroupDialog, setActiveGroupDialog] = useState(null); // { age, events, target }
+  const [hoveredEvent, setHoveredEvent] = useState(null); // State for portal tooltip (from main)
 
-  const [hoveredEvent, setHoveredEvent] = useState(null);
-
-  // Clear hoveredEvent when dragging starts/is active
-  useEffect(() => {
-    if (draggingInfo) {
-      setHoveredEvent(null);
-    }
-  }, [draggingInfo]);
+  const isTimelineHeightExpanded = isExpanded;
 
   // Default fallback if not provided (e.g. in test rendering)
   const chartLayout = propsChartLayout || {
@@ -39,7 +35,135 @@ export default function DesktopTimeline({
   const maxAge = activeDomain ? activeDomain[1] : inputs.lifeExpectancy;
   const totalYears = maxAge - minAge;
 
-  if (totalYears <= 0) return null;
+  // 1. Group events by rounded displayAge
+  const groupedEventsByAge = {};
+
+  timelineEvents.forEach((evt) => {
+    const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
+    const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
+    const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
+
+    const isSelected = !!(editingEvent && (
+      (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
+      (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
+    ));
+
+    const displayAge = (() => {
+      if (isPrimaryDragging) {
+        return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+      }
+      if (isLinkedDragging) {
+        const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
+        const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
+        return draggedDisplayAge + offset;
+      }
+      if (isDraggingThis && evt.type === 'retire') {
+        return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
+      }
+      return evt.age;
+    })();
+
+    const roundedAge = Math.round(displayAge);
+
+    if (roundedAge >= minAge && roundedAge <= maxAge) {
+      if (!groupedEventsByAge[roundedAge]) {
+        groupedEventsByAge[roundedAge] = [];
+      }
+      const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
+
+      groupedEventsByAge[roundedAge].push({
+        event: evt,
+        ...evt,
+        isDraggingThis,
+        isSelected,
+        shouldPulse,
+        displayAge,
+        roundedAge
+      });
+    }
+  });
+
+  // Deterministic ordering ranks
+  const categoryOrder = {
+    marriage: 1,
+    children: 2,
+    housing: 3,
+    career: 4,
+    financial: 5,
+    other: 6
+  };
+
+  const getEventCategory = (evt) => {
+    const type = evt.type;
+    if (type === 'marriage') return 'marriage';
+    if (type === 'haveChild' || type === 'childSupportEnds') return 'children';
+    if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'housing';
+    if (type === 'career' || type === 'sabbatical' || type === 'promotion') return 'career';
+    
+    const financialTypes = [
+      'socialSecurity',
+      'medicareEligibility',
+      'pension',
+      'rentalIncome',
+      'annuity',
+      'otherRetirementIncome',
+      'debtPayoff',
+      'payoffPlanEnd',
+      'windfall',
+      'assetTransfer',
+      'borrowing'
+    ];
+    if (financialTypes.includes(type) || isFinancialEvent(evt)) {
+      return 'financial';
+    }
+    return 'other';
+  };
+
+  const getCategoryRank = (evt) => categoryOrder[getEventCategory(evt)] || 6;
+
+  // Sort each age group's events deterministically
+  Object.keys(groupedEventsByAge).forEach((ageKey) => {
+    groupedEventsByAge[ageKey].sort((a, b) => {
+      const rankA = getCategoryRank(a);
+      const rankB = getCategoryRank(b);
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      const titleA = a.title || '';
+      const titleB = b.title || '';
+      return titleA.localeCompare(titleB);
+    });
+  });
+
+  const sortedAges = Object.keys(groupedEventsByAge).map(Number).sort((a, b) => a - b);
+
+  // Sync active group dialog during render
+  if (activeGroupDialog) {
+    const age = activeGroupDialog.age;
+    const currentGroup = groupedEventsByAge[age];
+    if (!currentGroup || currentGroup.length < 3) {
+      setActiveGroupDialog(null);
+    } else {
+      const prevEvents = activeGroupDialog.events;
+      const hasChanged = !prevEvents || prevEvents.length !== currentGroup.length || 
+                         prevEvents.some((e, i) => (e.originalId || e.type) !== (currentGroup[i].originalId || currentGroup[i].type));
+      if (hasChanged) {
+        setActiveGroupDialog({ ...activeGroupDialog, events: currentGroup });
+      }
+    }
+  }
+
+  // Close dialog and hover tooltip on dragging (sync to prop)
+  const [prevDraggingInfo, setPrevDraggingInfo] = useState(draggingInfo);
+  if (draggingInfo !== prevDraggingInfo) {
+    setPrevDraggingInfo(draggingInfo);
+    if (draggingInfo) {
+      setHoveredEvent(null);
+      if (activeGroupDialog) {
+        setActiveGroupDialog(null);
+      }
+    }
+  }
 
   // Compile active commitments (homeownership, childcare, marriage, etc.)
   const activeCommitments = [];
@@ -118,86 +242,10 @@ export default function DesktopTimeline({
     });
   }
 
-  // Preprocess events with display ages and positions
-  const processedEvents = useMemo(() => {
-    return timelineEvents.map(evt => {
-      const isPrimaryDragging = !!(draggingInfo && evt.originalId && String(draggingInfo.originalId) === String(evt.originalId));
-      const isLinkedDragging = !!(draggingInfo && evt.childEventId && String(draggingInfo.originalId) === String(evt.childEventId));
-      const isDraggingThis = isPrimaryDragging || isLinkedDragging || !!(draggingInfo && !evt.originalId && !evt.childEventId && evt.type === 'retire' && draggingInfo.type === 'retire');
-
-      const isSelected = !!(editingEvent && (
-        (evt.originalId && String(editingEvent.id) === String(evt.originalId)) ||
-        (!evt.originalId && evt.type === 'retire' && editingEvent.type === 'retire')
-      ));
-
-      const displayAge = (() => {
-        if (isPrimaryDragging) {
-          return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-        }
-        if (isLinkedDragging) {
-          const offset = draggingInfo.childEndOffset !== undefined ? draggingInfo.childEndOffset : 18;
-          const draggedDisplayAge = typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : (evt.age - offset);
-          return draggedDisplayAge + offset;
-        }
-        if (isDraggingThis && evt.type === 'retire') {
-          return typeof draggingInfo.currentAge === 'number' && !isNaN(draggingInfo.currentAge) ? draggingInfo.currentAge : evt.age;
-        }
-        return evt.age;
-      })();
-
-      const percent = totalYears > 0 ? ((displayAge - minAge) / totalYears) * 100 : 0;
-      const isFinancial = isFinancialEvent(evt);
-      const shouldPulse = window.pulseEventId && evt.originalId && String(window.pulseEventId) === String(evt.originalId);
-      const bottomPos = isExpanded ? `${1 + (evt.stackIndex * 1.625)}rem` : '1rem';
-
-      return {
-        ...evt,
-        isPrimaryDragging,
-        isLinkedDragging,
-        isDraggingThis,
-        isSelected,
-        displayAge,
-        percent,
-        isFinancial,
-        shouldPulse,
-        bottomPos
-      };
-    });
-  }, [timelineEvents, draggingInfo, editingEvent, isExpanded, minAge, maxAge, totalYears]);
-
-  // Group events by year for same-year summary markers (when collapsed)
-  const groupsByYear = useMemo(() => {
-    const groups = {};
-    processedEvents.forEach(evt => {
-      if (evt.displayAge < minAge || evt.displayAge > maxAge) return;
-      const year = Math.floor(evt.displayAge);
-      if (!groups[year]) {
-        groups[year] = [];
-      }
-      groups[year].push(evt);
-    });
-    return groups;
-  }, [processedEvents, minAge, maxAge]);
-
-  const cleanEvent = (e) => {
-    if (!e) return e;
-    const {
-      isPrimaryDragging,
-      isLinkedDragging,
-      isDraggingThis,
-      isSelected,
-      displayAge,
-      percent,
-      isFinancial,
-      shouldPulse,
-      bottomPos,
-      ...rest
-    } = e;
-    return rest;
-  };
+  if (totalYears <= 0) return null;
 
   return (
-    <div className="timeline-wrapper" style={{ flexGrow: 1, overflowX: 'auto', minWidth: 0, padding: '0.5rem 0' }}>
+    <div className="timeline-wrapper" style={{ flexGrow: 1, overflow: 'visible', minWidth: 0, padding: '0.5rem 0', position: 'relative', zIndex: 30 }}>
       {/* Expand/Collapse Toggle Header */}
       <div 
         onClick={() => setLocalIsExpanded(!isExpanded)}
@@ -247,7 +295,7 @@ export default function DesktopTimeline({
             <div style={{ width: `${chartLayout.leftPlotOffset}px`, minWidth: `${chartLayout.leftPlotOffset}px` }} />
           )}
           
-          <div className="timeline-row-content events-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: isExpanded ? '6.5rem' : '2.5rem', position: 'relative' }}>
+          <div className="timeline-row-content events-row-content" style={{ flexGrow: 1, padding: 0, marginRight: `${chartLayout.rightPlotOffset}px`, height: isTimelineHeightExpanded ? '8.5rem' : '2.5rem', minHeight: isTimelineHeightExpanded ? '8.5rem' : '2.5rem', position: 'relative' }}>
             <div className="timeline-track-inner" style={{ position: 'relative', width: '100%', height: '100%' }}>
               <div className="events-axis-line" style={{ bottom: '1rem', left: 0, right: 0 }} />
               
@@ -280,138 +328,61 @@ export default function DesktopTimeline({
                 </div>
               )}
 
-              {processedEvents.map((evt, idx) => {
-                if (evt.displayAge < minAge || evt.displayAge > maxAge) return null;
+              {sortedAges.map((ageKey) => {
+                const groupEvents = groupedEventsByAge[ageKey];
+                if (groupEvents.length === 0) return null;
 
-                const year = Math.floor(evt.displayAge);
-                const group = groupsByYear[year] || [];
-                const isTopEvent = group[group.length - 1] === evt;
-                const isGroup = !isExpanded && group.length > 1;
+                const displayXAge = groupEvents.length === 1 ? groupEvents[0].displayAge : ageKey;
+                const percent = totalYears > 0 ? ((displayXAge - minAge) / totalYears) * 100 : 0;
 
-                if (evt.isFinancial) {
-                  return (
-                    <div
-                      key={idx}
-                      className={`financial-milestone-wrapper ${evt.isDraggingThis ? 'dragging' : ''} ${evt.isSelected ? 'selected' : ''} ${evt.shouldPulse ? 'pulse-highlight-event' : ''}`}
-                      style={{
-                        left: `${evt.percent}%`,
-                        bottom: evt.bottomPos
-                      }}
-                      onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                      onTouchStart={(e) => handleNodeDragStart(e, evt)}
-                      onMouseEnter={(e) => {
-                        if (draggingInfo) return;
-                        if (isGroup) {
-                          setHoveredEvent({
-                            evt: null,
-                            groupEvents: group,
-                            target: e.currentTarget,
-                            displayAge: year
-                          });
-                        } else {
-                          setHoveredEvent({ evt, target: e.currentTarget, displayAge: evt.displayAge });
-                        }
-                      }}
-                      onMouseLeave={() => setHoveredEvent(null)}
-                      onClick={(e) => {
-                        if (dragOccurredRef.current) {
-                          e.stopPropagation();
-                          return;
-                        }
-                        if (isEditableEvent(evt)) {
-                          handleEditRoadmapEvent(cleanEvent(evt));
-                        }
-                      }}
-                    >
-                      <div className="financial-milestone-dot" style={isGroup && isTopEvent ? { background: 'var(--primary, #6366f1)', color: '#ffffff', fontWeight: '800' } : {}}>
-                        {isGroup && isTopEvent ? group.length : getEventIcon(evt)}
-                      </div>
-
-                      {/* Hidden text for test compatibility (since tooltips are now in a portal) */}
-                      <span className="sr-only" style={{ display: 'none' }}>
-                        {getEventIcon(evt)} {evt.title || evt.label}
-                      </span>
-                      <span className="sr-only" style={{ display: 'none' }}>
-                        Age {Math.floor(evt.displayAge)} • {evt.description}
-                      </span>
-
-                      {/* Keep old tooltip markup if flag is false */}
-                      {!USE_PORTAL_TOOLTIPS && !isGroup && (
-                        <div className={`timeline-tooltip ${evt.percent < 20 ? 'align-left' : evt.percent > 80 ? 'align-right' : ''}`}>
-                          <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                            {getEventIcon(evt)} {evt.title || evt.label}
-                          </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
-                            <div>Age {Math.floor(evt.displayAge)} • {evt.description}</div>
-                            {(() => {
-                              if (evt.type === 'mortgageOff') {
-                                const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                if (asset) {
-                                  return (
-                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                      P&I Savings: {formatCompactCurrency(propPIAmount(asset))}/yr
-                                    </div>
-                                  );
-                                }
-                              }
-                              if (evt.type === 'childSupportEnds') {
-                                return (
-                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                    Support expenses have ended
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Line connector down to axis */}
-                      {isExpanded && evt.stackIndex > 0 && (
-                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 1.625}rem`, bottom: `-${evt.stackIndex * 1.625}rem`, left: '50%', transform: 'translateX(-50%)' }} />
-                      )}
-                    </div>
-                  );
-                } else {
+                if (groupEvents.length === 1) {
+                  const evt = groupEvents[0];
+                  const isFinancial = isFinancialEvent(evt);
                   const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
+                  const eventKey = evt.originalId || `${evt.type}-${evt.age}`;
+
                   return (
                     <div
-                      key={idx}
-                      className={`milestone-circle-wrapper ${wrapperClass} ${evt.isDraggingThis ? 'dragging' : ''} ${evt.isSelected ? 'selected' : ''} ${evt.shouldPulse ? 'pulse-highlight-event' : ''}`}
+                      key={eventKey}
+                      className={`${isFinancial ? 'financial-milestone-wrapper' : `milestone-circle-wrapper ${wrapperClass}`} ${evt.isDraggingThis ? 'dragging' : ''} ${evt.isSelected ? 'selected' : ''} ${evt.shouldPulse ? 'pulse-highlight-event' : ''}`}
                       style={{
-                        left: `${evt.percent}%`,
-                        bottom: evt.bottomPos
+                        left: `${percent}%`,
+                        bottom: '1rem',
+                        transform: hoveredEventId === eventKey ? 'translateX(-50%) scale(1.08)' : 'translateX(-50%)',
+                        transition: 'transform 0.2s ease',
+                        zIndex: hoveredEventId === eventKey ? 35 : (isFinancial ? 20 : 25)
                       }}
-                      onMouseDown={(e) => handleNodeDragStart(e, evt)}
-                      onTouchStart={(e) => handleNodeDragStart(e, evt)}
                       onMouseEnter={(e) => {
-                        if (draggingInfo) return;
-                        if (isGroup) {
-                          setHoveredEvent({
-                            evt: null,
-                            groupEvents: group,
-                            target: e.currentTarget,
-                            displayAge: year
-                          });
-                        } else {
+                        setHoveredEventId(eventKey);
+                        if (!draggingInfo) {
                           setHoveredEvent({ evt, target: e.currentTarget, displayAge: evt.displayAge });
                         }
                       }}
-                      onMouseLeave={() => setHoveredEvent(null)}
+                      onMouseLeave={() => {
+                        setHoveredEventId(null);
+                        setHoveredEvent(null);
+                      }}
+                      onMouseDown={(e) => handleNodeDragStart(e, evt.event)}
+                      onTouchStart={(e) => handleNodeDragStart(e, evt.event)}
                       onClick={(e) => {
                         if (dragOccurredRef.current) {
                           e.stopPropagation();
                           return;
                         }
-                        if (isEditableEvent(evt)) {
-                          handleEditRoadmapEvent(cleanEvent(evt));
+                        if (isEditableEvent(evt.event)) {
+                          handleEditRoadmapEvent(evt.event);
                         }
                       }}
                     >
-                      <div className="milestone-glow-circle" style={isGroup && isTopEvent ? { background: 'var(--primary, #6366f1)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}}>
-                        {isGroup && isTopEvent ? group.length : getEventIcon(evt)}
-                      </div>
+                      {isFinancial ? (
+                        <div className="financial-milestone-dot">
+                          {getEventIcon(evt)}
+                        </div>
+                      ) : (
+                        <div className="milestone-glow-circle">
+                          {getEventIcon(evt)}
+                        </div>
+                      )}
 
                       {/* Hidden text for test compatibility (since tooltips are now in a portal) */}
                       <span className="sr-only" style={{ display: 'none' }}>
@@ -420,67 +391,143 @@ export default function DesktopTimeline({
                       <span className="sr-only" style={{ display: 'none' }}>
                         Age {Math.floor(evt.displayAge)} • {evt.description}
                       </span>
-
-                      {/* Keep old tooltip markup if flag is false */}
-                      {!USE_PORTAL_TOOLTIPS && !isGroup && (
-                        <div className={`timeline-tooltip ${evt.percent < 20 ? 'align-left' : evt.percent > 80 ? 'align-right' : ''}`}>
-                          <div style={{ fontWeight: '700', color: '#ffffff', marginBottom: '0.15rem', fontSize: '0.78rem' }}>
-                            {getEventIcon(evt)} {evt.title || evt.label}
-                          </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', whiteSpace: 'normal', minWidth: '180px', lineHeight: '1.3' }}>
-                            <div>Age {Math.floor(evt.displayAge)} • {evt.description}</div>
-                            {(() => {
-                              if (evt.type === 'buyHouse') {
-                                const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                if (asset) {
-                                  return (
-                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                      Price: {formatCompactCurrency(asset.purchasePrice || asset.homePrice || 0)}
-                                      {asset.purchaseType !== 'cash' && ` (${asset.mortgageRate || 6.5}% APR)`}
-                                    </div>
-                                  );
-                                }
-                              }
-                              if (evt.type === 'sellHouse') {
-                                const asset = inputs.houseAssets?.find(h => h.id === evt.houseId);
-                                if (asset) {
-                                  return (
-                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-emerald)' }}>
-                                      Property: {asset.name}
-                                    </div>
-                                  );
-                                }
-                              }
-                              if (evt.type === 'haveChild') {
-                                const ev = inputs.lifeEvents?.find(e => e.id === evt.originalId);
-                                if (ev) {
-                                  return (
-                                    <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-orange)' }}>
-                                      Support Term: {ev.includeCollege ? 22 : 18} years
-                                    </div>
-                                  );
-                                }
-                              }
-                              if (evt.type === 'marriage') {
-                                return (
-                                  <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
-                                    Spouse Income: {formatCompactCurrency(evt.spouseIncome)}/yr
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Line connector down to axis */}
-                      {isExpanded && evt.stackIndex > 0 && (
-                        <div className="milestone-connector-line" style={{ height: `${evt.stackIndex * 1.625}rem`, bottom: `-${evt.stackIndex * 1.625}rem`, left: '50%', transform: 'translateX(-50%)' }} />
-                      )}
                     </div>
                   );
                 }
+
+                if (groupEvents.length === 2) {
+                  return groupEvents.map((evt, idx) => {
+                    const isFinancial = isFinancialEvent(evt);
+                    const wrapperClass = (evt.isMilestone || evt.type === 'retire') ? 'milestone-event' : 'standard-milestone';
+                    const eventKey = evt.originalId || `${evt.type}-${evt.age}`;
+                    const bottomVal = `${16 + idx * 28}px`;
+                    const evtPercent = totalYears > 0 ? ((evt.displayAge - minAge) / totalYears) * 100 : 0;
+
+                    return (
+                      <div
+                        key={eventKey}
+                        className={`${isFinancial ? 'financial-milestone-wrapper' : `milestone-circle-wrapper ${wrapperClass}`} ${evt.isDraggingThis ? 'dragging' : ''} ${evt.isSelected ? 'selected' : ''} ${evt.shouldPulse ? 'pulse-highlight-event' : ''}`}
+                        style={{
+                          left: `${evtPercent}%`,
+                          bottom: bottomVal,
+                          transform: hoveredEventId === eventKey ? 'translateX(-50%) scale(1.08)' : 'translateX(-50%)',
+                          transition: 'transform 0.2s ease',
+                          zIndex: hoveredEventId === eventKey ? 35 : (isFinancial ? 20 : 25) + idx
+                        }}
+                        onMouseEnter={(e) => {
+                          setHoveredEventId(eventKey);
+                          if (!draggingInfo) {
+                            setHoveredEvent({ evt, target: e.currentTarget, displayAge: evt.displayAge });
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredEventId(null);
+                          setHoveredEvent(null);
+                        }}
+                        onMouseDown={(e) => handleNodeDragStart(e, evt.event)}
+                        onTouchStart={(e) => handleNodeDragStart(e, evt.event)}
+                        onClick={(e) => {
+                          if (dragOccurredRef.current) {
+                            e.stopPropagation();
+                            return;
+                          }
+                          if (isEditableEvent(evt.event)) {
+                            handleEditRoadmapEvent(evt.event);
+                          }
+                        }}
+                      >
+                        {isFinancial ? (
+                          <div className="financial-milestone-dot">
+                            {getEventIcon(evt)}
+                          </div>
+                        ) : (
+                          <div className="milestone-glow-circle">
+                            {getEventIcon(evt)}
+                          </div>
+                        )}
+
+                        {/* Hidden text for test compatibility (since tooltips are now in a portal) */}
+                        <span className="sr-only" style={{ display: 'none' }}>
+                          {getEventIcon(evt)} {evt.title || evt.label}
+                        </span>
+                        <span className="sr-only" style={{ display: 'none' }}>
+                          Age {Math.floor(evt.displayAge)} • {evt.description}
+                        </span>
+
+                        {idx > 0 && (
+                          <div className="milestone-connector-line" style={{ height: `${idx * 28}px`, bottom: `-${idx * 28}px`, left: '50%', transform: 'translateX(-50%)' }} />
+                        )}
+                      </div>
+                    );
+                  });
+                }
+
+                // 3+ events: render summary marker
+                const summaryKey = `summary-${ageKey}`;
+                const isDialogOpen = activeGroupDialog?.age === ageKey;
+
+                return (
+                  <div
+                    key={summaryKey}
+                    data-summary-age={ageKey}
+                    className="financial-milestone-wrapper summary-group-marker"
+                    style={{
+                      position: 'absolute',
+                      left: `${percent}%`,
+                      bottom: '1rem',
+                      transform: hoveredEventId === summaryKey ? 'translateX(-50%) scale(1.08)' : 'translateX(-50%)',
+                      transition: 'transform 0.2s ease',
+                      zIndex: hoveredEventId === summaryKey ? 35 : 20,
+                      pointerEvents: 'auto',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      setHoveredEventId(summaryKey);
+                      if (!draggingInfo && !isDialogOpen) {
+                        setHoveredEvent({
+                          evt: null,
+                          groupEvents,
+                          target: e.currentTarget,
+                          displayAge: ageKey
+                        });
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredEventId(null);
+                      setHoveredEvent(null);
+                    }}
+                    onClick={(e) => {
+                      if (isDialogOpen) {
+                        setActiveGroupDialog(null);
+                      } else {
+                        setActiveGroupDialog({ age: ageKey, events: groupEvents, target: e.currentTarget });
+                        setHoveredEvent(null); // clear tooltip when dialog opens
+                      }
+                    }}
+                  >
+                    <div 
+                      className="financial-milestone-dot"
+                      style={{
+                        background: 'var(--primary-light, rgba(99, 102, 241, 0.15))',
+                        borderColor: 'var(--primary, #6366f1)',
+                        color: 'var(--primary, #6366f1)',
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '50%',
+                        fontWeight: '800',
+                        fontSize: '0.65rem',
+                        opacity: 1
+                      }}
+                    >
+                      {groupEvents.length}
+                    </div>
+
+                    {/* Hidden text for test compatibility (since tooltips are now in a portal) */}
+                    <span className="sr-only" style={{ display: 'none' }}>
+                      Age {ageKey} • {groupEvents.length} Events
+                    </span>
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -623,13 +670,170 @@ export default function DesktopTimeline({
         </div>
 
       </div>
-      {USE_PORTAL_TOOLTIPS && hoveredEvent && (
+
+      {activeGroupDialog && (
+        <TimelineEventDialog
+          age={activeGroupDialog.age}
+          events={activeGroupDialog.events}
+          target={activeGroupDialog.target}
+          onClose={() => setActiveGroupDialog(null)}
+          handleEditRoadmapEvent={handleEditRoadmapEvent}
+          isFinancialEvent={isFinancialEvent}
+          getEventIcon={getEventIcon}
+        />
+      )}
+
+      {USE_PORTAL_TOOLTIPS && hoveredEvent && !activeGroupDialog && (
         <TimelineTooltipPortal
           hoveredEvent={hoveredEvent}
           inputs={inputs}
         />
       )}
     </div>
+  );
+}
+
+function TimelineEventDialog({ age, events, target, onClose, handleEditRoadmapEvent, isFinancialEvent, getEventIcon }) {
+  const dialogRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (!target || !target.isConnected) {
+      onClose();
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    const dialogWidth = 320;
+    const dialogHeight = dialogRef.current ? dialogRef.current.offsetHeight : 240;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Preferred: above and to the right
+    let left = rect.left + rect.width / 2;
+    let top = rect.top - dialogHeight - 8;
+
+    // If not enough space above, place below
+    if (top < 12) {
+      top = rect.bottom + 8;
+    }
+
+    // Clamp horizontally
+    if (left + dialogWidth > viewportWidth) {
+      left = viewportWidth - dialogWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    // Clamp vertically
+    if (top + dialogHeight > viewportHeight) {
+      top = viewportHeight - dialogHeight - 12;
+    }
+    if (top < 12) {
+      top = 12;
+    }
+
+    setCoords({ top, left });
+  }, [target, onClose]);
+
+  useEffect(() => {
+    updatePosition();
+
+    const timer = setTimeout(updatePosition, 0);
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [target, updatePosition]);
+
+  // Handle outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (dialogRef.current && !dialogRef.current.contains(e.target) && !target.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('click', handleOutsideClick, true);
+    return () => document.removeEventListener('click', handleOutsideClick, true);
+  }, [target, onClose]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const getEventCategoryClass = (evt) => {
+    const type = evt.type;
+    if (type === 'marriage') return 'marriage';
+    if (type === 'haveChild' || type === 'childSupportEnds') return 'children';
+    if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'housing';
+    if (type === 'career' || type === 'sabbatical' || type === 'promotion') return 'career';
+    if (isFinancialEvent(evt)) return 'financial';
+    return 'other';
+  };
+
+  return createPortal(
+    <div
+      ref={dialogRef}
+      className="timeline-event-dialog"
+      style={{
+        top: `${coords.top}px`,
+        left: `${coords.left}px`,
+      }}
+    >
+      <div className="timeline-event-dialog-header">
+        <h4 className="timeline-event-dialog-title">
+          {events.length} Events at Age {age}
+        </h4>
+        <button className="timeline-event-dialog-close" onClick={onClose} aria-label="Close dialog">
+          &times;
+        </button>
+      </div>
+
+      <div className="timeline-event-dialog-list">
+        {events.map((evt, idx) => {
+          const catClass = getEventCategoryClass(evt);
+          return (
+            <div
+              key={evt.originalId || `${evt.type}-${idx}`}
+              className={`timeline-event-dialog-row ${catClass}`}
+              onClick={() => {
+                handleEditRoadmapEvent(evt.event || evt);
+                onClose();
+              }}
+            >
+              <div className="timeline-event-dialog-icon">
+                {getEventIcon(evt)}
+              </div>
+              <div className="timeline-event-dialog-meta">
+                <span className="event-title">{evt.title}</span>
+                <span className="event-age">Age {Math.floor(evt.displayAge)}</span>
+              </div>
+              <div className="timeline-event-dialog-edit" title="Edit Event">
+                ✏️
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="timeline-event-dialog-footer">
+        Click an event above to edit it.
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -645,12 +849,11 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
   });
 
   useLayoutEffect(() => {
-    // Tweak 3: Guard against stale DOM nodes
     if (!target || !target.isConnected) return;
 
     const updatePosition = () => {
       if (!tooltipRef.current) return;
-      if (!target || !target.isConnected) return; // Tweak 3 guard
+      if (!target || !target.isConnected) return;
 
       const tooltipEl = tooltipRef.current;
       const tooltipRect = tooltipEl.getBoundingClientRect();
@@ -659,7 +862,6 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
 
       const targetRect = target.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
 
       // Horizontal position: center tooltip on target
       const targetCenterX = targetRect.left + targetRect.width / 2;
@@ -689,8 +891,8 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
       }
 
       setCoords({
-        top: top, // Tweak 1: position: fixed coordinates (no scrollY)
-        left: clampedLeft, // Tweak 1: position: fixed coordinates (no scrollX)
+        top: top,
+        left: clampedLeft,
         arrowLeft,
         isBelow,
         loaded: true
@@ -699,7 +901,6 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
 
     updatePosition();
 
-    // Listen to scroll (capture mode to capture container scrolls) and resize
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
 
@@ -709,7 +910,6 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
     };
   }, [target, evt, groupEvents, displayAge]);
 
-  // Tweak 3: Guard against stale DOM nodes
   if (!target || !target.isConnected) {
     return null;
   }
@@ -719,7 +919,7 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
       ref={tooltipRef}
       className="timeline-tooltip-portal"
       style={{
-        position: 'fixed', // Tweak 1: position: fixed
+        position: 'fixed',
         top: `${coords.top}px`,
         left: `${coords.left}px`,
         opacity: coords.loaded ? 1 : 0,
@@ -804,7 +1004,6 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '180px' }}>
             {[...groupEvents]
-              .sort((a, b) => (a.stackIndex || 0) - (b.stackIndex || 0))
               .map((item, idx) => (
                 <div key={idx} style={{ borderBottom: idx < groupEvents.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', paddingBottom: idx < groupEvents.length - 1 ? '0.35rem' : 0 }}>
                   <div style={{ fontWeight: '600', color: '#ffffff', fontSize: '0.74rem' }}>
