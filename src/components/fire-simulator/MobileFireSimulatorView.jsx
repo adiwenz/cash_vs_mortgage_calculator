@@ -32,6 +32,51 @@ import { CurrentConditionModal } from './CurrentConditionsPanel';
 import LifeProfileModal from './LifeProfileModal';
 import './MobileFireSimulator.css';
 
+function calculateTicks(min, max, targetTickCount = 5) {
+  if (min > max) {
+    [min, max] = [max, min];
+  }
+  
+  const finalMin = Math.min(0, min);
+  const finalMax = Math.max(0, max);
+  
+  if (finalMin === finalMax) {
+    return [0];
+  }
+  
+  const range = finalMax - finalMin;
+  let roughStep = range / (targetTickCount - 1);
+  
+  const exponent = Math.floor(Math.log10(roughStep));
+  const fraction = roughStep / Math.pow(10, exponent);
+  
+  let cleanStep;
+  if (fraction < 1.5) cleanStep = 1;
+  else if (fraction < 3.5) cleanStep = 2;
+  else if (fraction < 7.5) cleanStep = 5;
+  else cleanStep = 10;
+  
+  const step = cleanStep * Math.pow(10, exponent);
+  
+  const ticks = [0];
+  
+  // Go up from 0
+  let current = step;
+  while (ticks[ticks.length - 1] < finalMax - 1e-9) {
+    ticks.push(current);
+    current += step;
+  }
+  
+  // Go down from 0
+  current = -step;
+  while (ticks[0] > finalMin + 1e-9) {
+    ticks.unshift(current);
+    current -= step;
+  }
+  
+  return ticks;
+}
+
 const getPaceBadgeStyles = (pace) => {
   if (pace === 'Aggressive') {
     return {
@@ -584,6 +629,32 @@ export default function MobileFireSimulatorView({
   const todayDebt = simulation?.todayDebt ?? legacyTodayDebt;
   const todayNetWorth = simulation?.todayNetWorth ?? legacyTodayNetWorth;
   const tempSocialSecurityDetails = simulation?.tempSocialSecurityDetails ?? legacyTempSS;
+
+  const ticks = useMemo(() => {
+    let min = 0;
+    let max = 100000;
+    if (chartData && chartData.length) {
+      chartData.forEach((row) => {
+        if (row.netWorth !== undefined) {
+          if (row.netWorth < min) min = row.netWorth;
+          if (row.netWorth > max) max = row.netWorth;
+        }
+        if (row.assets !== undefined) {
+          if (row.assets < min) min = row.assets;
+          if (row.assets > max) max = row.assets;
+        }
+        if (row.debt !== undefined) {
+          if (row.debt < min) min = row.debt;
+          if (row.debt > max) max = row.debt;
+        }
+      });
+    }
+    const range = max - min;
+    const padding = range * 0.12;
+    const finalMin = min < 0 ? min - padding : 0;
+    const finalMax = max + padding;
+    return calculateTicks(finalMin, finalMax);
+  }, [chartData]);
 
   const inputs = scenario?.inputs ?? legacyInputs;
   const updateInput = scenario?.updateInput ?? legacyUpdateInput;
@@ -1319,7 +1390,10 @@ export default function MobileFireSimulatorView({
                             stroke="var(--text-tertiary)"
                             fontSize={8}
                             tickFormatter={formatYAxis}
+                            domain={[ticks[0], ticks[ticks.length - 1]]}
+                            ticks={ticks}
                           />
+                          <ReferenceLine y={0} stroke="var(--text-secondary, #6b7280)" strokeWidth={1.5} strokeDasharray="3 3" />
                           <Tooltip
                             position={tooltipPos}
                             content={({ active, payload, label }) => {

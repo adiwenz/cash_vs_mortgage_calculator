@@ -1,7 +1,52 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea, ReferenceLine } from 'recharts';
 import { formatCompactFinancial } from './helpers';
 import { lastChartChangeTypeRef } from './changeTypeTracker';
+
+function calculateTicks(min, max, targetTickCount = 5) {
+  if (min > max) {
+    [min, max] = [max, min];
+  }
+  
+  const finalMin = Math.min(0, min);
+  const finalMax = Math.max(0, max);
+  
+  if (finalMin === finalMax) {
+    return [0];
+  }
+  
+  const range = finalMax - finalMin;
+  let roughStep = range / (targetTickCount - 1);
+  
+  const exponent = Math.floor(Math.log10(roughStep));
+  const fraction = roughStep / Math.pow(10, exponent);
+  
+  let cleanStep;
+  if (fraction < 1.5) cleanStep = 1;
+  else if (fraction < 3.5) cleanStep = 2;
+  else if (fraction < 7.5) cleanStep = 5;
+  else cleanStep = 10;
+  
+  const step = cleanStep * Math.pow(10, exponent);
+  
+  const ticks = [0];
+  
+  // Go up from 0
+  let current = step;
+  while (ticks[ticks.length - 1] < finalMax - 1e-9) {
+    ticks.push(current);
+    current += step;
+  }
+  
+  // Go down from 0
+  current = -step;
+  while (ticks[0] > finalMin + 1e-9) {
+    ticks.unshift(current);
+    current -= step;
+  }
+  
+  return ticks;
+}
 
 function calculatePaddedYAxisDomain(chartData) {
   const values = chartData
@@ -117,6 +162,10 @@ export default function ProjectionGraph({
   const [yAxisDomain, setYAxisDomain] = useState(() => {
     return calculatePaddedYAxisDomain(chartData || []);
   });
+  const ticks = useMemo(() => {
+    if (!yAxisDomain) return [0];
+    return calculateTicks(yAxisDomain[0], yAxisDomain[1]);
+  }, [yAxisDomain]);
   const [showScaleUpdated, setShowScaleUpdated] = useState(false);
 
   const scaleTimeoutRef = useRef(null);
@@ -462,9 +511,11 @@ export default function ProjectionGraph({
             fontSize={10}
             tickFormatter={formatCompactFinancial}
             width={yAxisWidth}
-            domain={yAxisDomain || ['auto', 'auto']}
+            domain={[ticks[0], ticks[ticks.length - 1]]}
+            ticks={ticks}
             allowDataOverflow={false}
           />
+          <ReferenceLine y={0} stroke="var(--text-secondary, #6b7280)" strokeWidth={1.5} strokeDasharray="3 3" />
           <Tooltip
             position={tooltipPos}
             content={({ active, payload, label }) => {

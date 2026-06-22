@@ -509,7 +509,7 @@ describe('Mobile UX Refactor - Finley-Style Roadmap Experience', () => {
 
     // Select the first milestone (Buy Home at Age 40). By default, index 0 is selected.
     // Verify ReferenceLine and ReferenceDot are rendered with target x = 40.
-    const refLine = container.querySelector('[data-testid="ReferenceLine"]');
+    const refLine = container.querySelector('[data-testid="ReferenceLine"][data-x]');
     const refDot = container.querySelector('[data-testid="ReferenceDot"]');
 
     expect(refLine).not.toBeNull();

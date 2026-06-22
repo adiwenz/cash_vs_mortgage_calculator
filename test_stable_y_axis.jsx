@@ -26,7 +26,8 @@ vi.mock('recharts', () => {
     },
     CartesianGrid: () => null,
     Tooltip: () => null,
-    ReferenceArea: () => null
+    ReferenceArea: () => null,
+    ReferenceLine: () => null
   };
 });
 
