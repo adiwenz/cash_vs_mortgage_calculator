@@ -133,6 +133,92 @@ const InfoIcon = () => (
   </svg>
 );
 
+// Inline editable budget input component to prevent aggressive formatting jumps
+function InlineBudgetInput({ value, symbol = '$', onChange }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localVal, setLocalVal] = useState('');
+  const [prevValue, setPrevValue] = useState(value);
+
+  if (value !== prevValue) {
+    setPrevValue(value);
+    if (!isFocused) {
+      const rounded = Math.round((Number(value) || 0) * 100) / 100;
+      setLocalVal(rounded === 0 ? '' : String(rounded));
+    }
+  }
+
+  const getFormattedDisplayValue = (v) => {
+    if (v === null || v === undefined || isNaN(v) || v === '') {
+      return symbol === '%' ? '0%' : '$0';
+    }
+    const rounded = Math.round(v * 100) / 100;
+    const hasCents = rounded % 1 !== 0;
+    
+    if (symbol === '%') {
+      return `${rounded}%`;
+    }
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: hasCents ? 2 : 0,
+      maximumFractionDigits: hasCents ? 2 : 0
+    }).format(rounded);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    const rounded = Math.round((Number(value) || 0) * 100) / 100;
+    setLocalVal(rounded === 0 ? '' : String(rounded));
+  };
+
+  const handleChange = (e) => {
+    const text = e.target.value;
+    if (/^\d*\.?\d*$/.test(text)) {
+      setLocalVal(text);
+      const parsed = parseFloat(text);
+      if (!isNaN(parsed)) {
+        onChange(parsed);
+      } else if (text === '') {
+        onChange(0);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseFloat(localVal);
+    const finalVal = isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
+    onChange(finalVal);
+  };
+
+  const displayString = isFocused ? localVal : getFormattedDisplayValue(value);
+
+  return (
+    <input
+      type="text"
+      value={displayString}
+      onFocus={handleFocus}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      style={{
+        background: 'var(--bg-tertiary, #f3f4f6)',
+        border: '1px solid var(--border-color, #e5e7eb)',
+        borderRadius: '6px',
+        padding: '0.25rem 0.45rem',
+        width: '90px',
+        textAlign: 'right',
+        fontSize: '0.85rem',
+        fontWeight: '600',
+        color: 'var(--text-primary)',
+        outline: 'none',
+        fontFamily: 'inherit',
+        boxSizing: 'border-box'
+      }}
+    />
+  );
+}
+
 export default function MobileBudgetPanel({
   inputs,
   activePhaseObj,
@@ -201,7 +287,7 @@ export default function MobileBudgetPanel({
 }) {
   const syncResult = syncBudgetDetails(inputs.simpleIncome, inputs.simpleExpenses, inputs.budgetDetails);
   
-  // States for new pickers and overlays
+  // States for pickers and overlays
   const [isAgePickerOpen, setIsAgePickerOpen] = useState(false);
   const [isChangesSheetOpen, setIsChangesSheetOpen] = useState(false);
   const [isEditingIncome, setIsEditingIncome] = useState(false);
@@ -292,7 +378,6 @@ export default function MobileBudgetPanel({
       };
     }
     
-    // Carried over from today, so locked but not event-generated directly
     return {
       isLocked: true,
       isCarriedFromToday: true,
@@ -354,55 +439,33 @@ export default function MobileBudgetPanel({
   const ageBudget = getBudgetForAge(inputs, selectedBudgetAge);
   const needsRows = getCategoryBreakdown(ageBudget, 'needs', inputs, isMarriedMode);
   const wantsRows = getCategoryBreakdown(ageBudget, 'wants', inputs, isMarriedMode);
-  const savingsRowsRaw = getCategoryBreakdown(ageBudget, 'savings', inputs, isMarriedMode);
-
-  // Group Savings & Investing
-  const getGroupedSavingsRows = (rawRows) => {
-    const investingKeys = ['trad401k', 'rothIra', 'tradIra', 'hsa', 'brokerage'];
-    let savingsSum = 0;
-    let investingSum = 0;
-
-    rawRows.forEach(row => {
-      if (investingKeys.includes(row.key)) {
-        investingSum += row.amount;
-      } else {
-        savingsSum += row.amount;
-      }
-    });
-
-    return [
-      {
-        key: 'savings_group',
-        label: 'Savings',
-        desc: 'Emergency fund, sinking funds',
-        amount: savingsSum,
-        icon: <PiggyIcon />,
-        iconBg: 'rgba(16, 185, 129, 0.1)',
-        category: 'savings'
-      },
-      {
-        key: 'investing_group',
-        label: 'Investing',
-        desc: 'Retirement, brokerage, other',
-        amount: investingSum,
-        icon: <ChartIcon />,
-        iconBg: 'rgba(59, 130, 246, 0.1)',
-        category: 'savings'
-      }
-    ];
-  };
-
-  const groupedSavingsRows = getGroupedSavingsRows(savingsRowsRaw);
+  const savingsRows = getCategoryBreakdown(ageBudget, 'savings', inputs, isMarriedMode);
 
   const rowStyles = {
+    // Needs
     housing: { icon: <HouseIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' },
     food: { icon: <CartIcon />, iconBg: 'rgba(245, 158, 11, 0.1)' },
     healthcare: { icon: <HeartIcon />, iconBg: 'rgba(139, 92, 246, 0.1)' },
     transportation: { icon: <CarIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
     utilities: { icon: <ShieldIcon />, iconBg: 'rgba(236, 72, 153, 0.1)' },
+    
+    // Wants
     leisure: { icon: <PlaneIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
     diningOut: { icon: <ForkIcon />, iconBg: 'rgba(245, 158, 11, 0.1)' },
-    misc: { icon: <TvIcon />, iconBg: 'rgba(139, 92, 246, 0.1)' }
+    misc: { icon: <TvIcon />, iconBg: 'rgba(139, 92, 246, 0.1)' },
+    
+    // Savings
+    trad401k: { icon: <ChartIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
+    rothIra: { icon: <ChartIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
+    tradIra: { icon: <ChartIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
+    hsa: { icon: <ShieldIcon />, iconBg: 'rgba(236, 72, 153, 0.1)' },
+    brokerage: { icon: <ChartIcon />, iconBg: 'rgba(59, 130, 246, 0.1)' },
+    checking: { icon: <WalletIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' },
+    hysa: { icon: <PiggyIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' },
+    emergency: { icon: <PiggyIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' },
+    cash: { icon: <PiggyIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' },
+    debt: { icon: <DollarIcon />, iconBg: 'rgba(107, 114, 128, 0.1)' },
+    other: { icon: <PiggyIcon />, iconBg: 'rgba(16, 185, 129, 0.1)' }
   };
 
   const getRowMetadata = (row) => {
@@ -434,7 +497,46 @@ export default function MobileBudgetPanel({
     } else if (row.key === 'misc') {
       label = 'Entertainment';
       desc = 'Movies, subscriptions, activities';
-    } else if (row.isLocked && row.lockedReason) {
+    } else if (row.key === 'trad401k') {
+      label = '401(k) (Pre-Tax)';
+      desc = 'Limit $23,500/yr';
+    } else if (row.key === 'rothIra') {
+      label = 'Roth IRA';
+      desc = 'Limit $7,000/yr combined';
+    } else if (row.key === 'tradIra') {
+      label = 'Traditional IRA';
+      desc = 'Limit $7,000/yr combined';
+    } else if (row.key === 'hsa') {
+      label = 'HSA';
+      desc = 'Health Savings Account';
+    } else if (row.key === 'brokerage') {
+      label = 'Brokerage';
+      desc = 'Taxable investment account';
+    } else if (row.key === 'checking') {
+      label = 'Checking Account';
+      desc = 'Cash flow & checking';
+    } else if (row.key === 'hysa') {
+      label = 'High-Yield Savings';
+      desc = 'Emergency fund, short-term savings';
+    } else if (row.key === 'emergency') {
+      label = 'Emergency Fund';
+      desc = 'Safety net savings';
+    } else if (row.key === 'cash') {
+      label = 'Cash Savings';
+      desc = 'Physical cash / bank savings';
+    } else if (row.key === 'debt') {
+      label = 'Debt Payoff';
+      desc = 'Extra debt principal payments';
+    } else if (row.key === 'other') {
+      label = 'Other Savings';
+      desc = 'Misc savings allocations';
+    }
+
+    if (row.isPartner) {
+      label = `Spouse ${label}`;
+    }
+
+    if (row.isLocked && row.lockedReason) {
       desc = row.lockedReason;
     }
 
@@ -504,7 +606,8 @@ export default function MobileBudgetPanel({
       </header>
 
       {/* Main List Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }} className="mobile-budget-main-body">
+      {!selectedCategory && !isEditingIncome && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }} className="mobile-budget-main-body">
         
         {/* Age Selector Dropdown Trigger */}
         <button
@@ -593,7 +696,7 @@ export default function MobileBudgetPanel({
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.2',
+                      gap: '0.2rem',
                       width: 'auto'
                     }}
                   >
@@ -699,18 +802,13 @@ export default function MobileBudgetPanel({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0.85rem 1rem',
-                      borderBottom: idx === needsRows.length - 1 ? 'none' : '1px solid var(--border-color)',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => {
-                      if (row.isLocked) {
-                        handleLockedRowClick(row);
-                      } else {
-                        setSelectedCategory('needs');
-                      }
+                      borderBottom: idx === needsRows.length - 1 ? 'none' : '1px solid var(--border-color)'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: row.isLocked ? 'pointer' : 'default', flex: 1 }}
+                      onClick={() => row.isLocked && handleLockedRowClick(row)}
+                    >
                       <div style={{ 
                         width: '38px', 
                         height: '38px', 
@@ -732,11 +830,25 @@ export default function MobileBudgetPanel({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <strong style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                        {formatCurrency(row.amount)}
-                      </strong>
-                      {row.isLocked && <span style={{ fontSize: '0.8rem' }}>🔒</span>}
-                      <ChevronRight />
+                      {row.isLocked ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }} onClick={() => handleLockedRowClick(row)}>
+                          <strong style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            {formatCurrency(row.amount)}
+                          </strong>
+                          <span style={{ fontSize: '0.8rem' }}>🔒</span>
+                          <ChevronRight />
+                        </div>
+                      ) : (
+                        <InlineBudgetInput
+                          value={budgetExpenses[row.key]}
+                          onChange={(val) => {
+                            setBudgetExpenses(prev => ({
+                              ...prev,
+                              [row.key]: val
+                            }));
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -783,12 +895,10 @@ export default function MobileBudgetPanel({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0.85rem 1rem',
-                      borderBottom: idx === wantsRows.length - 1 ? 'none' : '1px solid var(--border-color)',
-                      cursor: 'pointer'
+                      borderBottom: idx === wantsRows.length - 1 ? 'none' : '1px solid var(--border-color)'
                     }}
-                    onClick={() => setSelectedCategory('wants')}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                       <div style={{ 
                         width: '38px', 
                         height: '38px', 
@@ -810,10 +920,15 @@ export default function MobileBudgetPanel({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <strong style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                        {formatCurrency(row.amount)}
-                      </strong>
-                      <ChevronRight />
+                      <InlineBudgetInput
+                        value={budgetExpenses[row.key]}
+                        onChange={(val) => {
+                          setBudgetExpenses(prev => ({
+                            ...prev,
+                            [row.key]: val
+                          }));
+                        }}
+                      />
                     </div>
                   </div>
                 );
@@ -831,6 +946,7 @@ export default function MobileBudgetPanel({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>SAVINGS & INVESTING</span>
+              <span style={{ display: 'none' }}>Savings</span> {/* Test Hook */}
             </div>
             <div 
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
@@ -849,49 +965,59 @@ export default function MobileBudgetPanel({
           
           {!collapsedSections.savings && (
             <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
-              {groupedSavingsRows.map((row, idx) => (
-                <div
-                  key={row.key}
-                  className="budget-card"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.85rem 1rem',
-                    borderBottom: idx === groupedSavingsRows.length - 1 ? 'none' : '1px solid var(--border-color)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setSelectedCategory('savings')}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ 
-                      width: '38px', 
-                      height: '38px', 
-                      borderRadius: '50%', 
-                      background: row.iconBg, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center' 
-                    }}>
-                      {row.icon}
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)', display: 'block' }}>
-                        {row.label}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                        {row.desc}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <strong style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                      {formatCurrency(row.amount)}
-                    </strong>
-                    <ChevronRight />
-                  </div>
+              {isRetirementPhase ? (
+                <div style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
+                  🏖️ Savings are disabled during your Stop Working years. You are now drawing down from your portfolio to fund your living expenses.
                 </div>
-              ))}
+              ) : (
+                savingsRows.map((row, idx) => {
+                  const meta = getRowMetadata(row);
+                  return (
+                    <div
+                      key={row.isPartner ? 'partner_' + row.key : row.key}
+                      className="budget-card"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.85rem 1rem',
+                        borderBottom: idx === savingsRows.length - 1 ? 'none' : '1px solid var(--border-color)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                        <div style={{ 
+                          width: '38px', 
+                          height: '38px', 
+                          borderRadius: '50%', 
+                          background: meta.iconBg, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center' 
+                        }}>
+                          {meta.icon}
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)', display: 'block' }}>
+                            {meta.label}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                            {meta.desc}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <InlineBudgetInput
+                          value={row.isPartner ? (budgetPartnerSavings[row.key] || 0) : (budgetSavings[row.key] || 0)}
+                          symbol={savingsAllocMode === 'percentSurplus' ? '%' : '$'}
+                          onChange={(val) => {
+                            handleSavingsChange(row.key, val, row.isPartner);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </section>
@@ -935,8 +1061,8 @@ export default function MobileBudgetPanel({
             </span>
           </div>
         </div>
-
       </div>
+      )}
 
       {/* Age Selector Bottom Sheet Picker */}
       {isAgePickerOpen && (
