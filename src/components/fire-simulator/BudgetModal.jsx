@@ -121,7 +121,7 @@ export default function BudgetModal({
     else if (eventType === 'Child') type = 'child';
     else if (eventType === 'Home Purchase') type = 'buyHouse';
     else if (eventType === 'Borrowing') type = 'debt';
-    else if (eventType === 'Income Change / Promotion') type = 'careerChange';
+    else if (eventType === 'Income Change') type = 'careerChange';
     else if (eventType === 'Windfall') type = 'windfall';
     else if (eventType === 'Retirement / Social Security') type = 'socialSecurity';
 
@@ -593,7 +593,7 @@ export default function BudgetModal({
       else if (e.type === 'marriage') eventName = 'Marriage';
       else if (e.type === 'buyHouse') eventName = 'Home Purchase';
       else if (e.type === 'windfall') eventName = 'Windfall';
-      else if (e.type === 'careerChange' || e.type === 'promotion') eventName = 'Promotion';
+      else if (e.type === 'careerChange' || e.type === 'promotion') eventName = 'Income Change';
       else if (e.type === 'retire') eventName = 'Retirement';
       else eventName = e.name || e.type;
 

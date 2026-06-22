@@ -24,6 +24,8 @@ import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import MobileChildPlanningModal from './MobileChildPlanningModal';
 import MobileHousePlanningModal from './MobileHousePlanningModal';
+import MobileMarriagePlanningModal from './MobileMarriagePlanningModal';
+import MobileIncomeChangeModal from './MobileIncomeChangeModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
@@ -2479,6 +2481,22 @@ export default function MobileFireSimulatorView({
           eventController={eventController}
           simulation={simulation}
           uiState={uiState}
+          onClose={() => setEditingEvent(null)}
+        />
+      ) : editingEvent && (editingEvent.type === 'marriage' || editingEvent.type === 'get-married') ? (
+        <MobileMarriagePlanningModal
+          scenario={scenario}
+          eventController={eventController}
+          simulation={simulation}
+          uiState={uiState}
+          onClose={() => setEditingEvent(null)}
+          handleSetBudgetClick={budgetController?.handleSetBudgetClick}
+          setIsBudgetOpenFromMarriageWizard={budgetController?.setIsBudgetOpenFromMarriageWizard}
+        />
+      ) : editingEvent && editingEvent.type === 'careerChange' ? (
+        <MobileIncomeChangeModal
+          scenario={scenario}
+          eventController={eventController}
           onClose={() => setEditingEvent(null)}
         />
       ) : editingEvent && (

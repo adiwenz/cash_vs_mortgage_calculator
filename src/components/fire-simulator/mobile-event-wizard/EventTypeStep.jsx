@@ -1,6 +1,34 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 
+const getPastelColor = (type) => {
+  const colors = {
+    marriage: '#edf2ff',      // soft pastel blue/indigo
+    buyHouse: '#ffedd5',      // soft peach
+    haveChild: '#dcfce7',     // soft green
+    careerChange: '#f1f5f9',  // soft cool gray
+    move: '#fee2e2',          // soft pink/red
+    windfall: '#fef9c3',      // soft yellow/gold
+    
+    sabbatical: '#e0f2fe',    // soft tropical blue
+    sellHouse: '#ffedd5',     // soft orange/peach
+    studentLoan: '#fee2e2',   // soft red
+    creditCard: '#f1f5f9',    // soft gray
+    carLoan: '#e0f2fe',       // soft blue
+    personalLoan: '#f3e8ff',  // soft purple
+    debtPayoff: '#dcfce7',    // soft green
+    college: '#f3e8ff',       // soft lavender
+    custom: '#e0f2fe',        // soft cyan/blue
+    retire: '#ffedd5',        // soft warm orange
+    socialSecurity: '#fef9c3',// soft gold
+    pension: '#dcfce7',       // soft green
+    rentalIncome: '#e2e8f0',  // soft slate
+    annuity: '#f3e8ff',       // soft violet
+    otherRetirementIncome: '#fef9c3' // soft gold
+  };
+  return colors[type] || '#f1f5f9';
+};
+
 export default function EventTypeStep({
   searchQuery,
   setSearchQuery,
@@ -71,7 +99,7 @@ export default function EventTypeStep({
           onBlur={() => setSearchFocused(false)}
         />
       </div>
-
+ 
       {searchQuery === '' && (
         <div className="mobile-wizard-list" style={{ marginTop: '1rem' }}>
           {primaryEvents.map((item) => {
@@ -85,7 +113,9 @@ export default function EventTypeStep({
                 disabled={disabled}
                 style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               >
-                <span className="item-icon">{item.icon}</span>
+                <span className="item-icon-wrapper" style={{ backgroundColor: getPastelColor(item.type) }}>
+                  <span className="item-icon">{item.icon}</span>
+                </span>
                 <span className="item-label">
                   {item.label}{disabled ? ' (Already Added)' : ''}
                 </span>
@@ -98,21 +128,8 @@ export default function EventTypeStep({
             type="button"
             className="mobile-wizard-list-item show-more-toggle-row"
             onClick={() => setShowAdvancedEvents(!showAdvancedEvents)}
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              background: 'rgba(255, 255, 255, 0.01)',
-              border: '1px dashed rgba(255, 255, 255, 0.1)',
-              color: 'var(--text-secondary, #94a3b8)',
-              padding: '0.75rem 1rem',
-              borderRadius: '14px',
-              cursor: 'pointer',
-              width: '100%',
-              transition: 'all 0.2s ease',
-            }}
           >
-            <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>
+            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>
               {showAdvancedEvents ? 'Show Less ↑' : 'Show More ↓'}
             </span>
           </button>
@@ -138,7 +155,9 @@ export default function EventTypeStep({
                     disabled={disabled}
                     style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   >
-                    <span className="item-icon">{item.icon}</span>
+                    <span className="item-icon-wrapper" style={{ backgroundColor: getPastelColor(item.type) }}>
+                      <span className="item-icon">{item.icon}</span>
+                    </span>
                     <span className="item-label">
                       {item.label}{disabled ? ' (Already Added)' : ''}
                     </span>
@@ -164,7 +183,9 @@ export default function EventTypeStep({
                 disabled={disabled}
                 style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               >
-                <span className="item-icon">{item.icon}</span>
+                <span className="item-icon-wrapper" style={{ backgroundColor: getPastelColor(item.type) }}>
+                  <span className="item-icon">{item.icon}</span>
+                </span>
                 <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
                   <span className="item-label">
                     {item.label}{disabled ? ' (Already Added)' : ''}

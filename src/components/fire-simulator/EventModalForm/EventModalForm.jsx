@@ -15,6 +15,7 @@ import CareerFields from './CareerFields';
 import RetirementFields from './RetirementFields';
 import GenericEventFields from './GenericEventFields';
 import RecommendationFooter from './RecommendationFooter';
+import IncomeChangeImpactPreview from './IncomeChangeImpactPreview';
 
 export default function EventModalForm({
   simulation,
@@ -143,6 +144,12 @@ export default function EventModalForm({
         <EventTypeHeader type={type} editingEvent={editingEvent} />
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {type === 'careerChange' && (
+            <IncomeChangeImpactPreview
+              inputs={inputs}
+              editingEvent={editingEvent}
+            />
+          )}
           {(type === 'buyHouse' || type === 'sellHouse') && (
             <HouseFields
               type={type}

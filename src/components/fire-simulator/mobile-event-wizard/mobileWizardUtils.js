@@ -38,7 +38,7 @@ export function getEventFriendlyTitle(type, borrowingType, name, childName) {
   const labels = {
     haveChild: 'Child / Adoption',
     marriage: 'Marriage / Partner',
-    careerChange: 'Career Change',
+    careerChange: 'Income Change',
     sabbatical: 'Sabbatical',
     buyHouse: 'Home Purchase',
     sellHouse: 'Sell House',

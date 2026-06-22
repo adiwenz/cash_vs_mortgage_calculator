@@ -137,7 +137,7 @@ export default function DesktopBudgetPanel({
         explanations.push(`+$${(Number(evt.amount) || 0).toLocaleString()} windfall`);
       } else if (evt.type === 'careerChange' || evt.type === 'promotion') {
         const amt = Number(evt.amount || evt.salaryIncrease) || 0;
-        explanations.push(`+$${(amt / 12).toLocaleString()}/mo income from Promotion`);
+        explanations.push(`+$${(amt / 12).toLocaleString()}/mo from Income Change`);
       } else if (evt.type === 'retire') {
         explanations.push(`Stop Working starts`);
       }
@@ -263,7 +263,7 @@ export default function DesktopBudgetPanel({
               overflow: 'hidden',
               marginBottom: '0.5rem'
             }}>
-              {['Marriage', 'Child', 'Home Purchase', 'Borrowing', 'Income Change / Promotion', 'Windfall', 'Retirement / Social Security'].map(type => (
+              {['Marriage', 'Child', 'Home Purchase', 'Borrowing', 'Income Change', 'Windfall', 'Retirement / Social Security'].map(type => (
                 <button
                   key={type}
                   type="button"

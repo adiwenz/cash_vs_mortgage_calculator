@@ -584,8 +584,8 @@ export function getEventsForAge(inputs, age) {
         emoji = '💰';
         name = 'Windfall';
       } else if (e.type === 'careerChange' || e.type === 'promotion') {
-        emoji = '📈';
-        name = 'Promotion';
+        emoji = '💼';
+        name = 'Income Change';
       } else if (e.type === 'college' || e.type === 'education') {
         emoji = '🎓';
         name = 'Education';
@@ -721,7 +721,7 @@ export function getAppliedEventsThroughAge(inputs, age) {
       else if (e.type === 'haveChild') { emoji = '👶'; name = 'Child'; }
       else if (e.type === 'buyHouse') { emoji = '🏠'; name = 'Home Purchase'; }
       else if (e.type === 'windfall') { emoji = '💰'; name = 'Windfall'; }
-      else if (e.type === 'careerChange' || e.type === 'promotion') { emoji = '📈'; name = 'Promotion'; }
+      else if (e.type === 'careerChange' || e.type === 'promotion') { emoji = '💼'; name = 'Income Change'; }
       else if (e.type === 'college' || e.type === 'education') { emoji = '🎓'; name = 'Education'; }
       else if (e.type === 'vehicle' || e.type === 'carLoan') { emoji = '🚗'; name = 'Vehicle'; }
       else if (e.type === 'retire') { emoji = '🏖️'; name = 'Retirement'; }
@@ -1158,7 +1158,7 @@ export function getChangesFromToday(inputs, selectedBudgetAge) {
   const incomeDiff = targetBudget.income - todayBudget.income;
   if (incomeDiff !== 0) {
     const isMarried = targetBudget.phase.isMarried && !todayBudget.phase.isMarried;
-    const source = isMarried ? '💍 Marriage' : '📈 Promotion/Income Change';
+    const source = isMarried ? '💍 Marriage' : '💼 Income Change';
     changes.push({
       event: source,
       text: `${incomeDiff > 0 ? '+' : ''}${formatCurrency(incomeDiff)}/mo income`
