@@ -2984,6 +2984,9 @@ input:checked + .slider-round:before {
 }
 
 @keyframes mobileFloatUpDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
+}
 
 /* ==========================================================================
    MOBILE HOUSING FLOW (WHITE SHEET WIZARD)
