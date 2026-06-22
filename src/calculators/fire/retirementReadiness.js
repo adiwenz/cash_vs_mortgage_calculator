@@ -236,8 +236,43 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
   const retirementLog = deflatedLogs.find(log => log.age === targetRetirementAge) || deflatedLogs[deflatedLogs.length - 1];
   const finalSurplusShortfall = plannedProjection.endingSurplusShortfall / Math.pow(1 + inflationRate, simYearsToCompute);
 
+  // Calculate shortfall and required assets at desired retirement age (targetRetirementAge)
+  const nominalRequiredAtDesired = calculateMinimumPortfolioForRetirement(profile, phases, events, targetRetirementAge, maxLifeExpectancy, 'lastsLifeExp', false);
+  const factorAtDesired = Math.pow(1 + inflationRate, Math.max(0, targetRetirementAge - currentAge));
+  const deflatedRequiredAtDesired = nominalRequiredAtDesired / factorAtDesired;
+
+  const nominalRetirementLog = plannedProjection.logs.find(log => log.age === targetRetirementAge) || plannedProjection.logs[plannedProjection.logs.length - 1];
+  const nominalProjectedAtDesired = nominalRetirementLog ? nominalRetirementLog.portfolio : 0;
+  const deflatedProjectedAtDesired = retirementLog ? retirementLog.portfolio : 0;
+
+  // Plan success check: user stops working at desired retirement age,
+  // and total net worth never drops below $0 from desired retirement age through lifeExpectancy.
+  let isSolventAtDesired = true;
+  if (!plannedProjection.moneyLasts) {
+    isSolventAtDesired = false;
+  } else {
+    for (let i = 0; i < deflatedLogs.length; i++) {
+      const log = deflatedLogs[i];
+      if (log.age >= targetRetirementAge && log.age <= lifeExpectancy) {
+        if (log.netWorth < 0) {
+          isSolventAtDesired = false;
+          break;
+        }
+      }
+    }
+  }
+
+  let deflatedShortfallAtDesired = isSolventAtDesired ? 0 : deflatedRequiredAtDesired - deflatedProjectedAtDesired;
+  if (!isSolventAtDesired && deflatedShortfallAtDesired <= 0) {
+    deflatedShortfallAtDesired = 1; // force a small positive shortfall to trigger the options button
+  }
+  let nominalShortfallAtDesired = isSolventAtDesired ? 0 : nominalRequiredAtDesired - nominalProjectedAtDesired;
+  if (!isSolventAtDesired && nominalShortfallAtDesired <= 0) {
+    nominalShortfallAtDesired = 1;
+  }
+
   let retirementOutcome;
-  if (plannedProjection.runOutAge === null) {
+  if (plannedProjection.runOutAge === null && isSolventAtDesired) {
     if (retirementReadyAgeComfortable !== null && targetRetirementAge >= retirementReadyAgeComfortable) {
       retirementOutcome = 'comfortable';
     } else {
@@ -247,7 +282,6 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     retirementOutcome = 'retirementGap';
   }
 
-  const nominalRetirementLog = plannedProjection.logs.find(log => log.age === targetRetirementAge) || plannedProjection.logs[plannedProjection.logs.length - 1];
 
   let nominalRetirementIncomeSources = 0;
   let retirementIncomeSourcesInTodayDollars = 0;
@@ -328,6 +362,13 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     nominalEndingSurplusShortfall: plannedProjection.nominalEndingSurplusShortfall !== undefined ? plannedProjection.nominalEndingSurplusShortfall : plannedProjection.endingSurplusShortfall,
     deflatedEndingSurplusShortfall: finalSurplusShortfall,
     nominalRetirementIncomeSources,
-    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars
+    deflatedRetirementIncomeSources: retirementIncomeSourcesInTodayDollars,
+    nominalRequiredAtDesired,
+    deflatedRequiredAtDesired,
+    nominalProjectedAtDesired,
+    deflatedProjectedAtDesired,
+    nominalShortfallAtDesired,
+    deflatedShortfallAtDesired,
+    isSolventAtDesired
   };
 }

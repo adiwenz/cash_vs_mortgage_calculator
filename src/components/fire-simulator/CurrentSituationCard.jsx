@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatCurrency } from './helpers';
+import { formatCurrency, formatAnnualSummaryCurrency } from './helpers';
 import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
 import { getNormalizedPhases } from '../../fireCalculations';
 import { setLastChartChangeType } from './changeTypeTracker';
@@ -49,9 +49,31 @@ export default function CurrentSituationCard({
 
   const currentPhaseAnnualSpending = useMemo(() => {
     if (!currentPhase) return 0;
-    const monthlySpending = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    return monthlySpending * 12;
-  }, [currentPhase]);
+    if (!inputs.hasCustomizedBudget) {
+      const annualIncome = Number(inputs.simpleIncome) || 0;
+      
+      let savingsRate = 0;
+      if (inputs.displayedSavingsRate !== undefined && inputs.displayedSavingsRate !== null) {
+        savingsRate = Number(inputs.displayedSavingsRate);
+      } else if (inputs.savingsRate !== undefined && inputs.savingsRate !== null) {
+        savingsRate = Number(inputs.savingsRate);
+      } else if (currentPhase.displayedSavingsRate !== undefined && currentPhase.displayedSavingsRate !== null) {
+        savingsRate = Number(currentPhase.displayedSavingsRate);
+      } else if (currentPhase.savingsRate !== undefined && currentPhase.savingsRate !== null) {
+        savingsRate = Number(currentPhase.savingsRate);
+      } else {
+        // Fallback: derive from precise annual budget
+        const preciseMonthlyExpenseTotal = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const preciseAnnualBudget = preciseMonthlyExpenseTotal * 12;
+        savingsRate = annualIncome > 0 ? ((annualIncome - preciseAnnualBudget) / annualIncome) * 100 : 0;
+      }
+      
+      return annualIncome * (1 - savingsRate / 100);
+    } else {
+      const preciseMonthlyExpenseTotal = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      return preciseMonthlyExpenseTotal * 12;
+    }
+  }, [currentPhase, inputs.hasCustomizedBudget, inputs.simpleIncome, inputs.displayedSavingsRate, inputs.savingsRate]);
 
   const lifeProfile = inputs.lifeProfile || {};
   const household = lifeProfile.household || {};
@@ -326,7 +348,7 @@ export default function CurrentSituationCard({
         >
           <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Spending (budget)</span>
           <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-            {formatCurrency(currentPhaseAnnualSpending)}
+            {formatAnnualSummaryCurrency(currentPhaseAnnualSpending)}
           </span>
         </div>
 

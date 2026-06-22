@@ -61,7 +61,8 @@ export function useSimulationResults(inputs, scenarios, editingEvent) {
       endingSurplusShortfall: isNominal ? activeResults.nominalEndingSurplusShortfall : activeResults.deflatedEndingSurplusShortfall,
       retirementIncomeSources: isNominal ? activeResults.nominalRetirementIncomeSources : activeResults.deflatedRetirementIncomeSources,
       fiNumber: isNominal ? activeResults.nominalRetirementReadyTarget : activeResults.deflatedRetirementReadyTarget,
-      retireTodayTarget: activeResults.retireTodayTarget
+      retireTodayTarget: activeResults.retireTodayTarget,
+      shortfallAtDesired: isNominal ? activeResults.nominalShortfallAtDesired : activeResults.deflatedShortfallAtDesired
     };
   }, [activeResults, displayMode]);
 
