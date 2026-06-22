@@ -10,6 +10,51 @@ import {
   ReferenceLine
 } from 'recharts';
 
+function calculateTicks(min, max, targetTickCount = 5) {
+  if (min > max) {
+    [min, max] = [max, min];
+  }
+  
+  const finalMin = Math.min(0, min);
+  const finalMax = Math.max(0, max);
+  
+  if (finalMin === finalMax) {
+    return [0];
+  }
+  
+  const range = finalMax - finalMin;
+  let roughStep = range / (targetTickCount - 1);
+  
+  const exponent = Math.floor(Math.log10(roughStep));
+  const fraction = roughStep / Math.pow(10, exponent);
+  
+  let cleanStep;
+  if (fraction < 1.5) cleanStep = 1;
+  else if (fraction < 3.5) cleanStep = 2;
+  else if (fraction < 7.5) cleanStep = 5;
+  else cleanStep = 10;
+  
+  const step = cleanStep * Math.pow(10, exponent);
+  
+  const ticks = [0];
+  
+  // Go up from 0
+  let current = step;
+  while (ticks[ticks.length - 1] < finalMax - 1e-9) {
+    ticks.push(current);
+    current += step;
+  }
+  
+  // Go down from 0
+  current = -step;
+  while (ticks[0] > finalMin + 1e-9) {
+    ticks.unshift(current);
+    current -= step;
+  }
+  
+  return ticks;
+}
+
 // Format dollar values cleanly
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -83,6 +128,32 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
     }
     return null;
   }, [data, visibleScenarios]);
+
+  const bounds = React.useMemo(() => {
+    let min = 0;
+    let max = yAxisMax || 100000;
+    if (data && data.length) {
+      data.forEach((row) => {
+        if (visibleScenarios.cashBuyer && row.cashBuyerNW !== undefined) {
+          if (row.cashBuyerNW < min) min = row.cashBuyerNW;
+          if (row.cashBuyerNW > max) max = row.cashBuyerNW;
+        }
+        if (visibleScenarios.mortgageBuyer && row.mortgageBuyerNW !== undefined) {
+          if (row.mortgageBuyerNW < min) min = row.mortgageBuyerNW;
+          if (row.mortgageBuyerNW > max) max = row.mortgageBuyerNW;
+        }
+      });
+    }
+    max = Math.ceil(max * 1.05);
+    if (min < 0) {
+      min = Math.floor(min * 1.12);
+    }
+    return { min, max };
+  }, [data, visibleScenarios, yAxisMax]);
+
+  const ticks = React.useMemo(() => {
+    return calculateTicks(bounds.min, bounds.max);
+  }, [bounds]);
 
   return (
     <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -218,8 +289,10 @@ export default function ComparisonChart({ data, visibleScenarios, onToggleScenar
                 fontSize={11}
                 tickFormatter={formatYAxis}
                 dx={-10}
-                domain={[0, yAxisMax]}
+                domain={[ticks[0], ticks[ticks.length - 1]]}
+                ticks={ticks}
               />
+              <ReferenceLine y={0} stroke="var(--text-secondary, #6b7280)" strokeWidth={1.5} strokeDasharray="3 3" />
               <Tooltip content={<CustomTooltip />} />
               
               {intersectionYear !== null && intersectionYear <= zoomRange && (

@@ -39,7 +39,7 @@ vi.mock('recharts', () => {
       }
       return null;
     },
-    ReferenceLine: () => <div data-testid="ReferenceLine" />,
+    ReferenceLine: ({ x }) => <div data-testid="ReferenceLine" data-x={x} />,
     ReferenceDot: () => <div data-testid="ReferenceDot" />,
     ReferenceArea: () => <div data-testid="ReferenceArea" />
   };
@@ -133,7 +133,7 @@ describe('ProjectionGraph and Timelines - Life Events Decoupling', () => {
     expect(badges.length).toBe(0);
 
     // Recharts Mock should not render ReferenceLine or ReferenceDot since they are removed
-    const refLines = container.querySelectorAll('[data-testid="ReferenceLine"]');
+    const refLines = container.querySelectorAll('[data-testid="ReferenceLine"][data-x]');
     expect(refLines.length).toBe(0);
 
     const refDots = container.querySelectorAll('[data-testid="ReferenceDot"]');
