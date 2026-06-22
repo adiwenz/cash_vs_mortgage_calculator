@@ -159,12 +159,8 @@ describe('IRS Retirement Limits Helpers and UI Capping', () => {
     );
 
     // Open Save & Invest tab
-    const savingsCard = screen.getByText(/Save & Invest/i).closest('.budget-card');
+    const savingsCard = screen.getAllByText(/Savings & Investing/i)[0].closest('.budget-card');
     fireEvent.click(savingsCard);
-
-    // Click "Edit Savings →"
-    const editSavingsBtn = screen.getByRole('button', { name: /Edit Savings →/i });
-    fireEvent.click(editSavingsBtn);
 
     // Find the 401(k) input
     const input401k = getInputByWrapperText(/401\(k\) \(Pre-Tax\)/i);
@@ -192,7 +188,7 @@ describe('IRS Retirement Limits Helpers and UI Capping', () => {
     expect(nextState2.trad401k).toBe(1500);
 
     // Find Brokerage input
-    const inputBrokerage = getInputByWrapperText(/Taxable Brokerage/i);
+    const inputBrokerage = getInputByWrapperText(/^Brokerage$/i);
     fireEvent.change(inputBrokerage, { target: { value: '5000' } });
     expect(mockSetBudgetSavings).toHaveBeenCalled();
     const updaterB = mockSetBudgetSavings.mock.calls[mockSetBudgetSavings.mock.calls.length - 1][0];
@@ -258,11 +254,8 @@ describe('IRS Retirement Limits Helpers and UI Capping', () => {
     );
 
     // Open Save & Invest tab
-    const savingsCard = screen.getByText(/Save & Invest/i).closest('.budget-card');
+    const savingsCard = screen.getAllByText(/Savings & Investing/i)[0].closest('.budget-card');
     fireEvent.click(savingsCard);
-
-    const editSavingsBtn = screen.getByRole('button', { name: /Edit Savings →/i });
-    fireEvent.click(editSavingsBtn);
 
     const partner401kInput = getInputByWrapperText(/Partner 401\(k\)/i);
     
@@ -331,8 +324,8 @@ describe('IRS Retirement Limits Helpers and UI Capping', () => {
     );
 
     // Tapping Savings opens the Savings Allocation sheet directly
-    const savingsRow = screen.getByText('Brokerage, cash, retirement');
-    fireEvent.click(savingsRow);
+    const savingsRing = screen.getByText('Savings', { exact: true }).closest('.budget-card');
+    fireEvent.click(savingsRing);
 
     const input401k = getInputByWrapperText(/401\(k\)/i);
     
