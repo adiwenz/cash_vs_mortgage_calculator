@@ -196,9 +196,11 @@ describe('Mobile Event Wizard & Flow', () => {
       />
     );
 
-    // Click on Move / Relocate
-    const careerBtn = screen.getByText('Move / Relocate');
-    fireEvent.click(careerBtn);
+    // Search and select Sabbatical (which is not a simple event and goes to timing screen)
+    const searchInput = screen.getByPlaceholderText('Search events...');
+    fireEvent.change(searchInput, { target: { value: 'sabbatical' } });
+    const sabbaticalBtn = screen.getByText('Sabbatical');
+    fireEvent.click(sabbaticalBtn);
 
     // Step 3 Timing screen has title "When does this happen?"
     expect(screen.getByText('When does this happen?')).toBeDefined();
@@ -647,8 +649,11 @@ describe('Mobile Event Wizard & Flow', () => {
           setEditingEvent={setEditingEvent}
         />
       );
-      const moveBtn = screen.getByText('Move / Relocate');
-      fireEvent.click(moveBtn);
+      // Search and select Sabbatical (which is not a simple event and goes to timing screen)
+      const searchInput = screen.getByPlaceholderText('Search events...');
+      fireEvent.change(searchInput, { target: { value: 'sabbatical' } });
+      const sabbaticalBtn = screen.getByText('Sabbatical');
+      fireEvent.click(sabbaticalBtn);
       expect(screen.getByText('When does this happen?')).toBeDefined();
     });
 
@@ -892,13 +897,6 @@ describe('Mobile Event Wizard & Flow', () => {
 
     render(
       <MobileEventWizard
-        scenario={{ inputs }}
-        eventController={{
-          editingEvent: { type: 'selectType', isNew: true },
-          handleSaveEvent: vi.fn(),
-          handleDeleteEvent: vi.fn()
-        }}
-        simulation={{ nominalData: [] }}
         inputs={inputs}
         editingEvent={{ type: 'selectType', isNew: true }}
         setEditingEvent={setEditingEvent}
@@ -919,6 +917,117 @@ describe('Mobile Event Wizard & Flow', () => {
     expect(args.type).toBe('buyHouse');
     expect(args.isNew).toBe(true);
   });
+
+  test('Backdrop theme class dynamically changes based on event type', () => {
+    const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    const setEditingEvent = vi.fn();
+
+    const checkTheme = (draftType, expectedClass, isSimple = false) => {
+      const { container, unmount } = render(
+        <MobileEventWizard
+          inputs={inputs}
+          editingEvent={{ type: draftType, isNew: true }}
+          setEditingEvent={setEditingEvent}
+          handleSaveEvent={vi.fn()}
+          handleDeleteEvent={vi.fn()}
+          onClose={vi.fn()}
+          getInputsWithEvent={vi.fn()}
+          baselineResults={null}
+        />
+      );
+      if (isSimple) {
+        const backdrop = container.querySelector('.mobile-simple-form-backdrop');
+        expect(backdrop).not.toBeNull();
+      } else {
+        const backdrop = container.querySelector('.mobile-wizard-backdrop');
+        expect(backdrop).not.toBeNull();
+        expect(backdrop.className).toContain(expectedClass);
+      }
+      unmount();
+    };
+
+    checkTheme('careerChange', 'theme-income');
+    checkTheme('sabbatical', 'theme-income');
+    checkTheme('buyHouse', 'theme-housing');
+    checkTheme('sellHouse', 'theme-housing');
+    checkTheme('move', 'theme-housing', true);
+    checkTheme('retire', 'theme-retirement');
+    checkTheme('socialSecurity', 'theme-retirement');
+    checkTheme('pension', 'theme-retirement', true);
+    checkTheme('rentalIncome', 'theme-retirement', true);
+    checkTheme('annuity', 'theme-retirement', true);
+    checkTheme('otherRetirementIncome', 'theme-retirement', true);
+    checkTheme('borrowing', 'theme-debt');
+    checkTheme('debtPayoff', 'theme-debt', true);
+    checkTheme('payoffPlan', 'theme-debt');
+    checkTheme('custom', 'theme-goal');
+  });
+
+  test('Simple events render MobileSimpleEventForm directly on add and edit', () => {
+    const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    const handleSaveEvent = vi.fn();
+    const handleDeleteEvent = vi.fn();
+    const onClose = vi.fn();
+    const setEditingEvent = vi.fn();
+
+    // 1. Creation flow (starts past step 2)
+    const { container, rerender } = render(
+      <MobileEventWizard
+        inputs={inputs}
+        editingEvent={{ type: 'pension', isNew: true }}
+        setEditingEvent={setEditingEvent}
+        handleSaveEvent={handleSaveEvent}
+        handleDeleteEvent={handleDeleteEvent}
+        onClose={onClose}
+        getInputsWithEvent={vi.fn()}
+        baselineResults={null}
+      />
+    );
+
+    // Verify it renders MobileSimpleEventForm elements
+    expect(screen.getByText('Add Pension')).toBeDefined();
+    expect(screen.getByText('Income Name')).toBeDefined();
+    expect(screen.getByText('Start Age')).toBeDefined();
+    expect(screen.getByText('Monthly Amount ($)')).toBeDefined();
+
+    // Test Save button
+    const saveBtn = screen.getByRole('button', { name: /Save Event/i });
+    fireEvent.click(saveBtn);
+    expect(handleSaveEvent).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+
+    // 2. Edit flow (existing event, starts at step 8)
+    rerender(
+      <MobileEventWizard
+        inputs={inputs}
+        editingEvent={{ id: 'move-1', type: 'move', location: 'Hawaii', moveAge: 45, newSpending: 60000, movingCost: 5000, isNew: false }}
+        setEditingEvent={setEditingEvent}
+        handleSaveEvent={handleSaveEvent}
+        handleDeleteEvent={handleDeleteEvent}
+        onClose={onClose}
+        getInputsWithEvent={vi.fn()}
+        baselineResults={null}
+      />
+    );
+
+    // Verify move form values are pre-populated
+    expect(screen.getByText('Move / Relocate')).toBeDefined();
+    const locationInput = container.querySelector('input[type="text"]');
+    expect(locationInput.value).toBe('Hawaii');
+
+    const numberInputs = container.querySelectorAll('input[type="number"]');
+    // moveAge (45), newSpending (60000), movingCost (5000)
+    const values = Array.from(numberInputs).map(input => input.value);
+    expect(values).toContain('45');
+    expect(values).toContain('60000');
+    expect(values).toContain('5000');
+
+    // Test Delete button
+    const deleteBtn = screen.getByRole('button', { name: /Delete Event/i });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
+    fireEvent.click(deleteBtn);
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(handleDeleteEvent).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
 });
-
-

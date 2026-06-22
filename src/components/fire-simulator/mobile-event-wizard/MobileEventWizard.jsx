@@ -38,6 +38,7 @@ import DebtWizardStep from './DebtWizardStep';
 import OtherEventWizardStep from './OtherEventWizardStep';
 import RecommendationStep from './RecommendationStep';
 import ReviewStep from './ReviewStep';
+import MobileSimpleEventForm from './MobileSimpleEventForm';
 
 export default function MobileEventWizard({
   scenario,
@@ -84,7 +85,13 @@ export default function MobileEventWizard({
 
   // Determine initial step
   const [step, setStep] = useState(() => {
-    if (isNew) return 2; // Choose Event Type
+    if (isNew) {
+      const simpleEventTypes = ['move', 'windfall', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome', 'college', 'debtPayoff'];
+      if (editingEvent && editingEvent.type && simpleEventTypes.includes(editingEvent.type)) {
+        return 3;
+      }
+      return 2; // Choose Event Type
+    }
     return 8; // Event Details / Manage page
   });
 
@@ -530,11 +537,53 @@ export default function MobileEventWizard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftEvent, inputs, baselineResults, isNew, afterReadyAge]);
 
+  const themeClass = useMemo(() => {
+    if (!draftEvent || !draftEvent.type) return '';
+    const t = draftEvent.type;
+    if (['careerChange', 'sabbatical'].includes(t)) return 'theme-income';
+    if (['buyHouse', 'sellHouse', 'move'].includes(t)) return 'theme-housing';
+    if (['retire', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(t)) return 'theme-retirement';
+    if (['borrowing', 'debtPayoff', 'payoffPlan'].includes(t)) return 'theme-debt';
+    return 'theme-goal';
+  }, [draftEvent?.type]);
+
+  const isSimpleEvent = useMemo(() => {
+    if (!draftEvent || !draftEvent.type) return false;
+    return ['move', 'windfall', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome', 'college', 'debtPayoff'].includes(draftEvent.type);
+  }, [draftEvent?.type]);
+
+  if (isSimpleEvent && step !== 2) {
+    return (
+      <MobileSimpleEventForm
+        draftEvent={draftEvent}
+        setDraftEvent={setDraftEvent}
+        isNew={isNew}
+        onCancel={() => {
+          if (isNew) {
+            setStep(2);
+            setDraftEvent({ type: 'selectType', isNew: true });
+          } else {
+            onClose();
+          }
+        }}
+        onSave={() => {
+          handleSaveEvent(draftEvent);
+          onClose();
+        }}
+        onDelete={() => {
+          handleDeleteEvent(draftEvent);
+          onClose();
+        }}
+      />
+    );
+  }
+
   return (
     <WizardShell
       step={step}
       isNew={isNew}
       title={title}
+      themeClass={themeClass}
       onBack={() => {
         const prev = getPreviousStep(step, isNew);
         setStep(prev);

@@ -24,7 +24,10 @@ export function getEventIcon(type, borrowingType) {
     retire: '🏖️',
     socialSecurity: '💰',
     pension: '📜',
-    rentalIncome: '🏢'
+    rentalIncome: '🏢',
+    annuity: '📈',
+    otherRetirementIncome: '💵',
+    payoffPlan: '🏁'
   };
   return icons[type] || '🎯';
 }
@@ -36,25 +39,28 @@ export function getEventFriendlyTitle(type, borrowingType, name, childName) {
   }
   if (name) return name;
   const labels = {
-    haveChild: 'Child / Adoption',
+    haveChild: 'Have a Child',
     marriage: 'Marriage / Partner',
     careerChange: 'Income Change',
     sabbatical: 'Sabbatical',
-    buyHouse: 'Home Purchase',
-    sellHouse: 'Sell House',
+    buyHouse: 'Buy a House',
+    sellHouse: 'Sell a House',
     move: 'Move / Relocate',
     studentLoan: 'Student Loan',
-    creditCard: 'Credit Card',
-    carLoan: 'Auto Loan',
+    creditCard: 'Credit Card Balance',
+    carLoan: 'Car Loan',
     personalLoan: 'Personal Loan',
-    debtPayoff: 'Debt Payoff',
+    debtPayoff: 'Debt Payoff Plan',
     college: 'College Tuition',
-    windfall: 'Windfall / Inflow',
-    custom: 'Custom Goal',
-    retire: 'Stop Working',
-    socialSecurity: 'Social Security',
-    pension: 'Pension Inflow',
-    rentalIncome: 'Rental Income'
+    windfall: 'Windfall / Inheritance',
+    custom: 'Custom Life Event',
+    retire: 'Schedule Stop Working',
+    socialSecurity: 'Claim Social Security',
+    pension: 'Add Pension',
+    rentalIncome: 'Add Rental Income',
+    annuity: 'Add Annuity',
+    otherRetirementIncome: 'Add Other Non-Work Income',
+    payoffPlan: 'Payoff Plan'
   };
   const key = type === 'borrowing' ? borrowingType : type;
   return labels[key] || 'Life Event';

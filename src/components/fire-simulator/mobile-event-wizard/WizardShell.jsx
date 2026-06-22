@@ -6,12 +6,13 @@ export default function WizardShell({
   onBack,
   onClose,
   title,
+  themeClass = '',
   children
 }) {
   const isPicker = step === 2;
   
   return (
-    <div className={`mobile-wizard-backdrop ${isPicker ? 'light-theme event-picker-theme' : ''}`}>
+    <div className={`mobile-wizard-backdrop ${themeClass} ${isPicker ? 'light-theme event-picker-theme' : ''}`}>
       <div className="mobile-wizard-container">
         
         {/* HEADER */}
