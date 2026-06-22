@@ -4180,5 +4180,38 @@
   border-bottom-right-radius: var(--radius-lg, 12px);
 }
 
+/* Portal Tooltip styles */
+.timeline-tooltip-portal {
+  position: fixed;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  width: max-content;
+  max-width: 250px;
+  color: #ffffff;
+  pointer-events: none;
+  z-index: 9999;
+}
 
+.tooltip-portal-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(15, 23, 42, 0.95);
+  border-left: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+  transform: rotate(45deg);
+}
 
+.tooltip-portal-arrow[data-placement="top"] {
+  bottom: -5px;
+}
+
+.tooltip-portal-arrow[data-placement="bottom"] {
+  top: -5px;
+  transform: rotate(225deg);
+}
