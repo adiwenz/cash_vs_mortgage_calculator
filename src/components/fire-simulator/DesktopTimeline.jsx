@@ -648,7 +648,7 @@ export default function DesktopTimeline({
                         className="timeline-tick-label-new"
                         style={{
                           fontWeight: isMajorTick ? '700' : '600',
-                          color: isMajorTick ? 'var(--text-secondary)',
+                          color: isMajorTick ? 'var(--text-secondary)' : 'var(--text-tertiary)',
                           fontSize: '0.7rem',
                           marginTop: '2px',
                           display: 'block'
