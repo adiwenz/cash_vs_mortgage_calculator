@@ -116,33 +116,14 @@ export default function GoalHeroCard({
     projectedAgeNum >= currentAge &&
     isRetirementSuccessful === true;
 
-  // Determine readiness status and badge content
-  let statusBadge = null;
+  // Determine readiness status
   let readinessScore = 0.0;
 
   if (isValidProjectedAge) {
     if (projectedAgeNum > targetRetirementAge) {
-      const diff = projectedAgeNum - targetRetirementAge;
       readinessScore = 0.5;
-      statusBadge = (
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          padding: '0.35rem 0.75rem',
-          borderRadius: '999px',
-          fontSize: '0.85rem',
-          fontWeight: '700',
-          backgroundColor: 'var(--warning-light, rgba(245, 158, 11, 0.1))',
-          color: 'var(--warning, #d97706)',
-          border: '1px solid rgba(245, 158, 11, 0.2)'
-        }}>
-          {diff} {diff === 1 ? 'year' : 'years'} later than your goal
-        </div>
-      );
     } else {
       readinessScore = 1.0;
-      statusBadge = null;
     }
   }
 
@@ -187,7 +168,6 @@ export default function GoalHeroCard({
                 <span className="goal-hero-right-age-label">years old</span>
               </div>
               <div className="goal-hero-badge-container">
-                {statusBadge}
               </div>
             </>
           ) : (

@@ -48,7 +48,7 @@ describe('GoalHeroCard Component Redesign', () => {
     expect(screen.getAllByText('years old').length).toBeGreaterThanOrEqual(2);
   });
 
-  test('Shows earlier/on-track/later badge correctly', () => {
+  test('Does not show any earlier/on-track/later badges', () => {
     const { rerender } = render(
       <GoalHeroCard
         currentAge={30}
@@ -62,7 +62,8 @@ describe('GoalHeroCard Component Redesign', () => {
       />
     );
 
-    expect(screen.getByText('3 years later than your goal')).toBeDefined();
+    expect(screen.queryByText(/later than your goal/)).toBeNull();
+    expect(screen.queryByText("You're on track")).toBeNull();
 
     // Rerender with earlier
     rerender(
@@ -78,6 +79,7 @@ describe('GoalHeroCard Component Redesign', () => {
       />
     );
 
+    expect(screen.queryByText(/later than your goal/)).toBeNull();
     expect(screen.queryByText("You're on track")).toBeNull();
 
     // Rerender with on track (equal)
@@ -94,6 +96,7 @@ describe('GoalHeroCard Component Redesign', () => {
       />
     );
 
+    expect(screen.queryByText(/later than your goal/)).toBeNull();
     expect(screen.queryByText("You're on track")).toBeNull();
   });
 
