@@ -713,7 +713,10 @@ export default function BudgetModal({
   };
 
   const totalAllocated = needsTotal + wantsTotal + activeSavings;
-  const remainingBalance = takeHomeIncome - totalAllocated;
+  let remainingBalance = takeHomeIncome - totalAllocated;
+  if (Math.abs(remainingBalance) < 0.05) {
+    remainingBalance = 0;
+  }
   const panelProps = {
     inputs,
     activePhaseObj,

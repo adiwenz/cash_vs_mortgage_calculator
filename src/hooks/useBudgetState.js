@@ -413,7 +413,7 @@ export function useBudgetState(
         const wsPhase = Object.values(finalEdited).find(p => p.type === 'workSave');
         const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
         const childBoost = Math.max(0, currentPhase.income - standardIncomeMonthly);
-        newInputs.simpleIncome = (currentPhase.income - childBoost) * 12;
+        newInputs.simpleIncome = scen.inputs.simpleIncome;
         newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
       }
 
@@ -423,7 +423,12 @@ export function useBudgetState(
         }
         const matchingPhase = Object.values(finalEdited).find(p => p.startAge === inc.startAge && (p.type === 'careerChange' || p.type === 'current'));
         if (matchingPhase) {
-          inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;
+          // Keep the main/base career salary canonical from inputs, avoiding penny drift from monthly calculations
+          if (inc.id === 'inc-1' || inc.id === 'simple-inc' || inc.id === 'simple-inc-worksave' || (inc.name && (inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('job')))) {
+            inc.amount = inc.frequency === 'monthly' ? scen.inputs.simpleIncome / 12 : scen.inputs.simpleIncome;
+          } else {
+            inc.amount = inc.frequency === 'monthly' ? matchingPhase.income : matchingPhase.income * 12;
+          }
         }
         return inc;
       });
