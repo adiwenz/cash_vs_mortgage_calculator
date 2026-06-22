@@ -209,7 +209,7 @@ export default function MobileEventWizard({
     { type: 'haveChild', label: 'Child / Adoption', category: 'Family', icon: '👶', popular: true },
     { type: 'marriage', label: 'Marriage / Partner', category: 'Family', icon: '💍', popular: true },
     
-    { type: 'careerChange', label: 'Career Change', category: 'Career', icon: '💼', popular: true },
+    { type: 'careerChange', label: 'Income Change', category: 'Career', icon: '💼', popular: true },
     { type: 'sabbatical', label: 'Sabbatical', category: 'Career', icon: '🌴', popular: false },
     
     { type: 'buyHouse', label: 'Home Purchase', category: 'Housing', icon: '🏠', popular: true },
@@ -243,6 +243,11 @@ export default function MobileEventWizard({
     }
     if (type === 'marriage') {
       const baseDefaults = getDefaultEvent('marriage', { inputs, isMobile: true });
+      setEditingEvent({ ...baseDefaults, isNew: true });
+      return;
+    }
+    if (type === 'careerChange') {
+      const baseDefaults = getDefaultEvent('careerChange', { inputs, isMobile: true });
       setEditingEvent({ ...baseDefaults, isNew: true });
       return;
     }

@@ -409,7 +409,7 @@ export default function LifePlanScreen({
         <option value="marriage">💍 Get Married</option>
         <option value="buyHouse">🏠 Buy a House</option>
         <option value="haveChild">👶 Have a Child</option>
-        <option value="careerChange">💼 Career Change</option>
+        <option value="careerChange">💼 Income Change</option>
         <option value="move">📍 Move / Relocate</option>
         <option value="retire" disabled={(inputs.lifeEvents || []).some(e => e.type === 'retire')}>
           🏖 Retire {(inputs.lifeEvents || []).some(e => e.type === 'retire') ? ' (Already Added)' : ''}

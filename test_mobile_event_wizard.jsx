@@ -196,8 +196,8 @@ describe('Mobile Event Wizard & Flow', () => {
       />
     );
 
-    // Click on Career Change
-    const careerBtn = screen.getByText('Career Change');
+    // Click on Move / Relocate
+    const careerBtn = screen.getByText('Move / Relocate');
     fireEvent.click(careerBtn);
 
     // Step 3 Timing screen has title "When does this happen?"

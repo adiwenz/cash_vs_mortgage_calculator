@@ -27,38 +27,45 @@ export default function RecommendationFooter({
     (type === 'socialSecurity' && (claimAge < 62 || claimAge > 70));
 
   return (
-    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: (editingEvent.id && type !== 'retire' && type !== 'socialSecurity') ? 'space-between' : 'flex-end' }}>
-      {editingEvent.id && type !== 'retire' && type !== 'socialSecurity' && (
+    <div style={{ display: 'flex', marginTop: '1.25rem', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
         <button
           type="button"
           className="btn-secondary"
           style={{
-            color: 'var(--accent-rose, #f43f5e)',
-            borderColor: 'rgba(244, 63, 94, 0.2)',
-            backgroundColor: 'rgba(244, 63, 94, 0.05)',
-            fontWeight: '700'
+            padding: '0.5rem 1.25rem',
+            fontSize: '0.9rem',
+            fontWeight: '600'
           }}
-          onClick={handleDeleteEvent}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
-            e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.05)';
-            e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.2)';
-          }}
-        >
-          Delete Event
-        </button>
-      )}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        <button
-          type="button"
-          className="btn-icon"
           onClick={() => setEditingEvent(null)}
         >
           Cancel
         </button>
+        {editingEvent.id && type !== 'retire' && type !== 'socialSecurity' && (
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{
+              color: 'var(--accent-rose, #f43f5e)',
+              borderColor: 'rgba(244, 63, 94, 0.2)',
+              backgroundColor: 'rgba(244, 63, 94, 0.05)',
+              fontWeight: '700'
+            }}
+            onClick={handleDeleteEvent}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(244, 63, 94, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(244, 63, 94, 0.2)';
+            }}
+          >
+            Delete Event
+          </button>
+        )}
+      </div>
+      <div>
         {(() => {
           let primaryCta = 'Save Event';
           let onPrimaryClick = handleSaveEvent;

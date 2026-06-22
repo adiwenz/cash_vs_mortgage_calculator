@@ -100,17 +100,17 @@ export default function CareerFields({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <input
             type="checkbox"
-            id="permanent-raise"
+            id="permanent-change"
             checked={editingEvent.permanent !== false}
             onChange={(e) => setEditingEvent({ ...editingEvent, permanent: e.target.checked })}
             style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
           />
-          <label htmlFor="permanent-raise" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
-            Permanent Raise
+          <label htmlFor="permanent-change" className="input-name" style={{ margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+            Permanent Change
           </label>
         </div>
         <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', paddingLeft: '1.55rem', display: 'block' }}>
-          If checked, the raise continues after child rearing or specific phases end, becoming available for additional savings.
+          If checked, this change continues after child rearing or specific phases end, becoming available for additional savings.
         </span>
       </div>
     </>
