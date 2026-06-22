@@ -42,14 +42,8 @@ describe('Mobile Budget Phase Editor', () => {
   test('Mobile Budget Modal - Shows breakdown, opens category sheet, updates live, Done/Save/Cancel', async () => {
     render(<FireSimulator />);
     
-    // Click on the Standard working phase card to expand it (wait for it to render)
-    const phaseCard = await screen.findByText((content, element) => {
-      return element.className === 'mobile-phase-card-title' && content === 'Working';
-    });
-    fireEvent.click(phaseCard);
-
-    // Open Budget Modal on mobile by clicking the Edit Budget Configuration button (wait for it to render)
-    const editBtn = await screen.findByText(/Edit Budget Configuration/i);
+    // Open Budget Modal on mobile by clicking the Edit Budget card directly (wait for it to render)
+    const editBtn = await screen.findByText('Edit Budget');
     fireEvent.click(editBtn);
     
     // Assert Modal is Open
@@ -142,7 +136,7 @@ describe('Mobile Budget Phase Editor', () => {
     });
 
     // Re-open budget modal to verify values persisted
-    const editBtnRef = await screen.findByText(/Edit Budget Configuration/i);
+    const editBtnRef = await screen.findByText('Edit Budget');
     fireEvent.click(editBtnRef);
 
     expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
@@ -169,7 +163,7 @@ describe('Mobile Budget Phase Editor', () => {
     });
 
     // Re-open to verify it was NOT saved (should still be 3200, not 3400)
-    const editBtnRef2 = await screen.findByText(/Edit Budget Configuration/i);
+    const editBtnRef2 = await screen.findByText('Edit Budget');
     fireEvent.click(editBtnRef2);
 
     expect(screen.getAllByText('$3,200/mo')[0]).toBeDefined();
