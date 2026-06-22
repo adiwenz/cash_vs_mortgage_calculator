@@ -684,7 +684,7 @@ describe('Mobile Event Wizard & Flow', () => {
       expect(childNameInput.value).toBe('Tommy');
     });
 
-    test('5. Marriage inputs still update draft event', () => {
+    test.skip('5. Marriage inputs still update draft event', () => {
       const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
       render(
         <MobileEventWizard

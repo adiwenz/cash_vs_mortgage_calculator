@@ -241,6 +241,11 @@ export default function MobileEventWizard({
       setEditingEvent({ ...baseDefaults, isNew: true });
       return;
     }
+    if (type === 'marriage') {
+      const baseDefaults = getDefaultEvent('marriage', { inputs, isMobile: true });
+      setEditingEvent({ ...baseDefaults, isNew: true });
+      return;
+    }
 
     const preserveFields = draftEvent && (
       draftEvent.type === type || 
