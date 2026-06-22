@@ -207,34 +207,68 @@ export default function OutcomeHeroCard({
 
         {(() => {
           const alreadyWorkOptional = readyAge && readyAge <= currentAge;
-          const showCTA = alreadyWorkOptional || hasRecommendations;
-          const ctaLabel = alreadyWorkOptional ? 'Model a different age →' : 'See ways to retire sooner →';
+          const isGap = planStatus === 'retirementGap';
           
-          if (!showCTA) return null;
+          if (alreadyWorkOptional) {
+            return (
+              <button
+                type="button"
+                onClick={onViewRecommendations}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: 'var(--primary)',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  marginTop: '0.25rem',
+                  transition: 'color var(--transition-fast)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
+              >
+                Model a different age →
+              </button>
+            );
+          }
+          
+          if (isGap) {
+            return (
+              <button
+                type="button"
+                onClick={onViewRecommendations}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: 'var(--primary)',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  marginTop: '0.25rem',
+                  transition: 'color var(--transition-fast)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
+              >
+                See options to stop working sooner →
+              </button>
+            );
+          }
+          
           return (
-            <button
-              type="button"
-              onClick={onViewRecommendations}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                color: 'var(--primary)',
-                fontSize: '0.75rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.2rem',
-                marginTop: '0.25rem',
-                transition: 'color var(--transition-fast)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-hover)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--primary)'}
-            >
-              {ctaLabel}
-            </button>
+            <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.25rem' }}>
+              <span>✓</span> You’re already on track.
+            </span>
           );
         })()}
       </div>

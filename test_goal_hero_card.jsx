@@ -357,4 +357,27 @@ describe('GoalHeroCard Component Redesign', () => {
     expect(screen.getByText('You can stop working at')).toBeDefined();
     expect(screen.getByText(String(simResult.retirementReadyAge))).toBeDefined();
   });
+
+  test('Shows recommendations button and hides goal delay badge when shortfall > 0', () => {
+    render(
+      <GoalHeroCard
+        currentAge={30}
+        targetRetirementAge={60}
+        projectedRetirementAge={63}
+        lifeExpectancy={85}
+        hasSolvableRecommendations={false}
+        status="comfortable"
+        onTargetAgeChange={vi.fn()}
+        isRetirementSuccessful={true}
+        shortfall={5000}
+        onViewRecommendations={vi.fn()}
+      />
+    );
+
+    // Should display the recommendations button
+    expect(screen.getByText('See options to stop working sooner')).toBeDefined();
+
+    // Should NOT display the "3 years later than your goal" badge/pill
+    expect(screen.queryByText('3 years later than your goal')).toBeNull();
+  });
 });

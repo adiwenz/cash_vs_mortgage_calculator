@@ -49,7 +49,9 @@ export default function GoalHeroCard({
   hasSolvableRecommendations = false,
   status,
   onTargetAgeChange,
-  isRetirementSuccessful = false
+  isRetirementSuccessful = false,
+  shortfall = 0,
+  onViewRecommendations
 }) {
   const [val, setVal] = useState(String(targetRetirementAge));
   const debounceTimerRef = useRef(null);
@@ -185,8 +187,37 @@ export default function GoalHeroCard({
                 <span className="goal-hero-right-age-val">{projectedRetirementAge}</span>
                 <span className="goal-hero-right-age-label">years old</span>
               </div>
-              <div className="goal-hero-badge-container">
-                {statusBadge}
+              <div className="goal-hero-badge-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+                {shortfall > 0 ? (
+                  <button
+                    type="button"
+                    onClick={onViewRecommendations}
+                    style={{
+                      marginTop: '0.4rem',
+                      background: 'var(--primary, #6366f1)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      boxShadow: 'var(--shadow-sm)',
+                      transition: 'background var(--transition-fast)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-hover, #4f46e5)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary, #6366f1)'}
+                  >
+                    See options to stop working sooner
+                  </button>
+                ) : (
+                  <>
+                    {statusBadge}
+                    <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.4rem' }}>
+                      <span>✓</span> You’re already on track.
+                    </span>
+                  </>
+                )}
               </div>
             </>
           ) : (
@@ -194,9 +225,36 @@ export default function GoalHeroCard({
               <h4 className="goal-hero-right-headline">
                 {hasSolvableRecommendations ? "A few adjustments away." : "You’ve got a starting point."}
               </h4>
-              <p className="goal-hero-right-subheadline">
+              <p className="goal-hero-right-subheadline" style={{ marginBottom: '0.25rem' }}>
                 {hasSolvableRecommendations ? "Let’s get you there." : "Let’s build from here."}
               </p>
+              {shortfall > 0 ? (
+                <button
+                  type="button"
+                  onClick={onViewRecommendations}
+                  style={{
+                    background: 'var(--primary, #6366f1)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm)',
+                    transition: 'background var(--transition-fast)',
+                    alignSelf: 'flex-start'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-hover, #4f46e5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary, #6366f1)'}
+                >
+                  See options to stop working sooner
+                </button>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.4rem' }}>
+                  <span>✓</span> You’re already on track.
+                </span>
+              )}
             </>
           )}
         </div>
