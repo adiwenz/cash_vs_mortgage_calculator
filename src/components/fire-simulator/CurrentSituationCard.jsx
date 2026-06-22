@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency, formatAnnualSummaryCurrency } from './helpers';
 import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
-import { getNormalizedPhases } from '../../fireCalculations';
+import { getNormalizedPhases, buildBaselineCurrentInputs } from '../../fireCalculations';
 import { setLastChartChangeType } from './changeTypeTracker';
 
 export default function CurrentSituationCard({
@@ -37,18 +37,25 @@ export default function CurrentSituationCard({
     return Math.min(100, Math.max(0, Math.round(rate * 10) / 10));
   }, [inputs.simpleIncome, inputs.simpleExpenses]);
 
-  const currentPhase = useMemo(() => {
-    const phases = getNormalizedPhases(inputs);
-    const currentAge = Number(inputs.currentAge) || 35;
-    return phases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || phases[0];
+  const baselineEffectiveInputs = useMemo(() => {
+    return buildBaselineCurrentInputs(inputs);
   }, [inputs]);
 
-  const currentPhaseShortfall = useMemo(() => {
-    return currentPhase ? currentPhase.monthlyBudgetShortfall || 0 : 0;
-  }, [currentPhase]);
+  const baselinePhases = useMemo(() => {
+    return getNormalizedPhases(baselineEffectiveInputs);
+  }, [baselineEffectiveInputs]);
 
-  const currentPhaseAnnualSpending = useMemo(() => {
-    if (!currentPhase) return 0;
+  const baselineCurrentPhase = useMemo(() => {
+    const currentAge = Number(inputs.currentAge) || 35;
+    return baselinePhases.find(p => currentAge >= p.startAge && currentAge < p.endAge) || baselinePhases[0];
+  }, [baselinePhases, inputs.currentAge]);
+
+  const baselineMonthlyShortfall = useMemo(() => {
+    return baselineCurrentPhase ? baselineCurrentPhase.monthlyBudgetShortfall || 0 : 0;
+  }, [baselineCurrentPhase]);
+
+  const baselineAnnualSpending = useMemo(() => {
+    if (!baselineCurrentPhase) return 0;
     if (!inputs.hasCustomizedBudget) {
       const annualIncome = Number(inputs.simpleIncome) || 0;
       
@@ -57,29 +64,32 @@ export default function CurrentSituationCard({
         savingsRate = Number(inputs.displayedSavingsRate);
       } else if (inputs.savingsRate !== undefined && inputs.savingsRate !== null) {
         savingsRate = Number(inputs.savingsRate);
-      } else if (currentPhase.displayedSavingsRate !== undefined && currentPhase.displayedSavingsRate !== null) {
-        savingsRate = Number(currentPhase.displayedSavingsRate);
-      } else if (currentPhase.savingsRate !== undefined && currentPhase.savingsRate !== null) {
-        savingsRate = Number(currentPhase.savingsRate);
+      } else if (baselineCurrentPhase.displayedSavingsRate !== undefined && baselineCurrentPhase.displayedSavingsRate !== null) {
+        savingsRate = Number(baselineCurrentPhase.displayedSavingsRate);
+      } else if (baselineCurrentPhase.savingsRate !== undefined && baselineCurrentPhase.savingsRate !== null) {
+        savingsRate = Number(baselineCurrentPhase.savingsRate);
       } else {
         // Fallback: derive from precise annual budget
-        const preciseMonthlyExpenseTotal = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const preciseMonthlyExpenseTotal = Object.values(baselineCurrentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
         const preciseAnnualBudget = preciseMonthlyExpenseTotal * 12;
         savingsRate = annualIncome > 0 ? ((annualIncome - preciseAnnualBudget) / annualIncome) * 100 : 0;
       }
       
-      return annualIncome * (1 - savingsRate / 100);
+      const calculatedSpending = annualIncome * (1 - savingsRate / 100);
+      const preciseMonthlyExpenseTotal = Object.values(baselineCurrentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const preciseAnnualBudget = preciseMonthlyExpenseTotal * 12;
+      return Math.max(calculatedSpending, preciseAnnualBudget);
     } else {
-      const preciseMonthlyExpenseTotal = Object.values(currentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const preciseMonthlyExpenseTotal = Object.values(baselineCurrentPhase.expenses || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
       return preciseMonthlyExpenseTotal * 12;
     }
-  }, [currentPhase, inputs.hasCustomizedBudget, inputs.simpleIncome, inputs.displayedSavingsRate, inputs.savingsRate]);
+  }, [baselineCurrentPhase, inputs.hasCustomizedBudget, inputs.simpleIncome, inputs.displayedSavingsRate, inputs.savingsRate]);
 
-  const lifeProfile = inputs.lifeProfile || {};
-  const household = lifeProfile.household || {};
-  const home = lifeProfile.home || {};
-  const children = lifeProfile.children || [];
-  const debts = lifeProfile.debts || [];
+  const baselineProfile = inputs.lifeProfile || {};
+  const baselineHousehold = baselineProfile.household || {};
+  const baselineHome = baselineProfile.home || {};
+  const baselineChildren = baselineProfile.children || [];
+  const baselineDebts = baselineProfile.debts || [];
 
   const actionRowStyle = {
     display: 'flex',
@@ -203,7 +213,7 @@ export default function CurrentSituationCard({
             color: '#7e22ce',
             fontWeight: '600'
           }}>
-            {household.status === 'married' ? 'Married' : household.status === 'partnered' ? 'Partnered' : 'Single'}
+            {baselineHousehold.status === 'married' ? 'Married' : baselineHousehold.status === 'partnered' ? 'Partnered' : 'Single'}
           </span>
           <span style={{ color: 'var(--text-tertiary)' }}>•</span>
           <span style={{
@@ -214,9 +224,9 @@ export default function CurrentSituationCard({
             color: '#15803d',
             fontWeight: '600'
           }}>
-            {home.status === 'own' ? 'Homeowner' : 'Renting'}
+            {baselineHome.status === 'own' ? 'Homeowner' : 'Renting'}
           </span>
-          {children.length > 0 && (
+          {baselineChildren.length > 0 && (
             <>
               <span style={{ color: 'var(--text-tertiary)' }}>•</span>
               <span style={{
@@ -227,7 +237,7 @@ export default function CurrentSituationCard({
                 color: '#a16207',
                 fontWeight: '600'
               }}>
-                {children.length} {children.length === 1 ? 'Child' : 'Children'}
+                {baselineChildren.length} {baselineChildren.length === 1 ? 'Child' : 'Children'}
               </span>
             </>
           )}
@@ -348,17 +358,17 @@ export default function CurrentSituationCard({
         >
           <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Spending (budget)</span>
           <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-            {formatAnnualSummaryCurrency(currentPhaseAnnualSpending)}
+            {formatAnnualSummaryCurrency(baselineAnnualSpending)}
           </span>
         </div>
 
         {/* Shortfall */}
-        {currentPhaseShortfall > 0 && (
+        {baselineMonthlyShortfall > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0.25rem 0.5rem', margin: '0 -0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '15px', color: 'var(--accent-rose, #ef4444)', fontWeight: '600' }}>Shortfall</span>
               <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--accent-rose, #ef4444)' }}>
-                -{formatCurrency(Math.round(currentPhaseShortfall))}/mo
+                -{formatCurrency(Math.round(baselineMonthlyShortfall))}/mo
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary, #9ca3af)', fontWeight: '400', textAlign: 'right' }}>

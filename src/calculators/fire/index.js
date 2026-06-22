@@ -55,7 +55,8 @@ import {
 } from './retireSooner.js';
 
 import {
-  buildEffectiveSimulationInputs
+  buildEffectiveSimulationInputs,
+  buildBaselineCurrentInputs
 } from './effectiveInputs.js';
 
 export {
@@ -83,7 +84,8 @@ export {
   applySaveMoreAdjustment,
   applyEarnMoreAdjustment,
   applyBalancedAdjustment,
-  buildEffectiveSimulationInputs
+  buildEffectiveSimulationInputs,
+  buildBaselineCurrentInputs
 };
 
 // getSavingsPriority is now defined and exported from fireCalculations.js for legacy compatibility

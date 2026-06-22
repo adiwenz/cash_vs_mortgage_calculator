@@ -203,3 +203,32 @@ export function buildEffectiveSimulationInputs(inputs) {
 
   return effective;
 }
+
+export function buildBaselineCurrentInputs(inputs) {
+  if (!inputs) return inputs;
+
+  // 1. Deep clone/build effective simulation inputs which maps lifeProfile -> effective lists.
+  const effective = buildEffectiveSimulationInputs(inputs);
+
+  // 2. Now, strip out all timeline event assumptions.
+  // We keep only the derived events/debts/incomes/members which represent the manual baseline situation.
+  if (inputs.useLifeProfile) {
+    return {
+      ...effective,
+      lifeEvents: (effective.lifeEvents || []).filter(e => e.isDerived),
+      debtList: (effective.debtList || []).filter(d => d.isDerived),
+      incomeList: (effective.incomeList || []).filter(i => i.isDerived),
+      householdMembers: (effective.householdMembers || []).filter(m => m.id === 'spouse' || m.isDerived)
+    };
+  } else {
+    // If useLifeProfile is false, the baseline situation is the simple inputs (no timeline events at all).
+    return {
+      ...effective,
+      lifeEvents: [],
+      debtList: [],
+      incomeList: [],
+      householdMembers: []
+    };
+  }
+}
+
