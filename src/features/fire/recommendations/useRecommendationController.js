@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { applyRecommendation } from './applyRecommendation.js';
+import { setLastChartChangeType } from '../../../components/fire-simulator/changeTypeTracker';
 
 /**
  * Controller hook for recommendations. Owns recommendation state and orchestrates updates.
@@ -44,6 +45,7 @@ export function useRecommendationController({
 
     // 1. Update scenarios state
     if (setScenarios) {
+      setLastChartChangeType('event_value_change');
       setScenarios(prev => prev.map(s => {
         if (s.id !== currentScenarioId) return s;
         return { ...s, inputs: result.updatedInputs };

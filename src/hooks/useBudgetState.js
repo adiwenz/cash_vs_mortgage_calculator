@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getNormalizedPhases } from '../fireCalculations';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
 import { roundCurrency } from '../simulatorMathUtils';
+import { setLastChartChangeType } from '../components/fire-simulator/changeTypeTracker';
 
 export function useBudgetState(
   scenarios,
@@ -328,6 +329,7 @@ export function useBudgetState(
       }
     };
 
+    setLastChartChangeType('budget_change');
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
 

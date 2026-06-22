@@ -1,6 +1,81 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea } from 'recharts';
 import { formatCompactFinancial } from './helpers';
+import { lastChartChangeTypeRef } from './changeTypeTracker';
+
+function calculatePaddedYAxisDomain(chartData) {
+  const values = chartData
+    .flatMap(d => [
+      d.netWorth,
+      d.currentPlan,
+      d.needAmount,
+      d.requiredPath,
+    ])
+    .filter(v => Number.isFinite(v));
+  if (!values.length) return [0, 100000];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  // Sane default domain for very small values
+  if (max <= 100000 && min >= 0) {
+    return [0, 100000];
+  }
+
+  const range = Math.max(max - min, 1);
+  const padding = range * 0.12;
+  let paddedMin = min - padding;
+  let paddedMax = max + padding;
+
+  if (min >= 0) {
+    paddedMin = 0;
+  } else {
+    paddedMin = Math.min(0, min - padding);
+  }
+
+  return [paddedMin, paddedMax];
+}
+
+function shouldLockYAxisForChange(changeType) {
+  return [
+    'event_timing_change',
+    'event_drag',
+    'goal_age_change',
+    'active_year_change',
+    'hover_change',
+    'timeline_cluster_toggle',
+    'chart_zoom_change',
+  ].includes(changeType);
+}
+
+function shouldAnimateYAxisForChange(changeType) {
+  return [
+    'income_change',
+    'savings_rate_change',
+    'budget_change',
+    'asset_change',
+    'spending_change',
+    'assumption_change',
+    'event_value_change',
+    'event_add',
+    'event_remove',
+    'windfall_change',
+    'home_value_change',
+    'social_security_change',
+    'life_expectancy_change',
+    'profile_value_change',
+  ].includes(changeType);
+}
+
+function isSeverelyClipped(nextDomain, currentDomain) {
+  if (!currentDomain) return false;
+  const [nextMin, nextMax] = nextDomain;
+  const [currentMin, currentMax] = currentDomain;
+  const currentRange = Math.max(currentMax - currentMin, 1);
+  return (
+    nextMax > currentMax + currentRange * 0.08 ||
+    nextMin < currentMin - currentRange * 0.08
+  );
+}
 
 export default function ProjectionGraph({
   chartData,
@@ -38,6 +113,101 @@ export default function ProjectionGraph({
   const setZoomDomain = propsSetZoomDomain !== undefined ? propsSetZoomDomain : setLocalZoomDomain;
   const setIsZoomed = propsSetIsZoomed !== undefined ? propsSetIsZoomed : setLocalIsZoomed;
   const zoomDragOccurredRef = useRef(false);
+
+  const [yAxisDomain, setYAxisDomain] = useState(() => {
+    return calculatePaddedYAxisDomain(chartData || []);
+  });
+  const [showScaleUpdated, setShowScaleUpdated] = useState(false);
+
+  const scaleTimeoutRef = useRef(null);
+  const animationFrameRef = useRef(null);
+
+  const animateYAxisDomain = (fromDomain, toDomain, duration = 350) => {
+    if (animationFrameRef.current) {
+      try {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      } catch (e) {
+        // Safe fallback for testing environment timer mismatch
+      }
+    }
+
+    // Trigger Scale updated notification
+    setShowScaleUpdated(true);
+    if (scaleTimeoutRef.current) {
+      clearTimeout(scaleTimeoutRef.current);
+    }
+    scaleTimeoutRef.current = setTimeout(() => {
+      setShowScaleUpdated(false);
+    }, 1200);
+
+    const start = Date.now();
+    function tick() {
+      const elapsed = Date.now() - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // cubic ease-out
+      const next = [
+        fromDomain[0] + (toDomain[0] - fromDomain[0]) * eased,
+        fromDomain[1] + (toDomain[1] - fromDomain[1]) * eased,
+      ];
+      setYAxisDomain(next);
+      if (t < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      }
+    }
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+  };
+
+  useEffect(() => {
+    if (!chartData || chartData.length === 0) return;
+
+    const nextDomain = calculatePaddedYAxisDomain(chartData);
+
+    if (!yAxisDomain) {
+      setYAxisDomain(nextDomain);
+      return;
+    }
+
+    // During active dragging, the Y-axis must be completely frozen.
+    // Do not run severe clipping checks while draggingInfo is active.
+    if (draggingInfo) {
+      return;
+    }
+
+    const changeType = lastChartChangeTypeRef.current;
+
+    if (shouldLockYAxisForChange(changeType)) {
+      if (isSeverelyClipped(nextDomain, yAxisDomain)) {
+        animateYAxisDomain(yAxisDomain, nextDomain);
+      }
+      // Otherwise keep stable
+    } else if (shouldAnimateYAxisForChange(changeType)) {
+      animateYAxisDomain(yAxisDomain, nextDomain);
+    } else {
+      // Safe fallback: preserve stability unless the new data is severely clipped
+      if (isSeverelyClipped(nextDomain, yAxisDomain)) {
+        animateYAxisDomain(yAxisDomain, nextDomain);
+      }
+    }
+
+    // Reset interaction tracking ref
+    lastChartChangeTypeRef.current = null;
+  }, [chartData, draggingInfo]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        try {
+          window.cancelAnimationFrame(animationFrameRef.current);
+        } catch (e) {
+          // Safe fallback for testing environment timer mismatch
+        }
+      }
+      if (scaleTimeoutRef.current) {
+        clearTimeout(scaleTimeoutRef.current);
+      }
+    };
+  }, []);
+
 
   const getActiveAge = (e) => {
     const age = Number(e?.activeLabel);
@@ -180,6 +350,32 @@ export default function ProjectionGraph({
         zIndex: 'auto' 
       }}
     >
+      {showScaleUpdated && (
+        <div
+          className="scale-updated-badge"
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: !isMobile && isZoomed ? '115px' : '12px',
+            zIndex: 50,
+            padding: '0.4rem 0.8rem',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            borderRadius: '8px',
+            background: 'rgba(37, 99, 235, 0.08)',
+            color: 'var(--primary, #2563eb)',
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            transition: 'opacity 150ms ease-in-out'
+          }}
+        >
+          <span>✨</span> Scale updated
+        </div>
+      )}
       {!isMobile && isZoomed && (
         <button
           onClick={handleResetZoom}
@@ -266,6 +462,8 @@ export default function ProjectionGraph({
             fontSize={10}
             tickFormatter={formatCompactFinancial}
             width={yAxisWidth}
+            domain={yAxisDomain || ['auto', 'auto']}
+            allowDataOverflow={false}
           />
           <Tooltip
             position={tooltipPos}

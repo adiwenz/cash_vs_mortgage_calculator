@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 import { formatCurrency, clampAgeValue } from './helpers';
+import { setLastChartChangeType } from './changeTypeTracker';
 
 export default function LifeProfileModal({
   isOpen,
@@ -167,6 +168,7 @@ export default function LifeProfileModal({
 
   // Save profile updates to scenario state
   const handleSave = () => {
+    setLastChartChangeType('profile_value_change');
     // Determine new simpleInvestments value from localProfile assets
     const totalAssets = Object.values(localProfile.assets).reduce((sum, v) => sum + (Number(v) || 0), 0);
     

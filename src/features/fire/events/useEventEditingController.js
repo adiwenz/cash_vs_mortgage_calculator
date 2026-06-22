@@ -3,6 +3,7 @@ import { getDefaultEvent } from './eventDefaults.js';
 import { eventSaveRouter } from './eventSaveRouter.js';
 import { isEditableEvent } from '../../../components/fire-simulator/helpers.js';
 import { validateSocialSecurityClaimAge } from '../../../fireCalculations.js';
+import { setLastChartChangeType } from '../../../components/fire-simulator/changeTypeTracker';
 
 export function useEventEditingController({
   scenarios,
@@ -92,6 +93,7 @@ export function useEventEditingController({
         targetEvent = defaultLifeEvent;
       }
 
+      setLastChartChangeType('social_security_change');
       setScenarios(prev => prev.map(scen => {
         if (scen.id !== currentScenarioId) return scen;
         return {
@@ -127,6 +129,19 @@ export function useEventEditingController({
     const isSyntheticEvent = passedEvent && (passedEvent.nativeEvent || passedEvent.preventDefault);
     const eventToSave = (passedEvent && !isSyntheticEvent) ? passedEvent : editingEvent;
     if (!eventToSave) return;
+
+    if (eventToSave.type === 'windfall') {
+      setLastChartChangeType('windfall_change');
+    } else if (eventToSave.type === 'buyHouse' || eventToSave.type === 'sellHouse') {
+      setLastChartChangeType('home_value_change');
+    } else if (eventToSave.type === 'socialSecurity') {
+      setLastChartChangeType('social_security_change');
+    } else {
+      const isNew = !inputs.lifeEvents?.some(e => e.id === eventToSave.id) &&
+                    !inputs.spendingPhases?.some(p => p.id === eventToSave.id) &&
+                    !inputs.incomeList?.some(i => i.id === eventToSave.id);
+      setLastChartChangeType(isNew ? 'event_add' : 'event_value_change');
+    }
 
     const isRecommendationApplied = eventToSave.recommendationApplied === true;
 
@@ -193,6 +208,7 @@ export function useEventEditingController({
     const result = eventSaveRouter.routeDelete(evt, inputs);
     if (!result) return;
 
+    setLastChartChangeType('event_remove');
     setScenarios(prev => prev.map(scen => {
       if (scen.id !== currentScenarioId) return scen;
       return {
@@ -281,6 +297,7 @@ export function useEventEditingController({
 
     dragOccurredRef.current = false;
 
+    setLastChartChangeType('event_drag');
     setDraggingInfo({
       originalId: evt.originalId || null,
       type: evt.type,
@@ -351,6 +368,7 @@ export function useEventEditingController({
               setTimeout(() => setNotification(null), 2000);
             }
           }
+          setLastChartChangeType('event_timing_change');
           commitEventAgeChange(evt, targetAge);
         }
         return null;

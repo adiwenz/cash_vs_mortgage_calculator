@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from './helpers';
 import { CurrencyInput, PercentInput } from '../ui/PlainInputs';
 import { getNormalizedPhases } from '../../fireCalculations';
+import { setLastChartChangeType } from './changeTypeTracker';
 
 export default function CurrentSituationCard({
   inputs,
@@ -231,6 +232,7 @@ export default function CurrentSituationCard({
             value={inputs.simpleIncome || 0}
             onChange={(e) => {
               const val = Number(e.target.value) || 0;
+              setLastChartChangeType('income_change');
               updateInput('simpleIncome', val);
             }}
             style={{
@@ -290,6 +292,7 @@ export default function CurrentSituationCard({
               const val = Number(e.target.value) || 0;
               const income = Number(inputs.simpleIncome) || 0;
               const newExpenses = Math.round(income * (1 - val / 100));
+              setLastChartChangeType('savings_rate_change');
               updateInput('simpleExpenses', newExpenses);
             }}
             min={0}

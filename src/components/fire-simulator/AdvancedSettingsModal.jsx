@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { setLastChartChangeType } from './changeTypeTracker';
 
 export default function AdvancedSettingsModal({ scenario, onClose }) {
   const inputs = scenario?.inputs || {};
@@ -39,6 +40,7 @@ export default function AdvancedSettingsModal({ scenario, onClose }) {
   );
 
   const handleSave = () => {
+    setLastChartChangeType('assumption_change');
     scenario.setScenarios((prev) =>
       prev.map((scen) => {
         if (scen.id === scenario.currentScenarioId) {
