@@ -1275,15 +1275,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .goal-hero-right-age-val {
-  font-size: 46px;
-  font-weight: 900;
+  font-size: 32px;
+  font-weight: 800;
   color: var(--text-primary);
   font-family: var(--font-heading);
   line-height: 1.1;
 }
 
 .goal-hero-right-age-label {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-secondary);
   font-weight: 600;
 }
@@ -1321,8 +1321,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .goal-hero-svg {
   height: 100%;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
   display: block;
 }
 

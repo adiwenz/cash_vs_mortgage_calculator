@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function renderTreeFoliage(planStatus) {
   if (planStatus === 'comfortable') {
@@ -56,6 +56,7 @@ export default function GoalHeroCard({
 
   // Sync state if external changes happen
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVal(String(targetRetirementAge || 65));
   }, [targetRetirementAge]);
 
@@ -146,7 +147,7 @@ export default function GoalHeroCard({
   }
 
   // Illustration constants
-  const treeTransform = 'translate(218px, 98.25px) scale(2.8)';
+  const treeTransform = 'translate(618px, 98.25px) scale(2.8)';
   const sunOpacity = 0.55 + (readinessScore * 0.45);
   const hillSaturation = 75 + (readinessScore * 25);
   const showTreeGlow = status === 'comfortable';
@@ -204,7 +205,8 @@ export default function GoalHeroCard({
         {/* SVG Landscape Illustration */}
         <div className="goal-hero-svg-container">
           <svg 
-            viewBox="0 0 400 180" 
+            viewBox="0 0 800 180" 
+            preserveAspectRatio="xMaxYMax slice"
             className="goal-hero-svg"
           >
             <defs>
@@ -237,26 +239,26 @@ export default function GoalHeroCard({
             </defs>
 
             {/* Sun */}
-            <circle cx="300" cy="85" r="50" fill="url(#sun-grad)" style={{ opacity: sunOpacity, transition: 'opacity 600ms ease' }} />
+            <circle cx="700" cy="85" r="50" fill="url(#sun-grad)" style={{ opacity: sunOpacity, transition: 'opacity 600ms ease' }} />
 
             {/* Clouds */}
-            <path d="M 120,40 Q 128,32 138,36 Q 146,26 156,34 Q 166,31 170,40 Z" fill="#ffffff" opacity="0.35" />
-            <path d="M 280,30 Q 286,23 294,27 Q 302,19 310,26 Q 318,23 322,30 Z" fill="#ffffff" opacity="0.3" />
+            <path d="M 520,40 Q 528,32 538,36 Q 546,26 556,34 Q 566,31 570,40 Z" fill="#ffffff" opacity="0.35" />
+            <path d="M 680,30 Q 686,23 694,27 Q 702,19 710,26 Q 718,23 722,30 Z" fill="#ffffff" opacity="0.3" />
 
             {/* Birds */}
-            <path d="M 150,25 Q 152,22 154,25 Q 156,22 158,25" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.2" opacity="0.5" />
-            <path d="M 162,20 Q 164,17 166,20 Q 168,17 170,20" fill="none" stroke="var(--text-tertiary)" strokeWidth="1" opacity="0.4" />
-            <path d="M 220,35 Q 222,32 224,35 Q 226,32 228,35" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.2" opacity="0.5" />
+            <path d="M 550,25 Q 552,22 554,25 Q 556,22 558,25" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.2" opacity="0.5" />
+            <path d="M 562,20 Q 564,17 566,20 Q 568,17 570,20" fill="none" stroke="var(--text-tertiary)" strokeWidth="1" opacity="0.4" />
+            <path d="M 620,35 Q 622,32 624,35 Q 626,32 628,35" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.2" opacity="0.5" />
 
             {/* Hills and winding path with dynamic saturation */}
             <g style={{ filter: `saturate(${hillSaturation}%)`, transition: 'filter 600ms ease' }}>
               {/* Hills */}
-              <path d="M -20,180 L -20,115 Q 110,70 230,105 Q 315,130 420,100 L 420,180 Z" fill="url(#hill-grad-back)" />
-              <path d="M -20,180 L -20,130 Q 120,90 250,125 Q 330,140 420,120 L 420,180 Z" fill="url(#hill-grad-mid)" />
-              <path d="M -20,180 L -20,145 Q 150,110 310,143 Q 365,150 420,140 L 420,180 Z" fill="url(#hill-grad-front)" />
+              <path d="M -420,180 L 150,180 C 200,180 310,139 380,115 Q 510,70 630,105 Q 715,130 820,100 L 820,180 Z" fill="url(#hill-grad-back)" />
+              <path d="M -420,180 L 200,180 C 240,180 310,150 380,130 Q 520,90 650,125 Q 730,140 820,120 L 820,180 Z" fill="url(#hill-grad-mid)" />
+              <path d="M -420,180 L 250,180 C 280,180 280,166 380,145 Q 550,110 710,143 Q 765,150 820,140 L 820,180 Z" fill="url(#hill-grad-front)" />
 
               {/* Winding Path */}
-              <path d="M 280,180 C 265,160 250,155 248,150 C 246,145 258,142 258,137 C 258,132 232,130 220,124 L 216,124 C 226,130 248,132 248,137 C 248,142 236,145 238,150 C 240,155 250,160 260,180 Z" fill="url(#path-grad)" />
+              <path d="M 680,180 C 665,160 650,155 648,150 C 646,145 658,142 658,137 C 658,132 632,130 620,124 L 616,124 C 626,130 648,132 648,137 C 648,142 636,145 638,150 C 640,155 650,160 660,180 Z" fill="url(#path-grad)" />
             </g>
 
             {/* Dynamic Tree */}
