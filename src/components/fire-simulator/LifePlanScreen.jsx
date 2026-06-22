@@ -514,6 +514,8 @@ export default function LifePlanScreen({
                   status={displayedResults.retirementOutcome}
                   onTargetAgeChange={(newAge) => commitEventAgeChange({ type: 'retire' }, newAge)}
                   isRetirementSuccessful={displayedResults.isRetirementSuccessful}
+                  shortfall={displayedResults.shortfallAtDesired}
+                  onViewRecommendations={() => setShowImprovementModal(true)}
                 />
               );
             })()}

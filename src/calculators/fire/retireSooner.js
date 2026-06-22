@@ -19,131 +19,55 @@ function runSimulation(inputs) {
   return formatSimulationResultStage(readinessResult, profile, phases, plannedProjection, normalizedInputs);
 }
 
-// Helper to apply Save More adjustment
-export function applySaveMoreAdjustment(inputs, S_monthly) {
+// Helper to apply Balanced adjustment (Save More, Earn More, and Balanced are all wrappers/cases of this)
+export function applyBalancedAdjustment(inputs, S_wants_monthly, I_annual, targetRetirementAge) {
   const newInputs = JSON.parse(JSON.stringify(inputs));
-  const currentAgeVal = Number(newInputs.currentAge) || 35;
-  const normPhases = getNormalizedPhases(newInputs);
-  const currentPhase = normPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normPhases[0];
-
-  if (currentPhase && S_monthly > 0) {
-    const currentWants = (Number(currentPhase.expenses.leisure) || 0) + 
-                         (Number(currentPhase.expenses.diningOut) || 0) + 
-                         (Number(currentPhase.expenses.misc) || 0);
-    const wantsReduction = S_monthly;
-    const ratio = currentWants > 0 ? (currentWants - wantsReduction) / currentWants : 0;
-    
-    if (currentPhase.expenses.leisure !== undefined) currentPhase.expenses.leisure = Math.round(currentPhase.expenses.leisure * ratio);
-    if (currentPhase.expenses.diningOut !== undefined) currentPhase.expenses.diningOut = Math.round(currentPhase.expenses.diningOut * ratio);
-    if (currentPhase.expenses.misc !== undefined) currentPhase.expenses.misc = Math.round(currentPhase.expenses.misc * ratio);
-    
-    if (!currentPhase.savings) currentPhase.savings = {};
-    currentPhase.savings.brokerage = (currentPhase.savings.brokerage || 0) + S_monthly;
-  }
-
-  newInputs.budgetDetails.phases = normPhases.map(p => ({
-    id: p.id,
-    type: p.type,
-    name: p.name,
-    startAge: p.startAge,
-    endAge: p.endAge,
-    income: p.income,
-    savingsAllocMode: p.savingsAllocMode || 'fixed',
-    savings: p.savings,
-    partnerSavings: p.partnerSavings || {},
-    expenses: p.expenses
-  }));
-
-  if (currentPhase) {
-    const wsPhase = normPhases.find(p => p.type === 'workSave');
-    const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
-    newInputs.simpleIncome = standardIncomeMonthly * 12;
-    newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
-  }
-
-  newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-    if (inc.id === 'simple-inc' || inc.id === 'inc-1' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-      inc.amount = newInputs.simpleIncome;
+  if (targetRetirementAge !== undefined && targetRetirementAge !== null) {
+    newInputs.targetRetirementAge = targetRetirementAge;
+    if (newInputs.lifeEvents) {
+      const retireEv = newInputs.lifeEvents.find(e => e.type === 'retire');
+      if (retireEv) {
+        retireEv.age = targetRetirementAge;
+      }
     }
-    return inc;
-  });
-
-  return newInputs;
-}
-
-// Helper to apply Earn More adjustment
-export function applyEarnMoreAdjustment(inputs, I_annual) {
-  const newInputs = JSON.parse(JSON.stringify(inputs));
-  const currentAgeVal = Number(newInputs.currentAge) || 35;
-  const normPhases = getNormalizedPhases(newInputs);
-  const currentPhase = normPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normPhases[0];
-
-  if (currentPhase && I_annual > 0) {
-    const oldIncome = currentPhase.income * 12;
-    const newIncome = oldIncome + I_annual;
-    
-    let oldTaxes = 0;
-    let newTaxes = 0;
-    if (newInputs.includeTaxes) {
-      oldTaxes = calculateUSTaxForModal(oldIncome, 0, newInputs.filingStatus || 'single');
-      newTaxes = calculateUSTaxForModal(newIncome, 0, newInputs.filingStatus || 'single');
-    }
-    const netIncrease = I_annual - (newTaxes - oldTaxes);
-    const monthlyNetSavings = Math.round(netIncrease / 12);
-    
-    currentPhase.income = Math.round(newIncome / 12);
-    if (!currentPhase.savings) currentPhase.savings = {};
-    currentPhase.savings.brokerage = (currentPhase.savings.brokerage || 0) + monthlyNetSavings;
   }
 
-  newInputs.budgetDetails.phases = normPhases.map(p => ({
-    id: p.id,
-    type: p.type,
-    name: p.name,
-    startAge: p.startAge,
-    endAge: p.endAge,
-    income: p.income,
-    savingsAllocMode: p.savingsAllocMode || 'fixed',
-    savings: p.savings,
-    partnerSavings: p.partnerSavings || {},
-    expenses: p.expenses
-  }));
-
-  if (currentPhase) {
-    const wsPhase = normPhases.find(p => p.type === 'workSave');
-    const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
-    newInputs.simpleIncome = standardIncomeMonthly * 12;
-  }
-
-  newInputs.incomeList = (newInputs.incomeList || []).map(inc => {
-    if (inc.id === 'simple-inc' || inc.id === 'inc-1' || inc.name.toLowerCase().includes('job') || inc.name.toLowerCase().includes('salary')) {
-      inc.amount = newInputs.simpleIncome;
-    }
-    return inc;
-  });
-
-  return newInputs;
-}
-
-// Helper to apply Balanced adjustment
-export function applyBalancedAdjustment(inputs, S_wants, I_annual) {
-  const newInputs = JSON.parse(JSON.stringify(inputs));
   const currentAgeVal = Number(newInputs.currentAge) || 35;
   const normPhases = getNormalizedPhases(newInputs);
   const currentPhase = normPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normPhases[0];
 
   if (currentPhase) {
-    if (S_wants > 0) {
-      const currentWants = (Number(currentPhase.expenses.leisure) || 0) + 
-                           (Number(currentPhase.expenses.diningOut) || 0) + 
-                           (Number(currentPhase.expenses.misc) || 0);
-      const ratio = currentWants > 0 ? (currentWants - S_wants) / currentWants : 0;
-      if (currentPhase.expenses.leisure !== undefined) currentPhase.expenses.leisure = Math.round(currentPhase.expenses.leisure * ratio);
-      if (currentPhase.expenses.diningOut !== undefined) currentPhase.expenses.diningOut = Math.round(currentPhase.expenses.diningOut * ratio);
-      if (currentPhase.expenses.misc !== undefined) currentPhase.expenses.misc = Math.round(currentPhase.expenses.misc * ratio);
+    if (S_wants_monthly > 0) {
+      const expenses = currentPhase.expenses || {};
+      const wantsKeys = ['diningOut', 'leisure', 'misc'];
+      const needsKeys = ['food', 'transportation', 'utilities'];
       
+      const reductions = {};
+      let totalMaxRed = 0;
+      
+      wantsKeys.forEach(k => {
+        const val = Number(expenses[k]) || 0;
+        reductions[k] = { val, maxRed: val };
+        totalMaxRed += val;
+      });
+      
+      needsKeys.forEach(k => {
+        const val = Number(expenses[k]) || 0;
+        const floor = Math.round(val * 0.5);
+        reductions[k] = { val, maxRed: Math.max(0, val - floor) };
+        totalMaxRed += Math.max(0, val - floor);
+      });
+
+      if (totalMaxRed > 0) {
+        const scale = Math.min(1, S_wants_monthly / totalMaxRed);
+        Object.keys(reductions).forEach(k => {
+          const redAmount = Math.round(reductions[k].maxRed * scale);
+          currentPhase.expenses[k] = Math.max(0, reductions[k].val - redAmount);
+        });
+      }
+
       if (!currentPhase.savings) currentPhase.savings = {};
-      currentPhase.savings.brokerage = (currentPhase.savings.brokerage || 0) + S_wants;
+      currentPhase.savings.brokerage = (currentPhase.savings.brokerage || 0) + Math.round(S_wants_monthly);
     }
 
     if (I_annual > 0) {
@@ -160,6 +84,7 @@ export function applyBalancedAdjustment(inputs, S_wants, I_annual) {
       const monthlyNetSavings = Math.round(netIncrease / 12);
       
       currentPhase.income = Math.round(newIncome / 12);
+      if (!currentPhase.savings) currentPhase.savings = {};
       currentPhase.savings.brokerage = (currentPhase.savings.brokerage || 0) + monthlyNetSavings;
     }
   }
@@ -194,129 +119,175 @@ export function applyBalancedAdjustment(inputs, S_wants, I_annual) {
   return newInputs;
 }
 
+// Helper to apply Save More adjustment
+export function applySaveMoreAdjustment(inputs, S_monthly, targetRetirementAge) {
+  return applyBalancedAdjustment(inputs, S_monthly, 0, targetRetirementAge);
+}
+
+// Helper to apply Earn More adjustment
+export function applyEarnMoreAdjustment(inputs, I_annual, targetRetirementAge) {
+  return applyBalancedAdjustment(inputs, 0, I_annual, targetRetirementAge);
+}
+
 export function calculateRetireSoonerOptions(inputs, targetAge) {
   const currentAgeVal = Number(inputs.currentAge) || 35;
+  const lifeExpectancyVal = Number(inputs.lifeExpectancy) || 85;
   const normPhases = getNormalizedPhases(inputs);
   const currentPhase = normPhases.find(p => currentAgeVal >= p.startAge && currentAgeVal < p.endAge) || normPhases[0];
 
-  const phaseIncome = currentPhase ? currentPhase.income : (Number(inputs.simpleIncome) / 12 || 4166.67);
-  const taxes = inputs.includeTaxes 
-    ? Math.round(calculateUSTaxForModal(phaseIncome * 12 || 0, 0, inputs.filingStatus || 'single') / 12)
-    : 0;
-  const netMonthlyIncome = phaseIncome - taxes;
-
-  const wantsFloor = Math.max(250, 0.10 * netMonthlyIncome);
-  const currentMonthlyWants = currentPhase
-    ? (Number(currentPhase.expenses.leisure) || 0) + 
-      (Number(currentPhase.expenses.diningOut) || 0) + 
-      (Number(currentPhase.expenses.misc) || 0)
-    : 0;
-
-  const maxAvailableSavingsIncrease = Math.max(0, currentMonthlyWants - wantsFloor);
-
-  // 1. Save More Fast Path & Binary Search
-  let requiredSaveMoreMonthly = null;
-  if (maxAvailableSavingsIncrease > 0) {
-    const maxSaveMoreInputs = applySaveMoreAdjustment(inputs, maxAvailableSavingsIncrease);
-    const maxSaveMoreRes = runSimulation(maxSaveMoreInputs);
+  let maxReducibleMonthlySpending = 0;
+  if (currentPhase) {
+    const expenses = currentPhase.expenses || {};
+    const wantsKeys = ['diningOut', 'leisure', 'misc'];
+    const needsKeys = ['food', 'transportation', 'utilities'];
     
-    if (maxSaveMoreRes.retirementReadyAge !== null && maxSaveMoreRes.retirementReadyAge <= targetAge) {
-      // Save More is possible! Binary search between 0 and maxAvailableSavingsIncrease
-      let saveMoreLow = 0;
-      let saveMoreHigh = Math.ceil(maxAvailableSavingsIncrease / 25);
-      let saveMoreSteps = -1;
+    wantsKeys.forEach(k => {
+      maxReducibleMonthlySpending += (Number(expenses[k]) || 0);
+    });
+    
+    needsKeys.forEach(k => {
+      const val = (Number(expenses[k]) || 0);
+      maxReducibleMonthlySpending += (val - Math.round(val * 0.5));
+    });
+  }
+  const maxReducibleAnnualSpending = maxReducibleMonthlySpending * 12;
 
+  // Solvency check function based on net worth
+  const checkSolvency = (testInputs) => {
+    const res = runSimulation(testInputs);
+    if (!res.moneyLasts) return false;
+    const logs = res.data || [];
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      if (log.age >= targetAge && log.age <= lifeExpectancyVal) {
+        if (log.netWorth < 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  // 1. Calculate Save More option
+  let requiredSaveMoreMonthly = null;
+  if (maxReducibleAnnualSpending > 0) {
+    const maxSaveMoreInputs = applySaveMoreAdjustment(inputs, maxReducibleMonthlySpending, targetAge);
+    if (checkSolvency(maxSaveMoreInputs)) {
+      let saveMoreLow = 0;
+      let saveMoreHigh = Math.round(maxReducibleAnnualSpending);
+      let requiredSaveMoreAnnual = null;
+      
       while (saveMoreLow <= saveMoreHigh) {
         const mid = Math.floor((saveMoreLow + saveMoreHigh) / 2);
-        const sAmt = mid * 25;
-        const testInputs = applySaveMoreAdjustment(inputs, sAmt);
-        const res = runSimulation(testInputs);
-        
-        if (res.retirementReadyAge !== null && res.retirementReadyAge <= targetAge) {
-          saveMoreSteps = mid;
+        const testInputs = applySaveMoreAdjustment(inputs, mid / 12, targetAge);
+        if (checkSolvency(testInputs)) {
+          requiredSaveMoreAnnual = mid;
           saveMoreHigh = mid - 1;
         } else {
           saveMoreLow = mid + 1;
         }
       }
-      requiredSaveMoreMonthly = saveMoreSteps !== -1 ? saveMoreSteps * 25 : null;
+      if (requiredSaveMoreAnnual !== null) {
+        requiredSaveMoreMonthly = Math.round(requiredSaveMoreAnnual / 12);
+      }
     }
   }
 
-  // 2. Earn More Fast Path & Binary Search
+  // 2. Calculate Earn More option
   let requiredEarnMoreAnnual = null;
-  const maxEarnMoreInputs = applyEarnMoreAdjustment(inputs, 1000000);
-  const maxEarnMoreRes = runSimulation(maxEarnMoreInputs);
-
-  if (maxEarnMoreRes.retirementReadyAge !== null && maxEarnMoreRes.retirementReadyAge <= targetAge) {
-    // Earn More is possible! Binary search up to $1,000,000/yr (2000 steps of $500)
+  let earnMoreHigh = Number(inputs.simpleIncome) || 50000;
+  let successAtCap = false;
+  const maxCap = 1000000;
+  
+  while (earnMoreHigh <= maxCap) {
+    const testInputs = applyEarnMoreAdjustment(inputs, earnMoreHigh, targetAge);
+    if (checkSolvency(testInputs)) {
+      successAtCap = true;
+      break;
+    }
+    if (earnMoreHigh === maxCap) break;
+    earnMoreHigh = Math.min(maxCap, earnMoreHigh * 2);
+  }
+  
+  if (successAtCap) {
     let earnMoreLow = 0;
-    let earnMoreHigh = 2000;
-    let earnMoreSteps = -1;
-
     while (earnMoreLow <= earnMoreHigh) {
       const mid = Math.floor((earnMoreLow + earnMoreHigh) / 2);
-      const incAmt = mid * 500;
-      const testInputs = applyEarnMoreAdjustment(inputs, incAmt);
-      const res = runSimulation(testInputs);
-      
-      if (res.retirementReadyAge !== null && res.retirementReadyAge <= targetAge) {
-        earnMoreSteps = mid;
+      const testInputs = applyEarnMoreAdjustment(inputs, mid, targetAge);
+      if (checkSolvency(testInputs)) {
+        requiredEarnMoreAnnual = mid;
         earnMoreHigh = mid - 1;
       } else {
         earnMoreLow = mid + 1;
       }
     }
-    requiredEarnMoreAnnual = earnMoreSteps !== -1 ? earnMoreSteps * 500 : null;
   }
 
-  // 3. Balanced Option Fast Path & Binary Search
-  const solveIncomeIncrease = (wantsReduction) => {
-    // Fast path: if even $1,000,000/yr extra income doesn't work, skip search
-    const maxBalancedInputs = applyBalancedAdjustment(inputs, wantsReduction, 1000000);
-    const maxBalancedRes = runSimulation(maxBalancedInputs);
-    if (maxBalancedRes.retirementReadyAge === null || maxBalancedRes.retirementReadyAge > targetAge) {
-      return null;
+  // 3. Calculate Balanced option
+  let requiredBalancedX = null;
+  let balancedHigh = Number(inputs.simpleIncome) || 50000;
+  let successBalancedCap = false;
+  
+  while (balancedHigh <= maxCap) {
+    const targetSpendingReduction = balancedHigh * 0.5;
+    const spendingReduction = Math.min(targetSpendingReduction, maxReducibleAnnualSpending);
+    const incomeIncrease = balancedHigh - spendingReduction;
+    
+    const testInputs = applyBalancedAdjustment(inputs, spendingReduction / 12, incomeIncrease, targetAge);
+    if (checkSolvency(testInputs)) {
+      successBalancedCap = true;
+      break;
     }
-
+    if (balancedHigh === maxCap) break;
+    balancedHigh = Math.min(maxCap, balancedHigh * 2);
+  }
+  
+  if (successBalancedCap) {
     let balancedLow = 0;
-    let balancedHigh = 2000; // up to $1M/yr
-    let balancedSteps = -1;
-
     while (balancedLow <= balancedHigh) {
       const mid = Math.floor((balancedLow + balancedHigh) / 2);
-      const incAmt = mid * 500;
-      const testInputs = applyBalancedAdjustment(inputs, wantsReduction, incAmt);
-      const res = runSimulation(testInputs);
+      const targetSpendingReduction = mid * 0.5;
+      const spendingReduction = Math.min(targetSpendingReduction, maxReducibleAnnualSpending);
+      const incomeIncrease = mid - spendingReduction;
       
-      if (res.retirementReadyAge !== null && res.retirementReadyAge <= targetAge) {
-        balancedSteps = mid;
+      const testInputs = applyBalancedAdjustment(inputs, spendingReduction / 12, incomeIncrease, targetAge);
+      if (checkSolvency(testInputs)) {
+        requiredBalancedX = mid;
         balancedHigh = mid - 1;
       } else {
         balancedLow = mid + 1;
       }
     }
-    return balancedSteps !== -1 ? balancedSteps * 500 : null;
-  };
-
-  let wantsReductionBalanced = requiredSaveMoreMonthly !== null 
-    ? Math.round((requiredSaveMoreMonthly / 2) / 25) * 25 
-    : Math.round((maxAvailableSavingsIncrease / 2) / 25) * 25;
-  wantsReductionBalanced = Math.min(wantsReductionBalanced, maxAvailableSavingsIncrease);
-
-  let requiredBalancedIncomeAnnual = solveIncomeIncrease(wantsReductionBalanced);
+  }
   
-  if (requiredBalancedIncomeAnnual === null) {
-    // If that does not work, increase savings portion up to maxAvailableSavingsIncrease, then solve income again
-    wantsReductionBalanced = maxAvailableSavingsIncrease;
-    requiredBalancedIncomeAnnual = solveIncomeIncrease(wantsReductionBalanced);
+  let wantsReductionBalanced = 0;
+  let requiredBalancedIncomeAnnual = null;
+  if (requiredBalancedX !== null) {
+    const targetSpendingReduction = requiredBalancedX * 0.5;
+    const spendingReduction = Math.min(targetSpendingReduction, maxReducibleAnnualSpending);
+    wantsReductionBalanced = Math.round(spendingReduction / 12);
+    requiredBalancedIncomeAnnual = requiredBalancedX - spendingReduction;
   }
 
+  const targetInputs = applySaveMoreAdjustment(inputs, 0, targetAge);
+  const targetSimRes = runSimulation(targetInputs);
+  const targetRequiredAssets = targetSimRes.nominalRequiredAtDesired;
+  const targetDeflatedRequiredAssets = targetSimRes.deflatedRequiredAtDesired;
+  const targetShortfall = targetSimRes.nominalShortfallAtDesired;
+  const targetDeflatedShortfall = targetSimRes.deflatedShortfallAtDesired;
+
   return {
-    maxAvailableSavingsIncrease,
+    maxAvailableSavingsIncrease: maxReducibleMonthlySpending,
+    maxReducibleAnnualSpending,
     requiredSaveMoreMonthly,
+    requiredSaveMoreAnnual: requiredSaveMoreMonthly ? requiredSaveMoreMonthly * 12 : null,
     requiredEarnMoreAnnual,
     wantsReductionBalanced,
-    requiredBalancedIncomeAnnual
+    wantsReductionBalancedAnnual: wantsReductionBalanced * 12,
+    requiredBalancedIncomeAnnual,
+    targetRequiredAssets,
+    targetDeflatedRequiredAssets,
+    targetShortfall,
+    targetDeflatedShortfall
   };
 }
