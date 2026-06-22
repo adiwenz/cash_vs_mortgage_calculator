@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getActiveChildrenCountAtAge, propPIAmount } from '../../simulatorMathUtils';
 import { isEditableEvent, isFinancialEvent, formatCompactCurrency, getEventIcon } from './helpers';
@@ -22,13 +22,6 @@ export default function DesktopTimeline({
   const [hoveredEvent, setHoveredEvent] = useState(null); // State for portal tooltip (from main)
 
   const isTimelineHeightExpanded = isExpanded;
-
-  // Clear hoveredEvent when dragging starts/is active
-  useEffect(() => {
-    if (draggingInfo) {
-      setHoveredEvent(null);
-    }
-  }, [draggingInfo]);
 
   // Default fallback if not provided (e.g. in test rendering)
   const chartLayout = propsChartLayout || {
@@ -160,12 +153,15 @@ export default function DesktopTimeline({
     }
   }
 
-  // Close dialog on dragging (sync to prop)
+  // Close dialog and hover tooltip on dragging (sync to prop)
   const [prevDraggingInfo, setPrevDraggingInfo] = useState(draggingInfo);
   if (draggingInfo !== prevDraggingInfo) {
     setPrevDraggingInfo(draggingInfo);
-    if (draggingInfo && activeGroupDialog) {
-      setActiveGroupDialog(null);
+    if (draggingInfo) {
+      setHoveredEvent(null);
+      if (activeGroupDialog) {
+        setActiveGroupDialog(null);
+      }
     }
   }
 
@@ -866,7 +862,6 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
 
       const targetRect = target.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
 
       // Horizontal position: center tooltip on target
       const targetCenterX = targetRect.left + targetRect.width / 2;
