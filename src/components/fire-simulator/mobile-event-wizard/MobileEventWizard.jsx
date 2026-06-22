@@ -242,6 +242,12 @@ export default function MobileEventWizard({
       return;
     }
 
+    if (type === 'buyHouse') {
+      const baseDefaults = getDefaultEvent('buyHouse', { inputs, isMobile: true });
+      setEditingEvent({ ...baseDefaults, isNew: true });
+      return;
+    }
+
     const preserveFields = draftEvent && (
       draftEvent.type === type || 
       (draftEvent.type === 'borrowing' && draftEvent.borrowingType === type)

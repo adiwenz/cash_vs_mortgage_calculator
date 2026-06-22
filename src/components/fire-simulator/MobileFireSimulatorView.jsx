@@ -23,7 +23,7 @@ import RetireSoonerModal from './RetireSoonerModal';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
 import MobileChildPlanningModal from './MobileChildPlanningModal';
-import HousePlanningModal from './HousePlanningModal';
+import MobileHousePlanningModal from './MobileHousePlanningModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
 import BudgetModal from './BudgetModal';
@@ -2474,7 +2474,7 @@ export default function MobileFireSimulatorView({
           onClose={() => setEditingEvent(null)}
         />
       ) : editingEvent && editingEvent.type === 'buyHouse' ? (
-        <HousePlanningModal
+        <MobileHousePlanningModal
           scenario={scenario}
           eventController={eventController}
           simulation={simulation}
