@@ -1289,7 +1289,7 @@ export default function MobileFireSimulatorView({
                       </div>
                     </div>
 
-                    <div ref={chartContainerRef} style={{ height: '340px', width: '100%', marginLeft: '-15px' }}>
+                    <div ref={chartContainerRef} style={{ height: '180px', width: '100%', marginLeft: '-15px' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={chartData}
