@@ -50,13 +50,6 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     throw new Error(`Could not find input associated with text matching: ${textRegex}`);
   };
 
-  const getStatsCardValue = (labelText) => {
-    const label = screen.getByText(new RegExp(labelText, 'i'));
-    const wrapper = label.closest('div');
-    const strong = wrapper.querySelector('strong');
-    return strong.textContent;
-  };
-
   test('test_marriage_event_default_partner', async () => {
     navigateToStep2();
 
@@ -303,6 +296,7 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     // Let's set a wedding age different from marriage age or keep defaults
     const weddingAgeInput = getInputByWrapperText(/Wedding Age/i);
     expect(weddingAgeInput.value).toBe('35'); // defaults to 35
+    fireEvent.change(weddingAgeInput, { target: { value: '36' } });
 
     fireEvent.click(nextBtn); // Step 2 -> 3
     fireEvent.click(nextBtn); // Step 3 -> 4

@@ -18,6 +18,12 @@ describe('Child Event Linked Dragging Regression Test', () => {
     vi.clearAllMocks();
   });
 
+  const getInputByWrapperText = (textRegex) => {
+    const el = screen.getByText(textRegex);
+    const wrapper = el.closest('.input-wrapper');
+    return wrapper.querySelector('input, select');
+  };
+
   const navigateToStep2 = () => {
     render(<FireSimulator />);
     
@@ -47,11 +53,18 @@ describe('Child Event Linked Dragging Regression Test', () => {
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
 
+    // Set annual childcare cost to 0 so we don't trigger a promotion event even with rebalance
+    const costInput = getInputByWrapperText(/Annual Childcare Cost/i);
+    fireEvent.change(costInput, { target: { value: '0' } });
+
     // Save
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
+    // Select Rebalance Budget
+    const rebalanceOption = screen.getByText('Rebalance Budget');
+    fireEvent.click(rebalanceOption);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {

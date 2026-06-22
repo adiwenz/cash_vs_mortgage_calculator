@@ -69,13 +69,6 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     throw new Error(`Could not find input associated with text matching: ${textRegex}`);
   };
 
-  const clickDoneOnWelcomeModal = (childName) => {
-    const heading = screen.getByRole('heading', { name: new RegExp(`Welcome, ${childName}!`, 'i') });
-    const modal = heading.closest('.modal-content');
-    const doneBtn = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === 'Done');
-    fireEvent.click(doneBtn);
-  };
-
   test('1. Budget Modal - Opens, renders defaults, modifies state, cancels, and saves', async () => {
     render(<FireSimulator />);
     
@@ -142,11 +135,17 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
     expect(childNameInput.value).toBe('Liam');
     
+    // Set annual childcare cost to 0
+    const costInput = getInputByWrapperText(/Annual Childcare Cost/i);
+    fireEvent.change(costInput, { target: { value: '0' } });
+    
     // Continue to step 2
     const continueBtn = screen.getByRole('button', { name: /Continue/i });
     fireEvent.click(continueBtn);
     
     // Confirm child event rebalance/promotion selection
+    const rebalanceOption = screen.getByText('Rebalance Budget');
+    fireEvent.click(rebalanceOption);
     const confirmBtn = screen.getByRole('button', { name: /Confirm/i });
     fireEvent.click(confirmBtn);
     
@@ -407,16 +406,24 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'haveChild' } });
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
+    
+    // Set annual childcare cost to 0
+    const costInput = getInputByWrapperText(/Annual Childcare Cost/i);
+    fireEvent.change(costInput, { target: { value: '0' } });
+    
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
+    // Select Rebalance Budget so we don't get a career/promotion event at age 35
+    const rebalanceOption = screen.getByText('Rebalance Budget');
+    fireEvent.click(rebalanceOption);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
     
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /Add Child/i })).toBeNull();
     });
-    
+
     // Click the timeline node for Liam
     const liamTooltipText = screen.getAllByText(/Have Child: Liam/i)[0];
     const liamNode = liamTooltipText.closest('.financial-milestone-wrapper, .milestone-circle-wrapper, .timeline-node, .vertical-timeline-node');
@@ -543,11 +550,18 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
 
+    // Set annual childcare cost to 0
+    const costInput = getInputByWrapperText(/Annual Childcare Cost/i);
+    fireEvent.change(costInput, { target: { value: '0' } });
+
     // Save
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
+    // Select Rebalance Budget so we don't get a career/promotion event at age 35
+    const rebalanceOption = screen.getByText('Rebalance Budget');
+    fireEvent.click(rebalanceOption);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
@@ -590,11 +604,15 @@ describe('FireSimulator Modals and Decision Wizards', () => {
 
     // Modify spouse income or just go next
     const nextBtn = screen.getByRole('button', { name: /Continue/i });
-    fireEvent.click(nextBtn); // Step 2
+    fireEvent.click(nextBtn); // Step 2 (Wedding planner)
 
-    fireEvent.click(nextBtn); // Step 3
+    // Set wedding age to 36 so they don't group at age 35
+    const weddingAgeInput = getInputByWrapperText(/Wedding Age/i);
+    fireEvent.change(weddingAgeInput, { target: { value: '36' } });
 
-    fireEvent.click(nextBtn); // Step 4 (Taxes / Marriage Impact)
+    fireEvent.click(nextBtn); // Step 2 -> 3
+
+    fireEvent.click(nextBtn); // Step 3 -> 4
 
     // Confirm warnings if present
     const zeroSpendConfirm = document.getElementById('confirm-partner-zero-spending');
@@ -796,11 +814,18 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     const childNameInput = screen.getByPlaceholderText(/e.g. Liam/i);
     fireEvent.change(childNameInput, { target: { value: 'Liam' } });
 
+    // Set annual childcare cost to 0
+    const costInput = getInputByWrapperText(/Annual Childcare Cost/i);
+    fireEvent.change(costInput, { target: { value: '0' } });
+
     // Save
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Confirm/i })).toBeDefined();
     });
+    // Select Rebalance Budget so we don't get a career/promotion event at age 35
+    const rebalanceOption = screen.getByText('Rebalance Budget');
+    fireEvent.click(rebalanceOption);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
