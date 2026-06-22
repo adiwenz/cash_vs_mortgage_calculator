@@ -3140,5 +3140,190 @@ input:checked + .slider-round:before {
   margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   MOBILE EVENT PICKER LIGHT THEME (REDESIGNED ADD LIFE EVENT MENU)
+   ========================================================================== */
+
+.show-more-toggle-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary, #94a3b8);
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.mobile-wizard-backdrop.event-picker-theme {
+  background: var(--bg-primary, #f8f7f4) !important;
+  color: var(--text-primary, #1f2937) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-container {
+  background: var(--bg-primary, #f8f7f4) !important;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-header {
+  background: var(--bg-primary, #f8f7f4) !important;
+  border-bottom: none !important;
+  padding: 1.25rem 1.25rem 0.5rem 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: auto !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-header-btn.light-theme {
+  background: #ffffff !important;
+  border: 1px solid var(--border, #e5e7eb) !important;
+  color: var(--secondary, #1e3a5f) !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-header-btn.light-theme:active {
+  background: var(--bg-primary, #f8f7f4) !important;
+  transform: scale(0.95) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-body {
+  background: var(--bg-primary, #f8f7f4) !important;
+  padding: 0 1.25rem 2rem 1.25rem !important;
+  color: var(--text-primary, #1f2937) !important;
+  overflow-y: auto !important;
+  flex: 1 !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-title {
+  color: var(--secondary, #1e3a5f) !important;
+  font-size: 1.75rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 1.25rem !important;
+  font-weight: 800 !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-search-container {
+  background: #ffffff !important;
+  border: 1px solid var(--border, #e5e7eb) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.75rem 1rem !important;
+  gap: 0.5rem !important;
+  margin-bottom: 0.75rem !important;
+  transition: all 0.25s ease !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-search-container.focused {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+  background: #ffffff !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-search-input {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-primary, #1f2937) !important;
+  font-size: 0.92rem !important;
+  width: 100% !important;
+  outline: none !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-search-input::placeholder {
+  color: var(--text-tertiary, #9ca3af) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .search-icon {
+  color: var(--text-tertiary, #9ca3af) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-list-item {
+  background: #ffffff !important;
+  border: 1px solid var(--border, #e5e7eb) !important;
+  border-radius: 18px !important;
+  padding: 1.1rem 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  color: inherit !important;
+  font-family: inherit !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-list-item:active {
+  background: var(--bg-card-hover, #fafaf9) !important;
+  transform: translateY(1px) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-list-item .item-icon-wrapper {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 1rem !important;
+  flex-shrink: 0 !important;
+  font-size: 1.35rem !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-list-item .item-label {
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  color: var(--secondary, #1e3a5f) !important;
+  flex: 1 !important;
+  text-align: left !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .mobile-wizard-list-item .item-arrow {
+  font-size: 1.15rem !important;
+  color: var(--text-secondary, #6b7280) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .show-more-toggle-row {
+  background: rgba(139, 92, 246, 0.04) !important;
+  border: 1px dashed rgba(139, 92, 246, 0.4) !important;
+  color: #8b5cf6 !important;
+  border-radius: 18px !important;
+  padding: 1rem !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  box-shadow: none !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .show-more-toggle-row:active {
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .show-more-toggle-row span {
+  color: #8b5cf6 !important;
+}
+
+.mobile-wizard-backdrop.event-picker-theme .advanced-divider {
+  background: var(--border, #e5e7eb) !important;
+}
+
 
 
