@@ -190,7 +190,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.change(select, { target: { value: 'careerChange' } });
     
     // Verify Career Change modal opens
-    expect(screen.getByRole('heading', { name: /Career Change/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Income Change/i })).toBeDefined();
     
     // Verify fields
     const jobTitle = getInputByWrapperText(/Job Title \/ Name/i);
@@ -208,7 +208,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(saveBtn);
     
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Career Change/i })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /Income Change/i })).toBeNull();
     });
   });
 
@@ -884,7 +884,7 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(editBtn);
 
     // Verify Career Change modal opens
-    expect(screen.getByRole('heading', { name: /Career Change/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /Income Change/i })).toBeDefined();
   });
 
   test('15. Desktop Life Decision picker displays primary options by default and toggles advanced options with Show More/Less', () => {

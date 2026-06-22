@@ -416,7 +416,7 @@ export default function CurrentSituationCard({
                   { type: 'marriage', label: '💍 Get Married' },
                   { type: 'buyHouse', label: '🏠 Buy a House' },
                   { type: 'haveChild', label: '👶 Have a Child' },
-                  { type: 'careerChange', label: '💼 Career Change' },
+                  { type: 'careerChange', label: '💼 Income Change' },
                   { type: 'move', label: '📍 Move / Relocate' },
                   { 
                      type: 'retire', 
