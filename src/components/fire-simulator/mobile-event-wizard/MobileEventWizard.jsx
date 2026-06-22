@@ -239,7 +239,6 @@ export default function MobileEventWizard({
     if (type === 'haveChild') {
       const baseDefaults = getDefaultEvent('haveChild', { inputs, isMobile: true });
       setEditingEvent({ ...baseDefaults, isNew: true });
-      if (onClose) onClose();
       return;
     }
 

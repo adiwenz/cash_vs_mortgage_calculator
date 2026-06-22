@@ -22,7 +22,7 @@ import { CurrencyInput, PercentInput, NumberInput } from '../ui/PlainInputs';
 import RetireSoonerModal from './RetireSoonerModal';
 import MobileResults from './MobileResults';
 import MobileEventWizard from './MobileEventWizard';
-import ChildPlanningModal from './ChildPlanningModal';
+import MobileChildPlanningModal from './MobileChildPlanningModal';
 import HousePlanningModal from './HousePlanningModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
@@ -2392,7 +2392,7 @@ export default function MobileFireSimulatorView({
       )}
 
       {editingEvent && editingEvent.type === 'haveChild' ? (
-        <ChildPlanningModal
+        <MobileChildPlanningModal
           scenario={scenario}
           eventController={eventController}
           simulation={simulation}
