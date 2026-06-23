@@ -20,13 +20,28 @@ export function getTimelineItems(inputs) {
 
   const items = [];
 
-  // Helper to safely resolve age
+  // Defensive helper function to extract age fields from inconsistent event shapes
   const getEventAge = (ev) => {
-    if (ev.age !== undefined && ev.age !== null && ev.age !== '') return Number(ev.age);
-    if (ev.startAge !== undefined && ev.startAge !== null && ev.startAge !== '') return Number(ev.startAge);
-    if (ev.purchaseAge !== undefined && ev.purchaseAge !== null && ev.purchaseAge !== '') return Number(ev.purchaseAge);
-    if (ev.claimingAge !== undefined && ev.claimingAge !== null && ev.claimingAge !== '') return Number(ev.claimingAge);
-    if (ev.birthAge !== undefined && ev.birthAge !== null && ev.birthAge !== '') return Number(ev.birthAge);
+    if (!ev) return currentAge;
+    const fields = [
+      'age',
+      'eventAge',
+      'startAge',
+      'targetAge',
+      'changeAge',
+      'purchaseAge',
+      'marriageAge',
+      'moveAge',
+      'childAge',
+      'arrivalAge',
+      'claimingAge'
+    ];
+    for (const f of fields) {
+      if (ev[f] !== undefined && ev[f] !== null && ev[f] !== '') {
+        const val = Number(ev[f]);
+        if (!isNaN(val)) return val;
+      }
+    }
     return currentAge;
   };
 
@@ -42,7 +57,7 @@ export function getTimelineItems(inputs) {
   }
 
   // Find marriage events
-  const marriageEvents = enabledEvents.filter(e => e.type === 'marriage');
+  const marriageEvents = enabledEvents.filter(e => e.type === 'marriage' || e.type === 'getMarried');
   const marriageAge = marriageEvents.length > 0 ? getEventAge(marriageEvents[0]) : null;
 
   if (baselineMarried) {
@@ -131,7 +146,7 @@ export function getTimelineItems(inputs) {
     baselineOwn = true;
   }
 
-  const buyHouseEvents = enabledEvents.filter(e => e.type === 'buyHouse');
+  const buyHouseEvents = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
   const sellHouseEvents = enabledEvents.filter(e => e.type === 'sellHouse');
 
   const buyAge = buyHouseEvents.length > 0 ? getEventAge(buyHouseEvents[0]) : null;
@@ -340,12 +355,58 @@ export function getTimelineItems(inputs) {
     });
   }
 
+  // 5b. Safe fallback for other current children lists if not already mapped via effective.lifeEvents
+  const userChildren = inputs.children || [];
+  if (Array.isArray(userChildren)) {
+    userChildren.forEach((child, index) => {
+      const childAge = Number(child.age || 0);
+      const birthAge = currentAge - childAge;
+      const childId = child.id || `child-inputs-${index}`;
+      
+      // Check if we already have a child event matching this ID or birth age to avoid duplicates
+      const exists = enabledEvents.some(e => e.id === childId || ((e.type === 'haveChild' || e.type === 'child') && getEventAge(e) === birthAge));
+      if (!exists) {
+        items.push({
+          id: `event-child-point-${childId}`,
+          sourceId: childId,
+          sourceType: 'child',
+          kind: TIMELINE_ITEM_KIND.POINT,
+          category: TIMELINE_CATEGORY.CHILDREN,
+          label: child.name || `Child ${index + 1}`,
+          description: 'Child arrival',
+          age: birthAge,
+          startAge: null,
+          endAge: null,
+          isDerived: true,
+          metadata: { ...child }
+        });
+
+        const dependentYears = child.includeCollege ? 22 : 18;
+        items.push({
+          id: `event-child-dependent-period-${childId}`,
+          sourceId: childId,
+          sourceType: 'child',
+          kind: TIMELINE_ITEM_KIND.PERIOD,
+          category: TIMELINE_CATEGORY.CHILDREN,
+          label: child.name ? `${child.name} (Dependent)` : `Child ${index + 1} (Dependent)`,
+          description: `Dependent years (up to age ${dependentYears})`,
+          age: null,
+          startAge: birthAge,
+          endAge: birthAge + dependentYears,
+          isDerived: true,
+          metadata: { ...child }
+        });
+      }
+    });
+  }
+
   // 6. Existing Life Events Mapping
   enabledEvents.forEach(event => {
     const age = getEventAge(event);
 
     switch (event.type) {
       case 'marriage':
+      case 'getMarried':
         items.push({
           id: `event-marriage-point-${event.id}`,
           sourceId: event.id,
@@ -363,6 +424,8 @@ export function getTimelineItems(inputs) {
         break;
 
       case 'buyHouse':
+      case 'homePurchase':
+      case 'buyHome':
         items.push({
           id: `event-buyhouse-point-${event.id}`,
           sourceId: event.id,
@@ -420,6 +483,7 @@ export function getTimelineItems(inputs) {
 
       case 'haveChild':
       case 'child':
+      case 'createChild':
         items.push({
           id: `event-child-point-${event.id}`,
           sourceId: event.id,
@@ -614,6 +678,23 @@ export function getTimelineItems(inputs) {
           category: TIMELINE_CATEGORY.MAJOR_EVENT,
           label: event.name || 'Retirement',
           description: `Retirement target at age ${age}`,
+          age: age,
+          startAge: null,
+          endAge: null,
+          isDerived: event.isDerived || false,
+          metadata: { ...event }
+        });
+        break;
+
+      case 'windfall':
+        items.push({
+          id: `event-windfall-point-${event.id}`,
+          sourceId: event.id,
+          sourceType: 'lifeEvent',
+          kind: TIMELINE_ITEM_KIND.POINT,
+          category: TIMELINE_CATEGORY.MAJOR_EVENT,
+          label: event.name || 'Windfall',
+          description: `Windfall of ${event.amount || 0}`,
           age: age,
           startAge: null,
           endAge: null,

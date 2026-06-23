@@ -197,4 +197,66 @@ describe('timelineSelectors', () => {
     expect(() => getActiveEventsAtAge(inputs, 40)).not.toThrow();
     expect(() => getActivePeriodsAtAge(inputs, 40)).not.toThrow();
   });
+
+  test('getEventAge defends against inconsistent field names', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      lifeEvents: [
+        { id: 'ev-1', type: 'marriage', marriageAge: 39, enabled: true },
+        { id: 'ev-2', type: 'homePurchase', purchaseAge: 44, enabled: true },
+        { id: 'ev-3', type: 'createChild', arrivalAge: 41, enabled: true },
+        { id: 'ev-4', type: 'incomeChange', changeAge: 52, enabled: true },
+        { id: 'ev-5', type: 'windfall', eventAge: 37, enabled: true }
+      ]
+    };
+    
+    const items = getTimelineItems(inputs);
+    
+    const marriagePoint = items.find(item => item.id === 'event-marriage-point-ev-1');
+    expect(marriagePoint).toBeDefined();
+    expect(marriagePoint.age).toBe(39);
+
+    const homePoint = items.find(item => item.id === 'event-buyhouse-point-ev-2');
+    expect(homePoint).toBeDefined();
+    expect(homePoint.age).toBe(44);
+
+    const childPoint = items.find(item => item.id === 'event-child-point-ev-3');
+    expect(childPoint).toBeDefined();
+    expect(childPoint.age).toBe(41);
+
+    const incomePoint = items.find(item => item.id === 'event-incomechange-point-ev-4');
+    expect(incomePoint).toBeDefined();
+    expect(incomePoint.age).toBe(52);
+
+    const windfallPoint = items.find(item => item.id === 'event-windfall-point-ev-5');
+    expect(windfallPoint).toBeDefined();
+    expect(windfallPoint.age).toBe(37);
+  });
+
+  test('supports type aliases like getMarried, buyHome, createChild', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      lifeEvents: [
+        { id: 'alias-marriage', type: 'getMarried', age: 37, enabled: true },
+        { id: 'alias-home', type: 'buyHome', age: 41, enabled: true },
+        { id: 'alias-child', type: 'createChild', age: 39, enabled: true }
+      ]
+    };
+    
+    const items = getTimelineItems(inputs);
+    
+    const marriagePoint = items.find(item => item.id === 'event-marriage-point-alias-marriage');
+    expect(marriagePoint).toBeDefined();
+    expect(marriagePoint.age).toBe(37);
+
+    const homePoint = items.find(item => item.id === 'event-buyhouse-point-alias-home');
+    expect(homePoint).toBeDefined();
+    expect(homePoint.age).toBe(41);
+
+    const childPoint = items.find(item => item.id === 'event-child-point-alias-child');
+    expect(childPoint).toBeDefined();
+    expect(childPoint.age).toBe(39);
+  });
 });
