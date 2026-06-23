@@ -29,4 +29,5 @@ export function normalizeHouseholdModel(inputs) {
 export * from './constants.js';
 export * from './factories.js';
 export * from './ownership.js';
+export * from './householdSelectors.js';
 

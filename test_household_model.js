@@ -5,7 +5,20 @@ import {
   createEmptyOwnershipMap,
   createSelfPersonFromLegacyInputs,
   createHouseholdFromLegacyInputs,
-  buildLegacyOwnershipMap
+  buildLegacyOwnershipMap,
+  getHouseholdModel,
+  hasHouseholdModel,
+  getPrimaryPerson,
+  getPartnerPerson,
+  hasPartner,
+  getPrimaryPersonAge,
+  getPrimaryPersonLifeExpectancy,
+  getPrimaryPersonRetirementGoalAge,
+  getHousehold,
+  getHouseholdRelationshipStatus,
+  getHouseholdFilingStatus,
+  getOwnershipMap,
+  getOwnershipForObject
 } from './src/models/household/index.js';
 import { normalizeInputsStage } from './src/calculators/fire/pipeline/normalizeInputs.js';
 import { runFireSimulation } from './src/calculators/fire/index.js';
@@ -374,6 +387,177 @@ describe('Household Data Model Foundation Tests', () => {
       expect(map.objects['event:1'].ownerType).toBe('person');
     });
   });
+
+  describe('Phase 1D — Household Model Selectors', () => {
+    const mockNormalizedInputs = {
+      householdModel: {
+        schemaVersion: 1,
+        people: {
+          self: {
+            id: 'self',
+            role: 'self',
+            displayName: 'You',
+            demographics: {
+              currentAge: 35,
+              lifeExpectancy: 85
+            },
+            work: {
+              desiredStopWorkingAge: 62
+            }
+          }
+        },
+        household: {
+          id: 'household',
+          relationship: {
+            status: 'married'
+          },
+          tax: {
+            filingStatus: 'married_filing_jointly'
+          }
+        },
+        ownership: {
+          version: 1,
+          objects: {
+            'inc-1': {
+              ownerType: 'person',
+              ownerIds: ['self'],
+              shares: { self: 1 }
+            }
+          }
+        }
+      }
+    };
+
+    describe('Household Model Present', () => {
+      test('getPrimaryPerson() returns people.self', () => {
+        expect(getPrimaryPerson(mockNormalizedInputs)).toEqual(mockNormalizedInputs.householdModel.people.self);
+      });
+
+      test('getPrimaryPersonAge() returns normalized age', () => {
+        expect(getPrimaryPersonAge(mockNormalizedInputs)).toBe(35);
+      });
+
+      test('getPrimaryPersonLifeExpectancy() returns normalized value', () => {
+        expect(getPrimaryPersonLifeExpectancy(mockNormalizedInputs)).toBe(85);
+      });
+
+      test('getPrimaryPersonRetirementGoalAge() returns normalized value', () => {
+        expect(getPrimaryPersonRetirementGoalAge(mockNormalizedInputs)).toBe(62);
+      });
+
+      test('getHouseholdRelationshipStatus() returns normalized status', () => {
+        expect(getHouseholdRelationshipStatus(mockNormalizedInputs)).toBe('married');
+      });
+
+      test('getHouseholdFilingStatus() returns normalized filing status', () => {
+        expect(getHouseholdFilingStatus(mockNormalizedInputs)).toBe('married_filing_jointly');
+      });
+
+      test('getOwnershipForObject() returns ownership metadata', () => {
+        expect(getOwnershipForObject(mockNormalizedInputs, 'inc-1')).toEqual({
+          ownerType: 'person',
+          ownerIds: ['self'],
+          shares: { self: 1 }
+        });
+      });
+    });
+
+    describe('Legacy Fallback when householdModel is absent', () => {
+      const legacyInputs = {
+        currentAge: 40,
+        lifeExpectancy: 90,
+        desiredRetirementAge: 60,
+        maritalStatus: 'partnered',
+        filingStatus: 'head_of_household'
+      };
+
+      test('getPrimaryPersonAge() falls back to currentAge', () => {
+        expect(getPrimaryPersonAge(legacyInputs)).toBe(40);
+        expect(getPrimaryPersonAge({})).toBeNull();
+      });
+
+      test('getPrimaryPersonLifeExpectancy() falls back to lifeExpectancy', () => {
+        expect(getPrimaryPersonLifeExpectancy(legacyInputs)).toBe(90);
+        expect(getPrimaryPersonLifeExpectancy({})).toBeNull();
+      });
+
+      test('getPrimaryPersonRetirementGoalAge() falls back to desiredRetirementAge / retirementAge', () => {
+        expect(getPrimaryPersonRetirementGoalAge(legacyInputs)).toBe(60);
+        expect(getPrimaryPersonRetirementGoalAge({ retirementAge: 65 })).toBe(65);
+        expect(getPrimaryPersonRetirementGoalAge({ targetRetirementAge: 67 })).toBe(67);
+        expect(getPrimaryPersonRetirementGoalAge({})).toBeNull();
+      });
+
+      test('getHouseholdRelationshipStatus() falls back to maritalStatus', () => {
+        expect(getHouseholdRelationshipStatus(legacyInputs)).toBe('partnered');
+        expect(getHouseholdRelationshipStatus({})).toBe('single');
+      });
+
+      test('getHouseholdFilingStatus() falls back to filingStatus', () => {
+        expect(getHouseholdFilingStatus(legacyInputs)).toBe('head_of_household');
+        expect(getHouseholdFilingStatus({})).toBe('single');
+      });
+    });
+
+    describe('Partner Handling', () => {
+      test('hasPartner() returns false when no partner exists', () => {
+        expect(hasPartner(mockNormalizedInputs)).toBe(false);
+        expect(hasPartner({ maritalStatus: 'single' })).toBe(false);
+        expect(hasPartner({})).toBe(false);
+      });
+
+      test('hasPartner() returns true when partner status exists', () => {
+        expect(hasPartner({ maritalStatus: 'married' })).toBe(true);
+        expect(hasPartner({ maritalStatus: 'partnered' })).toBe(true);
+      });
+
+      test('getPartnerPerson() returns null when no partner exists', () => {
+        expect(getPartnerPerson(mockNormalizedInputs)).toBeNull();
+        expect(getPartnerPerson({})).toBeNull();
+      });
+    });
+
+    describe('Null Safety & Read-Only Behavior', () => {
+      test('does not throw on missing inputs or empty objects', () => {
+        expect(getHouseholdModel(undefined)).toBeNull();
+        expect(hasHouseholdModel(undefined)).toBe(false);
+        expect(getPrimaryPerson(undefined)).toBeNull();
+        expect(getPartnerPerson(undefined)).toBeNull();
+        expect(getPrimaryPersonAge(undefined)).toBeNull();
+        expect(getPrimaryPersonLifeExpectancy(undefined)).toBeNull();
+        expect(getPrimaryPersonRetirementGoalAge(undefined)).toBeNull();
+        expect(getHousehold(undefined)).toBeNull();
+        expect(getHouseholdRelationshipStatus(undefined)).toBe('single');
+        expect(getHouseholdFilingStatus(undefined)).toBe('single');
+        expect(getOwnershipMap(undefined)).toEqual({ version: 1, objects: {} });
+        expect(getOwnershipForObject(undefined, 'inc-1')).toBeNull();
+      });
+
+      test('does not throw when householdModel exists but parts are missing', () => {
+        const incompleteInputs = {
+          householdModel: {}
+        };
+        expect(getPrimaryPerson(incompleteInputs)).toBeNull();
+        expect(getPrimaryPersonAge(incompleteInputs)).toBeNull();
+        expect(getHouseholdRelationshipStatus(incompleteInputs)).toBe('single');
+        expect(getOwnershipMap(incompleteInputs)).toEqual({ version: 1, objects: {} });
+      });
+
+      test('does not accidentally create or modify householdModel on input object', () => {
+        const inputs = { currentAge: 35 };
+        const copy = JSON.stringify(inputs);
+
+        getPrimaryPerson(inputs);
+        getPrimaryPersonAge(inputs);
+        getHouseholdRelationshipStatus(inputs);
+        getOwnershipMap(inputs);
+
+        expect(JSON.stringify(inputs)).toBe(copy);
+        expect(inputs.householdModel).toBeUndefined();
+      });
+    });
+  });
 });
+
 
 
