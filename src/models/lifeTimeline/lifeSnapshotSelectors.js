@@ -1,5 +1,4 @@
 import { buildEffectiveSimulationInputs } from '../../calculators/fire/effectiveInputs.js';
-import { getActiveDebtsForAge } from '../../calculators/fire/debts.js';
 import { getActiveEventsAtAge, getActivePeriodsAtAge } from './timelineSelectors.js';
 import { TIMELINE_CATEGORY } from './timelineTypes.js';
 
@@ -13,7 +12,25 @@ import { TIMELINE_CATEGORY } from './timelineTypes.js';
 export function getLifeSnapshotAtAge(inputs, age) {
   const targetAge = Number(age);
   const effective = buildEffectiveSimulationInputs(inputs || {});
-  const currentAge = Math.max(0, Number(effective.currentAge) || 35);
+
+  // Infer currentAge defensively from currentAge, age, householdModel.people.self.age, or similar legacy fields
+  let currentAge = 35;
+  if (inputs) {
+    if (inputs.currentAge !== undefined && inputs.currentAge !== null && inputs.currentAge !== '') {
+      currentAge = Number(inputs.currentAge);
+    } else if (inputs.age !== undefined && inputs.age !== null && inputs.age !== '') {
+      currentAge = Number(inputs.age);
+    } else if (inputs.householdModel?.people?.self?.demographics?.currentAge !== undefined && inputs.householdModel?.people?.self?.demographics?.currentAge !== null) {
+      currentAge = Number(inputs.householdModel.people.self.demographics.currentAge);
+    } else if (inputs.householdModel?.people?.self?.age !== undefined && inputs.householdModel?.people?.self?.age !== null) {
+      currentAge = Number(inputs.householdModel.people.self.age);
+    } else if (effective.currentAge !== undefined && effective.currentAge !== null) {
+      currentAge = Number(effective.currentAge);
+    }
+  }
+  if (isNaN(currentAge)) {
+    currentAge = 35;
+  }
 
   const activeEvents = getActiveEventsAtAge(inputs, targetAge);
   const activePeriods = getActivePeriodsAtAge(inputs, targetAge);
@@ -61,21 +78,53 @@ export function getLifeSnapshotAtAge(inputs, age) {
 
   let partner = null;
   if (relationshipStatus === 'married' || relationshipStatus === 'partnered') {
-    partner = {
-      currentAge: targetAge,
-      role: 'partner',
-      displayName: 'Partner'
-    };
+    if (inputs.householdModel?.people?.partner) {
+      partner = { ...inputs.householdModel.people.partner };
+    } else {
+      const spouseMember = (effective.householdMembers || []).find(m => m.id === 'spouse');
+      if (spouseMember) {
+        partner = {
+          role: 'partner',
+          displayName: spouseMember.name || 'Partner',
+          ...spouseMember
+        };
+      } else {
+        partner = {
+          role: 'partner',
+          displayName: 'Partner'
+        };
+      }
+    }
+    if (partner) {
+      let partnerAgeToday = currentAge;
+      if (partner.demographics?.currentAge !== undefined && partner.demographics?.currentAge !== null) {
+        partnerAgeToday = Number(partner.demographics.currentAge);
+      } else if (partner.currentAge !== undefined && partner.currentAge !== null) {
+        partnerAgeToday = Number(partner.currentAge);
+      }
+      const yearsElapsed = targetAge - currentAge;
+      partner.currentAge = partnerAgeToday + yearsElapsed;
+    }
   }
 
   // 4. Children
   const children = [];
   const enabledEvents = (effective.lifeEvents || []).filter(e => e.enabled !== false);
+  const childEvents = enabledEvents.filter(e => e.type === 'haveChild' || e.type === 'child' || e.type === 'createChild');
   
-  // Collect from lifeProfile children (which are converted to haveChild derived events) or manually entered haveChild events
-  const childEvents = enabledEvents.filter(e => e.type === 'haveChild' || e.type === 'child');
   childEvents.forEach((chEvent, idx) => {
-    const birthAge = chEvent.birthAge !== undefined ? Number(chEvent.birthAge) : (chEvent.age !== undefined ? Number(chEvent.age) : currentAge);
+    // Defensive age resolver for child arrival
+    let birthAge = currentAge;
+    const fields = ['birthAge', 'age', 'arrivalAge', 'childAge'];
+    for (const f of fields) {
+      if (chEvent[f] !== undefined && chEvent[f] !== null && chEvent[f] !== '') {
+        const val = Number(chEvent[f]);
+        if (!isNaN(val)) {
+          birthAge = val;
+          break;
+        }
+      }
+    }
     const childAgeAtSnapshot = targetAge - birthAge;
     const dependentYears = chEvent.includeCollege ? 22 : 18;
 
@@ -91,14 +140,25 @@ export function getLifeSnapshotAtAge(inputs, age) {
 
   // 5. Income
   const activeIncomeItems = activePeriods.filter(p => p.category === TIMELINE_CATEGORY.INCOME && p.kind === 'period');
-  let annualIncome = 0;
   
-  activeIncomeItems.forEach(item => {
-    const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
-    annualIncome += amount;
-  });
+  // Calculate current annual income fallback
+  let currentAnnualIncome = 0;
+  if (effective.incomeList && effective.incomeList.length > 0) {
+    currentAnnualIncome = effective.incomeList.reduce((sum, inc) => sum + (Number(inc.amount) || 0), 0);
+  } else {
+    currentAnnualIncome = Number(effective.simpleIncome) || 0;
+  }
 
-  // Include partner income if married at the target age
+  let annualIncome = 0;
+  if (activeIncomeItems.length > 0) {
+    activeIncomeItems.forEach(item => {
+      annualIncome += Number(item.metadata?.amount || item.metadata?.value || 0);
+    });
+  } else {
+    annualIncome = currentAnnualIncome;
+  }
+
+  // Include partner income if married at target age
   if (relationshipStatus === 'married' || relationshipStatus === 'partnered') {
     let partnerIncome = 0;
     const spouseMember = (effective.householdMembers || []).find(m => m.id === 'spouse');
@@ -110,10 +170,21 @@ export function getLifeSnapshotAtAge(inputs, age) {
     annualIncome += partnerIncome;
   }
 
-  // 6. Debts
-  const resolvedActiveDebts = getActiveDebtsForAge(effective, enabledEvents, targetAge);
+  // 6. Debts: derive from active periods under category DEBT
+  const activeDebtPeriods = activePeriods.filter(p => p.category === TIMELINE_CATEGORY.DEBT);
+  const activeDebts = activeDebtPeriods.map(p => {
+    const meta = p.metadata || {};
+    return {
+      id: p.sourceId || p.id,
+      name: p.label,
+      type: meta.borrowingType || meta.type || 'debt',
+      monthlyPayment: Math.round(meta.payment || meta.minPayment || 0),
+      icon: meta.icon || '💸',
+      payoffAge: p.endAge
+    };
+  });
 
-  // 7. Assets: Baseline invested assets fallback (no future projections)
+  // 7. Assets: baseline fallback (no future projections)
   const ass = effective.assets || {};
   const customAssetsStartingValue = enabledEvents
     .filter(c => c.type === 'conditionItem' && ['checkingSavings', 'brokerage', 'retirement', 'asset'].includes(c.subtype || c.type))
@@ -144,7 +215,7 @@ export function getLifeSnapshotAtAge(inputs, age) {
       activeIncomeItems
     },
     debts: {
-      activeDebts: resolvedActiveDebts
+      activeDebts
     },
     assets: {
       investedAssets: baselineInvestedAssets

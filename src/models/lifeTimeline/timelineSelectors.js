@@ -355,6 +355,44 @@ export function getTimelineItems(inputs) {
     });
   }
 
+  // 5c. Pre-existing house asset mortgages
+  if (effective.houseAssets) {
+    effective.houseAssets.forEach(h => {
+      if (h.hasMortgage && h.mortgage) {
+        const balance = Number(h.mortgage.balance) || 0;
+        const apr = Number(h.mortgage.rate !== undefined ? h.mortgage.rate : (h.mortgage.interestRate !== undefined ? h.mortgage.interestRate : 6.5));
+        const termYears = Number(h.mortgage.term !== undefined ? h.mortgage.term : (h.mortgage.loanTerm !== undefined ? h.mortgage.loanTerm : 30));
+        const startAge = currentAge;
+        const payoffAge = startAge + termYears;
+
+        // Check if we already have this mortgage in debtList to avoid duplicates
+        const exists = (effective.debtList || []).some(d => d.id === `derived-mortgage` || d.id === `mortgage-existing-${h.id}`);
+        if (!exists) {
+          items.push({
+            id: `debt-period-mortgage-existing-${h.id}`,
+            sourceId: h.id,
+            sourceType: 'houseAsset',
+            kind: TIMELINE_ITEM_KIND.PERIOD,
+            category: TIMELINE_CATEGORY.DEBT,
+            label: `${h.name || 'Home'} Mortgage`,
+            description: `Pre-existing mortgage on ${h.name || 'home'}`,
+            age: null,
+            startAge: startAge,
+            endAge: payoffAge,
+            isDerived: true,
+            metadata: {
+              ...h.mortgage,
+              type: 'mortgage',
+              balance,
+              interestRate: apr,
+              payment: h.mortgage.monthlyPayment || h.mortgage.payment || 0
+            }
+          });
+        }
+      }
+    });
+  }
+
   // 5b. Safe fallback for other current children lists if not already mapped via effective.lifeEvents
   const userChildren = inputs.children || [];
   if (Array.isArray(userChildren)) {
@@ -459,7 +497,7 @@ export function getTimelineItems(inputs) {
             startAge: age,
             endAge: age + termYears,
             isDerived: true,
-            metadata: { ...event }
+            metadata: { ...event, borrowingType: 'mortgage', type: 'mortgage' }
           });
         }
         break;

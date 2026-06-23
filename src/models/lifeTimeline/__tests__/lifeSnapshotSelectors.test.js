@@ -111,4 +111,96 @@ describe('lifeSnapshotSelectors', () => {
     
     expect(() => getLifeSnapshotAtAge(inputs, 45)).not.toThrow();
   });
+
+  test('getLifeSnapshotAtAge infers currentAge from legacy fields', () => {
+    const inputs1 = { age: 40 };
+    expect(getLifeSnapshotAtAge(inputs1, 45).currentAge).toBe(40);
+
+    const inputs2 = {
+      householdModel: {
+        people: {
+          self: {
+            age: 42
+          }
+        }
+      }
+    };
+    expect(getLifeSnapshotAtAge(inputs2, 45).currentAge).toBe(42);
+
+    const inputs3 = {
+      householdModel: {
+        people: {
+          self: {
+            demographics: {
+              currentAge: 44
+            }
+          }
+        }
+      }
+    };
+    expect(getLifeSnapshotAtAge(inputs3, 45).currentAge).toBe(44);
+  });
+
+  test('getLifeSnapshotAtAge extracts partner and calculates their age correctly', () => {
+    const inputs = {
+      currentAge: 35,
+      filingStatus: 'married',
+      householdModel: {
+        people: {
+          partner: {
+            role: 'partner',
+            displayName: 'My Spouse',
+            currentAge: 38
+          }
+        }
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 45);
+    expect(snapshot.relationshipStatus).toBe('married');
+    expect(snapshot.people.partner).toBeDefined();
+    expect(snapshot.people.partner.displayName).toBe('My Spouse');
+    expect(snapshot.people.partner.currentAge).toBe(48); // 38 + (45 - 35)
+  });
+
+  test('getLifeSnapshotAtAge sums annualIncome and falls back correctly', () => {
+    const inputsNoIncomeList = {
+      currentAge: 35,
+      simpleIncome: 100000
+    };
+    const snapshotNoList = getLifeSnapshotAtAge(inputsNoIncomeList, 40);
+    expect(snapshotNoList.income.annualIncome).toBe(100000);
+
+    const inputsWithIncomeList = {
+      currentAge: 35,
+      incomeList: [
+        { id: 'inc-1', name: 'Salary', amount: 80000, startAge: 35, endAge: 65 }
+      ]
+    };
+    const snapshotWithList = getLifeSnapshotAtAge(inputsWithIncomeList, 40);
+    expect(snapshotWithList.income.annualIncome).toBe(80000);
+
+    // Active at 40, but retired at 70 (activeIncomeItems is empty, so falls back to currentAnnualIncome (80000))
+    const snapshotRetired = getLifeSnapshotAtAge(inputsWithIncomeList, 70);
+    expect(snapshotRetired.income.annualIncome).toBe(80000);
+  });
+
+  test('getLifeSnapshotAtAge derives activeDebts from active periods', () => {
+    const inputs = {
+      currentAge: 35,
+      debtList: [
+        { id: 'debt-1', name: 'Student Loan', balance: 20000, interestRate: 5.0, payment: 200, frequency: 'monthly', startAge: 35 }
+      ]
+    };
+
+    // Active at 40
+    const snapshot40 = getLifeSnapshotAtAge(inputs, 40);
+    expect(snapshot40.debts.activeDebts.length).toBe(1);
+    expect(snapshot40.debts.activeDebts[0].name).toBe('Student Loan');
+    expect(snapshot40.debts.activeDebts[0].monthlyPayment).toBe(200);
+
+    // Inactive at 70 (amortized loan payoff age is calculated to be before age 70)
+    const snapshot70 = getLifeSnapshotAtAge(inputs, 70);
+    expect(snapshot70.debts.activeDebts.length).toBe(0);
+  });
 });
