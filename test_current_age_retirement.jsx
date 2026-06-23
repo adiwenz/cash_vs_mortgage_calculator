@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
+import React from 'react';
+import { render, screen } from '@testing-library/react';
 import { describe, test, expect, beforeEach } from 'vitest';
 import { runFireSimulation, getNormalizedPhases, getEditableBudgetPhases } from './src/fireCalculations.js';
 import { getBudgetForAge } from './src/components/fire-simulator/helpers.js';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
+import CurrentSituationCard from './src/components/fire-simulator/CurrentSituationCard';
+import GoalHeroCard from './src/components/fire-simulator/GoalHeroCard';
 
 describe('Current Age Retirement Budget Collision', () => {
   let baseInputs;
@@ -87,5 +91,42 @@ describe('Current Age Retirement Budget Collision', () => {
     // Lifestyle spending today = 42500 / yr.
     // At retirement, it should scale to 42500 * 70% = 29750/yr.
     expect(nominalAt35.expenses).toBeCloseTo(29750, -1);
+  });
+
+  test('CurrentSituationCard renders "Planning assumes work stops today" when currentAge === targetRetirementAge', () => {
+    const handleSetBudgetClick = () => {};
+    const onOpenLifeProfile = () => {};
+    const handleCreateEvent = () => {};
+    const updateInput = () => {};
+
+    render(
+      <CurrentSituationCard
+        inputs={baseInputs}
+        handleSetBudgetClick={handleSetBudgetClick}
+        onOpenLifeProfile={onOpenLifeProfile}
+        handleCreateEvent={handleCreateEvent}
+        updateInput={updateInput}
+      />
+    );
+
+    expect(screen.getByText('Planning assumes work stops today')).toBeDefined();
+  });
+
+  test('GoalHeroCard renders "🏖️ Stop Working Today" when currentAge === targetRetirementAge', () => {
+    const onTargetAgeChange = () => {};
+    const onViewRecommendations = () => {};
+
+    render(
+      <GoalHeroCard
+        currentAge={35}
+        targetRetirementAge={35}
+        projectedRetirementAge={35}
+        status="comfortable"
+        onTargetAgeChange={onTargetAgeChange}
+        onViewRecommendations={onViewRecommendations}
+      />
+    );
+
+    expect(screen.getByText('🏖️ Stop Working Today')).toBeDefined();
   });
 });

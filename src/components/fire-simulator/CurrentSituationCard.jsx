@@ -17,6 +17,9 @@ export default function CurrentSituationCard({
   const [activePopover, setActivePopover] = useState(null);
   const [showAdvancedEvents, setShowAdvancedEvents] = useState(false);
 
+  const currentAge = Number(inputs.currentAge) || 35;
+  const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+
   // Close popovers on click outside
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -343,21 +346,7 @@ export default function CurrentSituationCard({
             }}
           />
         </div>
-        {inputs.currentAge === inputs.targetRetirementAge && (
-          <div 
-            style={{
-              textAlign: 'right',
-              fontSize: '12px',
-              color: 'var(--text-secondary)',
-              fontStyle: 'italic',
-              marginTop: '-0.2rem',
-              marginBottom: '0.4rem',
-              paddingRight: '0.5rem'
-            }}
-          >
-            Paused in retirement plan
-          </div>
-        )}
+
 
         {/* Spending (budget) */}
         <div 
@@ -389,6 +378,20 @@ export default function CurrentSituationCard({
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary, #9ca3af)', fontWeight: '400', textAlign: 'right' }}>
               Based on your current budget and required expenses.
             </div>
+          </div>
+        )}
+
+        {currentAge === targetRetirementAge && (
+          <div 
+            style={{
+              fontSize: '13px',
+              color: 'var(--text-tertiary, #9ca3af)',
+              fontStyle: 'italic',
+              marginTop: '0.25rem',
+              padding: '0 0.5rem'
+            }}
+          >
+            Planning assumes work stops today
           </div>
         )}
       </div>
