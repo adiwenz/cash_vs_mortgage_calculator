@@ -519,6 +519,11 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       baseSavings = { trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0 };
       basePartnerSavings = { trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0 };
       savingsAllocMode = standardSavingsAllocMode;
+      if (i > 0) {
+        baseExpenses = { ...phases[i - 1].baseExpenses };
+      } else {
+        baseExpenses = { ...standardExpenses };
+      }
     }
 
     Object.keys(baseExpenses).forEach(k => {
@@ -1163,6 +1168,47 @@ export function getNormalizedPhases(inputs) {
   const events = getEventsFromInputs(inputs);
   const budgetOverrides = inputs.budgetDetails?.phases || [];
   return derivePhasesFromEvents(profile, events, budgetOverrides);
+}
+
+/**
+ * CRITICAL: This helper is strictly for UI/budget-editing purposes ONLY.
+ * It generates editable budget phases including future/current retirement periods.
+ */
+export function getEditableBudgetPhases(inputs) {
+  return getNormalizedPhases(inputs);
+}
+
+export function getTimelineRowInfo(t, inputs) {
+  const currentAge = Number(inputs.currentAge) || 35;
+  const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+  const isToday = t.age === currentAge;
+  
+  let title = '';
+  let label = '';
+  
+  if (isToday) {
+    if (currentAge === targetRetirementAge) {
+      title = `Today / Stop Working (Age ${t.age})`;
+      const otherEvents = (t.events || []).filter(e => e.type !== 'today' && e.type !== 'retire' && e.id !== 'retire-auto');
+      if (otherEvents.length > 0) {
+        label = otherEvents.map(e => e.name).join(' + ');
+      }
+    } else {
+      title = `Today (Age ${t.age})`;
+      const otherEvents = (t.events || []).filter(e => e.type !== 'today');
+      if (otherEvents.length > 0) {
+        label = otherEvents.map(e => e.name).join(' + ');
+      } else {
+        label = 'Current Budget';
+      }
+    }
+  } else {
+    title = `Age ${t.age} (${t.year})`;
+    const cleanEvents = (t.events || []).filter(e => e.type !== 'today');
+    label = cleanEvents.map(e => e.name === 'Retirement' ? 'Stop Working' : e.name).join(' + ');
+  }
+  
+  return { title, label };
 }
 
 export function getPhaseChangeExplanations(activePhaseObj, normalizedPhases) {

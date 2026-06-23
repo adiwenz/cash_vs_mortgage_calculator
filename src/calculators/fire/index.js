@@ -23,6 +23,8 @@ import {
 import {
   derivePhasesFromEvents,
   getNormalizedPhases,
+  getEditableBudgetPhases,
+  getTimelineRowInfo,
   getPhaseChangeExplanations,
   syncBudgetDetails
 } from './phases.js';
@@ -75,6 +77,8 @@ export {
   validateFireInputs,
   derivePhasesFromEvents,
   getNormalizedPhases,
+  getEditableBudgetPhases,
+  getTimelineRowInfo,
   getPhaseChangeExplanations,
   syncBudgetDetails,
   projectYearlyBalances,

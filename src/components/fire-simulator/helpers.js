@@ -1,8 +1,8 @@
-import formatCompactCurrency, { formatCompactFinancial } from '../../utils/formatCompactCurrency';
-import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
+import { getNormalizedPhases, getEditableBudgetPhases, getTimelineRowInfo, getPhaseChangeExplanations } from '../../fireCalculations';
 import { calculateUSTaxForModal, getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
+import formatCompactCurrency, { formatCompactFinancial } from '../../utils/formatCompactCurrency';
 
-export { formatCompactCurrency, formatCompactFinancial };
+export { formatCompactCurrency, formatCompactFinancial, getTimelineRowInfo };
 
 export const formatCurrency = (val) => {
   if (val === null || val === undefined || isNaN(val) || val === '') return '';
@@ -753,8 +753,11 @@ export function getAppliedEventsThroughAge(inputs, age) {
 }
 
 export function getBudgetForAge(inputs, age) {
-  const normalizedPhases = getNormalizedPhases(inputs);
   const currentAge = Number(inputs.currentAge) || 35;
+  const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+  const normalizedPhases = (age === currentAge && currentAge < targetRetirementAge)
+    ? getEditableBudgetPhases(inputs)
+    : getNormalizedPhases(inputs);
   
   const phase = normalizedPhases.find(p => age >= p.startAge && age < p.endAge)
                 || normalizedPhases[normalizedPhases.length - 1]
@@ -1105,7 +1108,7 @@ export function getCategoryBreakdown(budget, category, inputs, isMarriedModeOver
         amount: targetVal,
         desc: item.desc,
         isLocked: isRetirement,
-        lockedReason: isRetirement ? 'Savings are disabled during retirement' : null,
+        lockedReason: isRetirement ? 'Work-based savings are disabled during retirement' : null,
         isPartner: false,
         changeFromToday: targetVal - todayVal
       });
@@ -1135,7 +1138,7 @@ export function getCategoryBreakdown(budget, category, inputs, isMarriedModeOver
           amount: targetVal,
           desc: item.desc,
           isLocked: isRetirement,
-          lockedReason: isRetirement ? 'Savings are disabled during retirement' : null,
+          lockedReason: isRetirement ? 'Work-based savings are disabled during retirement' : null,
           isPartner: true,
           changeFromToday: targetVal - todayVal
         });

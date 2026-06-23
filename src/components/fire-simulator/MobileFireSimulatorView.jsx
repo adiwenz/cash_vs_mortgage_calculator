@@ -1193,6 +1193,26 @@ export default function MobileFireSimulatorView({
                     />
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>years old</span>
                   </div>
+                  {Number(inputs.currentAge) === Number(inputs.targetRetirementAge) && (
+                    <div 
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        backgroundColor: '#fffbeb',
+                        color: '#b45309',
+                        border: '1px solid #fef3c7',
+                        borderRadius: '9999px',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        marginTop: '4px',
+                        alignSelf: 'flex-start'
+                      }}
+                    >
+                      <span>🏖️ Stop Working Today</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Divider */}

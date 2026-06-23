@@ -6,7 +6,8 @@ import {
   getAppliedEventsThroughAge, 
   getBudgetForAge, 
   getCategoryBreakdown, 
-  getChangesFromToday 
+  getChangesFromToday,
+  getTimelineRowInfo
 } from './helpers';
 import { getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
 import { NumberInput, CurrencyInput } from '../ui/PlainInputs';
@@ -49,6 +50,11 @@ export default function DesktopBudgetPanel({
   spouseAge,
   filingStatus,
   hsaCoverageType,
+  isBudgetOpenFromMarriageWizard,
+  isRetirementPhase,
+  remainingBalance,
+  activeSavingsRate,
+  budgetShortfall,
   activeBudgetPhase,
   savingsAllocMode,
   budgetHsaCoverage,
@@ -59,11 +65,8 @@ export default function DesktopBudgetPanel({
   getEventDetails,
   getBudgetPhaseThemeClass,
   totalAllocated,
-  remainingBalance,
   modalTitle,
-  isRetirementPhase,
   monthlyTax,
-  activeSavingsRate,
   handleReduceWants,
   handleAutoReduceSavingsToBalance,
   handleIncreaseIncome,
@@ -76,7 +79,7 @@ export default function DesktopBudgetPanel({
   handleClearSavings,
   budgetScalingMode,
   handleToggleBudgetScalingMode,
-  budgetShortfall,
+  editingEvent,
 
   // Redesigned timeline props
   selectedBudgetAge,
@@ -165,6 +168,7 @@ export default function DesktopBudgetPanel({
           {timelineAges.map((t) => {
             const isSelected = t.age === selectedBudgetAge;
             const isToday = t.age === inputs.currentAge;
+            const { title, label } = getTimelineRowInfo(t, inputs);
             
             return (
               <button
@@ -203,11 +207,11 @@ export default function DesktopBudgetPanel({
                 
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 'bold' : 'normal', color: 'var(--text-primary)' }}>
-                    {isToday ? `Today (Age ${t.age})` : `Age ${t.age} (${t.year})`}
+                    {title}
                   </span>
-                  {t.label && t.label !== 'Today' && (
+                  {label && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                      {t.label}
+                      {label}
                     </span>
                   )}
                 </div>
@@ -315,42 +319,62 @@ export default function DesktopBudgetPanel({
         </div>
 
         {/* Impact Banner */}
-        <div style={{
-          background: selectedBudgetAge === inputs.currentAge ? 'rgba(16, 185, 129, 0.05)' : 'rgba(59, 130, 246, 0.05)',
-          border: selectedBudgetAge === inputs.currentAge ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(59, 130, 246, 0.15)',
-          borderRadius: '8px',
-          padding: '0.75rem 1rem',
-          marginBottom: '1rem',
-          display: 'flex',
-          gap: '0.5rem',
-          alignItems: 'flex-start'
-        }}>
-          <span style={{ fontSize: '1.1rem', marginTop: '-0.1rem' }}>{selectedBudgetAge === inputs.currentAge ? '💡' : 'ℹ️'}</span>
-          <div>
-            {selectedBudgetAge === inputs.currentAge ? (
+        {isRetirementPhase ? (
+          <div style={{
+            background: 'rgba(245, 158, 11, 0.05)',
+            border: '1px solid rgba(245, 158, 11, 0.15)',
+            borderRadius: '8px',
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'flex-start'
+          }}>
+            <span style={{ fontSize: '1.1rem', marginTop: '-0.1rem' }}>🏖️</span>
+            <div>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                Set your monthly plan for today.
+                Work stops at this age. This budget reflects your retirement plan.
               </p>
-            ) : (
-              <div>
-                <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary, #3b82f6)' }}>
-                  Previewing changes through Age {selectedBudgetAge}
-                </h5>
-                {impactExps.length > 0 ? (
-                  <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    {impactExps.map((exp, idx) => (
-                      <li key={idx} style={{ marginBottom: '0.15rem' }}>{exp}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    No budget-impacting event effects applied yet.
-                  </p>
-                )}
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{
+            background: selectedBudgetAge === inputs.currentAge ? 'rgba(16, 185, 129, 0.05)' : 'rgba(59, 130, 246, 0.05)',
+            border: selectedBudgetAge === inputs.currentAge ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(59, 130, 246, 0.15)',
+            borderRadius: '8px',
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'flex-start'
+          }}>
+            <span style={{ fontSize: '1.1rem', marginTop: '-0.1rem' }}>{selectedBudgetAge === inputs.currentAge ? '💡' : 'ℹ️'}</span>
+            <div>
+              {selectedBudgetAge === inputs.currentAge ? (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Set your monthly plan for today.
+                </p>
+              ) : (
+                <div>
+                  <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary, #3b82f6)' }}>
+                    Previewing changes through Age {selectedBudgetAge}
+                  </h5>
+                  {impactExps.length > 0 ? (
+                    <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {impactExps.map((exp, idx) => (
+                        <li key={idx} style={{ marginBottom: '0.15rem' }}>{exp}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      No budget-impacting event effects applied yet.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Budget Rings */}
         <div className="budget-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', justifyItems: 'center', gap: '1.25rem', margin: '1rem 0' }}>
@@ -455,15 +479,18 @@ export default function DesktopBudgetPanel({
           <div>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Monthly Income</span>
             <CurrencyInput
+              disabled={isRetirementPhase}
               style={{
                 fontSize: '1.1rem',
                 fontWeight: 'bold',
                 padding: '0.2rem 0.4rem',
                 width: '110px',
                 color: 'var(--text-primary)',
-                background: 'var(--bg-tertiary)',
+                background: isRetirementPhase ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
                 border: '1px solid var(--border-color)',
-                borderRadius: '6px'
+                borderRadius: '6px',
+                opacity: isRetirementPhase ? 0.6 : 1,
+                cursor: isRetirementPhase ? 'not-allowed' : 'text'
               }}
               value={budgetMonthlyIncome}
               onChange={(e) => {
@@ -608,7 +635,7 @@ export default function DesktopBudgetPanel({
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
               {isRetirementPhase && selectedCategory === 'savings' ? (
                 <div style={{ padding: '1rem 0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
-                  🏖️ Savings are disabled during your Stop Working years. You are now drawing down from your portfolio to fund your living expenses.
+                  🏖️ Work-based savings are disabled during retirement.
                 </div>
               ) : (
                 breakdownRows.map(row => (
