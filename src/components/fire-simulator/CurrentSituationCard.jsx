@@ -30,8 +30,8 @@ export default function CurrentSituationCard({
     spendingPercent: 70,
     age: currentAge
   };
-  const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire') || fallbackRetireEvent;
-  const retirementSpendingPercent = Number(retireEvent.spendingPercent) || 70;
+  const retireEvent = (inputs?.lifeEvents || []).find(e => e?.type === 'retire') || fallbackRetireEvent;
+  const retirementSpendingPercent = Number(retireEvent?.spendingPercent) || 70;
 
   // Close popovers on click outside
   useEffect(() => {
