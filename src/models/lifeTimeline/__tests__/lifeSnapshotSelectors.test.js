@@ -203,4 +203,50 @@ describe('lifeSnapshotSelectors', () => {
     const snapshot70 = getLifeSnapshotAtAge(inputs, 70);
     expect(snapshot70.debts.activeDebts.length).toBe(0);
   });
+
+  test('getLifeSnapshotAtAge returns current housing status', () => {
+    const inputsOwn = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifeProfile: {
+        home: { status: 'own', homeValue: 300000, mortgageBalance: 150000, monthlyPayment: 1000 }
+      }
+    };
+    const snapshotOwn = getLifeSnapshotAtAge(inputsOwn, 35);
+    expect(snapshotOwn.housingStatus).toBe('own');
+
+    const inputsRent = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifeProfile: {
+        home: { status: 'rent', monthlyRent: 2000 }
+      }
+    };
+    const snapshotRent = getLifeSnapshotAtAge(inputsRent, 35);
+    expect(snapshotRent.housingStatus).toBe('rent');
+  });
+
+  test('getLifeSnapshotAtAge returns future annual income after an income change event', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: false,
+      incomeList: [
+        { id: 'inc-1', name: 'Salary', amount: 50000, startAge: 35, endAge: 45 }
+      ],
+      lifeEvents: [
+        { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true }
+      ]
+    };
+
+    // Age 40: Should be original salary
+    const snapshot40 = getLifeSnapshotAtAge(inputs, 40);
+    expect(snapshot40.income.annualIncome).toBe(50000);
+
+    // Age 46: Should be new job salary
+    const snapshot46 = getLifeSnapshotAtAge(inputs, 46);
+    expect(snapshot46.income.annualIncome).toBe(80000);
+  });
 });
