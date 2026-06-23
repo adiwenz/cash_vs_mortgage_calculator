@@ -6,6 +6,9 @@ import {
   createSelfPersonFromLegacyInputs,
   createHouseholdFromLegacyInputs
 } from './src/models/household/index.js';
+import { normalizeInputsStage } from './src/calculators/fire/pipeline/normalizeInputs.js';
+import { runFireSimulation } from './src/calculators/fire/index.js';
+
 
 describe('Household Data Model Foundation Tests', () => {
   describe('createEmptyOwnershipMap', () => {
@@ -109,4 +112,102 @@ describe('Household Data Model Foundation Tests', () => {
       expect(JSON.stringify(inputs)).toBe(originalJson);
     });
   });
+
+  describe('normalizeInputsStage Integration', () => {
+    test('normalizeInputs now returns householdModel and preserves legacy fields', () => {
+      const normalized = normalizeInputsStage(DEFAULT_FIRE_INPUTS);
+
+      // Verify householdModel exists and has correct self person & household structure
+      expect(normalized.householdModel).toBeDefined();
+      expect(normalized.householdModel.schemaVersion).toBe(1);
+      expect(normalized.householdModel.people.self).toBeDefined();
+      expect(normalized.householdModel.people.self.id).toBe('self');
+      expect(normalized.householdModel.household).toBeDefined();
+      expect(normalized.householdModel.household.id).toBe('household');
+
+      // Verify existing legacy fields remain present after normalization
+      expect(normalized.currentAge).toBe(35);
+      expect(normalized.lifeExpectancy).toBe(85);
+      expect(normalized.targetRetirementAge).toBe(65);
+      expect(normalized.filingStatus).toBe('single');
+      expect(normalized.incomeList).toBeDefined();
+      expect(normalized.spendingPhases).toBeDefined();
+      expect(normalized.lifeEvents).toBeDefined();
+    });
+
+    test('preserves existing householdModel if it already has schemaVersion === 1', () => {
+      const existingModel = {
+        schemaVersion: 1,
+        people: {
+          self: { id: 'self', role: 'self', displayName: 'Modified User' }
+        },
+        household: { id: 'household', relationship: { status: 'married' } },
+        ownership: { version: 1, objects: {} },
+        migration: { createdFromLegacy: false }
+      };
+
+      const inputs = {
+        ...DEFAULT_FIRE_INPUTS,
+        householdModel: existingModel
+      };
+
+      const normalized = normalizeInputsStage(inputs);
+      expect(normalized.householdModel).toBe(existingModel);
+      expect(normalized.householdModel.people.self.displayName).toBe('Modified User');
+    });
+  });
+
+  describe('Simulation Parity Verification', () => {
+    test('default childless scenario result is unchanged after attaching householdModel', () => {
+      // 1. Run simulation with standard default inputs
+      const resultsWithModel = runFireSimulation(DEFAULT_FIRE_INPUTS);
+
+      // 2. Run simulation with a clone of default inputs where householdModel is manually stripped
+      const inputsWithoutModel = { ...DEFAULT_FIRE_INPUTS };
+      delete inputsWithoutModel.householdModel;
+      const resultsWithoutModel = runFireSimulation(inputsWithoutModel);
+
+      // 3. Assert simulation results are identical/parity
+      // Verify key outputs are identical or numerically equal:
+      // - retirementReadyAge
+      // - finalNetWorth (value at index nominalData.length - 1)
+      // - yearly projection length (nominalData.length)
+      expect(resultsWithModel.retirementReadyAge).toBe(resultsWithoutModel.retirementReadyAge);
+      expect(resultsWithModel.moneyLasts).toBe(resultsWithoutModel.moneyLasts);
+      
+      const lastWithModel = resultsWithModel.nominalData[resultsWithModel.nominalData.length - 1];
+      const lastWithoutModel = resultsWithoutModel.nominalData[resultsWithoutModel.nominalData.length - 1];
+      
+      expect(lastWithModel.age).toBe(lastWithoutModel.age);
+      expect(lastWithModel.netWorth).toBeCloseTo(lastWithoutModel.netWorth, 2);
+      expect(lastWithModel.portfolio).toBeCloseTo(lastWithoutModel.portfolio, 2);
+      expect(resultsWithModel.nominalData.length).toBe(resultsWithoutModel.nominalData.length);
+    });
+
+    test('married legacy scenario result is unchanged after attaching householdModel', () => {
+      const marriedInputs = {
+        ...DEFAULT_FIRE_INPUTS,
+        maritalStatus: 'married',
+        filingStatus: 'married_filing_jointly'
+      };
+
+      const resultsWithModel = runFireSimulation(marriedInputs);
+
+      const marriedInputsWithoutModel = { ...marriedInputs };
+      delete marriedInputsWithoutModel.householdModel;
+      const resultsWithoutModel = runFireSimulation(marriedInputsWithoutModel);
+
+      expect(resultsWithModel.retirementReadyAge).toBe(resultsWithoutModel.retirementReadyAge);
+      expect(resultsWithModel.moneyLasts).toBe(resultsWithoutModel.moneyLasts);
+
+      const lastWithModel = resultsWithModel.nominalData[resultsWithModel.nominalData.length - 1];
+      const lastWithoutModel = resultsWithoutModel.nominalData[resultsWithoutModel.nominalData.length - 1];
+
+      expect(lastWithModel.age).toBe(lastWithoutModel.age);
+      expect(lastWithModel.netWorth).toBeCloseTo(lastWithoutModel.netWorth, 2);
+      expect(lastWithModel.portfolio).toBeCloseTo(lastWithoutModel.portfolio, 2);
+      expect(resultsWithModel.nominalData.length).toBe(resultsWithoutModel.nominalData.length);
+    });
+  });
 });
+

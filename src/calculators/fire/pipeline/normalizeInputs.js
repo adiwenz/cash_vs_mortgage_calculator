@@ -1,6 +1,7 @@
 import { getActiveChildrenCountAtAge } from '../../../simulatorMathUtils.js';
 import { getPartitionedPhases } from '../phases.js';
 import { normalizeSocialSecurityEvent } from '../socialSecurity.js';
+import { normalizeHouseholdModel } from '../../../models/household/index.js';
 
 export function normalizeInputsStage(inputs) {
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
@@ -267,7 +268,7 @@ export function normalizeInputsStage(inputs) {
     enabled: true
   };
 
-  return {
+  const normalized = {
     ...inputs,
     currentAge,
     lifeExpectancy,
@@ -280,4 +281,8 @@ export function normalizeInputsStage(inputs) {
     lifeEvents,
     socialSecurity
   };
+
+  normalized.householdModel = normalizeHouseholdModel(normalized);
+
+  return normalized;
 }
