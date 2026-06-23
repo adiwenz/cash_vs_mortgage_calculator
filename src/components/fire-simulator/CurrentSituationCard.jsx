@@ -343,6 +343,21 @@ export default function CurrentSituationCard({
             }}
           />
         </div>
+        {inputs.currentAge === inputs.targetRetirementAge && (
+          <div 
+            style={{
+              textAlign: 'right',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              fontStyle: 'italic',
+              marginTop: '-0.2rem',
+              marginBottom: '0.4rem',
+              paddingRight: '0.5rem'
+            }}
+          >
+            Paused in retirement plan
+          </div>
+        )}
 
         {/* Spending (budget) */}
         <div 

@@ -155,6 +155,26 @@ export default function GoalHeroCard({
           />
           <span className="goal-hero-input-label">years old</span>
         </div>
+        {Number(currentAge) === Number(targetRetirementAge) && (
+          <div 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: '#fffbeb',
+              color: '#b45309',
+              border: '1px solid #fef3c7',
+              borderRadius: '9999px',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: '600',
+              marginTop: '8px',
+              alignSelf: 'flex-start'
+            }}
+          >
+            <span>🏖️ Stop Working Today</span>
+          </div>
+        )}
       </div>
 
       {/* Right Area: Illustration & Results */}

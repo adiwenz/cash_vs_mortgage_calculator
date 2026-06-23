@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getNormalizedPhases } from '../fireCalculations';
+import { getNormalizedPhases, getEditableBudgetPhases } from '../fireCalculations';
 import { calculateMarriageEstimates } from '../components/fire-simulator/helpers';
 import { roundCurrency } from '../simulatorMathUtils';
 import { setLastChartChangeType } from '../components/fire-simulator/changeTypeTracker';
@@ -102,7 +102,7 @@ export function useBudgetState(
 
   const handleSetBudgetClick = (initialPhaseId = null, fromMarriageWizard = false) => {
     const inp = inputs;
-    const normalizedPhases = getNormalizedPhases(inp);
+    const normalizedPhases = getEditableBudgetPhases(inp);
     
     let estimatedExpenses = null;
     let estimatedPartnerSavings = null;
@@ -414,7 +414,12 @@ export function useBudgetState(
         const standardIncomeMonthly = wsPhase ? wsPhase.income : currentPhase.income;
         const childBoost = Math.max(0, currentPhase.income - standardIncomeMonthly);
         newInputs.simpleIncome = scen.inputs.simpleIncome;
-        newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
+        
+        if (Number(newInputs.currentAge) < Number(newInputs.targetRetirementAge)) {
+          newInputs.simpleExpenses = Object.keys(currentPhase.expenses).filter(k => !k.startsWith('debt_')).reduce((sum, v) => sum + (currentPhase.expenses[v] || 0), 0) * 12;
+        } else {
+          newInputs.simpleExpenses = scen.inputs.simpleExpenses;
+        }
       }
 
       newInputs.incomeList = (newInputs.incomeList || []).map(inc => {

@@ -365,12 +365,11 @@ describe('FireSimulator Modals and Decision Wizards', () => {
     fireEvent.click(setBudgetBtn);
     expect(screen.getByRole('heading', { name: /Budget/i, level: 3 })).toBeDefined();
 
-    // Verify there are 3 ages as tabs inside the Budget Modal
+    // Verify there are 4 ages as tabs inside the Budget Modal
     const tabs = document.querySelectorAll('.budget-sidebar-tab, .budget-modal-tab');
-    expect(tabs.length).toBeGreaterThanOrEqual(3);
+    expect(tabs.length).toBe(4);
     expect(tabs[0].textContent).toContain('Age 35');
     expect(tabs[1].textContent).toContain('Age 40');
-    expect(tabs[2].textContent).toContain('Age 65');
  
     // Click on the first tab
     fireEvent.click(tabs[0]);

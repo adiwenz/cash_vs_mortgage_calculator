@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getNormalizedPhases, getPhaseChangeExplanations } from '../../fireCalculations';
+import { getNormalizedPhases, getEditableBudgetPhases, getPhaseChangeExplanations } from '../../fireCalculations';
 import { calculateUSTaxForModal, getRetirementLimit, capMonthlyContribution, roundCurrency } from '../../simulatorMathUtils';
 import { 
   formatCurrency,
@@ -181,7 +181,7 @@ export default function BudgetModal({
   );
 
   // Get normalized phases
-  const normalizedPhases = getNormalizedPhases(inputs);
+  const normalizedPhases = getEditableBudgetPhases(inputs);
   const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
   const isRetirementPhase = activePhaseObj?.type === 'retire';
 

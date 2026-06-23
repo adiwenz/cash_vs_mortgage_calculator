@@ -6,7 +6,8 @@ import {
   getAppliedEventsThroughAge,
   getBudgetForAge,
   getCategoryBreakdown,
-  getChangesFromToday
+  getChangesFromToday,
+  getTimelineRowInfo
 } from './helpers';
 import { getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
 import { NumberInput } from '../ui/PlainInputs';
@@ -316,27 +317,24 @@ export default function MobileBudgetPanel({
   };
 
   const formatAgeLabel = (t) => {
-    const isToday = t.age === inputs.currentAge;
+    const { title, label } = getTimelineRowInfo(t, inputs);
     const cleanEmojis = (t.emojis || []).filter(e => e !== '●');
-    const cleanEvents = (t.events || []).filter(e => e.type !== 'today');
-    
-    if (isToday) {
-      if (cleanEvents.length > 0) {
-        const emojiStr = cleanEmojis.length > 0 ? ` · ${cleanEmojis.join(' ')}` : '';
-        const eventStr = cleanEvents.map(e => e.name).join(' + ');
-        return `Today · Age ${t.age}${emojiStr} ${eventStr}`;
-      }
-      return `Today · Age ${t.age}`;
-    }
-    
     const emojiStr = cleanEmojis.length > 0 ? ` · ${cleanEmojis.join(' ')}` : '';
-    const eventStr = cleanEvents.length > 0 ? ` ${cleanEvents.map(e => e.name).join(' + ')}` : '';
-    return `Age ${t.age}${emojiStr}${eventStr}`;
+    if (label) {
+      return `${title}${emojiStr} · ${label}`;
+    }
+    return `${title}${emojiStr}`;
   };
 
   const changesFromToday = getChangesFromToday(inputs, selectedBudgetAge);
 
   const getIncomeLockInfo = () => {
+    if (isRetirementPhase) {
+      return {
+        isLocked: true,
+        lockedReason: 'Work-based income is disabled in retirement'
+      };
+    }
     if (selectedBudgetAge === inputs.currentAge) {
       return { isLocked: false };
     }
@@ -648,7 +646,23 @@ export default function MobileBudgetPanel({
         </button>
 
         {/* Future Age Impact Banner */}
-        {selectedBudgetAge > inputs.currentAge && (
+        {isRetirementPhase ? (
+          <div style={{
+            background: 'rgba(245, 158, 11, 0.05)',
+            border: '1px solid rgba(245, 158, 11, 0.15)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.25rem' }}>🏖️</span>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                Work stops at this age. This budget reflects your retirement plan.
+              </p>
+            </div>
+          </div>
+        ) : selectedBudgetAge > inputs.currentAge && (
           <div style={{
             background: '#eff6ff',
             border: '1px solid #bfdbfe',
@@ -967,7 +981,7 @@ export default function MobileBudgetPanel({
             <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
               {isRetirementPhase ? (
                 <div style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
-                  🏖️ Savings are disabled during your Stop Working years. You are now drawing down from your portfolio to fund your living expenses.
+                  🏖️ Work-based savings are disabled during retirement.
                 </div>
               ) : (
                 savingsRows.map((row, idx) => {
@@ -1414,7 +1428,7 @@ export default function MobileBudgetPanel({
           >
             {isRetirementPhase && selectedCategory === 'savings' ? (
               <div style={{ padding: '1rem 0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' }}>
-                🏖️ Savings are disabled during your Stop Working years. You are now drawing down from your portfolio to fund your living expenses.
+                🏖️ Work-based savings are disabled during retirement.
               </div>
             ) : (
               getCategoryBreakdown(ageBudget, selectedCategory, inputs, isMarriedMode).map(row => (
