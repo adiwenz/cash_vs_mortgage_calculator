@@ -4,7 +4,8 @@ import {
   normalizeHouseholdModel,
   createEmptyOwnershipMap,
   createSelfPersonFromLegacyInputs,
-  createHouseholdFromLegacyInputs
+  createHouseholdFromLegacyInputs,
+  buildLegacyOwnershipMap
 } from './src/models/household/index.js';
 import { normalizeInputsStage } from './src/calculators/fire/pipeline/normalizeInputs.js';
 import { runFireSimulation } from './src/calculators/fire/index.js';
@@ -209,5 +210,170 @@ describe('Household Data Model Foundation Tests', () => {
       expect(resultsWithModel.nominalData.length).toBe(resultsWithoutModel.nominalData.length);
     });
   });
+
+  describe('Phase 1C — Ownership Metadata Mappings', () => {
+    test('income defaults to self ownership', () => {
+      const inputs = {
+        incomeList: [{ id: 'inc-1' }]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['inc-1']).toEqual({
+        ownerType: 'person',
+        ownerIds: ['self'],
+        shares: { self: 1 }
+      });
+    });
+
+    test('asset defaults to self ownership', () => {
+      const inputs = {
+        assets: { brokerage: 5000 },
+        houseAssets: [{ id: 'house-1' }]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['brokerage']).toEqual({
+        ownerType: 'person',
+        ownerIds: ['self'],
+        shares: { self: 1 }
+      });
+      expect(map.objects['house-1']).toEqual({
+        ownerType: 'person',
+        ownerIds: ['self'],
+        shares: { self: 1 }
+      });
+    });
+
+    test('debt defaults to self ownership', () => {
+      const inputs = {
+        debtList: [{ id: 'debt-1' }]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['debt-1']).toEqual({
+        ownerType: 'person',
+        ownerIds: ['self'],
+        shares: { self: 1 }
+      });
+    });
+
+    test('child event defaults to household ownership', () => {
+      const inputs = {
+        lifeEvents: [
+          { id: 'c1', type: 'child' },
+          { id: 'c2', type: 'createChild' },
+          { id: 'c3', type: 'childcare' }
+        ]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['c1'].ownerType).toBe('household');
+      expect(map.objects['c2'].ownerType).toBe('household');
+      expect(map.objects['c3'].ownerType).toBe('household');
+    });
+
+    test('house purchase/sale/mortgage event defaults to household ownership', () => {
+      const inputs = {
+        lifeEvents: [
+          { id: 'h1', type: 'house' },
+          { id: 'h2', type: 'housePurchase' },
+          { id: 'h3', type: 'buyHome' },
+          { id: 'h4', type: 'housing' },
+          { id: 'h5', type: 'mortgage' }
+        ]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['h1'].ownerType).toBe('household');
+      expect(map.objects['h2'].ownerType).toBe('household');
+      expect(map.objects['h3'].ownerType).toBe('household');
+      expect(map.objects['h4'].ownerType).toBe('household');
+      expect(map.objects['h5'].ownerType).toBe('household');
+    });
+
+    test('marriage/divorce/wedding/move/relocate event defaults to household ownership', () => {
+      const inputs = {
+        lifeEvents: [
+          { id: 'm1', type: 'marriage' },
+          { id: 'm2', type: 'divorce' },
+          { id: 'm3', type: 'wedding' },
+          { id: 'm4', type: 'move' },
+          { id: 'm5', type: 'relocate' }
+        ]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['m1'].ownerType).toBe('household');
+      expect(map.objects['m2'].ownerType).toBe('household');
+      expect(map.objects['m3'].ownerType).toBe('household');
+      expect(map.objects['m4'].ownerType).toBe('household');
+      expect(map.objects['m5'].ownerType).toBe('household');
+    });
+
+    test('career/income change event defaults to self ownership', () => {
+      const inputs = {
+        lifeEvents: [
+          { id: 's1', type: 'careerChange' },
+          { id: 's2', type: 'incomeChange' },
+          { id: 's3', type: 'promotion' },
+          { id: 's4', type: 'socialSecurity' },
+          { id: 's5', type: 'retirementGoal' }
+        ]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['s1'].ownerType).toBe('person');
+      expect(map.objects['s2'].ownerType).toBe('person');
+      expect(map.objects['s3'].ownerType).toBe('person');
+      expect(map.objects['s4'].ownerType).toBe('person');
+      expect(map.objects['s5'].ownerType).toBe('person');
+    });
+
+    test('unknown event defaults to self ownership', () => {
+      const inputs = {
+        lifeEvents: [{ id: 'u1', type: 'randomCustomEvent' }]
+      };
+      const map = buildLegacyOwnershipMap(inputs);
+      expect(map.objects['u1'].ownerType).toBe('person');
+      expect(map.objects['u1'].ownerIds).toEqual(['self']);
+    });
+
+    test('original event, asset, and debt objects are unmodified', () => {
+      const rawIncomes = [{ amount: 50000 }];
+      const rawAssets = { checking: 1000 };
+      const rawDebts = [{ balance: 2000 }];
+      const rawEvents = [{ type: 'haveChild' }];
+
+      const inputs = {
+        incomeList: rawIncomes,
+        assets: rawAssets,
+        debtList: rawDebts,
+        lifeEvents: rawEvents
+      };
+
+      const map = buildLegacyOwnershipMap(inputs);
+
+      expect(rawIncomes[0].ownership).toBeUndefined();
+      expect(rawAssets.ownership).toBeUndefined();
+      expect(rawDebts[0].ownership).toBeUndefined();
+      expect(rawEvents[0].ownership).toBeUndefined();
+    });
+
+    test('fallback keys are deterministic for objects without IDs', () => {
+      const inputs = {
+        incomeList: [{ name: 'Inc A' }, { name: 'Inc B' }],
+        debtList: [{ name: 'Debt A' }],
+        houseAssets: [{ name: 'Asset A' }],
+        lifeEvents: [{ type: 'buyHouse' }, { type: 'careerChange' }]
+      };
+
+      const map = buildLegacyOwnershipMap(inputs);
+
+      // Verify deterministic index-based keys
+      expect(map.objects['income:0']).toBeDefined();
+      expect(map.objects['income:1']).toBeDefined();
+      expect(map.objects['debt:0']).toBeDefined();
+      expect(map.objects['asset:0']).toBeDefined();
+      expect(map.objects['event:0']).toBeDefined();
+      expect(map.objects['event:1']).toBeDefined();
+
+      expect(map.objects['event:0'].ownerType).toBe('household');
+      expect(map.objects['event:1'].ownerType).toBe('person');
+    });
+  });
 });
+
 
