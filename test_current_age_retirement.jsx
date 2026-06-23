@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { runFireSimulation, getNormalizedPhases, getEditableBudgetPhases } from './src/fireCalculations.js';
 import { getBudgetForAge } from './src/components/fire-simulator/helpers.js';
 import { DEFAULT_FIRE_INPUTS } from './src/defaultInputs.js';
@@ -93,23 +93,101 @@ describe('Current Age Retirement Budget Collision', () => {
     expect(nominalAt35.expenses).toBeCloseTo(29750, -1);
   });
 
-  test('CurrentSituationCard renders "Planning assumes work stops today" when currentAge === targetRetirementAge', () => {
+  test('CurrentSituationCard renders dynamic retired values and edit link when currentAge === targetRetirementAge', () => {
     const handleSetBudgetClick = () => {};
     const onOpenLifeProfile = () => {};
     const handleCreateEvent = () => {};
     const updateInput = () => {};
+    const handleEditRoadmapEventSpy = vi.fn();
 
-    render(
+    const { rerender } = render(
       <CurrentSituationCard
         inputs={baseInputs}
         handleSetBudgetClick={handleSetBudgetClick}
         onOpenLifeProfile={onOpenLifeProfile}
         handleCreateEvent={handleCreateEvent}
         updateInput={updateInput}
+        handleEditRoadmapEvent={handleEditRoadmapEventSpy}
       />
     );
 
-    expect(screen.getByText('Planning assumes work stops today')).toBeDefined();
+    // 1. Assert Retired values
+    // Income shows $0
+    expect(screen.getByText('$0')).toBeDefined();
+    // Retired badge label exists next to Annual Income
+    expect(screen.getByText('Retired')).toBeDefined();
+    // Savings Rate shows 0%
+    expect(screen.getByText('0%')).toBeDefined();
+    // Spending (budget) displays scaled retirement baseline: $29,750
+    expect(screen.getByText('$29,750')).toBeDefined();
+    // Renders the link
+    expect(screen.getByText('(70% retirement baseline ·')).toBeDefined();
+    const editBtn = screen.getByText('Edit');
+    expect(editBtn).toBeDefined();
+
+    // 2. Click edit and assert spy call payload
+    editBtn.click();
+    expect(handleEditRoadmapEventSpy).toHaveBeenCalledTimes(1);
+    expect(handleEditRoadmapEventSpy).toHaveBeenCalledWith(baseInputs.lifeEvents[0]);
+
+    // 3. Toggling behavior: targetRetirementAge = 65 should revert to working values
+    const workingInputs = {
+      ...baseInputs,
+      targetRetirementAge: 65
+    };
+
+    rerender(
+      <CurrentSituationCard
+        inputs={workingInputs}
+        handleSetBudgetClick={handleSetBudgetClick}
+        onOpenLifeProfile={onOpenLifeProfile}
+        handleCreateEvent={handleCreateEvent}
+        updateInput={updateInput}
+        handleEditRoadmapEvent={handleEditRoadmapEventSpy}
+      />
+    );
+
+    // Income shows input box value (e.g. via input selector or check elements)
+    expect(screen.queryByText('Retired')).toBeNull();
+    expect(screen.queryByText('$29,750')).toBeNull();
+    // Spending should revert to baseline: $42,500
+    expect(screen.getByText('$42,500')).toBeDefined();
+  });
+
+  test('CurrentSituationCard handleEditRoadmapEvent safe fallback handling when retire event is missing', () => {
+    const handleSetBudgetClick = () => {};
+    const onOpenLifeProfile = () => {};
+    const handleCreateEvent = () => {};
+    const updateInput = () => {};
+    const handleEditRoadmapEventSpy = vi.fn();
+
+    // Remove retire event from inputs
+    const inputsNoRetire = {
+      ...baseInputs,
+      lifeEvents: []
+    };
+
+    render(
+      <CurrentSituationCard
+        inputs={inputsNoRetire}
+        handleSetBudgetClick={handleSetBudgetClick}
+        onOpenLifeProfile={onOpenLifeProfile}
+        handleCreateEvent={handleCreateEvent}
+        updateInput={updateInput}
+        handleEditRoadmapEvent={handleEditRoadmapEventSpy}
+      />
+    );
+
+    // Edit link should still render
+    const editBtn = screen.getByText('Edit');
+    expect(editBtn).toBeDefined();
+
+    // Click edit and verify it calls with fallback object
+    editBtn.click();
+    expect(handleEditRoadmapEventSpy).toHaveBeenCalledTimes(1);
+    const passedEvent = handleEditRoadmapEventSpy.mock.calls[0][0];
+    expect(passedEvent.type).toBe('retire');
+    expect(passedEvent.id).toBeDefined();
   });
 
   test('GoalHeroCard renders "🏖️ Stop Working Today" when currentAge === targetRetirementAge', () => {

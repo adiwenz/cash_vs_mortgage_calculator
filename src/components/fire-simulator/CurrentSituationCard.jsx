@@ -12,13 +12,26 @@ export default function CurrentSituationCard({
   showDebugButton,
   setShowDebugDrawer,
   setDebugTab,
-  updateInput
+  updateInput,
+  handleEditRoadmapEvent
 }) {
   const [activePopover, setActivePopover] = useState(null);
   const [showAdvancedEvents, setShowAdvancedEvents] = useState(false);
 
   const currentAge = Number(inputs.currentAge) || 35;
   const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
+
+  // Retrieve retirement event with robust fallback
+  const fallbackRetireEvent = {
+    id: 'retire-fallback',
+    type: 'retire',
+    name: 'Retirement',
+    enabled: true,
+    spendingPercent: 70,
+    age: currentAge
+  };
+  const retireEvent = (inputs.lifeEvents || []).find(e => e.type === 'retire') || fallbackRetireEvent;
+  const retirementSpendingPercent = Number(retireEvent.spendingPercent) || 70;
 
   // Close popovers on click outside
   useEffect(() => {
@@ -181,6 +194,10 @@ export default function CurrentSituationCard({
         .popover-item-hover:hover:not(:disabled) {
           background-color: #f3f4f6 !important;
         }
+        .edit-retirement-link:hover {
+          color: var(--primary-hover, #4f46e5) !important;
+          text-decoration: underline !important;
+        }
       `}</style>
 
       {/* Header Section */}
@@ -262,27 +279,58 @@ export default function CurrentSituationCard({
           }}
           className="financial-snapshot-row"
         >
-          <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Annual Income</span>
-          <CurrencyInput
-            value={inputs.simpleIncome || 0}
-            onChange={(e) => {
-              const val = Number(e.target.value) || 0;
-              setLastChartChangeType('income_change');
-              updateInput('simpleIncome', val);
-            }}
-            style={{
+          <span style={{ fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
+            <span>Annual Income</span>
+            {currentAge === targetRetirementAge && (
+              <span style={{
+                fontSize: '11px',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                background: '#f3f4f6',
+                color: '#4b5563',
+                fontWeight: '600',
+                marginLeft: '0.5rem',
+                display: 'inline-block'
+              }}>
+                Retired
+              </span>
+            )}
+          </span>
+          {currentAge === targetRetirementAge ? (
+            <span style={{
               fontSize: '16px',
               fontWeight: '600',
-              color: 'var(--text-primary)',
-              background: 'transparent',
-              border: 'none',
+              color: 'var(--text-tertiary, #9ca3af)',
               textAlign: 'right',
               width: '120px',
-              outline: 'none',
               fontFamily: 'inherit',
-              padding: 0
-            }}
-          />
+              padding: 0,
+              display: 'inline-block'
+            }}>
+              $0
+            </span>
+          ) : (
+            <CurrencyInput
+              value={inputs.simpleIncome || 0}
+              onChange={(e) => {
+                const val = Number(e.target.value) || 0;
+                setLastChartChangeType('income_change');
+                updateInput('simpleIncome', val);
+              }}
+              style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: 'var(--text-primary)',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'right',
+                width: '120px',
+                outline: 'none',
+                fontFamily: 'inherit',
+                padding: 0
+              }}
+            />
+          )}
         </div>
 
         {/* Invested Assets */}
@@ -320,31 +368,46 @@ export default function CurrentSituationCard({
           className="financial-snapshot-row"
         >
           <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Savings Rate</span>
-          <PercentInput
-            value={simpleSavingsRate}
-            precision={1}
-            onChange={(e) => {
-              const val = Number(e.target.value) || 0;
-              const income = Number(inputs.simpleIncome) || 0;
-              const newExpenses = Math.round(income * (1 - val / 100));
-              setLastChartChangeType('savings_rate_change');
-              updateInput('simpleExpenses', newExpenses);
-            }}
-            min={0}
-            max={100}
-            style={{
+          {currentAge === targetRetirementAge ? (
+            <span style={{
               fontSize: '16px',
               fontWeight: '600',
-              color: 'var(--success)',
-              background: 'transparent',
-              border: 'none',
+              color: 'var(--text-tertiary, #9ca3af)',
               textAlign: 'right',
               width: '60px',
-              outline: 'none',
               fontFamily: 'inherit',
-              padding: 0
-            }}
-          />
+              padding: 0,
+              display: 'inline-block'
+            }}>
+              0%
+            </span>
+          ) : (
+            <PercentInput
+              value={simpleSavingsRate}
+              precision={1}
+              onChange={(e) => {
+                const val = Number(e.target.value) || 0;
+                const income = Number(inputs.simpleIncome) || 0;
+                const newExpenses = Math.round(income * (1 - val / 100));
+                setLastChartChangeType('savings_rate_change');
+                updateInput('simpleExpenses', newExpenses);
+              }}
+              min={0}
+              max={100}
+              style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: 'var(--success)',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'right',
+                width: '60px',
+                outline: 'none',
+                fontFamily: 'inherit',
+                padding: 0
+              }}
+            />
+          )}
         </div>
 
 
@@ -362,7 +425,11 @@ export default function CurrentSituationCard({
         >
           <span style={{ fontSize: '15px', color: 'var(--text-secondary)' }}>Spending (budget)</span>
           <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-            {formatAnnualSummaryCurrency(baselineAnnualSpending)}
+            {formatAnnualSummaryCurrency(
+              currentAge === targetRetirementAge 
+                ? (baselineAnnualSpending * (retirementSpendingPercent / 100)) 
+                : baselineAnnualSpending
+            )}
           </span>
         </div>
 
@@ -384,14 +451,32 @@ export default function CurrentSituationCard({
         {currentAge === targetRetirementAge && (
           <div 
             style={{
-              fontSize: '13px',
+              fontSize: '12px',
               color: 'var(--text-tertiary, #9ca3af)',
               fontStyle: 'italic',
               marginTop: '0.25rem',
-              padding: '0 0.5rem'
+              padding: '0 0.5rem',
+              textAlign: 'right'
             }}
           >
-            Planning assumes work stops today
+            <span>({retirementSpendingPercent}% retirement baseline · </span>
+            <span 
+              onClick={() => {
+                if (handleEditRoadmapEvent) {
+                  handleEditRoadmapEvent(retireEvent);
+                }
+              }}
+              style={{
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                color: 'var(--primary, #6366f1)',
+                fontWeight: '600'
+              }}
+              className="edit-retirement-link"
+            >
+              Edit
+            </span>
+            <span>)</span>
           </div>
         )}
       </div>

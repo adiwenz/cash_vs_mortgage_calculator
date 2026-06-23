@@ -470,6 +470,7 @@ export default function LifePlanScreen({
               setShowDebugDrawer={setShowDebugDrawer}
               setDebugTab={setDebugTab}
               updateInput={updateInput}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
             />
             {/* Hidden button for Advanced Settings (used by automated tests) */}
             <button 
