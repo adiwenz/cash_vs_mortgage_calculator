@@ -48,36 +48,76 @@ function calculateTicks(min, max, targetTickCount = 5) {
   return ticks;
 }
 
-function calculatePaddedYAxisDomain(chartData) {
+function getVisibleChartDataMax(chartData, showNetWorth = true, showAssets = false, showDebt = false) {
+  if (!chartData || chartData.length === 0) return 0;
   const values = chartData
-    .flatMap(d => [
-      d.netWorth,
-      d.currentPlan,
-      d.needAmount,
-      d.requiredPath,
-    ])
+    .flatMap(d => {
+      const pts = [];
+      if (showNetWorth) {
+        pts.push(d.netWorth, d.currentPlan, d.needAmount, d.requiredPath);
+      }
+      if (showAssets) {
+        pts.push(d.assets);
+      }
+      if (showDebt) {
+        pts.push(d.debt);
+      }
+      return pts;
+    })
     .filter(v => Number.isFinite(v));
-  if (!values.length) return [0, 100000];
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  return values.length ? Math.max(...values) : 0;
+}
 
-  // Sane default domain for very small values
-  if (max <= 100000 && min >= 0) {
-    return [0, 100000];
+function getVisibleChartDataMin(chartData, showNetWorth = true, showAssets = false, showDebt = false) {
+  if (!chartData || chartData.length === 0) return 0;
+  const values = chartData
+    .flatMap(d => {
+      const pts = [];
+      if (showNetWorth) {
+        pts.push(d.netWorth, d.currentPlan, d.needAmount, d.requiredPath);
+      }
+      if (showAssets) {
+        pts.push(d.assets);
+      }
+      if (showDebt) {
+        pts.push(d.debt);
+      }
+      return pts;
+    })
+    .filter(v => Number.isFinite(v));
+  return values.length ? Math.min(...values) : 0;
+}
+
+function getNiceYAxisMax(visibleDataMax, visibleDataMin = 0) {
+  if (visibleDataMax <= 100000 && visibleDataMin >= 0) {
+    return 100000;
   }
-
+  const min = visibleDataMin;
+  const max = visibleDataMax;
   const range = Math.max(max - min, 1);
   const padding = range * 0.12;
-  let paddedMin = min - padding;
-  let paddedMax = max + padding;
+  return max + padding;
+}
 
-  if (min >= 0) {
-    paddedMin = 0;
-  } else {
-    paddedMin = Math.min(0, min - padding);
+function getNiceYAxisMin(visibleDataMax, visibleDataMin = 0) {
+  if (visibleDataMax <= 100000 && visibleDataMin >= 0) {
+    return 0;
   }
+  const min = visibleDataMin;
+  const max = visibleDataMax;
+  const range = Math.max(max - min, 1);
+  const padding = range * 0.12;
+  if (min >= 0) {
+    return 0;
+  } else {
+    return Math.min(0, min - padding);
+  }
+}
 
-  return [paddedMin, paddedMax];
+function calculatePaddedYAxisDomain(chartData, showNetWorth = true, showAssets = false, showDebt = false) {
+  const max = getVisibleChartDataMax(chartData, showNetWorth, showAssets, showDebt);
+  const min = getVisibleChartDataMin(chartData, showNetWorth, showAssets, showDebt);
+  return [getNiceYAxisMin(max, min), getNiceYAxisMax(max, min)];
 }
 
 function shouldLockYAxisForChange(changeType) {
@@ -143,7 +183,8 @@ export default function ProjectionGraph({
   setZoomDomain: propsSetZoomDomain,
   isZoomed: propsIsZoomed,
   setIsZoomed: propsSetIsZoomed,
-  chartLayout: propsChartLayout
+  chartLayout: propsChartLayout,
+  scenarioId = null
 }) {
   const chartContainerRef = useRef(null);
   const [activeTooltipCoord, setActiveTooltipCoord] = useState(null);
@@ -159,8 +200,64 @@ export default function ProjectionGraph({
   const setIsZoomed = propsSetIsZoomed !== undefined ? propsSetIsZoomed : setLocalIsZoomed;
   const zoomDragOccurredRef = useRef(false);
 
+  const [stickyYAxisMax, setStickyYAxisMax] = useState(null);
+
+  const visibleDataMax = useMemo(() => getVisibleChartDataMax(chartData, showNetWorth, showAssets, showDebt), [chartData, showNetWorth, showAssets, showDebt]);
+  const visibleDataMin = useMemo(() => getVisibleChartDataMin(chartData, showNetWorth, showAssets, showDebt), [chartData, showNetWorth, showAssets, showDebt]);
+  const niceVisibleMax = useMemo(() => getNiceYAxisMax(visibleDataMax, visibleDataMin), [visibleDataMax, visibleDataMin]);
+  const niceVisibleMin = useMemo(() => getNiceYAxisMin(visibleDataMax, visibleDataMin), [visibleDataMax, visibleDataMin]);
+
+  const lastIdentityRef = useRef({
+    scenarioId,
+    currentAge: inputs?.currentAge,
+    lifeExpectancy: inputs?.lifeExpectancy,
+    showAssets,
+    showDebt,
+    showNetWorth
+  });
+
+  useEffect(() => {
+    const identityChanged =
+      lastIdentityRef.current.scenarioId !== scenarioId ||
+      lastIdentityRef.current.currentAge !== inputs?.currentAge ||
+      lastIdentityRef.current.lifeExpectancy !== inputs?.lifeExpectancy ||
+      lastIdentityRef.current.showAssets !== showAssets ||
+      lastIdentityRef.current.showDebt !== showDebt ||
+      lastIdentityRef.current.showNetWorth !== showNetWorth;
+
+    lastIdentityRef.current = {
+      scenarioId,
+      currentAge: inputs?.currentAge,
+      lifeExpectancy: inputs?.lifeExpectancy,
+      showAssets,
+      showDebt,
+      showNetWorth
+    };
+
+    if (identityChanged) {
+      setStickyYAxisMax(niceVisibleMax);
+      return;
+    }
+
+    if (!niceVisibleMax || niceVisibleMax <= 0) return;
+
+    setStickyYAxisMax(prev => {
+      if (!prev) return niceVisibleMax;
+      // Always expand if current data no longer fits.
+      if (niceVisibleMax > prev) return niceVisibleMax;
+      // Shrink only when the old axis is much too tall.
+      // Example: old max is more than 2.5x the newly needed max.
+      const SHRINK_THRESHOLD = 2.5;
+      if (prev / niceVisibleMax >= SHRINK_THRESHOLD) {
+        return niceVisibleMax;
+      }
+      // Otherwise keep the previous axis for visual stability.
+      return prev;
+    });
+  }, [niceVisibleMax, scenarioId, inputs?.currentAge, inputs?.lifeExpectancy, showAssets, showDebt, showNetWorth]);
+
   const [yAxisDomain, setYAxisDomain] = useState(() => {
-    return calculatePaddedYAxisDomain(chartData || []);
+    return calculatePaddedYAxisDomain(chartData || [], showNetWorth, showAssets, showDebt);
   });
   const ticks = useMemo(() => {
     if (!yAxisDomain) return [0];
@@ -170,6 +267,8 @@ export default function ProjectionGraph({
 
   const scaleTimeoutRef = useRef(null);
   const animationFrameRef = useRef(null);
+
+  const lastScenarioIdRef = useRef(scenarioId);
 
   const animateYAxisDomain = (fromDomain, toDomain, duration = 350) => {
     if (animationFrameRef.current) {
@@ -209,9 +308,12 @@ export default function ProjectionGraph({
   useEffect(() => {
     if (!chartData || chartData.length === 0) return;
 
-    const nextDomain = calculatePaddedYAxisDomain(chartData);
+    const targetMax = stickyYAxisMax || niceVisibleMax;
+    const targetMin = niceVisibleMin;
+    const nextDomain = [targetMin, targetMax];
 
-    if (!yAxisDomain) {
+    if (!yAxisDomain || lastScenarioIdRef.current !== scenarioId) {
+      lastScenarioIdRef.current = scenarioId;
       setYAxisDomain(nextDomain);
       return;
     }
@@ -225,22 +327,22 @@ export default function ProjectionGraph({
     const changeType = lastChartChangeTypeRef.current;
 
     if (shouldLockYAxisForChange(changeType)) {
-      if (isSeverelyClipped(nextDomain, yAxisDomain)) {
+      if (targetMax < yAxisDomain[1] || isSeverelyClipped(nextDomain, yAxisDomain)) {
         animateYAxisDomain(yAxisDomain, nextDomain);
       }
       // Otherwise keep stable
     } else if (shouldAnimateYAxisForChange(changeType)) {
       animateYAxisDomain(yAxisDomain, nextDomain);
     } else {
-      // Safe fallback: preserve stability unless the new data is severely clipped
-      if (isSeverelyClipped(nextDomain, yAxisDomain)) {
+      // Safe fallback: preserve stability unless the new data is severely clipped or target max shrunk
+      if (targetMax < yAxisDomain[1] || isSeverelyClipped(nextDomain, yAxisDomain)) {
         animateYAxisDomain(yAxisDomain, nextDomain);
       }
     }
 
     // Reset interaction tracking ref
     lastChartChangeTypeRef.current = null;
-  }, [chartData, draggingInfo]);
+  }, [chartData, draggingInfo, stickyYAxisMax, niceVisibleMax, niceVisibleMin, scenarioId]);
 
   useEffect(() => {
     return () => {

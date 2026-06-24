@@ -561,6 +561,7 @@ export default function LifePlanScreen({
               isZoomed={isZoomed}
               setIsZoomed={setIsZoomed}
               chartLayout={chartLayout}
+              scenarioId={currentScenarioId}
             />
 
             <div className="timeline-section">

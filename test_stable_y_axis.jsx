@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import React from 'react';
+
 import ProjectionGraph from './src/components/fire-simulator/ProjectionGraph';
 import { lastChartChangeTypeRef } from './src/components/fire-simulator/changeTypeTracker';
 
@@ -158,7 +158,7 @@ describe('ProjectionGraph Stable Y-Axis and Animated Rescaling', () => {
       />
     );
 
-    const initialDomain = [...lastYAxisDomain];
+
 
     // Adding windfall change
     lastChartChangeTypeRef.current = 'windfall_change';
@@ -402,5 +402,227 @@ describe('ProjectionGraph Stable Y-Axis and Animated Rescaling', () => {
 
     // Badge should disappear
     expect(screen.queryByText('Scale updated')).toBeNull();
+  });
+
+  test('11. Goal age change 62 -> 90 -> 62 hysteresis behavior (2.5x threshold)', () => {
+    // Start at goal 62 with max 100k
+    const data62 = [
+      { age: 35, netWorth: 100000 },
+      { age: 62, netWorth: 100000 }
+    ];
+    const { rerender } = render(
+      <ProjectionGraph
+        chartData={data62}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+    
+    const initialMax = lastYAxisDomain[1];
+    expect(initialMax).toBe(100000);
+
+    // Expand to goal 90 (max 500k)
+    lastChartChangeTypeRef.current = 'goal_age_change';
+    const data90 = [
+      { age: 35, netWorth: 100000 },
+      { age: 90, netWorth: 500000 }
+    ];
+    
+    rerender(
+      <ProjectionGraph
+        chartData={data90}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const expandedMax = lastYAxisDomain[1];
+    expect(expandedMax).toBeGreaterThan(500000);
+
+    // Change back to 62 (max 100k).
+    // The ratio expandedMax / 100k is >= 2.5, so it should shrink.
+    lastChartChangeTypeRef.current = 'goal_age_change';
+    rerender(
+      <ProjectionGraph
+        chartData={data62}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(lastYAxisDomain[1]).toBeLessThan(expandedMax);
+    expect(lastYAxisDomain[1]).toBe(100000);
+  });
+
+  test('12. Small goal age changes do not constantly rescale the chart (under 2.5x)', () => {
+    // Start at max 200k
+    const dataLarge = [
+      { age: 35, netWorth: 200000 },
+      { age: 60, netWorth: 200000 }
+    ];
+    const { rerender } = render(
+      <ProjectionGraph
+        chartData={dataLarge}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    
+    const initialMax = lastYAxisDomain[1];
+    
+    // Change to max 100k (under 2.5x reduction, so it should keep 200k nice max)
+    lastChartChangeTypeRef.current = 'goal_age_change';
+    const dataSmall = [
+      { age: 35, netWorth: 100000 },
+      { age: 60, netWorth: 100000 }
+    ];
+
+    rerender(
+      <ProjectionGraph
+        chartData={dataSmall}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(lastYAxisDomain[1]).toEqual(initialMax);
+  });
+
+  test('13. Switching scenario resets the sticky Y-axis and recalculates fresh', () => {
+    const dataLarge = [
+      { age: 35, netWorth: 500000 }
+    ];
+    const { rerender } = render(
+      <ProjectionGraph
+        chartData={dataLarge}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+        scenarioId="scenario-A"
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const maxA = lastYAxisDomain[1];
+    expect(maxA).toBeGreaterThan(500000);
+
+    const dataSmall = [
+      { age: 35, netWorth: 100000 }
+    ];
+
+    // Change scenario ID and use smaller data
+    rerender(
+      <ProjectionGraph
+        chartData={dataSmall}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+        scenarioId="scenario-B"
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(lastYAxisDomain[1]).toBe(100000);
+  });
+
+  test('14. Changing life expectancy resets sticky max and recalculates fresh', () => {
+    const dataLarge = [
+      { age: 35, netWorth: 500000 }
+    ];
+    const { rerender } = render(
+      <ProjectionGraph
+        chartData={dataLarge}
+        inputs={{ ...inputs, lifeExpectancy: 85 }}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const dataSmall = [
+      { age: 35, netWorth: 100000 }
+    ];
+
+    // Change life expectancy
+    rerender(
+      <ProjectionGraph
+        chartData={dataSmall}
+        inputs={{ ...inputs, lifeExpectancy: 95 }}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(lastYAxisDomain[1]).toBe(100000);
+  });
+
+  test('15. Changing visible series toggles resets sticky max and recalculates fresh', () => {
+    const dataLarge = [
+      { age: 35, netWorth: 500000, assets: 100000 }
+    ];
+    const { rerender } = render(
+      <ProjectionGraph
+        chartData={dataLarge}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={true}
+        showAssets={false}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Toggle showNetWorth=false, showAssets=true
+    rerender(
+      <ProjectionGraph
+        chartData={dataLarge}
+        inputs={inputs}
+        displayedResults={displayedResults}
+        showNetWorth={false}
+        showAssets={true}
+      />
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(lastYAxisDomain[1]).toBe(100000);
   });
 });
