@@ -38,26 +38,65 @@ export function getTimelineProjection(inputs, options = {}) {
   const lifeExpectancy = Math.max(currentAge + 1, Number(effective.lifeExpectancy) || 85);
   const targetRetirementAge = Math.max(currentAge, Number(effective.targetRetirementAge) || 65);
 
-  let earliestAge = currentAge;
-  let latestAge = Math.max(currentAge, lifeExpectancy, targetRetirementAge);
+  let earliestRelevantEventAge = null;
+  let latestRelevantEventAge = null;
 
   items.forEach(item => {
-    if (item.age !== null && item.age !== undefined) {
-      earliestAge = Math.min(earliestAge, item.age);
-      latestAge = Math.max(latestAge, item.age);
+    // Exclude baseline statuses (single/married status, renting/owner status) and baseline income/spending phases
+    const isBaselineOrMainIncome = 
+      item.sourceType === 'baseline' || 
+      item.sourceType === 'income' || 
+      item.sourceType === 'spending' || 
+      item.id === 'status-relationship-single' || 
+      item.id === 'status-relationship-married' || 
+      item.id === 'status-housing-renting' || 
+      item.id === 'status-housing-owner' || 
+      (item.id && String(item.id).startsWith('income-period-')) ||
+      (item.id && String(item.id).startsWith('spending-period-'));
+
+    if (isBaselineOrMainIncome) {
+      return;
     }
-    if (item.startAge !== null && item.startAge !== undefined) {
-      earliestAge = Math.min(earliestAge, item.startAge);
-      latestAge = Math.max(latestAge, item.startAge);
-    }
-    if (item.endAge !== null && item.endAge !== undefined) {
-      earliestAge = Math.min(earliestAge, item.endAge);
-      latestAge = Math.max(latestAge, item.endAge);
-    }
+
+    const checkAge = (age) => {
+      if (age !== null && age !== undefined) {
+        const numAge = Number(age);
+        if (!isNaN(numAge) && isFinite(numAge)) {
+          if (earliestRelevantEventAge === null || numAge < earliestRelevantEventAge) {
+            earliestRelevantEventAge = numAge;
+          }
+          if (latestRelevantEventAge === null || numAge > latestRelevantEventAge) {
+            latestRelevantEventAge = numAge;
+          }
+        }
+      }
+    };
+
+    checkAge(item.age);
+    checkAge(item.startAge);
+    checkAge(item.endAge);
   });
 
-  const minAge = Math.min(currentAge, earliestAge);
-  const maxAge = latestAge;
+  let minAge = currentAge;
+  if (earliestRelevantEventAge !== null) {
+    minAge = Math.min(currentAge, earliestRelevantEventAge);
+  }
+
+  let maxAge = Math.max(lifeExpectancy, targetRetirementAge, currentAge + 1);
+  if (latestRelevantEventAge !== null) {
+    maxAge = Math.max(maxAge, latestRelevantEventAge);
+  }
+
+  // Ensure bounds are valid numbers, not null/undefined/NaN, and startAge <= endAge
+  if (minAge === null || minAge === undefined || isNaN(minAge) || !isFinite(minAge)) {
+    minAge = currentAge;
+  }
+  if (maxAge === null || maxAge === undefined || isNaN(maxAge) || !isFinite(maxAge)) {
+    maxAge = Math.max(currentAge + 1, lifeExpectancy);
+  }
+  if (minAge > maxAge) {
+    maxAge = minAge + 1;
+  }
 
   // 4. Resolve selectedAge
   const selectedAge = options.selectedAge !== undefined && options.selectedAge !== null

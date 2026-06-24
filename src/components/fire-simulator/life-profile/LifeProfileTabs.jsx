@@ -1,11 +1,5 @@
-import React from 'react';
 
-export default function LifeProfileTabs({
-  isMobile,
-  tabs,
-  activeTab,
-  setActiveTab
-}) {
+export default function LifeProfileTabs({ tabs, activeTab, setActiveTab, isMobile }) {
   if (isMobile) {
     return (
       <div className="life-profile-tabs-row" style={{ display: 'flex', overflowX: 'auto', padding: '0.5rem 1rem', borderBottom: '1px solid var(--border-color, #e5e7eb)', gap: '0.5rem', background: '#ffffff' }}>

@@ -8,10 +8,6 @@ import {
   getEventTimelineCategory,
   isEventDraggable,
   isEventEditable,
-  isRetirementEvent,
-  isSocialSecurityEvent,
-  isMarriageEvent,
-  isDivorceEvent,
   isChildEvent,
   isHousingEvent
 } from './index';
@@ -124,5 +120,27 @@ describe('Event Registry & Helpers', () => {
 
     // Verify it returns expected outputs without changing object
     expect(getEventShortLabel(testEvent)).toBe('Tommy');
+  });
+
+  test('getEventEmoji precedence rules', () => {
+    // 1. Canonical special-case icon
+    expect(getEventEmoji({ type: 'retirementReadyComfortable', icon: '🎉', emoji: '🌟' })).toBe('✓');
+    expect(getEventEmoji({ type: 'socialSecurity', icon: '💰', emoji: '💵' })).toBe('🎂');
+    expect(getEventEmoji({ type: 'promotion', icon: '💼', emoji: '💸' })).toBe('📈');
+    expect(getEventEmoji({ type: 'retirement', icon: '⭐', emoji: '🏖️' })).toBe('🏖');
+
+    // 2. event.emoji
+    expect(getEventEmoji({ type: 'buyHouse', emoji: '🏠', icon: '🏡' })).toBe('🏠');
+    expect(getEventEmoji({ type: 'customType', emoji: '🎸', icon: '🎺' })).toBe('🎸');
+
+    // 3. event.icon
+    expect(getEventEmoji({ type: 'buyHouse', icon: '🏡' })).toBe('🏡');
+    expect(getEventEmoji({ type: 'customType', icon: '🎺' })).toBe('🎺');
+
+    // 4. Registry default emoji
+    expect(getEventEmoji({ type: 'buyHouse' })).toBe('🏠');
+
+    // 5. Fallback emoji
+    expect(getEventEmoji({ type: 'unknownCrazyEvent' })).toBe('❓');
   });
 });

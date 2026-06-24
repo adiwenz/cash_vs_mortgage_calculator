@@ -1,7 +1,6 @@
-import React from 'react';
-import { CurrencyInput, NumberInput } from '../../ui/PlainInputs';
+import { NumberInput, CurrencyInput } from '../../ui/PlainInputs';
 import { clampAgeValue } from '../helpers';
-import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronRight } from 'lucide-react';
 
 export default function HouseholdTab({
   isMobile,
@@ -13,15 +12,15 @@ export default function HouseholdTab({
   localProfile,
   setLocalProfile,
   updateHouseholdField,
-  triggerSave,
   updateChild,
-  removeChild,
   addChild,
+  removeChild,
+  triggerSave,
   pushScreen,
   popScreen
 }) {
   if (isMobile) {
-    if (currentScreen?.name === 'child_details') {
+    if (currentScreen.name === 'child_details') {
       const childId = currentScreen.childId;
       const child = (localProfile.children || []).find(c => c.id === childId);
       if (!child) {
@@ -35,7 +34,7 @@ export default function HouseholdTab({
               <input
                 type="text"
                 className="mobile-input-field text-input"
-                value={child.name || ''}
+                value={child.name}
                 placeholder="Child"
                 onChange={(e) => updateChild(childId, 'name', e.target.value)}
                 onBlur={() => triggerSave()}
@@ -82,7 +81,6 @@ export default function HouseholdTab({
       );
     }
 
-    // Default mobile 'household' screen
     const hasPartner = localProfile.household.status !== 'single';
     return (
       <div className="life-profile-mobile-screen">
@@ -94,7 +92,7 @@ export default function HouseholdTab({
             <NumberInput
               aria-labelledby="label-age"
               className="mobile-input-field"
-              value={localAge === null || localAge === '' ? '' : localAge}
+              value={localAge === null ? '' : localAge}
               onChange={(e) => {
                 const val = e.target.value;
                 setLocalAge(val === '' ? '' : parseInt(val, 10));
@@ -112,7 +110,7 @@ export default function HouseholdTab({
             <NumberInput
               aria-labelledby="label-life-expectancy"
               className="mobile-input-field"
-              value={localLifeExpectancy === null || localLifeExpectancy === '' ? '' : localLifeExpectancy}
+              value={localLifeExpectancy === null ? '' : localLifeExpectancy}
               onChange={(e) => {
                 const val = e.target.value;
                 setLocalLifeExpectancy(val === '' ? '' : parseInt(val, 10));
@@ -256,7 +254,7 @@ export default function HouseholdTab({
     );
   }
 
-  // Desktop 'household' tab
+  // Desktop view
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div className="life-profile-row-two-col">
@@ -264,7 +262,7 @@ export default function HouseholdTab({
           <label className="life-profile-label-bold">Your Age</label>
           <NumberInput
             className="life-profile-input-field"
-            value={localAge === null || localAge === '' ? '' : localAge}
+            value={localAge === null ? '' : localAge}
             onChange={(e) => {
               const val = e.target.value;
               setLocalAge(val === '' ? '' : parseInt(val, 10));
@@ -353,7 +351,7 @@ export default function HouseholdTab({
                     type="text"
                     className="life-profile-text-input"
                     style={{ flex: 1, padding: '0.25rem 0.45rem', fontSize: '0.85rem' }}
-                    value={child.name || ''}
+                    value={child.name}
                     placeholder="Name (optional)"
                     onChange={(e) => updateChild(child.id, 'name', e.target.value)}
                   />

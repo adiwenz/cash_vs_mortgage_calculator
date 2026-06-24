@@ -1,5 +1,4 @@
-import React from 'react';
-import { CurrencyInput, PercentInput, NumberInput } from '../../ui/PlainInputs';
+import { NumberInput, CurrencyInput, PercentInput } from '../../ui/PlainInputs';
 import { Plus, Trash2 } from 'lucide-react';
 
 export default function IncomeTab({
@@ -14,12 +13,12 @@ export default function IncomeTab({
   localProfile,
   updateHouseholdField,
   updateIncomeSource,
-  removeIncomeSource,
   addIncomeSource,
+  removeIncomeSource,
   triggerSave
 }) {
   if (isMobile) {
-    if (currentScreen?.name === 'finance_income') {
+    if (currentScreen.name === 'finance_income') {
       return (
         <div className="life-profile-mobile-screen">
           <div className="life-profile-mobile-section-header">Primary Annual Income</div>
@@ -52,7 +51,7 @@ export default function IncomeTab({
                       <input
                         type="text"
                         className="mobile-item-title-input"
-                        value={inc.name || ''}
+                        value={inc.name}
                         placeholder="Rental Income"
                         onChange={(e) => updateIncomeSource(inc.id, 'name', e.target.value)}
                         onBlur={() => triggerSave()}
@@ -90,7 +89,7 @@ export default function IncomeTab({
                         <label>Start</label>
                         <NumberInput
                           className="mobile-input-field-small"
-                          value={inc.startAge === null || inc.startAge === '' ? '' : inc.startAge}
+                          value={inc.startAge}
                           onChange={(e) => {
                             const val = e.target.value;
                             updateIncomeSource(inc.id, 'startAge', val === '' ? 0 : parseInt(val, 10));
@@ -102,7 +101,7 @@ export default function IncomeTab({
                         <label>End</label>
                         <NumberInput
                           className="mobile-input-field-small"
-                          value={inc.endAge === null || inc.endAge === '' ? '' : inc.endAge}
+                          value={inc.endAge}
                           onChange={(e) => {
                             const val = e.target.value;
                             updateIncomeSource(inc.id, 'endAge', val === '' ? 0 : parseInt(val, 10));
@@ -134,7 +133,7 @@ export default function IncomeTab({
       );
     }
 
-    if (currentScreen?.name === 'work_retirement') {
+    if (currentScreen.name === 'work_retirement') {
       return (
         <div className="life-profile-mobile-screen">
           <div className="life-profile-mobile-section-header">Employment</div>
@@ -172,7 +171,7 @@ export default function IncomeTab({
               <label>Target Retirement Age</label>
               <NumberInput
                 className="mobile-input-field"
-                value={localTargetRetirementAge === null || localTargetRetirementAge === '' ? '' : localTargetRetirementAge}
+                value={localTargetRetirementAge === null ? '' : localTargetRetirementAge}
                 onChange={(e) => {
                   const val = e.target.value;
                   setLocalTargetRetirementAge(val === '' ? '' : parseInt(val, 10));
@@ -189,7 +188,7 @@ export default function IncomeTab({
               <label>Social Security Claim Age</label>
               <NumberInput
                 className="mobile-input-field"
-                value={localSSClaimingAge === null || localSSClaimingAge === '' ? '' : localSSClaimingAge}
+                value={localSSClaimingAge === null ? '' : localSSClaimingAge}
                 onChange={(e) => {
                   const val = e.target.value;
                   setLocalSSClaimingAge(val === '' ? '' : parseInt(val, 10));
@@ -206,11 +205,10 @@ export default function IncomeTab({
         </div>
       );
     }
-
     return null;
   }
 
-  // Desktop layout
+  // Desktop View
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div className="life-profile-row-two-col">
@@ -229,7 +227,7 @@ export default function IncomeTab({
           <label className="life-profile-label-bold">Target Retirement Age</label>
           <NumberInput
             className="life-profile-input-field"
-            value={localTargetRetirementAge === null || localTargetRetirementAge === '' ? '' : localTargetRetirementAge}
+            value={localTargetRetirementAge === null ? '' : localTargetRetirementAge}
             onChange={(e) => {
               const val = e.target.value;
               setLocalTargetRetirementAge(val === '' ? '' : parseInt(val, 10));
@@ -261,7 +259,7 @@ export default function IncomeTab({
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', paddingBottom: '0.5rem', lineHeight: '1.25' }}>
-            💡 You can claim retirement benefits as early as 62 and delay up to age 70.
+            💡 You can claims retirement benefits as early as 62 and delay up to age 70.
           </span>
         </div>
       </div>
@@ -287,14 +285,14 @@ export default function IncomeTab({
                     type="text"
                     className="life-profile-text-input"
                     style={{ flex: 1, padding: '0.25rem 0.45rem', fontSize: '0.85rem' }}
-                    value={inc.name || ''}
+                    value={inc.name}
                     placeholder="e.g. Rental Income"
                     onChange={(e) => updateIncomeSource(inc.id, 'name', e.target.value)}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                     <input
                       type="checkbox"
-                      checked={!!inc.isTaxable}
+                      checked={inc.isTaxable}
                       onChange={(e) => updateIncomeSource(inc.id, 'isTaxable', e.target.checked)}
                     />
                     <span>Taxable</span>

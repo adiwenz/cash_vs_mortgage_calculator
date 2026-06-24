@@ -13,6 +13,7 @@ import {
   normalizeCurrency, 
   normalizePercent 
 } from './eventHandlerUtils.js';
+import { getActiveScenario } from '../../state/scenarioSelectors.js';
 import { grossUpIncome } from '../../../../domain/housing/houseAffordability.js';
 
 export const houseEventHandler = {
@@ -132,7 +133,7 @@ export const houseEventHandler = {
       savedEvent = buyEvObj;
 
       // Simulation side effects and rebalancing
-      const currentScenObj = scenarios?.find(s => s.id === currentScenarioId) || scenarios?.[0];
+      const currentScenObj = getActiveScenario(scenarios, currentScenarioId);
       const beforeRes = currentScenObj ? runFireSimulation(currentScenObj.inputs) : runFireSimulation(inputs);
       const beforeReadyAge = beforeRes.retirementReadyAge;
 

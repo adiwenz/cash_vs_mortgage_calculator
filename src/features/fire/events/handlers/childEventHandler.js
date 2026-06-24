@@ -6,6 +6,7 @@ import {
   normalizeCurrency 
 } from './eventHandlerUtils.js';
 import { getChildEventBirthAge, setChildEventBirthAge } from '../../../../utils/childEventHelpers.js';
+import { getActiveScenario } from '../../state/scenarioSelectors.js';
 
 export const childEventHandler = {
   edit(baseEvent) {
@@ -85,7 +86,7 @@ export const childEventHandler = {
     );
 
     // Calculate baseline/impact before saving
-    const currentScenObj = scenarios?.find(s => s.id === currentScenarioId) || scenarios?.[0];
+    const currentScenObj = getActiveScenario(scenarios, currentScenarioId);
     const beforeRes = currentScenObj ? runFireSimulation(currentScenObj.inputs) : runFireSimulation(inputs);
     const beforeReadyAge = beforeRes.retirementReadyAge;
 

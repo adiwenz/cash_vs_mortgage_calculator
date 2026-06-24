@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getDefaultEvent } from '../../../features/fire/events/eventDefaults.js';
 import { eventSaveRouter } from '../../../features/fire/events/eventSaveRouter.js';
 import { setLastChartChangeType } from '../changeTypeTracker.js';
+import { getActiveScenario } from '../../../features/fire/state/scenarioSelectors.js';
 
 import { useEventDraftController } from './useEventDraftController.js';
 import { useTimelineDragController } from './useTimelineDragController.js';
@@ -87,7 +88,7 @@ export function useEventEditingController({
     }
 
     if (type === 'socialSecurity') {
-      const currentScen = scenarios.find(s => s.id === currentScenarioId);
+      const currentScen = getActiveScenario(scenarios, currentScenarioId);
       const inputsObj = currentScen ? currentScen.inputs : inputs;
       const newInputs = { ...inputsObj };
       newInputs.includeSocialSecurity = true;

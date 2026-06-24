@@ -61,6 +61,13 @@ Couples the domain math to React state and manages specific application flows:
   - `EventDetailsPanel.jsx`: Renders event details and actionable CTAs.
 - **Rules**: Must be presentational. They must not run simulations, mutate scenario states, or import large controller hooks directly.
 
+### Life Profile Module (`src/components/fire-simulator/life-profile/`)
+Houses the Life Profile editing/planning flow:
+- **`LifeProfileModal.jsx`**: Main modal layout hosting headers, sub-tabs, and save adaptation.
+- **`HouseholdTab.jsx`**, **`HousingTab.jsx`**, **`ChildrenTab.jsx`**, **`IncomeTab.jsx`**, **`AssetsTab.jsx`**, **`DebtsTab.jsx`**, **`TimelineSnapshotTab.jsx`**: Presentational tabs displaying local state inputs and computed metrics for each profile area.
+- **`useLifeProfileDraft.js`**: Hook managing localized profile drafts, and coordinates draft state resets on modal opens.
+- **`lifeProfileSaveAdapter.js`**: Pure utility mapping draft inputs to scenarios/inputs updates (e.g. updating simpleIncome, simpleExpenses, buyHouse events, and assets).
+
 ---
 
 ## 3. Event Handler & Saving Architecture
@@ -104,3 +111,18 @@ To prevent architectural and functional regressions:
 1. **Directory Boundaries**: Run `node test_architecture_boundaries.js` to ensure React imports do not pollute calculations or domain modules.
 2. **Simulation Golden Suite**: All pipeline adjustments must pass [test_simulation_pipeline_golden.js](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/test_simulation_pipeline_golden.js) validating outcome shape and immutability.
 3. **Changed and Full Runs**: Execute `npm run test:changed` during development and the full `npm run test` before committing/merging.
+
+---
+
+## 7. Architectural Guardrails & Rules
+
+To keep the codebase clean, robust, and maintainable, all developers and automated tools must adhere to these strict guardrails:
+
+1. **No Direct Mutation of Inputs**: UI components and feature controllers must never directly mutate the input objects or the scenario state. All changes must go through formal update/save actions.
+2. **Prefer Selectors**: UI components and controllers should prefer using selector functions (`scenarioSelectors`) over directly querying or destructuring raw `inputs` fields.
+3. **Object/Event-Based Timeline Rows**: Timeline rows represent discrete events and objects. They are not continuous phase matrices.
+4. **Derived State for Life Snapshot**: The Life Snapshot (or any snapshot view representing the state of the user's plan at a particular age) is computed on the fly as derived state from the current scenario inputs and active events, not stored as duplicate mutable state.
+5. **No Generic Phase Rendering on Timeline**: Generic ongoing statuses/states (like "Renting" or "Homeowner") must not render as individual event cards or rows on the timeline. The timeline is reserved for discrete actionable events.
+6. **Simulation Decoupling**: While [yearlySimulation.js](file:///Users/adriannawenz/code/finley-agent-scenario-model-adapter/src/calculators/fire/yearlySimulation.js) remains the public API entry point for the simulation calculations, its internal math and substeps belong in separated, dedicated modules under `src/calculators/fire/simulation/`.
+7. **Event Type Metadata Location**: All event type schemas, metadata definitions, colors, and type mapping config belong in [eventRegistry.js](file:///Users/adriannawenz/code/finley-agent-scenario-model-adapter/src/features/fire/events/eventRegistry.js).
+8. **Decoupled Modal Draft State**: Draft states for modals (like forms, inputs pre-population, and edits) must belong in specialized, lightweight custom hooks (e.g. `useEventDraftController`), rather than being stored in giant monolithic components.

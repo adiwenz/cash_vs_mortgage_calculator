@@ -1,4 +1,3 @@
-import React from 'react';
 import { NumberInput } from '../../ui/PlainInputs';
 
 export default function ChildrenTab({
@@ -30,7 +29,7 @@ export default function ChildrenTab({
                   type="text"
                   className="life-profile-text-input"
                   style={{ flex: 1 }}
-                  value={child.name || ''}
+                  value={child.name}
                   placeholder="Child's Name"
                   onChange={(e) => updateChild(child.id, 'name', e.target.value)}
                 />

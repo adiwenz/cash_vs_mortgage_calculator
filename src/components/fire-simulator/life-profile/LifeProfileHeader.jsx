@@ -1,13 +1,12 @@
-import React from 'react';
 import { ChevronLeft, X } from 'lucide-react';
 
 export default function LifeProfileHeader({
   isMobile,
-  onClose,
-  navStack,
   activeTab,
+  navStack,
   popScreenAndSave,
-  getMobileScreenTitle
+  onClose,
+  mobileScreenTitle
 }) {
   if (isMobile) {
     return (
@@ -22,7 +21,7 @@ export default function LifeProfileHeader({
         )}
         
         <span className="life-profile-mobile-title">
-          {activeTab === 'timeline' ? 'Timeline' : getMobileScreenTitle()}
+          {activeTab === 'timeline' ? 'Timeline' : mobileScreenTitle}
         </span>
         
         <button type="button" className="life-profile-mobile-close-btn" onClick={onClose}>

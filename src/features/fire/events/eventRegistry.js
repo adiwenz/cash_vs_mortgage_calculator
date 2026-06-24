@@ -288,27 +288,34 @@ export function getEventShortLabel(event) {
  */
 export function getEventEmoji(event) {
   if (!event) return '';
-  if (event.emoji) return event.emoji;
-  if (event.icon) return event.icon;
 
+  // 1. Canonical special-case icons take highest precedence
   if (event.type === 'today' || event.type === 'lifeExpectancy') {
     return '';
   }
   if (event.type && event.type.startsWith('retirementReady')) {
     return '✓';
   }
-  // Keep compatibility with legacy promotion icon check
   if (event.isPromotion || event.type === 'promotion') {
     return '📈';
   }
-  // Keep compatibility with legacy retirement icon checks
   if (event.type === 'retirement') {
     return '🏖';
   }
+  if (event.type === 'socialSecurity') {
+    return '🎂';
+  }
 
+  // 2. Custom values on the event object
+  if (event.emoji) return event.emoji;
+  if (event.icon) return event.icon;
+
+  // 3. Registry default emoji
   const canonical = getCanonicalEventType(event.type);
   const def = getEventDefinition(canonical);
-  return def.emoji || '';
+  
+  // 4. Fallback emoji
+  return def.emoji || '❓';
 }
 
 /**

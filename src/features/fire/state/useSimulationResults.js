@@ -10,6 +10,7 @@ import {
   buildEffectiveSimulationInputs
 } from '../../../fireCalculations.js';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
+import { getBaselineScenario } from './scenarioSelectors.js';
 
 export function useSimulationResults(inputs, scenarios, editingEvent) {
   const [displayMode, setDisplayMode] = useState('future'); // 'future' | 'today'
@@ -17,7 +18,7 @@ export function useSimulationResults(inputs, scenarios, editingEvent) {
 
   // Run baseline simulation
   const baselineResults = useMemo(() => {
-    const baselineInputs = scenarios.find(s => s.id === 'baseline')?.inputs || DEFAULT_FIRE_INPUTS;
+    const baselineInputs = getBaselineScenario(scenarios)?.inputs || DEFAULT_FIRE_INPUTS;
     return runFireSimulation(baselineInputs);
   }, [scenarios]);
 

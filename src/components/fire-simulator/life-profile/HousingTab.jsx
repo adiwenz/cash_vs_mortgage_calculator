@@ -1,11 +1,9 @@
-import React from 'react';
-import { CurrencyInput, NumberInput } from '../../ui/PlainInputs';
+import { NumberInput, CurrencyInput } from '../../ui/PlainInputs';
 
 export default function HousingTab({
   isMobile,
   localProfile,
   updateHomeField,
-  triggerSave,
   localBuyHouseEnabled,
   setLocalBuyHouseEnabled,
   localBuyHouseAge,
@@ -13,10 +11,12 @@ export default function HousingTab({
   localBuyHousePrice,
   setLocalBuyHousePrice,
   showAdvancedHome,
-  setShowAdvancedHome
+  setShowAdvancedHome,
+  triggerSave
 }) {
+  const home = localProfile.home;
+
   if (isMobile) {
-    const home = localProfile.home;
     return (
       <div className="life-profile-mobile-screen">
         <div className="life-profile-mobile-form-card">
@@ -147,7 +147,7 @@ export default function HousingTab({
               <label>Target Purchase Age</label>
               <NumberInput
                 className="mobile-input-field"
-                value={localBuyHouseAge === null || localBuyHouseAge === '' ? '' : localBuyHouseAge}
+                value={localBuyHouseAge === null ? '' : localBuyHouseAge}
                 onChange={(e) => {
                   const val = e.target.value;
                   setLocalBuyHouseAge(val === '' ? '' : parseInt(val, 10));
@@ -178,14 +178,14 @@ export default function HousingTab({
     );
   }
 
-  // Desktop layout
+  // Desktop view
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div className="life-profile-form-group">
         <label className="life-profile-label-bold">Housing Status</label>
         <select
           className="life-profile-select-field"
-          value={localProfile.home.status}
+          value={home.status}
           onChange={(e) => updateHomeField('status', e.target.value)}
         >
           <option value="rent">Renting</option>
@@ -193,12 +193,12 @@ export default function HousingTab({
         </select>
       </div>
 
-      {localProfile.home.status === 'rent' ? (
+      {home.status === 'rent' ? (
         <div className="life-profile-form-group">
           <label className="life-profile-label-bold">Monthly Rent ($/mo)</label>
           <CurrencyInput
             className="life-profile-input-field"
-            value={localProfile.home.monthlyRent}
+            value={home.monthlyRent}
             onChange={(e) => updateHomeField('monthlyRent', e.target.value === '' ? 0 : parseFloat(e.target.value))}
           />
         </div>
@@ -209,7 +209,7 @@ export default function HousingTab({
               <label className="life-profile-label-bold">Current Home Value ($)</label>
               <CurrencyInput
                 className="life-profile-input-field"
-                value={localProfile.home.homeValue}
+                value={home.homeValue}
                 onChange={(e) => updateHomeField('homeValue', e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
             </div>
@@ -217,7 +217,7 @@ export default function HousingTab({
               <label className="life-profile-label-bold">Outstanding Mortgage Balance ($)</label>
               <CurrencyInput
                 className="life-profile-input-field"
-                value={localProfile.home.mortgageBalance}
+                value={home.mortgageBalance}
                 onChange={(e) => updateHomeField('mortgageBalance', e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
             </div>
@@ -228,7 +228,7 @@ export default function HousingTab({
               <label className="life-profile-label-bold">Monthly Mortgage Payment ($/mo)</label>
               <CurrencyInput
                 className="life-profile-input-field"
-                value={localProfile.home.monthlyPayment}
+                value={home.monthlyPayment}
                 onChange={(e) => updateHomeField('monthlyPayment', e.target.value === '' ? 0 : parseFloat(e.target.value))}
               />
             </div>
@@ -253,7 +253,7 @@ export default function HousingTab({
                   <CurrencyInput
                     className="life-profile-input-field"
                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
-                    value={localProfile.home.propertyTaxes}
+                    value={home.propertyTaxes}
                     onChange={(e) => updateHomeField('propertyTaxes', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </div>
@@ -262,7 +262,7 @@ export default function HousingTab({
                   <CurrencyInput
                     className="life-profile-input-field"
                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
-                    value={localProfile.home.insurance}
+                    value={home.insurance}
                     onChange={(e) => updateHomeField('insurance', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </div>
@@ -271,7 +271,7 @@ export default function HousingTab({
                   <CurrencyInput
                     className="life-profile-input-field"
                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
-                    value={localProfile.home.hoa}
+                    value={home.hoa}
                     onChange={(e) => updateHomeField('hoa', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </div>

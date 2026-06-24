@@ -1,24 +1,21 @@
-import React from 'react';
-import { ZoomOut, ZoomIn, Maximize2, Settings } from 'lucide-react';
-import { getTimelineProjection, getLifeSnapshotAtAge } from '../../../models/lifeTimeline/index.js';
+import { 
+  ZoomIn, 
+  ZoomOut, 
+  Maximize2, 
+  Settings
+} from 'lucide-react';
+import { formatCurrency, formatCompactCurrency } from '../helpers';
 import { buildTimelineRows, getTimelineItemObjectKey, resolveHouseIdForEvent } from '../../../utils/timelineRowBuilder.js';
 
 export default function TimelineSnapshotTab({
   isMobile,
   inputs,
-  simulation,
+  projection,
+  snapshot,
   selectedAge,
-  setSelectedAge,
-  activeTab,
-  formatCurrency,
-  formatCompactCurrency,
   expandedCategories,
   setExpandedCategories
 }) {
-  // Derive projection and snapshot
-  const projection = getTimelineProjection(inputs, { selectedAge, simulation });
-  const snapshot = getLifeSnapshotAtAge(inputs, selectedAge);
-
   const getCategoryBg = (rowId) => {
     switch (rowId) {
       case 'relationship': return '#f3e8ff';
@@ -199,7 +196,7 @@ export default function TimelineSnapshotTab({
     );
   };
 
-  const renderTimelineRows = (proj, age) => {
+  const renderTimelineRows = (proj) => {
     const minAge = proj.minAge;
     const maxAge = proj.maxAge;
 
@@ -511,7 +508,7 @@ export default function TimelineSnapshotTab({
     );
   }
 
-  // Desktop layout
+  // Desktop view
   return (
     <div className="timeline-workspace-container">
       {/* Left Column: Timeline Canvas */}
