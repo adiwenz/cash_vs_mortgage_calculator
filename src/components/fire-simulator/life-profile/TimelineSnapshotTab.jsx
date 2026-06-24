@@ -7,6 +7,69 @@ import {
 import { formatCurrency, formatCompactCurrency } from '../helpers';
 import { buildTimelineRows, getTimelineItemObjectKey, resolveHouseIdForEvent } from '../../../utils/timelineRowBuilder.js';
 
+export const ageToTimelinePercent = (age, minAge, maxAge) => {
+  if (age === null || age === undefined || minAge === null || minAge === undefined || maxAge === null || maxAge === undefined) {
+    return null;
+  }
+
+  const min = Number(minAge);
+  const max = Number(maxAge);
+  const value = Number(age);
+
+  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return null;
+  }
+
+  return ((value - min) / (max - min)) * 100;
+};
+
+export const getTimelineBarStyle = ({ startAge, endAge, minAge, maxAge }) => {
+  if (
+    startAge === null || startAge === undefined ||
+    endAge === null || endAge === undefined ||
+    minAge === null || minAge === undefined ||
+    maxAge === null || maxAge === undefined
+  ) {
+    return null;
+  }
+
+  const rawStartAge = Number(startAge);
+  const rawEndAge = Number(endAge);
+  const rawMinAge = Number(minAge);
+  const rawMaxAge = Number(maxAge);
+
+  if (
+    !Number.isFinite(rawStartAge) ||
+    !Number.isFinite(rawEndAge) ||
+    !Number.isFinite(rawMinAge) ||
+    !Number.isFinite(rawMaxAge) ||
+    rawMaxAge <= rawMinAge
+  ) {
+    return null;
+  }
+
+  const visibleStartAge = Math.max(rawMinAge, rawStartAge);
+  const visibleEndAge = Math.min(rawMaxAge, rawEndAge);
+
+  if (visibleEndAge <= visibleStartAge) {
+    return null;
+  }
+
+  const left = ageToTimelinePercent(visibleStartAge, rawMinAge, rawMaxAge);
+  const right = ageToTimelinePercent(visibleEndAge, rawMinAge, rawMaxAge);
+
+  if (left === null || right === null) {
+    return null;
+  }
+
+  const width = Math.max(0, right - left);
+
+  return {
+    left: `${left}%`,
+    width: `${width}%`
+  };
+};
+
 export default function TimelineSnapshotTab({
   isMobile,
   inputs,
@@ -120,19 +183,25 @@ export default function TimelineSnapshotTab({
   };
 
   const renderPeriodBar = (item, minAge, maxAge) => {
-    const range = maxAge - minAge || 1;
-    const start = Math.max(minAge, item.startAge);
-    const end = Math.min(maxAge, item.endAge);
-    if (start >= end) return null;
-    const left = ((start - minAge) / range) * 100;
-    const width = ((end - start) / range) * 100;
+    const barStyle = getTimelineBarStyle({
+      startAge: item.startAge ?? item.age,
+      endAge: item.endAge ?? item.endAgeExclusive ?? item.endAgeInclusive,
+      minAge,
+      maxAge
+    });
+
+    if (!barStyle) return null;
+
+    const left = parseFloat(barStyle.left);
+    const width = parseFloat(barStyle.width);
+
     return (
       <div 
         key={item.id}
         style={{ 
           position: 'absolute', 
-          left: `${left}%`, 
-          width: `${width}%`, 
+          left: barStyle.left, 
+          width: barStyle.width, 
           display: 'flex', 
           alignItems: 'center',
           top: '50%',
@@ -142,7 +211,7 @@ export default function TimelineSnapshotTab({
       >
         <div 
           className={`timeline-period-bar cat-${item.category}`} 
-          style={{ width: '100%', position: 'relative', top: 'auto', transform: 'none' }}
+          style={{ width: '100%', position: 'relative', top: 'auto', transform: 'none', flexShrink: 0 }}
           title={`${item.title} (Ages ${item.startAge}-${item.endAge})`}
         >
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

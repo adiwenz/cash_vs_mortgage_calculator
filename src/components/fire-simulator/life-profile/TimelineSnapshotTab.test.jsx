@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import TimelineSnapshotTab from './TimelineSnapshotTab';
+import TimelineSnapshotTab, { ageToTimelinePercent, getTimelineBarStyle } from './TimelineSnapshotTab';
 
 afterEach(cleanup);
 
@@ -148,5 +148,80 @@ describe('TimelineSnapshotTab', () => {
     fireEvent.click(plotCol, { clientX: 300 });
 
     expect(onAgeChange).toHaveBeenCalledWith(55);
+  });
+
+  describe('timeline bar positioning math and helpers', () => {
+    it('correctly maps age to timeline percent', () => {
+      expect(ageToTimelinePercent(35, 35, 85)).toBe(0);
+      expect(ageToTimelinePercent(85, 35, 85)).toBe(100);
+      expect(ageToTimelinePercent(60, 35, 85)).toBe(50);
+      expect(ageToTimelinePercent(48, 35, 85)).toBe(26);
+      expect(ageToTimelinePercent(66, 35, 85)).toBe(62);
+    });
+
+    it('returns null for invalid inputs in ageToTimelinePercent', () => {
+      expect(ageToTimelinePercent(NaN, 35, 85)).toBeNull();
+      expect(ageToTimelinePercent(48, null, 85)).toBeNull();
+      expect(ageToTimelinePercent(48, 35, undefined)).toBeNull();
+      expect(ageToTimelinePercent(48, 85, 35)).toBeNull();
+      expect(ageToTimelinePercent(48, 35, 35)).toBeNull();
+    });
+
+    it('correctly calculates timeline bar style including clamping', () => {
+      // Normal within range
+      const style1 = getTimelineBarStyle({
+        startAge: 48,
+        endAge: 66,
+        minAge: 35,
+        maxAge: 85
+      });
+      expect(style1).toEqual({
+        left: '26%',
+        width: '36%'
+      });
+
+      // Clamped start age
+      const style2 = getTimelineBarStyle({
+        startAge: 30,
+        endAge: 66,
+        minAge: 35,
+        maxAge: 85
+      });
+      expect(style2).toEqual({
+        left: '0%',
+        width: '62%'
+      });
+
+      // Clamped end age
+      const style3 = getTimelineBarStyle({
+        startAge: 48,
+        endAge: 90,
+        minAge: 35,
+        maxAge: 85
+      });
+      expect(style3).toEqual({
+        left: '26%',
+        width: '74%'
+      });
+    });
+
+    it('returns null for invalid inputs or zero/negative width in getTimelineBarStyle', () => {
+      // Invalid ages
+      expect(getTimelineBarStyle({ startAge: NaN, endAge: 66, minAge: 35, maxAge: 85 })).toBeNull();
+      
+      // MinAge >= MaxAge
+      expect(getTimelineBarStyle({ startAge: 48, endAge: 66, minAge: 85, maxAge: 35 })).toBeNull();
+      expect(getTimelineBarStyle({ startAge: 48, endAge: 66, minAge: 35, maxAge: 35 })).toBeNull();
+
+      // endAge <= startAge
+      expect(getTimelineBarStyle({ startAge: 66, endAge: 48, minAge: 35, maxAge: 85 })).toBeNull();
+      expect(getTimelineBarStyle({ startAge: 48, endAge: 48, minAge: 35, maxAge: 85 })).toBeNull();
+
+      // Out of bounds start age >= maxAge
+      expect(getTimelineBarStyle({ startAge: 90, endAge: 100, minAge: 35, maxAge: 85 })).toBeNull();
+
+      // Out of bounds end age <= minAge
+      expect(getTimelineBarStyle({ startAge: 20, endAge: 30, minAge: 35, maxAge: 85 })).toBeNull();
+    });
   });
 });
