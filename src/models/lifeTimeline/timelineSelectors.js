@@ -1,6 +1,34 @@
 import { buildEffectiveSimulationInputs } from '../../calculators/fire/effectiveInputs.js';
 import { calculateAmortizedLoanPayoffAge } from '../../calculators/fire/debts.js';
 import { TIMELINE_ITEM_KIND, TIMELINE_CATEGORY } from './timelineTypes.js';
+import { getChildEventBirthAge } from '../../utils/childEventHelpers.js';
+
+export function getEventAge(ev, fallbackAge = 35) {
+  if (!ev) return fallbackAge;
+  if (ev.type === 'haveChild' || ev.type === 'child' || ev.type === 'createChild') {
+    return getChildEventBirthAge(ev);
+  }
+  const fields = [
+    'age',
+    'eventAge',
+    'startAge',
+    'targetAge',
+    'changeAge',
+    'purchaseAge',
+    'marriageAge',
+    'moveAge',
+    'childAge',
+    'arrivalAge',
+    'claimingAge'
+  ];
+  for (const f of fields) {
+    if (ev[f] !== undefined && ev[f] !== null && ev[f] !== '') {
+      const val = Number(ev[f]);
+      if (!isNaN(val)) return val;
+    }
+  }
+  return fallbackAge;
+}
 
 /**
  * Normalizes all timeline items from current profile situation and future events.
@@ -20,30 +48,6 @@ export function getTimelineItems(inputs) {
 
   const items = [];
 
-  // Defensive helper function to extract age fields from inconsistent event shapes
-  const getEventAge = (ev) => {
-    if (!ev) return currentAge;
-    const fields = [
-      'age',
-      'eventAge',
-      'startAge',
-      'targetAge',
-      'changeAge',
-      'purchaseAge',
-      'marriageAge',
-      'moveAge',
-      'childAge',
-      'arrivalAge',
-      'claimingAge'
-    ];
-    for (const f of fields) {
-      if (ev[f] !== undefined && ev[f] !== null && ev[f] !== '') {
-        const val = Number(ev[f]);
-        if (!isNaN(val)) return val;
-      }
-    }
-    return currentAge;
-  };
 
   const enabledEvents = (effective.lifeEvents || []).filter(e => e.enabled !== false);
 
@@ -58,7 +62,7 @@ export function getTimelineItems(inputs) {
 
   // Find marriage events
   const marriageEvents = enabledEvents.filter(e => e.type === 'marriage' || e.type === 'getMarried');
-  const marriageAge = marriageEvents.length > 0 ? getEventAge(marriageEvents[0]) : null;
+  const marriageAge = marriageEvents.length > 0 ? getEventAge(marriageEvents[0], currentAge) : null;
 
   if (baselineMarried) {
     items.push({
@@ -143,14 +147,23 @@ export function getTimelineItems(inputs) {
   if (inputs.useLifeProfile && inputs.lifeProfile?.home) {
     baselineOwn = inputs.lifeProfile.home.status === 'own';
   } else if (effective.houseAssets && effective.houseAssets.length > 0) {
-    baselineOwn = true;
+    const buyHouseEventsForCheck = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
+    const hasPreExistingHouse = effective.houseAssets.some(h => {
+      const buyEvent = buyHouseEventsForCheck.find(e => e.houseId === h.id || e.id === h.id);
+      if (!buyEvent) return true;
+      const eventAge = getEventAge(buyEvent, currentAge);
+      return eventAge <= currentAge;
+    });
+    if (hasPreExistingHouse) {
+      baselineOwn = true;
+    }
   }
 
   const buyHouseEvents = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
   const sellHouseEvents = enabledEvents.filter(e => e.type === 'sellHouse');
 
-  const buyAge = buyHouseEvents.length > 0 ? getEventAge(buyHouseEvents[0]) : null;
-  const sellAge = sellHouseEvents.length > 0 ? getEventAge(sellHouseEvents[0]) : null;
+  const buyAge = buyHouseEvents.length > 0 ? getEventAge(buyHouseEvents[0], currentAge) : null;
+  const sellAge = sellHouseEvents.length > 0 ? getEventAge(sellHouseEvents[0], currentAge) : null;
 
   if (baselineOwn) {
     const homeownerEnd = sellAge !== null && sellAge > currentAge ? sellAge : null;
@@ -402,7 +415,7 @@ export function getTimelineItems(inputs) {
       const childId = child.id || `child-inputs-${index}`;
       
       // Check if we already have a child event matching this ID or birth age to avoid duplicates
-      const exists = enabledEvents.some(e => e.id === childId || ((e.type === 'haveChild' || e.type === 'child') && getEventAge(e) === birthAge));
+      const exists = enabledEvents.some(e => e.id === childId || ((e.type === 'haveChild' || e.type === 'child') && getEventAge(e, currentAge) === birthAge));
       if (!exists) {
         items.push({
           id: `event-child-point-${childId}`,
@@ -440,7 +453,7 @@ export function getTimelineItems(inputs) {
 
   // 6. Existing Life Events Mapping
   enabledEvents.forEach(event => {
-    const age = getEventAge(event);
+    const age = getEventAge(event, currentAge);
 
     switch (event.type) {
       case 'marriage':

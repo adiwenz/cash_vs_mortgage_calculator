@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { getSocialSecurityFactor } from '../fireCalculations';
 import { propPIAmount } from '../simulatorMathUtils';
 import { getAssetLabel } from '../components/fire-simulator/helpers';
+import { getChildEventBirthAge } from '../utils/childEventHelpers.js';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-US', {
@@ -98,6 +99,7 @@ export function useTimelineEvents(inputs, displayedResults) {
       }
       if (ev.enabled) {
         const age = Number(
+          (ev.type === 'haveChild' || ev.type === 'child') ? getChildEventBirthAge(ev) :
           ev.purchaseAge !== undefined ? ev.purchaseAge :
           ev.birthAge !== undefined ? ev.birthAge :
           ev.parentAgeAtBirth !== undefined ? ev.parentAgeAtBirth :

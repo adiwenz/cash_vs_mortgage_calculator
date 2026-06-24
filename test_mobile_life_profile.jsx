@@ -23,11 +23,12 @@ describe('Mobile Life Profile Modal Redesign', () => {
         inputs={DEFAULT_FIRE_INPUTS}
         updateInput={updateInputMock}
         isMobile={true}
+        initialTab="household"
       />
     );
 
     // Assert header title and subtitle are rendered
-    expect(screen.getByText('Life Profile')).toBeDefined();
+    expect(screen.getByText('Life Planner')).toBeDefined();
     expect(screen.getByText('Tell us about your life so we can personalize your plan.')).toBeDefined();
 
     // Assert the 4 category cards exist
@@ -52,6 +53,7 @@ describe('Mobile Life Profile Modal Redesign', () => {
         inputs={DEFAULT_FIRE_INPUTS}
         updateInput={updateInputMock}
         isMobile={true}
+        initialTab="household"
       />
     );
 
@@ -82,6 +84,7 @@ describe('Mobile Life Profile Modal Redesign', () => {
         inputs={DEFAULT_FIRE_INPUTS}
         updateInput={updateInputMock}
         isMobile={true}
+        initialTab="household"
       />
     );
 
@@ -113,6 +116,7 @@ describe('Mobile Life Profile Modal Redesign', () => {
         inputs={DEFAULT_FIRE_INPUTS}
         updateInput={updateInputMock}
         isMobile={true}
+        initialTab="household"
       />
     );
 

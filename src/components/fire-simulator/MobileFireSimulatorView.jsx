@@ -791,7 +791,7 @@ export default function MobileFireSimulatorView({
   const [selectedMobilePhaseId, setSelectedMobilePhaseId] = useState(null);
 
   const [isLifeProfileOpen, setIsLifeProfileOpen] = useState(false);
-  const [lifeProfileTab, setLifeProfileTab] = useState('household');
+  const [lifeProfileTab, setLifeProfileTab] = useState('timeline');
   const [savingsRateOverride, setSavingsRateOverride] = useState(null);
   const [activeSavingsRate, setActiveSavingsRate] = useState(null);
   const [isCurrentSituationExpanded, setIsCurrentSituationExpanded] = useState(true);
@@ -1263,7 +1263,7 @@ export default function MobileFireSimulatorView({
                 return (
                   <div 
                     onClick={() => {
-                      setLifeProfileTab('household');
+                      setLifeProfileTab('timeline');
                       setIsLifeProfileOpen(true);
                     }}
                     style={{
@@ -1314,7 +1314,7 @@ export default function MobileFireSimulatorView({
 
                     {/* Right Column: CTA */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: 'var(--primary, #6366f1)', fontSize: '0.78rem', fontWeight: '700' }}>
-                      <span>Edit Life Profile</span>
+                      <span>Life Planner</span>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
@@ -2625,6 +2625,9 @@ export default function MobileFireSimulatorView({
         updateInput={updateInput}
         initialTab={lifeProfileTab}
         isMobile={true}
+        simulation={simulation?.activeResults || legacyActiveResults}
+        handleCreateEvent={eventController?.handleCreateEvent || legacyHandleCreateEvent}
+        handleEditRoadmapEvent={eventController?.handleEditRoadmapEvent || legacyHandleEditRoadmapEvent}
       />
 
       {notification && (() => {

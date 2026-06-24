@@ -259,4 +259,37 @@ describe('timelineSelectors', () => {
     expect(childPoint).toBeDefined();
     expect(childPoint.age).toBe(39);
   });
+
+  test('getTimelineItems housing status regression: Buy (51) and Sell (85) events', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      lifeExpectancy: 85,
+      useLifeProfile: false,
+      houseAssets: [
+        { id: 'house-1', purchasePrice: 500000 }
+      ],
+      lifeEvents: [
+        { id: 'buy-house-1', type: 'buyHouse', age: 51, houseId: 'house-1', enabled: true },
+        { id: 'sell-house-1', type: 'sellHouse', age: 85, houseId: 'house-1', enabled: true }
+      ]
+    };
+
+    const items = getTimelineItems(inputs);
+
+    const rentingStatus = items.find(item => item.id === 'status-housing-renting');
+    expect(rentingStatus).toBeDefined();
+    expect(rentingStatus.startAge).toBe(35);
+    expect(rentingStatus.endAge).toBe(51);
+
+    const homeownerStatus = items.find(item => item.id === 'status-housing-owner');
+    expect(homeownerStatus).toBeDefined();
+    expect(homeownerStatus.startAge).toBe(51);
+    expect(homeownerStatus.endAge).toBe(85);
+
+    const rentingPostSaleStatus = items.find(item => item.id === 'status-housing-renting-post-sale');
+    expect(rentingPostSaleStatus).toBeDefined();
+    expect(rentingPostSaleStatus.startAge).toBe(85);
+    expect(rentingPostSaleStatus.endAge).toBeNull();
+  });
 });

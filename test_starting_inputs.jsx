@@ -48,7 +48,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     fireEvent.click(screen.getAllByText('35')[0]);
 
     // Verify Life Profile modal is open
-    expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();
+    expect(screen.getByText(/Life Planner/i)).toBeDefined();
 
     // Find and modify Your Age input
     const ageLabel = screen.getByText('Your Age');
@@ -69,7 +69,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
 
     // Verify modal is closed
     await waitFor(() => {
-      expect(screen.queryByText(/Edit Life Profile/i)).toBeNull();
+      expect(screen.queryByText(/Life Planner/i)).toBeNull();
     });
 
     // Verify Age is updated in the sidebar
@@ -103,7 +103,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     fireEvent.click(assetsRowLabel);
 
     // Verify Edit Life Profile modal is open on Assets tab
-    expect(screen.getByText(/Edit Life Profile/i)).toBeDefined();
+    expect(screen.getByText(/Life Planner/i)).toBeDefined();
     expect(screen.getByText(/💵 Cash/i)).toBeDefined();
   });
 
@@ -127,7 +127,7 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
 
     // Verify modal is closed
     await waitFor(() => {
-      expect(screen.queryByText(/Edit Life Profile/i)).toBeNull();
+      expect(screen.queryByText(/Life Planner/i)).toBeNull();
     });
 
     // Verify Total Invested Assets is updated on the situation card

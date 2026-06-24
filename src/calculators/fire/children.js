@@ -1,8 +1,10 @@
+import { getChildEventBirthAge } from '../../utils/childEventHelpers.js';
+
 export function calculateYearlyChildCosts(age, enabledEvents, profile, currentAge, customChildren, nominalFactor) {
   let yearChildCostsToday = 0;
   enabledEvents.forEach(ev => {
     if (ev.type === 'haveChild') {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const birthAge = getChildEventBirthAge(ev) || 30;
       const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
       const childAge = age - birthAge;
 

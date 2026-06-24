@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs';
 import { syncBudgetDetails } from '../../../calculators/fire/index.js';
 import { roundCurrency } from '../../../simulatorMathUtils';
+import { setChildEventBirthAge } from '../../../utils/childEventHelpers.js';
 
 export function useScenarioState() {
   const [scenarios, setScenarios] = useState([
@@ -319,8 +320,7 @@ export function useScenarioState() {
             } else if (e.type === 'sellHouse') {
               updated.age = newAge;
             } else if (e.type === 'haveChild') {
-              updated.birthAge = newAge;
-              updated.age = newAge;
+              return setChildEventBirthAge(e, newAge);
             } else if (e.type === 'college') {
               updated.startAge = newAge;
             } else if (e.type === 'sabbatical') {
