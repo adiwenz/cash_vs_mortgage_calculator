@@ -249,4 +249,26 @@ describe('lifeSnapshotSelectors', () => {
     const snapshot46 = getLifeSnapshotAtAge(inputs, 46);
     expect(snapshot46.income.annualIncome).toBe(80000);
   });
+
+  test('getLifeSnapshotAtAge housing status regression: Buy (51) and Sell (85) events', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      lifeExpectancy: 85,
+      useLifeProfile: false,
+      houseAssets: [
+        { id: 'house-1', purchasePrice: 500000 }
+      ],
+      lifeEvents: [
+        { id: 'buy-house-1', type: 'buyHouse', age: 51, houseId: 'house-1', enabled: true },
+        { id: 'sell-house-1', type: 'sellHouse', age: 85, houseId: 'house-1', enabled: true }
+      ]
+    };
+
+    expect(getLifeSnapshotAtAge(inputs, 35).housingStatus).toBe('rent');
+    expect(getLifeSnapshotAtAge(inputs, 50).housingStatus).toBe('rent');
+    expect(getLifeSnapshotAtAge(inputs, 51).housingStatus).toBe('own');
+    expect(getLifeSnapshotAtAge(inputs, 84).housingStatus).toBe('own');
+    expect(getLifeSnapshotAtAge(inputs, 85).housingStatus).toBe('rent');
+  });
 });

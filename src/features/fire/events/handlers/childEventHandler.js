@@ -5,6 +5,7 @@ import {
   normalizeEventAge, 
   normalizeCurrency 
 } from './eventHandlerUtils.js';
+import { getChildEventBirthAge, setChildEventBirthAge } from '../../../../utils/childEventHelpers.js';
 
 export const childEventHandler = {
   edit(baseEvent) {
@@ -16,7 +17,7 @@ export const childEventHandler = {
     const newInputs = cloneInputs(inputs);
     const result = createStandardResult(newInputs);
 
-    const birthAgeVal = normalizeEventAge(editingEvent.birthAge !== undefined ? editingEvent.birthAge : editingEvent.parentAgeAtBirth, 30);
+    const birthAgeVal = getChildEventBirthAge(editingEvent);
     const childStartAgeVal = normalizeEventAge(editingEvent.childStartAge, 0);
     const includeCollegeVal = !!editingEvent.includeCollege;
     const maxAgeVal = includeCollegeVal ? 22 : 18;
@@ -63,23 +64,25 @@ export const childEventHandler = {
     const linkedPromoId = editingEvent.linkedEventId || `inc-promo-${Date.now()}`;
     const adjustmentStrategy = editingEvent.adjustmentStrategy || 'promotion';
 
-    const savedEventObj = {
-      id: childEventId,
-      type: 'haveChild',
-      enabled: true,
-      name: 'Have a Child',
-      childName: editingEvent.childName || '',
-      linkedEventId: linkedPromoId,
-      childStartAge: childStartAgeVal,
-      birthAge: birthAgeVal,
-      costMethod: costMethod,
-      customAges0to4: ages0to4Val,
-      customAges5to12: ages5to12Val,
-      customAges13to18: ages13to18Val,
-      customAges19to22: ages19to22Val,
-      includeCollege: includeCollegeVal,
-      adjustmentStrategy: adjustmentStrategy
-    };
+    const savedEventObj = setChildEventBirthAge(
+      {
+        id: childEventId,
+        type: 'haveChild',
+        enabled: true,
+        name: 'Have a Child',
+        childName: editingEvent.childName || '',
+        linkedEventId: linkedPromoId,
+        childStartAge: childStartAgeVal,
+        costMethod: costMethod,
+        customAges0to4: ages0to4Val,
+        customAges5to12: ages5to12Val,
+        customAges13to18: ages13to18Val,
+        customAges19to22: ages19to22Val,
+        includeCollege: includeCollegeVal,
+        adjustmentStrategy: adjustmentStrategy
+      },
+      birthAgeVal
+    );
 
     // Calculate baseline/impact before saving
     const currentScenObj = scenarios?.find(s => s.id === currentScenarioId) || scenarios?.[0];

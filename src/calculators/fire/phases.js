@@ -1,4 +1,5 @@
 import { getActiveChildrenCountAtAge, roundCurrency } from '../../simulatorMathUtils.js';
+import { getChildEventBirthAge } from '../../utils/childEventHelpers.js';
 import {
   getSocialSecurityFactor,
   getIncomeHistory,
@@ -52,7 +53,7 @@ export function getActiveEventsForInterval(startAge, endAge, enabledEvents, prof
         isActive = startAge < userAgeWhenSpouseDies;
       }
     } else if (e.type === 'haveChild') {
-      const birthAge = Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) || 30;
+      const birthAge = getChildEventBirthAge(e) || 30;
       const childStartAge = Number(e.childStartAge !== undefined ? e.childStartAge : 0);
       const includeCollege = e.includeCollege !== undefined ? e.includeCollege : false;
       const maxAge = includeCollege ? 22 : 18;
@@ -235,7 +236,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     ];
 
     if (e.type === 'haveChild') {
-      const birthAge = Number(e.birthAge !== undefined ? e.birthAge : e.parentAgeAtBirth) || 30;
+      const birthAge = getChildEventBirthAge(e) || 30;
       const startAge = Number(e.childStartAge !== undefined ? e.childStartAge : 0);
       const includeCollege = e.includeCollege !== undefined ? e.includeCollege : false;
       const maxAge = includeCollege ? 22 : 18;

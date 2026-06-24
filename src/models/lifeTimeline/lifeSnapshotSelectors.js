@@ -1,5 +1,5 @@
 import { buildEffectiveSimulationInputs } from '../../calculators/fire/effectiveInputs.js';
-import { getActiveEventsAtAge, getActivePeriodsAtAge } from './timelineSelectors.js';
+import { getActiveEventsAtAge, getActivePeriodsAtAge, getEventAge } from './timelineSelectors.js';
 import { TIMELINE_CATEGORY } from './timelineTypes.js';
 
 /**
@@ -32,6 +32,7 @@ export function getLifeSnapshotAtAge(inputs, age) {
     currentAge = 35;
   }
 
+  const enabledEvents = (effective.lifeEvents || []).filter(e => e.enabled !== false);
   const activeEvents = getActiveEventsAtAge(inputs, targetAge);
   const activePeriods = getActivePeriodsAtAge(inputs, targetAge);
 
@@ -64,7 +65,16 @@ export function getLifeSnapshotAtAge(inputs, age) {
     if (inputs.useLifeProfile && inputs.lifeProfile?.home) {
       baselineOwn = inputs.lifeProfile.home.status === 'own';
     } else if (effective.houseAssets && effective.houseAssets.length > 0) {
-      baselineOwn = true;
+      const buyHouseEventsForCheck = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
+      const hasPreExistingHouse = effective.houseAssets.some(h => {
+        const buyEvent = buyHouseEventsForCheck.find(e => e.houseId === h.id || e.id === h.id);
+        if (!buyEvent) return true;
+        const eventAge = getEventAge(buyEvent, currentAge);
+        return eventAge <= currentAge;
+      });
+      if (hasPreExistingHouse) {
+        baselineOwn = true;
+      }
     }
     housingStatus = baselineOwn ? 'own' : 'rent';
   }
@@ -109,7 +119,6 @@ export function getLifeSnapshotAtAge(inputs, age) {
 
   // 4. Children
   const children = [];
-  const enabledEvents = (effective.lifeEvents || []).filter(e => e.enabled !== false);
   const childEvents = enabledEvents.filter(e => e.type === 'haveChild' || e.type === 'child' || e.type === 'createChild');
   
   childEvents.forEach((chEvent, idx) => {

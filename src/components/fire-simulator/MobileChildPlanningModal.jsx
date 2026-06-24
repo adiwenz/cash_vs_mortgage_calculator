@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Info, Sprout, TrendingUp, Scale, ChevronRight, AlertCircle } from 'lucide-react';
 import { formatCurrency } from './helpers';
+import { getChildEventBirthAge, setChildEventBirthAge } from '../../utils/childEventHelpers';
 
 export default function MobileChildPlanningModal({
   scenario,
@@ -24,7 +25,7 @@ export default function MobileChildPlanningModal({
   const lifeExpectancy = inputs.lifeExpectancy !== undefined ? Number(inputs.lifeExpectancy) : 85;
 
   const [birthAge, setBirthAge] = useState(
-    editingEvent?.birthAge !== undefined ? editingEvent.birthAge : currentAge
+    editingEvent ? getChildEventBirthAge(editingEvent) : currentAge
   );
   const [childStartAge, setChildStartAge] = useState(
     editingEvent?.childStartAge !== undefined ? editingEvent.childStartAge : 0
@@ -98,19 +99,21 @@ export default function MobileChildPlanningModal({
   const handleConfirm = () => {
     try {
       setError(null);
-      let updatedEvent = {
-        ...editingEvent,
-        childName,
-        birthAge: Number(birthAge),
-        childStartAge: Number(childStartAge),
-        costMethod: 'custom',
-        customAges0to4: childcareCostAnnual,
-        customAges5to12: childcareCostAnnual,
-        customAges13to18: childcareCostAnnual,
-        customAges19to22: childcareCostAnnual,
-        includeCollege: includeCollege,
-        adjustmentStrategy: strategy
-      };
+      let updatedEvent = setChildEventBirthAge(
+        {
+          ...editingEvent,
+          childName,
+          childStartAge: Number(childStartAge),
+          costMethod: 'custom',
+          customAges0to4: childcareCostAnnual,
+          customAges5to12: childcareCostAnnual,
+          customAges13to18: childcareCostAnnual,
+          customAges19to22: childcareCostAnnual,
+          includeCollege: includeCollege,
+          adjustmentStrategy: strategy
+        },
+        Number(birthAge)
+      );
 
       handleSaveEvent(updatedEvent);
       setStep('confirmation');

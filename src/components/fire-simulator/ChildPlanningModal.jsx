@@ -3,6 +3,7 @@ import { Info } from 'lucide-react';
 import { formatCurrency } from './helpers';
 import { getNormalizedPhases } from '../../fireCalculations';
 import { NumberInput } from '../ui/PlainInputs';
+import { getChildEventBirthAge, setChildEventBirthAge } from '../../utils/childEventHelpers';
 
 export default function ChildPlanningModal({
   scenario,
@@ -21,7 +22,9 @@ export default function ChildPlanningModal({
 
   // Step 1 local state
   const [childName, setChildName] = useState(editingEvent?.childName || '');
-  const [birthAge, setBirthAge] = useState(editingEvent?.birthAge !== undefined ? editingEvent.birthAge : (inputs.currentAge || 35));
+  const [birthAge, setBirthAge] = useState(
+    editingEvent ? getChildEventBirthAge(editingEvent) : (inputs.currentAge || 35)
+  );
   const [childStartAge, setChildStartAge] = useState(editingEvent?.childStartAge !== undefined ? editingEvent.childStartAge : 0);
   const [includeCollege, setIncludeCollege] = useState(!!editingEvent?.includeCollege);
 
@@ -96,19 +99,21 @@ export default function ChildPlanningModal({
 
   // Perform Save Action
   const onSave = () => {
-    let updatedEvent = {
-      ...editingEvent,
-      childName,
-      birthAge: Number(birthAge),
-      childStartAge: Number(childStartAge),
-      costMethod: 'custom',
-      customAges0to4: childcareCostAnnual,
-      customAges5to12: childcareCostAnnual,
-      customAges13to18: childcareCostAnnual,
-      customAges19to22: childcareCostAnnual,
-      includeCollege: includeCollege,
-      adjustmentStrategy: strategy
-    };
+    let updatedEvent = setChildEventBirthAge(
+      {
+        ...editingEvent,
+        childName,
+        childStartAge: Number(childStartAge),
+        costMethod: 'custom',
+        customAges0to4: childcareCostAnnual,
+        customAges5to12: childcareCostAnnual,
+        customAges13to18: childcareCostAnnual,
+        customAges19to22: childcareCostAnnual,
+        includeCollege: includeCollege,
+        adjustmentStrategy: strategy
+      },
+      Number(birthAge)
+    );
 
     handleSaveEvent(updatedEvent);
     onClose();

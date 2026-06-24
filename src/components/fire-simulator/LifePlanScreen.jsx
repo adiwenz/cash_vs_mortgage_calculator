@@ -304,7 +304,7 @@ export default function LifePlanScreen({
 
   const [expandedMethodology, setExpandedMethodology] = useState(false);
   const [isLifeProfileOpen, setIsLifeProfileOpen] = useState(false);
-  const [lifeProfileTab, setLifeProfileTab] = useState('household');
+  const [lifeProfileTab, setLifeProfileTab] = useState('timeline');
   const [showAssets, setShowAssets] = useState(false);
   const [showDebt, setShowDebt] = useState(false);
   const [showNetWorth, setShowNetWorth] = useState(true);
@@ -1848,6 +1848,9 @@ export default function LifePlanScreen({
         inputs={inputs}
         updateInput={updateInput}
         initialTab={lifeProfileTab}
+        simulation={activeResults}
+        handleCreateEvent={handleCreateEvent}
+        handleEditRoadmapEvent={handleEditRoadmapEvent}
       />
 
     </>

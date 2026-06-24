@@ -1,4 +1,5 @@
 import { calculateMonthlyPayment } from './calculations.js';
+import { getChildEventBirthAge } from './utils/childEventHelpers.js';
 
 // U.S. Federal Tax Data (2026 guidelines)
 export const U_S_TAX_DATA = {
@@ -187,7 +188,7 @@ export function getActiveChildrenCountAtAge(age, lifeEvents) {
   let count = 0;
   const childEvents = (lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
   childEvents.forEach(ev => {
-    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const birthAge = getChildEventBirthAge(ev) || 30;
     const startAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
     const childAge = age - birthAge;
     if (childAge >= startAge) {
@@ -211,7 +212,7 @@ export function calculatePeakChildCosts(inp) {
   let minChildParentAge = Infinity;
   let maxChildParentAge = -Infinity;
   childEvents.forEach(ev => {
-    const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+    const birthAge = getChildEventBirthAge(ev) || 30;
     const includeCollege = ev.includeCollege !== undefined ? ev.includeCollege : false;
     const maxAge = includeCollege ? 22 : 18;
     if (birthAge < minChildParentAge) minChildParentAge = birthAge;
@@ -227,7 +228,7 @@ export function calculatePeakChildCosts(inp) {
   for (let age = currentAge; age < targetRetirementAge; age++) {
     let yearCost = 0;
     childEvents.forEach(ev => {
-      const birthAge = Number(ev.birthAge !== undefined ? ev.birthAge : ev.parentAgeAtBirth) || 30;
+      const birthAge = getChildEventBirthAge(ev) || 30;
       const childStartAge = Number(ev.childStartAge !== undefined ? ev.childStartAge : 0);
       const childAge = age - birthAge;
       if (childAge >= childStartAge) {
