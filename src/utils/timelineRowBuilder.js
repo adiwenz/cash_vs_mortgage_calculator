@@ -1,5 +1,14 @@
 import { TIMELINE_CATEGORY } from '../models/lifeTimeline/timelineTypes.js';
 import { getChildEventBirthAge } from './childEventHelpers.js';
+import {
+  getCurrentAge,
+  getLifeEvents,
+  getEnabledLifeEvents,
+  getHouseAssets,
+  getIncomeItems,
+  getDebtItems,
+  getHousingStatus
+} from '../features/fire/scenario/index.js';
 
 export function getObjectRowKey(objectType, id) {
   if (!objectType || !id) return null;
@@ -8,19 +17,19 @@ export function getObjectRowKey(objectType, id) {
 
 export function resolveHouseIdForEvent(ev, inputs) {
   if (!ev || !inputs) return null;
-  const houseAssets = (inputs.houseAssets || []).filter(h => h.purchaseType !== 'rent' && h.status !== 'rent' && !h.isRenting);
+  const houseAssets = getHouseAssets(inputs).filter(h => h.purchaseType !== 'rent' && h.status !== 'rent' && !h.isRenting);
 
   // 1. Direct match by houseId
-  if (ev.houseId && inputs.houseAssets.some(h => h.id === ev.houseId)) {
+  if (ev.houseId && getHouseAssets(inputs).some(h => h.id === ev.houseId)) {
     return ev.houseId;
   }
   // 2. Direct match by event ID
-  if (inputs.houseAssets.some(h => h.id === ev.id)) {
+  if (getHouseAssets(inputs).some(h => h.id === ev.id)) {
     return ev.id;
   }
 
   // 3. Positional fallback: map the N-th buy/sell event to the N-th non-renting house asset
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const buyEvents = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
   const evIdx = buyEvents.findIndex(e => e.id === ev.id);
   if (evIdx !== -1 && houseAssets[evIdx]) {
@@ -48,7 +57,7 @@ export function getTimelineItemObjectKey(item, inputs) {
     const objectType = mapSourceTypeToObjectType(item.sourceType, item.category);
     if (objectType && item.sourceId !== 'baseline-relationship' && item.sourceId !== 'baseline-housing') {
       if (objectType === 'housing') {
-        const ev = (inputs?.lifeEvents || []).find(e => e.id === item.sourceId);
+        const ev = getLifeEvents(inputs).find(e => e.id === item.sourceId);
         const resolvedId = resolveHouseIdForEvent(ev, inputs) || item.sourceId;
         return getObjectRowKey(objectType, resolvedId);
       }
@@ -79,7 +88,7 @@ export function getTimelineItemObjectKey(item, inputs) {
   const idStr = String(item.id || '');
   if (idStr.startsWith('event-buyhouse-mortgage-period-')) {
     const eid = idStr.replace('event-buyhouse-mortgage-period-', '');
-    const ev = (inputs?.lifeEvents || []).find(e => e.id === eid);
+    const ev = getLifeEvents(inputs).find(e => e.id === eid);
     const houseId = resolveHouseIdForEvent(ev, inputs) || eid;
     return getObjectRowKey('debt', `mortgage-${houseId}`);
   }
@@ -90,13 +99,13 @@ export function getTimelineItemObjectKey(item, inputs) {
 
   // Baseline homeowner status
   if (item.id === 'status-housing-owner' && item.sourceId === 'baseline-housing') {
-    const houseAssets = inputs?.houseAssets || [];
-    const enabledEvents = (inputs?.lifeEvents || []).filter(e => e.enabled !== false);
+    const houseAssets = getHouseAssets(inputs);
+    const enabledEvents = getEnabledLifeEvents(inputs);
     const preExisting = houseAssets.filter(h => {
       const buyEvent = enabledEvents.find(e => e.type === 'buyHouse' && e.houseId === h.id);
       if (!buyEvent) return true;
       const buyAge = buyEvent.purchaseAge !== undefined ? Number(buyEvent.purchaseAge) : Number(buyEvent.age || 35);
-      const currentAge = Number(inputs?.currentAge) || 35;
+      const currentAge = getCurrentAge(inputs);
       return buyAge <= currentAge;
     });
     const houseId = preExisting.length > 0 ? preExisting[0].id : (houseAssets[0]?.id || 'baseline-home');
@@ -105,7 +114,7 @@ export function getTimelineItemObjectKey(item, inputs) {
 
   // Resolve via lifeEvent lookup if sourceType is lifeEvent
   if (item.sourceType === 'lifeEvent' && item.sourceId) {
-    const ev = (inputs?.lifeEvents || []).find(e => e.id === item.sourceId);
+    const ev = getLifeEvents(inputs).find(e => e.id === item.sourceId);
     if (ev) {
       if (ev.type === 'haveChild' || ev.type === 'child' || ev.type === 'createChild') {
         return getObjectRowKey('child', ev.id);
@@ -140,13 +149,13 @@ export function getTimelineItemObjectKey(item, inputs) {
   // Housing
   if (idStr.startsWith('event-buyhouse-point-')) {
     const hid = idStr.replace('event-buyhouse-point-', '');
-    const ev = (inputs?.lifeEvents || []).find(e => e.id === hid);
+    const ev = getLifeEvents(inputs).find(e => e.id === hid);
     const resolvedId = resolveHouseIdForEvent(ev, inputs) || hid;
     return getObjectRowKey('housing', resolvedId);
   }
   if (idStr.startsWith('event-sellhouse-point-')) {
     const hid = idStr.replace('event-sellhouse-point-', '');
-    const ev = (inputs?.lifeEvents || []).find(e => e.id === hid);
+    const ev = getLifeEvents(inputs).find(e => e.id === hid);
     const resolvedId = resolveHouseIdForEvent(ev, inputs) || hid;
     return getObjectRowKey('housing', resolvedId);
   }
@@ -265,7 +274,7 @@ function getChildObjects(inputs) {
   });
 
   // 2. From inputs.lifeEvents
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const childEvents = enabledEvents.filter(e => e.type === 'haveChild' || e.type === 'child' || e.type === 'createChild');
   childEvents.forEach((e, idx) => {
     const id = e.id || `child-event-${idx}`;
@@ -285,19 +294,19 @@ function getChildObjects(inputs) {
 function getHousingObjects(inputs) {
   const houses = [];
   const seenIds = new Set();
-  const houseAssets = inputs.houseAssets || [];
+  const houseAssets = getHouseAssets(inputs);
 
   // Check if baseline is owned
   let isBaselineOwn = false;
   if (inputs.useLifeProfile && inputs.lifeProfile?.home) {
-    isBaselineOwn = inputs.lifeProfile.home.status === 'own';
-  } else if (inputs.houseAssets && inputs.houseAssets.length > 0) {
-    const buyHouseEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false && (e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome'));
-    const hasPreExistingHouse = inputs.houseAssets.some(h => {
+    isBaselineOwn = getHousingStatus(inputs) === 'own';
+  } else if (houseAssets.length > 0) {
+    const buyHouseEvents = getEnabledLifeEvents(inputs).filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
+    const hasPreExistingHouse = houseAssets.some(h => {
       const buyEvent = buyHouseEvents.find(e => e.houseId === h.id || e.id === h.id);
       if (!buyEvent) return true;
       const buyAge = buyEvent.purchaseAge !== undefined ? Number(buyEvent.purchaseAge) : Number(buyEvent.age || 35);
-      const currentAge = Number(inputs.currentAge) || 35;
+      const currentAge = getCurrentAge(inputs);
       return buyAge <= currentAge;
     });
     if (hasPreExistingHouse) {
@@ -305,7 +314,7 @@ function getHousingObjects(inputs) {
     }
   }
 
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const buyEvents = enabledEvents.filter(e => e.type === 'buyHouse' || e.type === 'homePurchase' || e.type === 'buyHome');
 
   houseAssets.forEach((h, idx) => {
@@ -337,7 +346,7 @@ function getIncomeObjects(inputs) {
   const seenIds = new Set();
 
   // 1. From inputs.incomeList
-  const incomeList = inputs.incomeList || [];
+  const incomeList = getIncomeItems(inputs);
   incomeList.forEach((inc, idx) => {
     const id = inc.id || `income-${idx}`;
     if (!seenIds.has(id)) {
@@ -361,7 +370,7 @@ function getIncomeObjects(inputs) {
   }
 
   // 3. From inputs.lifeEvents (income changes, pensions, social security, rental income)
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const incomeEvents = enabledEvents.filter(e => 
     ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome', 'careerChange', 'incomeChange'].includes(e.type)
   );
@@ -394,7 +403,7 @@ function getDebtObjects(inputs) {
   const seenIds = new Set();
 
   // 1. From inputs.debtList
-  const debtList = inputs.debtList || [];
+  const debtList = getDebtItems(inputs);
   debtList.forEach((d, idx) => {
     const id = d.id || `debt-${idx}`;
     if (!seenIds.has(id)) {
@@ -407,7 +416,7 @@ function getDebtObjects(inputs) {
   });
 
   // 2. From pre-existing house asset mortgages
-  const houseAssets = inputs.houseAssets || [];
+  const houseAssets = getHouseAssets(inputs);
   houseAssets.forEach(h => {
     if (h.hasMortgage && h.mortgage) {
       const id = `derived-mortgage-${h.id}`;
@@ -422,7 +431,7 @@ function getDebtObjects(inputs) {
   });
 
   // 3. From borrowing life events
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const borrowingEvents = enabledEvents.filter(e => e.type === 'borrowing');
   borrowingEvents.forEach((e, idx) => {
     const id = e.id || `borrowing-event-${idx}`;
@@ -441,7 +450,7 @@ function getDebtObjects(inputs) {
 function getEducationObjects(inputs) {
   const edu = [];
   const seenIds = new Set();
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const enabledEvents = getEnabledLifeEvents(inputs);
   const collegeEvents = enabledEvents.filter(e => e.type === 'college' || e.type === 'education');
   collegeEvents.forEach((e, idx) => {
     const id = e.id || `edu-event-${idx}`;

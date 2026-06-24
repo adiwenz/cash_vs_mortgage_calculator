@@ -17,6 +17,7 @@ import { hasResolvedRecommendationTradeoffs } from '../../../features/fire/recom
 import { runFireSimulation } from '../../../fireCalculations';
 import { generateChildRecommendations } from '../../../domain/events/child/childRecommendations';
 import { getDefaultEvent } from '../../../features/fire/events/eventDefaults';
+import { getEventDefinition } from '../../../features/fire/events';
 
 import {
   getStartAge,
@@ -239,7 +240,16 @@ export default function MobileEventWizard({
     { type: 'rentalIncome', label: 'Rental Income', category: 'Stop Working', icon: '🏢', popular: false },
     { type: 'annuity', label: 'Annuity', category: 'Stop Working', icon: '📈', popular: false },
     { type: 'otherRetirementIncome', label: 'Other Income', category: 'Stop Working', icon: '💵', popular: false }
-  ];
+  ].map(item => {
+    const def = getEventDefinition(item.type);
+    if (def && def.category !== 'other') {
+      return {
+        ...item,
+        icon: def.emoji || item.icon
+      };
+    }
+    return item;
+  });
 
   // Initialize event with defaults
   const selectEventType = (type) => {

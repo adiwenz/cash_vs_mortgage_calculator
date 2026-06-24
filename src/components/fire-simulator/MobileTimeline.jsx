@@ -1,36 +1,10 @@
 /* eslint-disable react-refresh/only-export-components, no-case-declarations, no-useless-assignment, no-unused-vars, react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { isEditableEvent, getEventIcon, formatCompactCurrency } from './helpers';
+import { getEventShortLabel, getCanonicalEventType } from '../../features/fire/events';
 
 const getShortLabel = (evt) => {
-  if (!evt) return '';
-  if (evt.type === 'socialSecurity') return 'Social Sec.';
-  if (evt.type === 'medicareEligibility') return 'Medicare';
-  if (evt.type === 'retire') return 'Stop Working';
-  if (evt.type === 'haveChild') {
-    return evt.label.replace('Have Child:', '').trim() || 'Have Child';
-  }
-  if (evt.type === 'childSupportEnds') return 'Support Ends';
-  if (evt.type === 'marriage') return 'Marriage';
-  if (evt.type === 'buyHouse') return 'Buy Home';
-  if (evt.type === 'sellHouse') return 'Sell Home';
-  if (evt.type === 'mortgageOff') return 'Mortgage Ends';
-  if (evt.type === 'college') return 'College';
-  if (evt.type === 'sabbatical') return 'Sabbatical';
-  if (evt.type === 'career') return 'Career';
-  if (evt.type === 'lifestyle') return 'Lifestyle';
-  if (evt.type === 'windfall') return 'Windfall';
-  if (evt.type === 'assetTransfer') return 'Transfer';
-  if (evt.type === 'borrowing') return 'Borrowing';
-  if (evt.type === 'payoffPlanEnd') return 'Loan Off';
-  if (evt.type === 'coastFire') return 'Coast FIRE';
-  if (evt.type.startsWith('retirementReady')) return 'Can Stop Working';
-  
-  let cleanLabel = evt.label || '';
-  if (cleanLabel.includes(':')) {
-    cleanLabel = cleanLabel.split(':')[0];
-  }
-  return cleanLabel;
+  return getEventShortLabel(evt);
 };
 
 export const getRoadmapDetails = (evt, formatCurrency, inputs) => {
@@ -156,11 +130,12 @@ const formatCurrency = (val) => {
 
 const getCircleColorClass = (type) => {
   if (type === 'today' || type === 'lifeExpectancy') return 'circle-neutral';
-  if (type === 'haveChild') return 'circle-blue';
-  if (type === 'retire' || type.startsWith('retirementReady')) return 'circle-green';
-  if (type === 'socialSecurity' || type === 'career') return 'circle-gold';
-  if (type === 'marriage') return 'circle-rose';
-  if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'circle-purple';
+  const canonical = getCanonicalEventType(type);
+  if (canonical === 'haveChild') return 'circle-blue';
+  if (canonical === 'retire' || (type && type.startsWith('retirementReady'))) return 'circle-green';
+  if (canonical === 'socialSecurity' || canonical === 'careerChange') return 'circle-gold';
+  if (canonical === 'marriage' || canonical === 'divorce') return 'circle-rose';
+  if (canonical === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'circle-purple';
   return 'circle-purple';
 };
 

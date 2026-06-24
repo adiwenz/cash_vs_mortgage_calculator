@@ -1,6 +1,7 @@
 import { getNormalizedPhases, getEditableBudgetPhases, getTimelineRowInfo, getPhaseChangeExplanations } from '../../fireCalculations';
 import { calculateUSTaxForModal, getRetirementLimit, roundCurrency } from '../../simulatorMathUtils';
 import formatCompactCurrency, { formatCompactFinancial } from '../../utils/formatCompactCurrency';
+import { getEventEmoji, getEventLabel } from '../../features/fire/events';
 
 export { formatCompactCurrency, formatCompactFinancial, getTimelineRowInfo };
 
@@ -502,28 +503,11 @@ export const isFinancialEvent = (evt) => {
 
 export const getEventIcon = (evt) => {
   if (!evt) return '';
-  if (evt.type === 'today' || evt.type === 'lifeExpectancy') {
-    return ''; // neutral endpoint circle only
-  }
-  if (evt.type?.startsWith('retirementReady')) {
-    return '✓';
-  }
+  // Special override for retirement in getEventIcon, where it has historically been ⭐ on charts/timeline
   if (evt.type === 'retire') {
     return '⭐';
   }
-  if (evt.type === 'socialSecurity') {
-    return '🎂';
-  }
-  if (evt.type === 'medicareEligibility') {
-    return '🏥';
-  }
-  if (evt.isPromotion || evt.type === 'promotion') {
-    return '📈';
-  }
-  if (evt.icon === '🏖️' || evt.icon === '🏖' || evt.type === 'retirement') {
-    return '🏖';
-  }
-  return evt.icon || '';
+  return getEventEmoji(evt);
 };
 
 export function getEventMarkerPosition(event, chartData, xScale, yScale, displayAge) {
@@ -568,39 +552,8 @@ export function getEventsForAge(inputs, age) {
     }
 
     if (matches) {
-      let emoji = '❓';
-      let name = e.name || e.type;
-      
-      if (e.type === 'marriage') {
-        emoji = '💍';
-        name = 'Marriage';
-      } else if (e.type === 'haveChild') {
-        emoji = '👶';
-        name = 'Child';
-      } else if (e.type === 'buyHouse') {
-        emoji = '🏠';
-        name = 'Home Purchase';
-      } else if (e.type === 'windfall') {
-        emoji = '💰';
-        name = 'Windfall';
-      } else if (e.type === 'careerChange' || e.type === 'promotion') {
-        emoji = '💼';
-        name = 'Income Change';
-      } else if (e.type === 'college' || e.type === 'education') {
-        emoji = '🎓';
-        name = 'Education';
-      } else if (e.type === 'vehicle' || e.type === 'carLoan') {
-        emoji = '🚗';
-        name = 'Vehicle';
-      } else if (e.type === 'retire') {
-        emoji = '🏖️';
-        name = 'Retirement';
-      } else if (e.type === 'socialSecurity') {
-        emoji = '💰';
-        name = 'Social Security';
-      } else if (e.icon) {
-        emoji = e.icon;
-      }
+      const emoji = getEventEmoji(e) || '❓';
+      const name = getEventLabel(e) || e.name || e.type;
 
       events.push({
         ...e,
@@ -714,19 +667,8 @@ export function getAppliedEventsThroughAge(inputs, age) {
     }
 
     if (eventAge !== null && eventAge <= age && eventAge > currentAge) {
-      let emoji = '❓';
-      let name = e.name || e.type;
-      
-      if (e.type === 'marriage') { emoji = '💍'; name = 'Marriage'; }
-      else if (e.type === 'haveChild') { emoji = '👶'; name = 'Child'; }
-      else if (e.type === 'buyHouse') { emoji = '🏠'; name = 'Home Purchase'; }
-      else if (e.type === 'windfall') { emoji = '💰'; name = 'Windfall'; }
-      else if (e.type === 'careerChange' || e.type === 'promotion') { emoji = '💼'; name = 'Income Change'; }
-      else if (e.type === 'college' || e.type === 'education') { emoji = '🎓'; name = 'Education'; }
-      else if (e.type === 'vehicle' || e.type === 'carLoan') { emoji = '🚗'; name = 'Vehicle'; }
-      else if (e.type === 'retire') { emoji = '🏖️'; name = 'Retirement'; }
-      else if (e.type === 'socialSecurity') { emoji = '💰'; name = 'Social Security'; }
-      else if (e.icon) emoji = e.icon;
+      const emoji = getEventEmoji(e) || '❓';
+      const name = getEventLabel(e) || e.name || e.type;
 
       applied.push({
         ...e,
