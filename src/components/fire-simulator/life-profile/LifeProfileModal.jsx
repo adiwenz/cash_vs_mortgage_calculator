@@ -46,6 +46,7 @@ export default function LifeProfileModal({
     localAge,
     setLocalAge,
     selectedAge,
+    setSelectedAge,
     localLifeExpectancy,
     setLocalLifeExpectancy,
     localSimpleIncome,
@@ -388,6 +389,9 @@ export default function LifeProfileModal({
                 projection={projection}
                 snapshot={snapshot}
                 selectedAge={selectedAge}
+                currentAge={localAge}
+                lifeExpectancy={localLifeExpectancy}
+                onSelectedAgeChange={setSelectedAge}
                 expandedCategories={expandedCategories}
                 setExpandedCategories={setExpandedCategories}
               />
@@ -432,6 +436,9 @@ export default function LifeProfileModal({
               projection={projection}
               snapshot={snapshot}
               selectedAge={selectedAge}
+              currentAge={localAge}
+              lifeExpectancy={localLifeExpectancy}
+              onSelectedAgeChange={setSelectedAge}
               expandedCategories={expandedCategories}
               setExpandedCategories={setExpandedCategories}
             />

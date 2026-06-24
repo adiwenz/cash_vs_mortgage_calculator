@@ -13,9 +13,46 @@ export default function TimelineSnapshotTab({
   projection,
   snapshot,
   selectedAge,
+  currentAge,
+  lifeExpectancy,
+  onSelectedAgeChange,
   expandedCategories,
   setExpandedCategories
 }) {
+  const clampSelectedAge = (age) => {
+    const min = Number(currentAge);
+    const max = Number(lifeExpectancy);
+    const numericAge = Number(age);
+
+    if (!Number.isFinite(numericAge)) return min;
+    return Math.min(max, Math.max(min, Math.round(numericAge)));
+  };
+
+  const handleTimelineClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, clickX / (rect.width || 1)));
+    const range = projection.maxAge - projection.minAge;
+    const clickedAge = projection.minAge + pct * range;
+    onSelectedAgeChange(clampSelectedAge(clickedAge));
+  };
+
+  const handleDecrementAge = () => {
+    onSelectedAgeChange(clampSelectedAge(selectedAge - 1));
+  };
+
+  const handleIncrementAge = () => {
+    onSelectedAgeChange(clampSelectedAge(selectedAge + 1));
+  };
+
+  const getSelectedAgePercent = () => {
+    const domainRange = projection.maxAge - projection.minAge;
+    if (domainRange <= 0) return 0;
+    return ((selectedAge - projection.minAge) / domainRange) * 100;
+  };
+
+  const isDecrementDisabled = selectedAge <= Number(currentAge);
+  const isIncrementDisabled = selectedAge >= Number(lifeExpectancy);
   const getCategoryBg = (rowId) => {
     switch (rowId) {
       case 'relationship': return '#f3e8ff';
@@ -276,6 +313,19 @@ export default function TimelineSnapshotTab({
               }}
             />
           )}
+          {selectedAge !== Number(currentAge) && selectedAge >= minAge && selectedAge <= maxAge && (
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${getSelectedAgePercent()}%`,
+                top: 0,
+                bottom: 0,
+                width: '2px',
+                background: 'rgba(37, 99, 235, 0.15)',
+                borderLeft: '2px dashed #2563eb',
+              }}
+            />
+          )}
         </div>
 
         {allDescriptors.map(descriptor => {
@@ -319,7 +369,11 @@ export default function TimelineSnapshotTab({
                   </span>
                 </div>
                 
-                <div className="timeline-row-plot-col" style={{ overflow: 'visible' }}>
+                <div 
+                  className="timeline-row-plot-col" 
+                  style={{ overflow: 'visible', cursor: 'pointer' }}
+                  onClick={handleTimelineClick}
+                >
                   <div className="timeline-row-baseline-track-line" />
                   
                   {isAssets ? (
@@ -365,7 +419,11 @@ export default function TimelineSnapshotTab({
                   </span>
                 </div>
                 
-                <div className="timeline-row-plot-col" style={{ overflow: 'visible' }}>
+                <div 
+                  className="timeline-row-plot-col" 
+                  style={{ overflow: 'visible', cursor: 'pointer' }}
+                  onClick={handleTimelineClick}
+                >
                   <div className="timeline-row-baseline-track-line" />
                   
                   {objectItems.map(item => {
@@ -400,7 +458,11 @@ export default function TimelineSnapshotTab({
         <div className="timeline-row-label-col">
           <span className="timeline-row-label-text" style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Age</span>
         </div>
-        <div className="timeline-row-plot-col" style={{ overflow: 'visible' }}>
+        <div 
+          className="timeline-row-plot-col" 
+          style={{ overflow: 'visible', cursor: 'pointer' }}
+          onClick={handleTimelineClick}
+        >
           {ticks.map(a => {
             const pct = ((a - minAge) / range) * 100;
             return (
@@ -445,6 +507,41 @@ export default function TimelineSnapshotTab({
               </div>
             </div>
           )}
+
+          {selectedAge !== Number(currentAge) && selectedAge >= minAge && selectedAge <= maxAge && (
+            <div 
+              style={{ 
+                position: 'absolute', 
+                left: `${getSelectedAgePercent()}%`, 
+                transform: 'translateX(-50%)', 
+                top: '-14px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                zIndex: 12 
+              }}
+            >
+              <span style={{ fontSize: '0.62rem', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase', marginBottom: '2px' }}>Selected</span>
+              <div 
+                style={{ 
+                  width: '20px', 
+                  height: '20px', 
+                  borderRadius: '50%', 
+                  background: '#2563eb', 
+                  color: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '0.65rem', 
+                  fontWeight: '800', 
+                  border: '2px solid #ffffff', 
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)' 
+                }}
+              >
+                {selectedAge}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -468,11 +565,38 @@ export default function TimelineSnapshotTab({
         
         <div className="life-snapshot-panel" style={{ padding: '1rem' }}>
           <div className="life-snapshot-header">
-            <h4 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>Life Snapshot</h4>
+            <h4 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>
+              <span>Life Snapshot</span>
+              <span style={{ marginLeft: '0.5rem', fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                - {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}
+              </span>
+            </h4>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>View your life at any age.</p>
           </div>
-          <div className="life-snapshot-age-selector-row" style={{ margin: '0.5rem 0' }}>
-            <span className="age-selector-text">Age {selectedAge} {selectedAge === projection.currentAge ? '(Today)' : ''}</span>
+          <div className="life-snapshot-age-selector-row" style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button 
+              type="button" 
+              className="age-selector-arrow-btn" 
+              onClick={handleDecrementAge}
+              disabled={isDecrementDisabled}
+              aria-label="Previous age"
+              style={isDecrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
+            >
+              &larr;
+            </button>
+            <span className="age-selector-text">
+              Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
+            </span>
+            <button 
+              type="button" 
+              className="age-selector-arrow-btn" 
+              onClick={handleIncrementAge}
+              disabled={isIncrementDisabled}
+              aria-label="Next age"
+              style={isIncrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
+            >
+              &rarr;
+            </button>
           </div>
           <div className="life-snapshot-rows-list">
             {renderSnapshotRow('❤️', 'Relationship', formatRelationshipStatus(snapshot.relationshipStatus))}
@@ -537,15 +661,40 @@ export default function TimelineSnapshotTab({
       {/* Right Column: Life Snapshot */}
       <div className="life-snapshot-panel">
         <div className="life-snapshot-header">
-          <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Life Snapshot</h4>
+          <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+            <span>Life Snapshot</span>
+            <span style={{ marginLeft: '0.5rem', fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              - {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}
+            </span>
+          </h4>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>View your life at any age.</p>
         </div>
 
         {/* Selected Age Indicator */}
         <div className="life-snapshot-age-selector-row">
-          <button type="button" className="age-selector-arrow-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>&larr;</button>
-          <span className="age-selector-text">Age {selectedAge} {selectedAge === projection.currentAge ? '(Today)' : ''}</span>
-          <button type="button" className="age-selector-arrow-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>&rarr;</button>
+          <button 
+            type="button" 
+            className="age-selector-arrow-btn" 
+            onClick={handleDecrementAge}
+            disabled={isDecrementDisabled}
+            aria-label="Previous age"
+            style={isDecrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
+          >
+            &larr;
+          </button>
+          <span className="age-selector-text">
+            Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
+          </span>
+          <button 
+            type="button" 
+            className="age-selector-arrow-btn" 
+            onClick={handleIncrementAge}
+            disabled={isIncrementDisabled}
+            aria-label="Next age"
+            style={isIncrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
+          >
+            &rarr;
+          </button>
         </div>
 
         {/* Snapshot Rows */}

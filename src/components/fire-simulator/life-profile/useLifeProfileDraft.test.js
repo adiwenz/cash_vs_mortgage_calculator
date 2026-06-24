@@ -101,4 +101,88 @@ describe('useLifeProfileDraft', () => {
 
     expect(result.current.localProfile.children[0].name).toBe('Bobby');
   });
+
+  it('clamps selectedAge when lifeExpectancy changes', () => {
+    const { result } = renderHook(() =>
+      useLifeProfileDraft({
+        isOpen: true,
+        inputs: {
+          currentAge: 35,
+          lifeExpectancy: 85,
+          simpleIncome: 50000,
+          targetRetirementAge: 65,
+          lifeEvents: [],
+          lifeProfile: null
+        },
+        onClose: () => {},
+        updateInput: () => {}
+      })
+    );
+
+    act(() => {
+      result.current.setSelectedAge(80);
+    });
+    expect(result.current.selectedAge).toBe(80);
+
+    act(() => {
+      result.current.setLocalLifeExpectancy(70);
+    });
+    expect(result.current.selectedAge).toBe(70);
+  });
+
+  it('resets selectedAge to currentAge when currentAge increases past selectedAge', () => {
+    const { result } = renderHook(() =>
+      useLifeProfileDraft({
+        isOpen: true,
+        inputs: {
+          currentAge: 35,
+          lifeExpectancy: 85,
+          simpleIncome: 50000,
+          targetRetirementAge: 65,
+          lifeEvents: [],
+          lifeProfile: null
+        },
+        onClose: () => {},
+        updateInput: () => {}
+      })
+    );
+
+    act(() => {
+      result.current.setSelectedAge(40);
+    });
+    expect(result.current.selectedAge).toBe(40);
+
+    act(() => {
+      result.current.setLocalAge(45);
+    });
+    expect(result.current.selectedAge).toBe(45);
+  });
+
+  it('keeps selectedAge unchanged when currentAge changes but selectedAge remains valid', () => {
+    const { result } = renderHook(() =>
+      useLifeProfileDraft({
+        isOpen: true,
+        inputs: {
+          currentAge: 35,
+          lifeExpectancy: 85,
+          simpleIncome: 50000,
+          targetRetirementAge: 65,
+          lifeEvents: [],
+          lifeProfile: null
+        },
+        onClose: () => {},
+        updateInput: () => {}
+      })
+    );
+
+    act(() => {
+      result.current.setSelectedAge(45);
+    });
+    expect(result.current.selectedAge).toBe(45);
+
+    act(() => {
+      result.current.setLocalAge(40);
+    });
+    expect(result.current.selectedAge).toBe(45);
+  });
 });

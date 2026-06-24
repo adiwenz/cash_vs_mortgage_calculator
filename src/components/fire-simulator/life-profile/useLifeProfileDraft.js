@@ -95,6 +95,19 @@ export default function useLifeProfileDraft({
     }
   }, [isOpen, inputs, initialTab]);
 
+  // Enforce selectedAge safety boundaries when localAge (currentAge) or localLifeExpectancy changes
+  useEffect(() => {
+    setSelectedAge(prev => {
+      if (prev < localAge) {
+        return localAge;
+      }
+      if (prev > localLifeExpectancy) {
+        return localLifeExpectancy;
+      }
+      return prev;
+    });
+  }, [localAge, localLifeExpectancy]);
+
   // Save profile updates to scenario state
   const saveToParent = (profileData, ageData, lifeExpData, salaryData, retireAgeData, ssAgeData, bhEnabled, bhAge, bhPrice) => {
     setLastChartChangeType('profile_value_change');
