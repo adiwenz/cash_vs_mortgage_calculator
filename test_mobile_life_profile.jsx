@@ -38,7 +38,10 @@ describe('Mobile Life Profile Modal Redesign', () => {
 
     // Assert self-person card is visible
     expect(screen.getByText('You')).toBeDefined();
-    expect(screen.getByText(/Age: 35 · Life Expectancy: 85/)).toBeDefined();
+    expect(screen.getByText('Your Age')).toBeDefined();
+    expect(screen.getByText('35')).toBeDefined();
+    expect(screen.getByText('Life Expectancy')).toBeDefined();
+    expect(screen.getByText('85')).toBeDefined();
   });
 
   test('edits You Age with auto-save on mobile', () => {
