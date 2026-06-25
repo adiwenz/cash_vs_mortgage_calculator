@@ -37,6 +37,7 @@ export const DEFAULT_FIRE_INPUTS = {
     tradIra: 0,
     rothIra: 0,
     hsa: 0,
+    savings529: 0,
     realEstate: 0,
     other: 0,
     debts: 0
@@ -142,7 +143,7 @@ export const DEFAULT_FIRE_INPUTS = {
     home: { status: 'rent', monthlyRent: 1500, homeValue: 0, mortgageBalance: 0, monthlyPayment: 0, propertyTaxes: 0, insurance: 0, hoa: 0 },
     children: [],
     debts: [],
-    assets: { cash: 0, brokerage: 5000, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, crypto: 0, businessEquity: 0 },
+    assets: { cash: 0, emergencyFund: 0, brokerage: 5000, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, savings529: 0, crypto: 0, businessEquity: 0 },
     incomeSources: []
   },
   useLifeProfile: false

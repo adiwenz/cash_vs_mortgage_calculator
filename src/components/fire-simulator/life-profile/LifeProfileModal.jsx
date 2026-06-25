@@ -163,6 +163,7 @@ export default function LifeProfileModal({
                 triggerSave={triggerSave}
                 editingItemId={editingItemId}
                 setEditingItemId={setEditingItemId}
+                initialTab={initialTab}
               />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
@@ -249,7 +250,7 @@ export default function LifeProfileModal({
         className="life-profile-modal-card" 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          maxWidth: (activeTab === 'timeline') ? '1400px' : '960px', 
+          maxWidth: (activeTab === 'timeline') ? '1400px' : (activeTab === 'lifeItems' || activeTab === 'events') ? '1280px' : '960px', 
           width: '95%', 
           transition: 'max-width 0.2s' 
         }}
@@ -296,6 +297,7 @@ export default function LifeProfileModal({
                       triggerSave={triggerSave}
                       editingItemId={editingItemId}
                       setEditingItemId={setEditingItemId}
+                      initialTab={initialTab}
                     />
                   )}
 
