@@ -20,7 +20,8 @@ import {
   AssetsTab,
   DebtsTab,
   TimelineSnapshotTab,
-  useLifeProfileDraft
+  useLifeProfileDraft,
+  EventsWorkspace
 } from './index.js';
 
 
@@ -31,7 +32,10 @@ export default function LifeProfileModal({
   updateInput,
   initialTab = 'timeline',
   isMobile = false,
-  simulation
+  simulation,
+  handleCreateEvent,
+  handleEditRoadmapEvent,
+  handleDeleteEvent
 }) {
   const {
     activeTab,
@@ -347,6 +351,7 @@ export default function LifeProfileModal({
   // Tabs definitions for desktop & mobile
   const tabs = [
     { id: 'timeline', label: '📈 Timeline', icon: '📈' },
+    { id: 'events', label: '📅 Events', icon: '📅' },
     { id: 'household', label: '💍 Household', icon: '💍' },
     { id: 'home', label: '🏠 Home', icon: '🏠' },
     { id: 'children', label: '👶 Children', icon: '👶' },
@@ -395,6 +400,23 @@ export default function LifeProfileModal({
                 expandedCategories={expandedCategories}
                 setExpandedCategories={setExpandedCategories}
               />
+            ) : activeTab === 'events' ? (
+              <EventsWorkspace
+                isMobile={true}
+                inputs={inputs}
+                projection={projection}
+                snapshot={snapshot}
+                selectedAge={selectedAge}
+                currentAge={localAge}
+                lifeExpectancy={localLifeExpectancy}
+                onSelectedAgeChange={setSelectedAge}
+                expandedCategories={expandedCategories}
+                setExpandedCategories={setExpandedCategories}
+                handleCreateEvent={handleCreateEvent}
+                handleEditRoadmapEvent={handleEditRoadmapEvent}
+                handleDeleteEvent={handleDeleteEvent}
+                simulation={simulation}
+              />
             ) : (
               renderMobileScreenContent()
             )}
@@ -411,7 +433,7 @@ export default function LifeProfileModal({
         className="life-profile-modal-card" 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          maxWidth: activeTab === 'timeline' ? '1400px' : '960px', 
+          maxWidth: (activeTab === 'timeline' || activeTab === 'events') ? '1400px' : '960px', 
           width: '95%', 
           transition: 'max-width 0.2s' 
         }}
@@ -428,7 +450,7 @@ export default function LifeProfileModal({
           isMobile={false}
         />
 
-        <div className={`life-profile-modal-body-layout ${activeTab === 'timeline' ? 'timeline-active' : ''}`}>
+        <div className={`life-profile-modal-body-layout ${(activeTab === 'timeline' || activeTab === 'events') ? 'timeline-active' : ''}`}>
           {activeTab === 'timeline' ? (
             <TimelineSnapshotTab
               isMobile={false}
@@ -441,6 +463,23 @@ export default function LifeProfileModal({
               onSelectedAgeChange={setSelectedAge}
               expandedCategories={expandedCategories}
               setExpandedCategories={setExpandedCategories}
+            />
+          ) : activeTab === 'events' ? (
+            <EventsWorkspace
+              isMobile={false}
+              inputs={inputs}
+              projection={projection}
+              snapshot={snapshot}
+              selectedAge={selectedAge}
+              currentAge={localAge}
+              lifeExpectancy={localLifeExpectancy}
+              onSelectedAgeChange={setSelectedAge}
+              expandedCategories={expandedCategories}
+              setExpandedCategories={setExpandedCategories}
+              handleCreateEvent={handleCreateEvent}
+              handleEditRoadmapEvent={handleEditRoadmapEvent}
+              handleDeleteEvent={handleDeleteEvent}
+              simulation={simulation}
             />
           ) : (
             <>

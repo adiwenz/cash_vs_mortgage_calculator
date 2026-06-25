@@ -198,6 +198,7 @@ export default function LifePlanScreen({
   validation: legacyValidation,
   handleCreateEvent: legacyHandleCreateEvent,
   handleEditRoadmapEvent: legacyHandleEditRoadmapEvent,
+  handleDeleteEvent: legacyHandleDeleteEvent,
   improvementPlan: legacyImprovementPlan,
   setShowImprovementModal: legacySetShowImprovementModal,
   handleSetBudgetClick: legacySetBudgetClick,
@@ -239,6 +240,7 @@ export default function LifePlanScreen({
   const editingEvent = eventController?.editingEvent ?? legacyEditingEvent;
   const handleCreateEvent = eventController?.handleCreateEvent ?? legacyHandleCreateEvent;
   const handleEditRoadmapEvent = eventController?.handleEditRoadmapEvent ?? legacyHandleEditRoadmapEvent;
+  const handleDeleteEvent = eventController?.handleDeleteEvent ?? legacyHandleDeleteEvent;
 
   const handleSetBudgetClick = budgetController?.handleSetBudgetClick ?? legacySetBudgetClick;
   const handleOpenSavingsDetails = budgetController?.handleOpenSavingsDetails ?? legacyHandleOpenSavingsDetails;
@@ -1852,6 +1854,7 @@ export default function LifePlanScreen({
         simulation={activeResults}
         handleCreateEvent={handleCreateEvent}
         handleEditRoadmapEvent={handleEditRoadmapEvent}
+        handleDeleteEvent={handleDeleteEvent}
       />
 
     </>

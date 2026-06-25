@@ -9,3 +9,6 @@ export { default as DebtsTab } from './DebtsTab';
 export { default as TimelineSnapshotTab } from './TimelineSnapshotTab';
 export { default as LifeProfileModal } from './LifeProfileModal';
 export { default as useLifeProfileDraft } from './useLifeProfileDraft';
+export { default as EventsWorkspace } from './EventsWorkspace';
+export { default as LifeSnapshotPanel } from './LifeSnapshotPanel';
+
