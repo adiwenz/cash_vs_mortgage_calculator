@@ -1,20 +1,31 @@
 import { clampAgeValue } from '../helpers';
+import { deriveLegacyInputsFromLifePlan } from '../../../models/lifePlan/lifePlanNormalization.js';
 
 /**
  * Pure adapter mapping the local life profile draft state back to
  * scenario fields. Does not mutate any arguments.
  */
-export function getSaveUpdates({
-  profile,
-  age,
-  lifeExp,
-  salary,
-  retireAge,
-  ssAge,
-  bhEnabled,
-  bhAge,
-  bhPrice
-}, inputs = {}) {
+export function getSaveUpdates(updates, inputs = {}) {
+  if (updates.lifePlan) {
+    const derived = deriveLegacyInputsFromLifePlan(updates.lifePlan, inputs);
+    return {
+      ...derived,
+      lifePlan: updates.lifePlan
+    };
+  }
+
+  const {
+    profile,
+    age,
+    lifeExp,
+    salary,
+    retireAge,
+    ssAge,
+    bhEnabled,
+    bhAge,
+    bhPrice
+  } = updates;
+
   // Safe deep clone of profile so we do not mutate inputs
   const profileData = JSON.parse(JSON.stringify(profile));
 

@@ -468,14 +468,6 @@ function getEducationObjects(inputs) {
 export function buildTimelineRows(inputs) {
   const actualInputs = inputs?.inputs || inputs || {};
 
-  const children = getChildObjects(actualInputs);
-  const housing = getHousingObjects(actualInputs);
-  const income = getIncomeObjects(actualInputs);
-  const debt = getDebtObjects(actualInputs);
-  const education = getEducationObjects(actualInputs);
-
-  const rows = [];
-
   const createRow = ({ type, id, parent, label, icon, count, objectType, objectId }) => ({
     type,
     id,
@@ -487,6 +479,74 @@ export function buildTimelineRows(inputs) {
     objectId: objectId || null,
     rowKey: type === 'object' ? getObjectRowKey(objectType, objectId) : null
   });
+
+  const rows = [];
+
+  if (actualInputs.lifePlan) {
+    const lifePlan = actualInputs.lifePlan;
+    const objects = lifePlan.objects || [];
+
+    // 1. Relationship / Household
+    const people = objects.filter(o => o.type === 'person');
+    rows.push(createRow({ type: 'category', id: 'relationship', parent: null, label: 'Relationship', icon: '❤️', count: people.length }));
+    people.forEach(p => {
+      rows.push(createRow({ type: 'object', id: p.id, parent: 'relationship', label: p.name, icon: '👤', objectType: p.type, objectId: p.id }));
+    });
+
+    // 2. Housing
+    const properties = objects.filter(o => o.type === 'property');
+    rows.push(createRow({ type: 'category', id: 'housing', parent: null, label: 'Housing', icon: '🏠', count: properties.length }));
+    properties.forEach(p => {
+      rows.push(createRow({ type: 'object', id: p.id, parent: 'housing', label: p.name, icon: '🏠', objectType: p.type, objectId: p.id }));
+    });
+
+    // 3. Children
+    const children = objects.filter(o => o.type === 'child');
+    rows.push(createRow({ type: 'category', id: 'children', parent: null, label: 'Children', icon: '👶', count: children.length }));
+    children.forEach(c => {
+      rows.push(createRow({ type: 'object', id: c.id, parent: 'children', label: c.name, icon: '👶', objectType: c.type, objectId: c.id }));
+    });
+
+    // 4. Jobs & Income
+    const jobs = objects.filter(o => o.type === 'job');
+    rows.push(createRow({ type: 'category', id: 'income', parent: null, label: 'Income', icon: '💼', count: jobs.length }));
+    jobs.forEach(j => {
+      rows.push(createRow({ type: 'object', id: j.id, parent: 'income', label: j.name, icon: '💼', objectType: j.type, objectId: j.id }));
+    });
+
+    // 5. Debt
+    const debts = objects.filter(o => o.type === 'debt');
+    rows.push(createRow({ type: 'category', id: 'debt', parent: null, label: 'Debt', icon: '💸', count: debts.length }));
+    debts.forEach(d => {
+      rows.push(createRow({ type: 'object', id: d.id, parent: 'debt', label: d.name, icon: '💸', objectType: d.type, objectId: d.id }));
+    });
+
+    // 6. Accounts / Assets
+    const accounts = objects.filter(o => o.type === 'account' || o.type === 'business');
+    rows.push(createRow({ type: 'category', id: 'assets', parent: null, label: 'Assets', icon: '🏦', count: accounts.length }));
+    accounts.forEach(a => {
+      rows.push(createRow({ type: 'object', id: a.id, parent: 'assets', label: a.name, icon: '🏦', objectType: a.type, objectId: a.id }));
+    });
+
+    // 7. Goals
+    const goals = objects.filter(o => o.type === 'goal');
+    rows.push(createRow({ type: 'category', id: 'goals', parent: null, label: 'Goals', icon: '🎯', count: goals.length }));
+    goals.forEach(g => {
+      rows.push(createRow({ type: 'object', id: g.id, parent: 'goals', label: g.name, icon: '🎯', objectType: g.type, objectId: g.id }));
+    });
+
+    // 8. Major Events
+    rows.push(createRow({ type: 'category', id: 'major-events', parent: null, label: 'Major Events', icon: '⭐️', count: 0 }));
+
+    return rows;
+  }
+
+  // Legacy fallback
+  const children = getChildObjects(actualInputs);
+  const housing = getHousingObjects(actualInputs);
+  const income = getIncomeObjects(actualInputs);
+  const debt = getDebtObjects(actualInputs);
+  const education = getEducationObjects(actualInputs);
 
   // 1. Relationship
   rows.push(createRow({

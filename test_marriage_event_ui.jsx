@@ -24,10 +24,20 @@ describe('Marriage Event Flow - UI and Financial Simulation Integration', () => 
     const totalAssetsRow = screen.getByText('Invested Assets');
     fireEvent.click(totalAssetsRow);
     
+    // Click Edit next to the Brokerage account card
     const brokerageLabel = screen.getByText('📈 Taxable Brokerage');
-    const parent = brokerageLabel.parentElement;
-    const input = parent.querySelector('input');
+    const listItem = brokerageLabel.closest('.life-profile-list-item');
+    const editButton = listItem.querySelector('button');
+    fireEvent.click(editButton);
+
+    // Modify Current Balance input in the edit form
+    const balanceLabel = screen.getByText('Current Balance');
+    const input = balanceLabel.parentElement.querySelector('input');
     fireEvent.change(input, { target: { value: '100000' } });
+
+    // Click Save Item
+    const saveItemButton = screen.getByRole('button', { name: /Save Item/i });
+    fireEvent.click(saveItemButton);
     
     const saveButton = screen.getByRole('button', { name: /Save Profile/i });
     fireEvent.click(saveButton);

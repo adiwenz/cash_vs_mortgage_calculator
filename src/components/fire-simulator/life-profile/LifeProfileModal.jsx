@@ -10,6 +10,9 @@ import {
 import { formatCurrency } from '../helpers';
 import { getTimelineProjection, getLifeSnapshotAtAge } from '../../../models/lifeTimeline/index.js';
 import { getProfileTotals, getProfileCompletion } from './lifeProfileDraftUtils';
+import LifeItemsWorkspace from './LifeItemsWorkspace';
+import AssumptionsPanel from '../../AssumptionsPanel';
+import LifeSnapshotPanel from './LifeSnapshotPanel';
 import {
   LifeProfileHeader,
   LifeProfileTabs,
@@ -81,7 +84,9 @@ export default function LifeProfileModal({
     popScreen,
     popScreenAndSave,
     triggerSave,
-    handleSave
+    handleSave,
+    localLifePlan,
+    setLocalLifePlan
   } = useLifeProfileDraft({
     isOpen,
     onClose,
@@ -96,268 +101,13 @@ export default function LifeProfileModal({
   // Summary Metrics calculations
   const { totalAssetsSum, totalDebtsSum, totalDebtsMonthlyPayments } = getProfileTotals(localProfile);
 
-  // Completion statuses
-  const { isHouseholdCompleted, isHomeCompleted, isFinancesCompleted, isWorkCompleted } = getProfileCompletion({
-    profile: localProfile,
-    age: localAge,
-    simpleIncome: localSimpleIncome,
-    targetRetirementAge: localTargetRetirementAge,
-    ssClaimingAge: localSSClaimingAge
-  });
-
-  const getMobileScreenTitle = () => {
-    const current = navStack[navStack.length - 1];
-    switch (current.name) {
-      case 'root':
-        return 'Life Planner';
-      case 'household':
-        return 'Household';
-      case 'child_details':
-        return 'Child Details';
-      case 'home':
-        return 'Home';
-      case 'finances_menu':
-        return 'Finances';
-      case 'finance_income':
-        return 'Income';
-      case 'finance_assets':
-        return 'Assets';
-      case 'finance_debts':
-        return 'Debts';
-      case 'work_retirement':
-        return 'Work & Retirement';
-      default:
-        return 'Life Planner';
-    }
-  };
-
-  const renderMobileScreenContent = () => {
-    const currentScreen = navStack[navStack.length - 1];
-    
-    switch (currentScreen.name) {
-      case 'root':
-        return (
-          <div className="life-profile-mobile-root">
-            <p className="life-profile-mobile-subtitle">
-              Tell us about your life so we can personalize your plan.
-            </p>
-            
-            <div className="life-profile-mobile-menu">
-              {/* Household */}
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('household')}>
-                <div className="menu-item-icon-container household-icon">
-                  <Users size={20} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Household</span>
-                  <span className="menu-item-desc">You, partner, children</span>
-                  {isHouseholdCompleted && (
-                    <span className="completion-status text-success">
-                      <Check size={12} style={{ marginRight: '2px', strokeWidth: 3 }} /> Completed
-                    </span>
-                  )}
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-
-              {/* Home */}
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('home')}>
-                <div className="menu-item-icon-container home-icon">
-                  <HomeIcon size={20} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Home</span>
-                  <span className="menu-item-desc">Where you live</span>
-                  {isHomeCompleted && (
-                    <span className="completion-status text-success">
-                      <Check size={12} style={{ marginRight: '2px', strokeWidth: 3 }} /> Completed
-                    </span>
-                  )}
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-
-              {/* Finances */}
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('finances_menu')}>
-                <div className="menu-item-icon-container finances-icon">
-                  <DollarSign size={20} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Finances</span>
-                  <span className="menu-item-desc">Income, assets, debts</span>
-                  {isFinancesCompleted && (
-                    <span className="completion-status text-success">
-                      <Check size={12} style={{ marginRight: '2px', strokeWidth: 3 }} /> Completed
-                    </span>
-                  )}
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-
-              {/* Work & Retirement */}
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('work_retirement')}>
-                <div className="menu-item-icon-container work-icon">
-                  <Briefcase size={20} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Work & Retirement</span>
-                  <span className="menu-item-desc">Career and retirement plans</span>
-                  {isWorkCompleted && (
-                    <span className="completion-status text-success">
-                      <Check size={12} style={{ marginRight: '2px', strokeWidth: 3 }} /> Completed
-                    </span>
-                  )}
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-            </div>
-
-            <div className="life-profile-mobile-info-banner">
-              <Info size={16} />
-              <span>You can update any section at any time. All fields are optional.</span>
-            </div>
-          </div>
-        );
-
-      case 'household':
-      case 'child_details':
-        return (
-          <HouseholdTab
-            isMobile={true}
-            currentScreen={currentScreen}
-            localAge={localAge}
-            setLocalAge={setLocalAge}
-            localLifeExpectancy={localLifeExpectancy}
-            setLocalLifeExpectancy={setLocalLifeExpectancy}
-            localProfile={localProfile}
-            setLocalProfile={setLocalProfile}
-            updateHouseholdField={updateHouseholdField}
-            updateChild={updateChild}
-            addChild={addChild}
-            removeChild={removeChild}
-            triggerSave={triggerSave}
-            pushScreen={pushScreen}
-            popScreen={popScreen}
-          />
-        );
-
-      case 'home':
-        return (
-          <HousingTab
-            isMobile={true}
-            localProfile={localProfile}
-            updateHomeField={updateHomeField}
-            localBuyHouseEnabled={localBuyHouseEnabled}
-            setLocalBuyHouseEnabled={setLocalBuyHouseEnabled}
-            localBuyHouseAge={localBuyHouseAge}
-            setLocalBuyHouseAge={setLocalBuyHouseAge}
-            localBuyHousePrice={localBuyHousePrice}
-            setLocalBuyHousePrice={setLocalBuyHousePrice}
-            showAdvancedHome={showAdvancedHome}
-            setShowAdvancedHome={setShowAdvancedHome}
-            triggerSave={triggerSave}
-          />
-        );
-
-      case 'finances_menu':
-        return (
-          <div className="life-profile-mobile-root">
-            <div className="life-profile-mobile-menu">
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('finance_income')}>
-                <div className="menu-item-icon-container finances-icon">
-                  <DollarSign size={20} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Income</span>
-                  <span className="menu-item-desc">Salary and extra income</span>
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('finance_assets')}>
-                <div className="menu-item-icon-container assets-icon">
-                  <DollarSign size={20} style={{ color: '#16a34a' }} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Assets</span>
-                  <span className="menu-item-desc">Cash and investments</span>
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-
-              <div className="life-profile-mobile-menu-item" onClick={() => pushScreen('finance_debts')}>
-                <div className="menu-item-icon-container debts-icon">
-                  <DollarSign size={20} style={{ color: '#dc2626' }} />
-                </div>
-                <div className="menu-item-text">
-                  <span className="menu-item-title">Debts</span>
-                  <span className="menu-item-desc">Mortgages and other loans</span>
-                </div>
-                <ChevronRight size={18} className="chevron-icon" />
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'finance_income':
-      case 'work_retirement':
-        return (
-          <IncomeTab
-            isMobile={true}
-            currentScreen={currentScreen}
-            localSimpleIncome={localSimpleIncome}
-            setLocalSimpleIncome={setLocalSimpleIncome}
-            localTargetRetirementAge={localTargetRetirementAge}
-            setLocalTargetRetirementAge={setLocalTargetRetirementAge}
-            localSSClaimingAge={localSSClaimingAge}
-            setLocalSSClaimingAge={setLocalSSClaimingAge}
-            localProfile={localProfile}
-            updateHouseholdField={updateHouseholdField}
-            updateIncomeSource={updateIncomeSource}
-            addIncomeSource={addIncomeSource}
-            removeIncomeSource={removeIncomeSource}
-            triggerSave={triggerSave}
-          />
-        );
-
-      case 'finance_assets':
-        return (
-          <AssetsTab
-            isMobile={true}
-            localProfile={localProfile}
-            updateAssetField={updateAssetField}
-            triggerSave={triggerSave}
-          />
-        );
-
-      case 'finance_debts':
-        return (
-          <DebtsTab
-            isMobile={true}
-            localProfile={localProfile}
-            updateHomeField={updateHomeField}
-            updateDebt={updateDebt}
-            addDebt={addDebt}
-            removeDebt={removeDebt}
-            triggerSave={triggerSave}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
   // Tabs definitions for desktop & mobile
   const tabs = [
     { id: 'timeline', label: '📈 Timeline', icon: '📈' },
+    { id: 'lifeItems', label: '📁 Life Items', icon: '📁' },
     { id: 'events', label: '📅 Events', icon: '📅' },
-    { id: 'household', label: '💍 Household', icon: '💍' },
-    { id: 'home', label: '🏠 Home', icon: '🏠' },
-    { id: 'children', label: '👶 Children', icon: '👶' },
-    { id: 'debts', label: '💳 Debts', icon: '💳' },
-    { id: 'assets', label: '🏦 Assets', icon: '🏦' },
-    { id: 'income', label: '💵 Income', icon: '💵' }
+    { id: 'snapshot', label: '📋 Snapshot', icon: '📋' },
+    { id: 'assumptions', label: '⚙️ Assumptions', icon: '⚙️' }
   ];
 
   // Derive projection and snapshot
@@ -376,7 +126,7 @@ export default function LifeProfileModal({
             navStack={navStack}
             popScreenAndSave={popScreenAndSave}
             onClose={onClose}
-            mobileScreenTitle={getMobileScreenTitle()}
+            mobileScreenTitle={activeTab === 'timeline' ? 'Timeline' : activeTab === 'lifeItems' ? 'Life Items' : activeTab === 'events' ? 'Events' : activeTab === 'snapshot' ? 'Snapshot' : 'Assumptions'}
           />
 
           <LifeProfileTabs
@@ -400,6 +150,16 @@ export default function LifeProfileModal({
                 expandedCategories={expandedCategories}
                 setExpandedCategories={setExpandedCategories}
               />
+            ) : activeTab === 'lifeItems' ? (
+              <LifeItemsWorkspace
+                isMobile={true}
+                inputs={inputs}
+                localLifePlan={localLifePlan}
+                setLocalLifePlan={setLocalLifePlan}
+                currentAge={localAge}
+                lifeExpectancy={localLifeExpectancy}
+                triggerSave={triggerSave}
+              />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
                 isMobile={true}
@@ -417,9 +177,57 @@ export default function LifeProfileModal({
                 handleDeleteEvent={handleDeleteEvent}
                 simulation={simulation}
               />
-            ) : (
-              renderMobileScreenContent()
-            )}
+            ) : activeTab === 'snapshot' ? (
+              <LifeSnapshotPanel
+                isMobile={true}
+                projection={projection}
+                snapshot={snapshot}
+                selectedAge={selectedAge}
+                currentAge={localAge}
+                lifeExpectancy={localLifeExpectancy}
+                onSelectedAgeChange={setSelectedAge}
+              />
+            ) : activeTab === 'assumptions' ? (
+              <div style={{ padding: '1rem' }}>
+                <AssumptionsPanel
+                  inputs={localLifePlan ? { ...inputs, ...localLifePlan.assumptions } : inputs}
+                  onChange={(key, val) => {
+                    if (localLifePlan) {
+                      const updated = {
+                        ...localLifePlan,
+                        assumptions: {
+                          ...localLifePlan.assumptions,
+                          [key]: val
+                        }
+                      };
+                      setLocalLifePlan(updated);
+                      triggerSave({ lifePlan: updated });
+                    }
+                  }}
+                  onReset={() => {
+                    if (localLifePlan) {
+                      const updated = {
+                        ...localLifePlan,
+                        assumptions: {
+                          expectedReturn: 7.0,
+                          postRetirementReturn: 5.0,
+                          inflationRate: 3.0,
+                          cashReturnRate: 2.0,
+                          lifestyleUpgrades: 0.0,
+                          swr: 4.0,
+                          includeTaxes: false,
+                          preMedicarePremium: 10000,
+                          medicarePremium: 4000
+                        }
+                      };
+                      setLocalLifePlan(updated);
+                      triggerSave({ lifePlan: updated });
+                    }
+                  }}
+                  onClose={onClose}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -433,7 +241,7 @@ export default function LifeProfileModal({
         className="life-profile-modal-card" 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          maxWidth: (activeTab === 'timeline' || activeTab === 'events') ? '1400px' : '960px', 
+          maxWidth: (activeTab === 'timeline') ? '1400px' : '960px', 
           width: '95%', 
           transition: 'max-width 0.2s' 
         }}
@@ -464,111 +272,91 @@ export default function LifeProfileModal({
               expandedCategories={expandedCategories}
               setExpandedCategories={setExpandedCategories}
             />
-          ) : activeTab === 'events' ? (
-            <EventsWorkspace
-              isMobile={false}
-              inputs={inputs}
-              projection={projection}
-              snapshot={snapshot}
-              selectedAge={selectedAge}
-              currentAge={localAge}
-              lifeExpectancy={localLifeExpectancy}
-              onSelectedAgeChange={setSelectedAge}
-              expandedCategories={expandedCategories}
-              setExpandedCategories={setExpandedCategories}
-              handleCreateEvent={handleCreateEvent}
-              handleEditRoadmapEvent={handleEditRoadmapEvent}
-              handleDeleteEvent={handleDeleteEvent}
-              simulation={simulation}
-            />
           ) : (
             <>
               {/* Left Side: Form Editing Section */}
               <div className="life-profile-edit-column">
                 <div className="life-profile-tab-content-panel">
-                  {activeTab === 'household' && (
-                    <HouseholdTab
+                  {activeTab === 'lifeItems' && (
+                    <LifeItemsWorkspace
                       isMobile={false}
-                      currentScreen={{ name: 'household' }}
-                      localAge={localAge}
-                      setLocalAge={setLocalAge}
-                      localLifeExpectancy={localLifeExpectancy}
-                      setLocalLifeExpectancy={setLocalLifeExpectancy}
-                      localProfile={localProfile}
-                      setLocalProfile={setLocalProfile}
-                      updateHouseholdField={updateHouseholdField}
-                      updateChild={updateChild}
-                      addChild={addChild}
-                      removeChild={removeChild}
-                      triggerSave={triggerSave}
-                      pushScreen={pushScreen}
-                      popScreen={popScreen}
-                    />
-                  )}
-
-                  {activeTab === 'home' && (
-                    <HousingTab
-                      isMobile={false}
-                      localProfile={localProfile}
-                      updateHomeField={updateHomeField}
-                      localBuyHouseEnabled={localBuyHouseEnabled}
-                      setLocalBuyHouseEnabled={setLocalBuyHouseEnabled}
-                      localBuyHouseAge={localBuyHouseAge}
-                      setLocalBuyHouseAge={setLocalBuyHouseAge}
-                      localBuyHousePrice={localBuyHousePrice}
-                      setLocalBuyHousePrice={setLocalBuyHousePrice}
-                      showAdvancedHome={showAdvancedHome}
-                      setShowAdvancedHome={setShowAdvancedHome}
+                      inputs={inputs}
+                      localLifePlan={localLifePlan}
+                      setLocalLifePlan={setLocalLifePlan}
+                      currentAge={localAge}
+                      lifeExpectancy={localLifeExpectancy}
                       triggerSave={triggerSave}
                     />
                   )}
 
-                  {activeTab === 'children' && (
-                    <ChildrenTab
-                      localProfile={localProfile}
-                      addChild={addChild}
-                      updateChild={updateChild}
-                      removeChild={removeChild}
+                  {activeTab === 'events' && (
+                    <EventsWorkspace
+                      isMobile={false}
+                      inputs={inputs}
+                      projection={projection}
+                      snapshot={snapshot}
+                      selectedAge={selectedAge}
+                      currentAge={localAge}
+                      lifeExpectancy={localLifeExpectancy}
+                      onSelectedAgeChange={setSelectedAge}
+                      expandedCategories={expandedCategories}
+                      setExpandedCategories={setExpandedCategories}
+                      handleCreateEvent={handleCreateEvent}
+                      handleEditRoadmapEvent={handleEditRoadmapEvent}
+                      handleDeleteEvent={handleDeleteEvent}
+                      simulation={simulation}
                     />
                   )}
 
-                  {activeTab === 'debts' && (
-                    <DebtsTab
+                  {activeTab === 'snapshot' && (
+                    <LifeSnapshotPanel
                       isMobile={false}
-                      localProfile={localProfile}
-                      updateHomeField={updateHomeField}
-                      updateDebt={updateDebt}
-                      addDebt={addDebt}
-                      removeDebt={removeDebt}
-                      triggerSave={triggerSave}
+                      projection={projection}
+                      snapshot={snapshot}
+                      selectedAge={selectedAge}
+                      currentAge={localAge}
+                      lifeExpectancy={localLifeExpectancy}
+                      onSelectedAgeChange={setSelectedAge}
                     />
                   )}
 
-                  {activeTab === 'assets' && (
-                    <AssetsTab
-                      isMobile={false}
-                      localProfile={localProfile}
-                      updateAssetField={updateAssetField}
-                      triggerSave={triggerSave}
-                    />
-                  )}
-
-                  {activeTab === 'income' && (
-                    <IncomeTab
-                      isMobile={false}
-                      currentScreen={{ name: 'finance_income' }}
-                      localSimpleIncome={localSimpleIncome}
-                      setLocalSimpleIncome={setLocalSimpleIncome}
-                      localTargetRetirementAge={localTargetRetirementAge}
-                      setLocalTargetRetirementAge={setLocalTargetRetirementAge}
-                      localSSClaimingAge={localSSClaimingAge}
-                      setLocalSSClaimingAge={setLocalSSClaimingAge}
-                      localProfile={localProfile}
-                      updateHouseholdField={updateHouseholdField}
-                      updateIncomeSource={updateIncomeSource}
-                      addIncomeSource={addIncomeSource}
-                      removeIncomeSource={removeIncomeSource}
-                      triggerSave={triggerSave}
+                  {activeTab === 'assumptions' && (
+                    <AssumptionsPanel
+                      inputs={localLifePlan ? { ...inputs, ...localLifePlan.assumptions } : inputs}
+                      onChange={(key, val) => {
+                        if (localLifePlan) {
+                          const updated = {
+                            ...localLifePlan,
+                            assumptions: {
+                              ...localLifePlan.assumptions,
+                              [key]: val
+                            }
+                          };
+                          setLocalLifePlan(updated);
+                          triggerSave({ lifePlan: updated });
+                        }
+                      }}
+                      onReset={() => {
+                        if (localLifePlan) {
+                          const updated = {
+                            ...localLifePlan,
+                            assumptions: {
+                              expectedReturn: 7.0,
+                              postRetirementReturn: 5.0,
+                              inflationRate: 3.0,
+                              cashReturnRate: 2.0,
+                              lifestyleUpgrades: 0.0,
+                              swr: 4.0,
+                              includeTaxes: false,
+                              preMedicarePremium: 10000,
+                              medicarePremium: 4000
+                            }
+                          };
+                          setLocalLifePlan(updated);
+                          triggerSave({ lifePlan: updated });
+                        }
+                      }}
+                      onClose={onClose}
                     />
                   )}
                 </div>
@@ -584,7 +372,8 @@ export default function LifeProfileModal({
               </div>
 
               {/* Right Side: Summary Section */}
-              <div className="life-profile-summary-column">
+              {activeTab !== 'events' && (
+                <div className="life-profile-summary-column">
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>Your Profile Summary</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {/* Household Card */}
@@ -753,6 +542,7 @@ export default function LifeProfileModal({
                   </div>
                 </div>
               </div>
+              )}
             </>
           )}
         </div>

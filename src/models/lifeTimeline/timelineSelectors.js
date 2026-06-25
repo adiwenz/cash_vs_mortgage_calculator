@@ -40,6 +40,79 @@ export function getEventAge(ev, fallbackAge = 35) {
 export function getTimelineItems(inputs) {
   if (!inputs) return [];
 
+  if (inputs.lifePlan) {
+    const lifePlan = inputs.lifePlan;
+    const currentAge = Number(lifePlan.currentAge) || 35;
+    const lifeExpectancy = Number(lifePlan.lifeExpectancy) || 85;
+    const items = [];
+
+    // 1. Process Objects -> Periods
+    lifePlan.objects.forEach(obj => {
+      let category = 'relationship';
+      if (obj.type === 'job') category = 'income';
+      else if (obj.type === 'property') category = 'housing';
+      else if (obj.type === 'child') category = 'children';
+      else if (obj.type === 'debt') category = 'debt';
+      else if (obj.type === 'account' || obj.type === 'business') category = 'assets';
+      else if (obj.type === 'goal') category = 'goals';
+
+      const startAge = obj.startAge !== undefined ? Number(obj.startAge) : currentAge;
+      const endAge = obj.endAge !== undefined ? Number(obj.endAge) : lifeExpectancy;
+
+      items.push({
+        id: obj.id,
+        sourceId: obj.id,
+        sourceType: 'lifeObject',
+        kind: 'period',
+        category,
+        label: obj.name,
+        title: obj.name,
+        description: `${obj.name} lifecycle`,
+        age: null,
+        startAge,
+        endAge,
+        objectType: obj.type,
+        objectId: obj.id,
+        isDerived: true,
+        metadata: obj.properties || {}
+      });
+    });
+
+    // 2. Process Events -> Points
+    lifePlan.events.forEach(ev => {
+      const obj = lifePlan.objects.find(o => o.id === ev.objectId);
+      let category = 'major-events';
+      if (obj) {
+        if (obj.type === 'job') category = 'income';
+        else if (obj.type === 'property') category = 'housing';
+        else if (obj.type === 'child') category = 'children';
+        else if (obj.type === 'debt') category = 'debt';
+        else if (obj.type === 'account' || obj.type === 'business') category = 'assets';
+        else if (obj.type === 'goal') category = 'goals';
+      }
+
+      items.push({
+        id: ev.id,
+        sourceId: ev.id,
+        sourceType: 'lifeEvent',
+        kind: 'point',
+        category,
+        label: ev.mutation?.name || ev.type,
+        title: ev.mutation?.name || ev.type,
+        description: ev.mutation?.description || ev.type,
+        age: Number(ev.age),
+        startAge: null,
+        endAge: null,
+        objectType: obj?.type || 'event',
+        objectId: ev.objectId,
+        isDerived: true,
+        metadata: ev.mutation || {}
+      });
+    });
+
+    return items;
+  }
+
   // 1. Normalize inputs using the shared effective inputs builder
   const effective = buildEffectiveSimulationInputs(inputs);
   const currentAge = Math.max(0, Number(effective.currentAge) || 35);

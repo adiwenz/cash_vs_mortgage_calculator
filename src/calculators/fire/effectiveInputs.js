@@ -1,8 +1,24 @@
+import { initializeLifePlanIfMissing, deriveLegacyInputsFromLifePlan } from '../../models/lifePlan/lifePlanNormalization.js';
+
 export function buildEffectiveSimulationInputs(inputs) {
   if (!inputs) return inputs;
 
+  let cloned = JSON.parse(JSON.stringify(inputs));
+  if (cloned.useLifeProfile) {
+    if (!cloned.lifePlan) {
+      cloned.lifePlan = initializeLifePlanIfMissing(cloned);
+    }
+    if (cloned.lifePlan) {
+      const derived = deriveLegacyInputsFromLifePlan(cloned.lifePlan, cloned);
+      cloned = {
+        ...cloned,
+        ...derived
+      };
+    }
+  }
+
   // 1. Deep clone the inputs
-  const effective = JSON.parse(JSON.stringify(inputs));
+  const effective = cloned;
 
   if (!effective.useLifeProfile || !effective.lifeProfile) {
     return effective;
@@ -22,13 +38,15 @@ export function buildEffectiveSimulationInputs(inputs) {
   // 2. Assets mapping
   const ass = profile.assets || {};
   effective.assets = {
-    ...effective.assets,
     cash: Number(ass.cash || 0),
     brokerage: Number(ass.brokerage || 0),
     trad401k: Number(ass.trad401k || 0),
     tradIra: Number(ass.tradIra || 0),
     rothIra: Number(ass.rothIra || 0),
     hsa: Number(ass.hsa || 0),
+    realEstate: Number(effective.assets.realEstate || 0),
+    emergencyFund: Number(effective.assets.emergencyFund || 0),
+    debts: Number(effective.assets.debts || 0),
     other: Number(ass.crypto || 0) + Number(ass.businessEquity || 0)
   };
 

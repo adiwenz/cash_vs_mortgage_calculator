@@ -366,15 +366,6 @@ export default function EventsWorkspace({
     return (
       <div className="timeline-mobile-snapshot-view" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '1rem' }}>
         {workspaceContent}
-        <LifeSnapshotPanel
-          isMobile={true}
-          projection={projection}
-          snapshot={snapshot}
-          selectedAge={selectedAge}
-          currentAge={currentAge}
-          lifeExpectancy={lifeExpectancy}
-          onSelectedAgeChange={onSelectedAgeChange}
-        />
       </div>
     );
   }
@@ -382,15 +373,6 @@ export default function EventsWorkspace({
   return (
     <div className="timeline-workspace-container">
       {workspaceContent}
-      <LifeSnapshotPanel
-        isMobile={false}
-        projection={projection}
-        snapshot={snapshot}
-        selectedAge={selectedAge}
-        currentAge={currentAge}
-        lifeExpectancy={lifeExpectancy}
-        onSelectedAgeChange={onSelectedAgeChange}
-      />
     </div>
   );
 }

@@ -2,6 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { defaultProfile } from './lifeProfileDraftUtils';
 import { getSaveUpdates } from './lifeProfileSaveAdapter';
 import { setLastChartChangeType } from '../changeTypeTracker';
+import { initializeLifePlanIfMissing, deriveLegacyInputsFromLifePlan } from '../../../models/lifePlan/lifePlanNormalization.js';
+
+const LEGACY_TABS = ['household', 'home', 'children', 'debts', 'assets', 'income'];
+function getNormalizedTab(tab) {
+  if (LEGACY_TABS.includes(tab)) {
+    return 'lifeItems';
+  }
+  return tab || 'timeline';
+}
 
 export default function useLifeProfileDraft({
   isOpen,
@@ -11,7 +20,7 @@ export default function useLifeProfileDraft({
   initialTab = 'timeline',
   isMobile = false
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(() => getNormalizedTab(initialTab));
   const [expandedCategories, setExpandedCategories] = useState({
     children: true,
     housing: true,
@@ -35,6 +44,7 @@ export default function useLifeProfileDraft({
   const [localLifeExpectancy, setLocalLifeExpectancy] = useState(inputs.lifeExpectancy || 85);
   const [localSimpleIncome, setLocalSimpleIncome] = useState(inputs.simpleIncome || 50000);
   const [localTargetRetirementAge, setLocalTargetRetirementAge] = useState(inputs.targetRetirementAge || 65);
+  const [localLifePlan, setLocalLifePlan] = useState(null);
   
   // Find social security event claiming age
   const initialSS = (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
@@ -57,6 +67,12 @@ export default function useLifeProfileDraft({
       setLocalLifeExpectancy(inputs.lifeExpectancy || 85);
       setLocalSimpleIncome(inputs.simpleIncome || 50000);
       setLocalTargetRetirementAge(inputs.targetRetirementAge || 65);
+
+      if (inputs.lifePlan) {
+        setLocalLifePlan(JSON.parse(JSON.stringify(inputs.lifePlan)));
+      } else {
+        setLocalLifePlan(initializeLifePlanIfMissing(inputs));
+      }
 
       const ssEv = (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
       setLocalSSClaimingAge(ssEv ? ssEv.claimingAge || 67 : 67);
@@ -86,7 +102,7 @@ export default function useLifeProfileDraft({
         ...(inputs.lifeProfile?.home || {})
       };
       setLocalProfile(merged);
-      setActiveTab(initialTab);
+      setActiveTab(getNormalizedTab(initialTab));
       setShowAdvancedHome(false);
       setIsSummaryExpanded(false);
       setNavStack([{ name: 'root' }]);
@@ -108,21 +124,32 @@ export default function useLifeProfileDraft({
     });
   }, [localAge, localLifeExpectancy]);
 
+  useEffect(() => {
+    if (localLifePlan) {
+      const derived = deriveLegacyInputsFromLifePlan(localLifePlan, inputs);
+      if (derived.lifeProfile) {
+        setLocalProfile(derived.lifeProfile);
+      }
+      if (derived.currentAge !== undefined) {
+        setLocalAge(derived.currentAge);
+      }
+      if (derived.lifeExpectancy !== undefined) {
+        setLocalLifeExpectancy(derived.lifeExpectancy);
+      }
+      if (derived.simpleIncome !== undefined) {
+        setLocalSimpleIncome(derived.simpleIncome);
+      }
+      if (derived.targetRetirementAge !== undefined) {
+        setLocalTargetRetirementAge(derived.targetRetirementAge);
+      }
+    }
+  }, [localLifePlan]);
+
   // Save profile updates to scenario state
-  const saveToParent = (profileData, ageData, lifeExpData, salaryData, retireAgeData, ssAgeData, bhEnabled, bhAge, bhPrice) => {
+  const saveToParent = (updatesObj) => {
     setLastChartChangeType('profile_value_change');
     
-    const updates = getSaveUpdates({
-      profile: profileData,
-      age: ageData,
-      lifeExp: lifeExpData,
-      salary: salaryData,
-      retireAge: retireAgeData,
-      ssAge: ssAgeData,
-      bhEnabled,
-      bhAge,
-      bhPrice
-    }, inputs);
+    const updates = getSaveUpdates(updatesObj, inputs);
 
     Object.entries(updates).forEach(([key, val]) => {
       updateInput(key, val);
@@ -130,17 +157,22 @@ export default function useLifeProfileDraft({
   };
 
   const triggerSave = (overrides = {}) => {
-    const profile = overrides.profile !== undefined ? overrides.profile : localProfile;
-    const age = overrides.age !== undefined ? overrides.age : localAge;
-    const lifeExp = overrides.lifeExp !== undefined ? overrides.lifeExp : localLifeExpectancy;
-    const salary = overrides.salary !== undefined ? overrides.salary : localSimpleIncome;
-    const retireAge = overrides.retireAge !== undefined ? overrides.retireAge : localTargetRetirementAge;
-    const ssAge = overrides.ssAge !== undefined ? overrides.ssAge : localSSClaimingAge;
-    const bhEnabled = overrides.bhEnabled !== undefined ? overrides.bhEnabled : localBuyHouseEnabled;
-    const bhAge = overrides.bhAge !== undefined ? overrides.bhAge : localBuyHouseAge;
-    const bhPrice = overrides.bhPrice !== undefined ? overrides.bhPrice : localBuyHousePrice;
-    
-    saveToParent(profile, age, lifeExp, salary, retireAge, ssAge, bhEnabled, bhAge, bhPrice);
+    const lifePlan = overrides.lifePlan !== undefined ? overrides.lifePlan : localLifePlan;
+    if (lifePlan) {
+      saveToParent({ lifePlan });
+    } else {
+      const profile = overrides.profile !== undefined ? overrides.profile : localProfile;
+      const age = overrides.age !== undefined ? overrides.age : localAge;
+      const lifeExp = overrides.lifeExp !== undefined ? overrides.lifeExp : localLifeExpectancy;
+      const salary = overrides.salary !== undefined ? overrides.salary : localSimpleIncome;
+      const retireAge = overrides.retireAge !== undefined ? overrides.retireAge : localTargetRetirementAge;
+      const ssAge = overrides.ssAge !== undefined ? overrides.ssAge : localSSClaimingAge;
+      const bhEnabled = overrides.bhEnabled !== undefined ? overrides.bhEnabled : localBuyHouseEnabled;
+      const bhAge = overrides.bhAge !== undefined ? overrides.bhAge : localBuyHouseAge;
+      const bhPrice = overrides.bhPrice !== undefined ? overrides.bhPrice : localBuyHousePrice;
+      
+      saveToParent({ profile, age, lifeExp, salary, retireAge, ssAge, bhEnabled, bhAge, bhPrice });
+    }
   };
 
   const handleSave = () => {
@@ -390,6 +422,8 @@ export default function useLifeProfileDraft({
     popScreen,
     popScreenAndSave,
     triggerSave,
-    handleSave
+    handleSave,
+    localLifePlan,
+    setLocalLifePlan
   };
 }
