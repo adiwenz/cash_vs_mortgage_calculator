@@ -40,8 +40,34 @@ export default function LifeItemsWorkspace({
 }) {
   const [editingItem, setEditingItem] = useState(null); // { mode: 'add'|'edit', type, item }
   const [showTypeSelect, setShowTypeSelect] = useState(false);
-
+  const [editingEvent, setEditingEvent] = useState(null); // { mode: 'add'|'edit', objectId, eventType, event }
+  
   const objects = localLifePlan?.objects || [];
+
+  const getEventDefaultLabel = (type) => {
+    switch (type) {
+      case 'job.raise': return 'Salary Raise';
+      case 'job.end': return 'End Job';
+      case 'account.contributionChange': return 'Change Contribution';
+      case 'account.allocationChange': return 'Change Allocation';
+      case 'debt.payoff': return 'Payoff Debt';
+      case 'property.sell': return 'Sell Property';
+      case 'child.dependencyEnds': return 'Set Dependency End Age';
+      case 'goal.complete': return 'Change Target Age';
+      default: return 'Custom Change';
+    }
+  };
+
+  const getEventInitialMutation = (type) => {
+    switch (type) {
+      case 'job.raise': return { annualIncome: 90000 };
+      case 'account.contributionChange': return { contributionAmount: 800 };
+      case 'account.allocationChange': return { allocation: '90/10' };
+      case 'child.dependencyEnds': return { dependencyEndAge: 18 };
+      case 'goal.complete': return { targetAge: 60 };
+      default: return {};
+    }
+  };
 
   // Group objects
   const grouped = {
@@ -76,11 +102,58 @@ export default function LifeItemsWorkspace({
     const mortgageId = `mortgage-${id}`;
     const cleanObjects = nextObjects.filter(o => o.id !== mortgageId);
 
+    // Cascade deletion to attached events
+    const cleanEvents = (localLifePlan.events || []).filter(e => e.objectId !== id && e.objectId !== mortgageId);
+
     const updatedPlan = {
       ...localLifePlan,
-      objects: cleanObjects
+      objects: cleanObjects,
+      events: cleanEvents
     };
     setLocalLifePlan(updatedPlan);
+    triggerSave({ lifePlan: updatedPlan });
+  };
+
+  const handleStartAddEvent = (itemId, eventType) => {
+    const defaultLabel = getEventDefaultLabel(eventType);
+    const newEvent = {
+      id: `event-${eventType}-${Date.now()}`,
+      objectId: itemId,
+      type: eventType,
+      age: currentAge + 5,
+      label: defaultLabel,
+      description: '',
+      mutation: getEventInitialMutation(eventType)
+    };
+    setEditingEvent({ mode: 'add', objectId: itemId, eventType, event: newEvent });
+  };
+
+  const handleStartEditEvent = (ev) => {
+    setEditingEvent({ mode: 'edit', objectId: ev.objectId, eventType: ev.type, event: JSON.parse(JSON.stringify(ev)) });
+  };
+
+  const handleDeleteEvent = (eventId) => {
+    const updatedPlan = {
+      ...localLifePlan,
+      events: (localLifePlan.events || []).filter(e => e.id !== eventId)
+    };
+    setLocalLifePlan(updatedPlan);
+    triggerSave({ lifePlan: updatedPlan });
+  };
+
+  const handleSaveEvent = (ev) => {
+    let nextEvents = localLifePlan.events || [];
+    if (editingEvent.mode === 'add') {
+      nextEvents = [...nextEvents, ev];
+    } else {
+      nextEvents = nextEvents.map(e => e.id === ev.id ? ev : e);
+    }
+    const updatedPlan = {
+      ...localLifePlan,
+      events: nextEvents
+    };
+    setLocalLifePlan(updatedPlan);
+    setEditingEvent(null);
     triggerSave({ lifePlan: updatedPlan });
   };
 
@@ -188,6 +261,43 @@ export default function LifeItemsWorkspace({
     </div>
   );
 
+  const renderEventActions = (item) => {
+    const buttons = [];
+    if (item.type === 'job') {
+      buttons.push({ label: '+ Raise', type: 'job.raise' });
+      buttons.push({ label: '+ End Job', type: 'job.end' });
+    } else if (item.type === 'account') {
+      buttons.push({ label: '+ Change Contribution', type: 'account.contributionChange' });
+      buttons.push({ label: '+ Change Allocation', type: 'account.allocationChange' });
+    } else if (item.type === 'debt') {
+      buttons.push({ label: '+ Payoff Event', type: 'debt.payoff' });
+    } else if (item.type === 'property') {
+      buttons.push({ label: '+ Sell Property', type: 'property.sell' });
+    } else if (item.type === 'child') {
+      buttons.push({ label: '+ Set Dependency End Age', type: 'child.dependencyEnds' });
+    } else if (item.type === 'goal') {
+      buttons.push({ label: '+ Change Target Age', type: 'goal.complete' });
+    }
+
+    if (buttons.length === 0) return null;
+
+    return (
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '0.4rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem' }}>
+        {buttons.map(btn => (
+          <button
+            key={btn.type}
+            type="button"
+            className="btn-secondary"
+            onClick={() => handleStartAddEvent(item.id, btn.type)}
+            style={{ padding: '3px 8px', fontSize: '0.68rem', borderRadius: '4px', background: '#f8fafc', color: 'var(--text-secondary)' }}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const renderCard = (item) => {
     const p = item.properties || {};
     let subtitle = '';
@@ -198,7 +308,7 @@ export default function LifeItemsWorkspace({
       details = item.properties?.role === 'partner' ? `Salary: ${formatCurrency(p.partnerIncome)}/yr · Assets: ${formatCurrency(Number(p.partnerSavings) + Number(p.partnerRetirement))}` : 'Self clock basics';
     } else if (item.type === 'child') {
       subtitle = `Child · Age ${currentAge - item.startAge}`;
-      details = `Arrival Age: ${item.startAge} · Childcare Cost: ${formatCurrency(p.childcareCost)}/yr ${p.includeCollege ? '· 🎓 College planned' : ''}`;
+      details = `Arrival Age: ${item.startAge} · childcare Cost: ${formatCurrency(p.childcareCost)}/yr ${p.includeCollege ? '· 🎓 College planned' : ''}`;
     } else if (item.type === 'job') {
       subtitle = `Job · Age ${item.startAge} to ${item.endAge || 'Retirement'}`;
       details = `Income: ${formatCurrency(p.annualIncome)}/yr · Growth: ${p.growthRate}%`;
@@ -219,27 +329,69 @@ export default function LifeItemsWorkspace({
       details = JSON.stringify(p);
     }
 
+    // Get events attached to this object
+    const itemEvents = (localLifePlan?.events || []).filter(e => e.objectId === item.id);
+
     return (
-      <div key={item.id} className="life-profile-list-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', marginBottom: '0.5rem', background: 'var(--card-bg, #fff)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-            {item.type === 'account' ? getAccountDisplayName(item.name, p.accountType) : item.name}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{subtitle}</span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{details}</span>
+      <div key={item.id} className="life-profile-list-item-card life-profile-list-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', marginBottom: '0.5rem', background: 'var(--card-bg, #fff)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+              {item.type === 'account' ? getAccountDisplayName(item.name, p.accountType) : item.name}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{subtitle}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{details}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            {item.properties?.role !== 'self' && (
+              <>
+                <button type="button" className="btn-secondary" onClick={() => handleStartEdit(item)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem' }}>
+                  <Edit2 size={12} />
+                </button>
+                <button type="button" className="btn-secondary text-danger" onClick={() => handleDelete(item.id)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', color: '#ef4444' }}>
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {item.properties?.role !== 'self' && (
-            <>
-              <button type="button" className="btn-secondary" onClick={() => handleStartEdit(item)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem' }}>
-                <Edit2 size={12} />
-              </button>
-              <button type="button" className="btn-secondary text-danger" onClick={() => handleDelete(item.id)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', color: '#ef4444' }}>
-                <Trash2 size={12} />
-              </button>
-            </>
-          )}
-        </div>
+
+        {/* Attached Events List */}
+        {itemEvents.length > 0 && (
+          <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.5px' }}>Changes / Events</span>
+            {itemEvents.map(ev => {
+              let evDetail = '';
+              if (ev.type === 'job.raise') evDetail = `Salary to ${formatCurrency(ev.mutation?.annualIncome)}`;
+              else if (ev.type === 'job.end') evDetail = 'Job Ends';
+              else if (ev.type === 'account.contributionChange') evDetail = `Contribution to ${formatCurrency(ev.mutation?.contributionAmount)}/mo`;
+              else if (ev.type === 'account.allocationChange') evDetail = `Allocation to ${ev.mutation?.allocation}`;
+              else if (ev.type === 'debt.payoff') evDetail = 'Paid Off';
+              else if (ev.type === 'property.sell') evDetail = 'Property Sold';
+              else if (ev.type === 'child.dependencyEnds') evDetail = `Dependency ends at age ${ev.mutation?.dependencyEndAge || ev.age}`;
+              else if (ev.type === 'goal.complete') evDetail = `Target age to ${ev.mutation?.targetAge || ev.age}`;
+
+              return (
+                <div key={ev.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <strong>Age {ev.age}:</strong> {ev.label || ev.type} {evDetail && `· ${evDetail}`}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button type="button" onClick={() => handleStartEditEvent(ev)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px' }} title="Edit Event">
+                      <Edit2 size={10} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteEvent(ev.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }} title="Delete Event">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Event actions row */}
+        {renderEventActions(item)}
       </div>
     );
   };
@@ -259,6 +411,170 @@ export default function LifeItemsWorkspace({
         {renderEditorForm(editingItem.item, (updated) => {
           setEditingItem({ ...editingItem, item: updated });
         }, () => handleSaveItem(editingItem.item))}
+      </div>
+    );
+  }
+
+  if (editingEvent) {
+    const ev = editingEvent.event;
+    const item = objects.find(o => o.id === editingEvent.objectId);
+
+    const updateEvField = (field, val) => {
+      setEditingEvent({
+        ...editingEvent,
+        event: {
+          ...ev,
+          [field]: val
+        }
+      });
+    };
+
+    const updateMutation = (key, val) => {
+      setEditingEvent({
+        ...editingEvent,
+        event: {
+          ...ev,
+          mutation: {
+            ...ev.mutation,
+            [key]: val
+          }
+        }
+      });
+    };
+
+    return (
+      <div className="life-profile-tab-content-panel" style={{ padding: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '800' }}>
+            {editingEvent.mode === 'add' ? 'Add' : 'Edit'} Event: {getEventDefaultLabel(editingEvent.eventType)}
+          </h4>
+          <button type="button" className="btn-secondary" onClick={() => setEditingEvent(null)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+            Cancel
+          </button>
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); handleSaveEvent(ev); }} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="life-profile-form-group">
+            <label className="life-profile-label-small">Event Label</label>
+            <input
+              type="text"
+              className="life-profile-input-field"
+              value={ev.label || ''}
+              onChange={(e) => updateEvField('label', e.target.value)}
+              required
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="life-profile-form-group">
+            <label className="life-profile-label-small">Event Age</label>
+            <input
+              type="number"
+              className="life-profile-input-field"
+              value={ev.age !== null && ev.age !== undefined ? ev.age : ''}
+              onChange={(e) => updateEvField('age', Number(e.target.value))}
+              min={item ? item.startAge : currentAge}
+              max={lifeExpectancy}
+              required
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="life-profile-form-group">
+            <label className="life-profile-label-small">Description (Optional)</label>
+            <input
+              type="text"
+              className="life-profile-input-field"
+              value={ev.description || ''}
+              onChange={(e) => updateEvField('description', e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          {/* Mutation Fields */}
+          {editingEvent.eventType === 'job.raise' && (
+            <div className="life-profile-form-group">
+              <label className="life-profile-label-small">New Annual Salary</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="number"
+                  className="life-profile-input-field"
+                  value={ev.mutation?.annualIncome !== undefined ? ev.mutation.annualIncome : ''}
+                  onChange={(e) => updateMutation('annualIncome', Number(e.target.value))}
+                  required
+                  style={{ width: '100%' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/ yr</span>
+              </div>
+            </div>
+          )}
+
+          {editingEvent.eventType === 'account.contributionChange' && (
+            <div className="life-profile-form-group">
+              <label className="life-profile-label-small">New Monthly Contribution</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="number"
+                  className="life-profile-input-field"
+                  value={ev.mutation?.contributionAmount !== undefined ? ev.mutation.contributionAmount : ''}
+                  onChange={(e) => updateMutation('contributionAmount', Number(e.target.value))}
+                  required
+                  style={{ width: '100%' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/ mo</span>
+              </div>
+            </div>
+          )}
+
+          {editingEvent.eventType === 'account.allocationChange' && (
+            <div className="life-profile-form-group">
+              <label className="life-profile-label-small">New Allocation (Stocks/Bonds)</label>
+              <input
+                type="text"
+                className="life-profile-input-field"
+                value={ev.mutation?.allocation || ''}
+                onChange={(e) => updateMutation('allocation', e.target.value)}
+                placeholder="e.g. 90/10"
+                required
+                style={{ width: '100%' }}
+              />
+            </div>
+          )}
+
+          {editingEvent.eventType === 'child.dependencyEnds' && (
+            <div className="life-profile-form-group">
+              <label className="life-profile-label-small">New Dependency End Age</label>
+              <input
+                type="number"
+                className="life-profile-input-field"
+                value={ev.mutation?.dependencyEndAge !== undefined ? ev.mutation.dependencyEndAge : ''}
+                onChange={(e) => updateMutation('dependencyEndAge', Number(e.target.value))}
+                required
+                style={{ width: '100%' }}
+              />
+            </div>
+          )}
+
+          {editingEvent.eventType === 'goal.complete' && (
+            <div className="life-profile-form-group">
+              <label className="life-profile-label-small">New Target Age</label>
+              <input
+                type="number"
+                className="life-profile-input-field"
+                value={ev.mutation?.targetAge !== undefined ? ev.mutation.targetAge : ''}
+                onChange={(e) => updateMutation('targetAge', Number(e.target.value))}
+                required
+                style={{ width: '100%' }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <button type="submit" className="btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 1rem' }}>
+              Save Event
+            </button>
+          </div>
+        </form>
       </div>
     );
   }

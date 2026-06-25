@@ -337,36 +337,38 @@ export default function TimelineSnapshotTab({
       });
     });
 
-    // Add custom ownership period bars for each house asset in the Housing category
-    const housingObjects = allDescriptors.filter(d => d.type === 'object' && d.parent === 'housing');
-    if (!normalizedItemsByCategoryId['housing']) {
-      normalizedItemsByCategoryId['housing'] = [];
-    }
-
-    housingObjects.forEach(houseRow => {
-      const houseId = houseRow.objectId;
-      const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
-      
-      const buyEv = enabledEvents.find(e => e.type === 'buyHouse' && (e.houseId === houseId || e.id === houseId || resolveHouseIdForEvent(e, inputs) === houseId));
-      const startAge = buyEv ? Number(buyEv.purchaseAge !== undefined ? buyEv.purchaseAge : (buyEv.age || 35)) : (Number(inputs.currentAge) || 35);
-      
-      const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && (e.houseId === houseId || e.id === houseId || resolveHouseIdForEvent(e, inputs) === houseId));
-      const endAge = sellEv ? Number(sellEv.age || 85) : (Number(inputs.lifeExpectancy) || 85);
-
-      if (startAge < endAge) {
-        normalizedItemsByCategoryId['housing'].push({
-          id: `housing-own-period-${houseId}`,
-          type: 'period',
-          category: 'housing',
-          title: `${houseRow.label} (Owned)`,
-          startAge,
-          endAge,
-          rowKey: houseRow.rowKey,
-          objectType: 'housing',
-          objectId: houseId
-        });
+    if (!inputs.lifePlan) {
+      // Add custom ownership period bars for each house asset in the Housing category
+      const housingObjects = allDescriptors.filter(d => d.type === 'object' && d.parent === 'housing');
+      if (!normalizedItemsByCategoryId['housing']) {
+        normalizedItemsByCategoryId['housing'] = [];
       }
-    });
+
+      housingObjects.forEach(houseRow => {
+        const houseId = houseRow.objectId;
+        const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
+        
+        const buyEv = enabledEvents.find(e => e.type === 'buyHouse' && (e.houseId === houseId || e.id === houseId || resolveHouseIdForEvent(e, inputs) === houseId));
+        const startAge = buyEv ? Number(buyEv.purchaseAge !== undefined ? buyEv.purchaseAge : (buyEv.age || 35)) : (Number(inputs.currentAge) || 35);
+        
+        const sellEv = enabledEvents.find(e => e.type === 'sellHouse' && (e.houseId === houseId || e.id === houseId || resolveHouseIdForEvent(e, inputs) === houseId));
+        const endAge = sellEv ? Number(sellEv.age || 85) : (Number(inputs.lifeExpectancy) || 85);
+
+        if (startAge < endAge) {
+          normalizedItemsByCategoryId['housing'].push({
+            id: `housing-own-period-${houseId}`,
+            type: 'period',
+            category: 'housing',
+            title: `${houseRow.label} (Owned)`,
+            startAge,
+            endAge,
+            rowKey: houseRow.rowKey,
+            objectType: 'housing',
+            objectId: houseId
+          });
+        }
+      });
+    }
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>

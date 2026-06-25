@@ -57,7 +57,38 @@ export function getTimelineItems(inputs) {
       else if (obj.type === 'goal') category = 'goals';
 
       const startAge = obj.startAge !== undefined ? Number(obj.startAge) : currentAge;
-      const endAge = obj.endAge !== undefined ? Number(obj.endAge) : lifeExpectancy;
+      let endAge = obj.endAge !== undefined ? Number(obj.endAge) : lifeExpectancy;
+
+      if (obj.type === 'job') {
+        const endEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'job.end');
+        if (endEv) {
+          endAge = Number(endEv.age);
+        }
+      } else if (obj.type === 'property') {
+        const sellEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'property.sell');
+        if (sellEv) {
+          endAge = Number(sellEv.age);
+        }
+      } else if (obj.type === 'debt') {
+        const payoffEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'debt.payoff');
+        if (payoffEv) {
+          endAge = Number(payoffEv.age);
+        } else {
+          const p = obj.properties || {};
+          endAge = calculateAmortizedLoanPayoffAge(
+            Number(p.balance || 0),
+            Number(p.interestRate || 0),
+            Number(p.monthlyPayment || 0),
+            startAge
+          );
+        }
+      } else if (obj.type === 'child') {
+        const depEndEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'child.dependencyEnds');
+        const depEndAge = depEndEv ? Number(depEndEv.mutation?.dependencyEndAge || depEndEv.age || 18) : Number(obj.properties?.dependencyEndAge || 18);
+        const includeCollege = !!obj.properties?.includeCollege;
+        const collegeEnd = includeCollege ? 22 : depEndAge;
+        endAge = startAge + collegeEnd;
+      }
 
       items.push({
         id: obj.id,
@@ -97,9 +128,9 @@ export function getTimelineItems(inputs) {
         sourceType: 'lifeEvent',
         kind: 'point',
         category,
-        label: ev.mutation?.name || ev.type,
-        title: ev.mutation?.name || ev.type,
-        description: ev.mutation?.description || ev.type,
+        label: ev.label || ev.mutation?.name || ev.type,
+        title: ev.label || ev.mutation?.name || ev.type,
+        description: ev.description || ev.mutation?.description || ev.type,
         age: Number(ev.age),
         startAge: null,
         endAge: null,

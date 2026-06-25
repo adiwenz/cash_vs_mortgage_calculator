@@ -114,7 +114,9 @@ export function getActiveDebtsForAge(profile, events, age) {
     const monthlyPayment = d.frequency === 'monthly' ? (Number(d.payment) || 0) : (Number(d.payment) || 0) / 12;
     const startAge = d.startAge !== undefined ? Number(d.startAge) : currentAge;
     
-    const payoffAge = calculateAmortizedLoanPayoffAge(balance, apr, monthlyPayment, startAge);
+    const payoffAge = d.payoffAge !== undefined
+      ? Number(d.payoffAge)
+      : calculateAmortizedLoanPayoffAge(balance, apr, monthlyPayment, startAge);
     
     if (age >= startAge && age < payoffAge) {
       activeDebts.push({
