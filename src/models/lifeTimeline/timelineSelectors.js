@@ -51,7 +51,7 @@ export function getTimelineItems(inputs) {
       let category = 'relationship';
       if (obj.type === 'job') category = 'income';
       else if (obj.type === 'property') category = 'housing';
-      else if (obj.type === 'child') category = 'children';
+      else if (obj.type === 'child' || (obj.type === 'person' && obj.properties?.role === 'child') || obj.type === 'dependent') category = 'children';
       else if (obj.type === 'debt') category = 'debt';
       else if (obj.type === 'account' || obj.type === 'business') category = 'assets';
       else if (obj.type === 'goal') category = 'goals';
@@ -82,8 +82,8 @@ export function getTimelineItems(inputs) {
             startAge
           );
         }
-      } else if (obj.type === 'child') {
-        const depEndEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'child.dependencyEnds');
+      } else if (obj.type === 'child' || (obj.type === 'person' && obj.properties?.role === 'child') || obj.type === 'dependent') {
+        const depEndEv = lifePlan.events.find(e => e.objectId === obj.id && (e.type === 'child.dependencyEnds' || e.type === 'dependencyEnds'));
         const depEndAge = depEndEv ? Number(depEndEv.mutation?.dependencyEndAge || depEndEv.age || 18) : Number(obj.properties?.dependencyEndAge || 18);
         const includeCollege = !!obj.properties?.includeCollege;
         const collegeEnd = includeCollege ? 22 : depEndAge;
@@ -116,7 +116,7 @@ export function getTimelineItems(inputs) {
       if (obj) {
         if (obj.type === 'job') category = 'income';
         else if (obj.type === 'property') category = 'housing';
-        else if (obj.type === 'child') category = 'children';
+        else if (obj.type === 'child' || (obj.type === 'person' && obj.properties?.role === 'child') || obj.type === 'dependent') category = 'children';
         else if (obj.type === 'debt') category = 'debt';
         else if (obj.type === 'account' || obj.type === 'business') category = 'assets';
         else if (obj.type === 'goal') category = 'goals';

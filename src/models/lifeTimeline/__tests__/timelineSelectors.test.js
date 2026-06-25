@@ -6,6 +6,8 @@ import {
   getActivePeriodsAtAge
 } from '../timelineSelectors.js';
 import { TIMELINE_ITEM_KIND, TIMELINE_CATEGORY } from '../timelineTypes.js';
+import { buildTimelineRows } from '../../../utils/timelineRowBuilder.js';
+
 
 describe('timelineSelectors', () => {
   test('getTimelineItems returns current relationship status period', () => {
@@ -291,5 +293,76 @@ describe('timelineSelectors', () => {
     expect(rentingPostSaleStatus).toBeDefined();
     expect(rentingPostSaleStatus.startAge).toBe(85);
     expect(rentingPostSaleStatus.endAge).toBeNull();
+  });
+
+  test('Child object appears in Timeline', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'child-1',
+            type: 'child',
+            name: 'Child',
+            startAge: 35,
+            properties: {
+              arrivalAge: 35,
+              childcareCost: 15000,
+              dependencyEndAge: 18,
+              collegeCost: 25000,
+              includeCollege: false
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const items = getTimelineItems(inputs);
+    const childPeriod = items.find(item => item.id === 'child-1');
+    expect(childPeriod).toBeDefined();
+    expect(childPeriod.category).toBe('children');
+    expect(childPeriod.startAge).toBe(35);
+    expect(childPeriod.endAge).toBe(53); // 35 + 18
+  });
+
+  test('Snapshot and Timeline use the same child object (Timeline verification)', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'child-1',
+            type: 'child',
+            name: 'Child',
+            startAge: 35,
+            properties: {
+              arrivalAge: 35,
+              childcareCost: 15000,
+              dependencyEndAge: 18,
+              collegeCost: 25000,
+              includeCollege: false
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const rows = buildTimelineRows(inputs);
+    const childrenRows = rows.filter(r => r.parent === 'children');
+    expect(childrenRows.length).toBe(1);
+    expect(childrenRows[0].id).toBe('child-1');
+    expect(childrenRows[0].rowKey).toBe('child-child-1');
   });
 });

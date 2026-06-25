@@ -86,7 +86,9 @@ export default function LifeProfileModal({
     triggerSave,
     handleSave,
     localLifePlan,
-    setLocalLifePlan
+    setLocalLifePlan,
+    editingItemId,
+    setEditingItemId
   } = useLifeProfileDraft({
     isOpen,
     onClose,
@@ -159,6 +161,8 @@ export default function LifeProfileModal({
                 currentAge={localAge}
                 lifeExpectancy={localLifeExpectancy}
                 triggerSave={triggerSave}
+                editingItemId={editingItemId}
+                setEditingItemId={setEditingItemId}
               />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
@@ -186,6 +190,10 @@ export default function LifeProfileModal({
                 currentAge={localAge}
                 lifeExpectancy={localLifeExpectancy}
                 onSelectedAgeChange={setSelectedAge}
+                onEditObject={(objectId) => {
+                  setEditingItemId(objectId);
+                  setActiveTab('lifeItems');
+                }}
               />
             ) : activeTab === 'assumptions' ? (
               <div style={{ padding: '1rem' }}>
@@ -286,6 +294,8 @@ export default function LifeProfileModal({
                       currentAge={localAge}
                       lifeExpectancy={localLifeExpectancy}
                       triggerSave={triggerSave}
+                      editingItemId={editingItemId}
+                      setEditingItemId={setEditingItemId}
                     />
                   )}
 
@@ -317,6 +327,10 @@ export default function LifeProfileModal({
                       currentAge={localAge}
                       lifeExpectancy={localLifeExpectancy}
                       onSelectedAgeChange={setSelectedAge}
+                      onEditObject={(objectId) => {
+                        setEditingItemId(objectId);
+                        setActiveTab('lifeItems');
+                      }}
                     />
                   )}
 

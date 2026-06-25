@@ -271,4 +271,169 @@ describe('lifeSnapshotSelectors', () => {
     expect(getLifeSnapshotAtAge(inputs, 84).housingStatus).toBe('own');
     expect(getLifeSnapshotAtAge(inputs, 85).housingStatus).toBe('rent');
   });
+
+  test('Active job salary appears in Snapshot', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-main',
+            type: 'job',
+            name: 'Main Salary',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 52);
+    expect(snapshot.income.annualIncome).toBe(50000);
+  });
+
+  test('Salary aliases normalize correctly', () => {
+    const aliases = ['annualIncome', 'salary', 'currentSalary', 'income', 'amount'];
+    aliases.forEach((alias, idx) => {
+      const inputs = {
+        ...DEFAULT_FIRE_INPUTS,
+        currentAge: 35,
+        useLifeProfile: true,
+        lifePlan: {
+          currentAge: 35,
+          lifeExpectancy: 85,
+          objects: [
+            {
+              id: `job-${idx}`,
+              type: 'job',
+              name: 'Main Salary',
+              startAge: 35,
+              endAge: 65,
+              properties: {
+                [alias]: 50000,
+                growthRate: 3
+              }
+            }
+          ],
+          events: [],
+          assumptions: {}
+        }
+      };
+
+      const snapshot = getLifeSnapshotAtAge(inputs, 52);
+      expect(snapshot.income.annualIncome).toBe(50000);
+    });
+  });
+
+  test('Snapshot and Timeline use the same child object (Snapshot verification)', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'child-1',
+            type: 'child',
+            name: 'Child',
+            startAge: 35,
+            properties: {
+              arrivalAge: 35,
+              childcareCost: 15000,
+              dependencyEndAge: 18,
+              collegeCost: 25000,
+              includeCollege: false
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 52);
+    expect(snapshot.children.length).toBe(1);
+    expect(snapshot.children[0].name).toBe('Child');
+    expect(snapshot.children[0].age).toBe(17); // 52 - 35
+  });
+
+  test('Snapshot annualIncome: active jobs contribute, ended job does not contribute after endAge', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-active-income',
+            type: 'job',
+            name: 'Active Job',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          },
+          {
+            id: 'job-active-salary',
+            type: 'job',
+            name: 'Active Salary Alias',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              salary: 30000,
+              growthRate: 3
+            }
+          },
+          {
+            id: 'job-ended',
+            type: 'job',
+            name: 'Ended Job',
+            startAge: 35,
+            endAge: 50,
+            properties: {
+              annualIncome: 40000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [
+          {
+            id: 'job-ended-event',
+            objectId: 'job-ended',
+            type: 'job.end',
+            age: 50
+          }
+        ],
+        assumptions: {}
+      }
+    };
+
+    // Age 49: all three jobs are active. Total income = 50000 + 30000 + 40000 = 120000
+    const snapshot49 = getLifeSnapshotAtAge(inputs, 49);
+    expect(snapshot49.income.annualIncome).toBe(120000);
+
+    // Age 50: job-ended is no longer active (ended at age 50). Total income = 50000 + 30000 = 80000
+    const snapshot50 = getLifeSnapshotAtAge(inputs, 50);
+    expect(snapshot50.income.annualIncome).toBe(80000);
+
+    // Age 52: job-ended is still ended. Total income = 80000
+    const snapshot52 = getLifeSnapshotAtAge(inputs, 52);
+    expect(snapshot52.income.annualIncome).toBe(80000);
+  });
 });

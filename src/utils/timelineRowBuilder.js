@@ -1,5 +1,6 @@
 import { TIMELINE_CATEGORY } from '../models/lifeTimeline/timelineTypes.js';
 import { getChildEventBirthAge } from './childEventHelpers.js';
+import { initializeLifePlanIfMissing } from '../models/lifePlan/lifePlanNormalization.js';
 import {
   getCurrentAge,
   getLifeEvents,
@@ -482,12 +483,13 @@ export function buildTimelineRows(inputs) {
 
   const rows = [];
 
-  if (actualInputs.lifePlan) {
-    const lifePlan = actualInputs.lifePlan;
+  const lifePlan = actualInputs.lifePlan || (actualInputs.useLifeProfile ? initializeLifePlanIfMissing(actualInputs) : null);
+
+  if (lifePlan) {
     const objects = lifePlan.objects || [];
 
     // 1. Relationship / Household
-    const people = objects.filter(o => o.type === 'person');
+    const people = objects.filter(o => o.type === 'person' && o.properties?.role !== 'child');
     rows.push(createRow({ type: 'category', id: 'relationship', parent: null, label: 'Relationship', icon: '❤️', count: people.length }));
     people.forEach(p => {
       rows.push(createRow({ type: 'object', id: p.id, parent: 'relationship', label: p.name, icon: '👤', objectType: p.type, objectId: p.id }));
@@ -501,10 +503,10 @@ export function buildTimelineRows(inputs) {
     });
 
     // 3. Children
-    const children = objects.filter(o => o.type === 'child');
+    const children = objects.filter(o => o.type === 'child' || (o.type === 'person' && o.properties?.role === 'child') || o.type === 'dependent');
     rows.push(createRow({ type: 'category', id: 'children', parent: null, label: 'Children', icon: '👶', count: children.length }));
     children.forEach(c => {
-      rows.push(createRow({ type: 'object', id: c.id, parent: 'children', label: c.name, icon: '👶', objectType: c.type, objectId: c.id }));
+      rows.push(createRow({ type: 'object', id: c.id, parent: 'children', label: c.name || 'Child', icon: '👶', objectType: c.type, objectId: c.id }));
     });
 
     // 4. Jobs & Income

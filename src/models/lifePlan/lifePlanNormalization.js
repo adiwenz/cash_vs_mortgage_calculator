@@ -5,16 +5,395 @@
 import { calculateAmortizedLoanPayoffAge } from '../../calculators/fire/debts.js';
 import { syncBudgetDetails } from '../../calculators/fire/phases.js';
 
+export function syncLifePlanWithInputs(lifePlan, inputs) {
+  if (!lifePlan || !inputs) return lifePlan;
+
+  const currentAge = Math.max(0,
+    Number(inputs.currentAge) ||
+    Number(inputs.age) ||
+    Number(inputs.householdModel?.people?.self?.demographics?.currentAge) ||
+    Number(inputs.householdModel?.people?.self?.age) ||
+    35
+  );
+  const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
+  const targetRetirementAge = Math.max(currentAge, Number(inputs.targetRetirementAge) || 65);
+
+  lifePlan.currentAge = currentAge;
+  lifePlan.lifeExpectancy = lifeExpectancy;
+
+  lifePlan.objects = lifePlan.objects || [];
+  lifePlan.events = lifePlan.events || [];
+
+  const isProfileMode = inputs.useLifeProfile === true || (inputs.useLifeProfile !== false && inputs.lifeProfile && Object.keys(inputs.lifeProfile).length > 0);
+  const profile = isProfileMode ? (inputs.lifeProfile || {}) : {};
+
+  // 1. Sync self-person
+  let selfPerson = lifePlan.objects.find(o => o.id === 'self-person');
+  if (!selfPerson) {
+    selfPerson = {
+      id: 'self-person',
+      type: 'person',
+      name: 'You',
+      startAge: currentAge,
+      endAge: lifeExpectancy,
+      properties: { role: 'self' }
+    };
+    lifePlan.objects.push(selfPerson);
+  } else {
+    selfPerson.startAge = currentAge;
+    selfPerson.endAge = lifeExpectancy;
+  }
+
+  // 2. Sync partner/spouse person object
+  const household = profile.household || {};
+  const marriageEvents = (inputs.lifeEvents || []).filter(e => e.type === 'marriage' && e.enabled);
+  const ssEv = (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
+  const ssAge = ssEv ? ssEv.claimingAge || 67 : 67;
+  const ssBenefit = ssEv ? ssEv.monthlyBenefit || 2000 : 2000;
+
+  const isMarried = household.status === 'married' || 
+                    household.status === 'partnered' || 
+                    (!isProfileMode && (inputs.filingStatus === 'married' || inputs.filingStatus === 'marriedFilingJointly')) ||
+                    !!inputs.householdModel?.people?.partner;
+  const hasPartner = isMarried || marriageEvents.length > 0;
+  let partnerObj = lifePlan.objects.find(o => o.id === 'spouse-partner');
+  if (hasPartner) {
+    const partnerInfo = inputs.householdModel?.people?.partner || {};
+    const partnerName = partnerInfo.displayName || 'Partner';
+    const partnerAge = Number(partnerInfo.currentAge) || Number(household.partnerAge) || currentAge;
+    const partnerIncome = Number(household.partnerIncome || partnerInfo.partnerIncome || (marriageEvents[0]?.spouseIncome) || 0);
+    const marriageAge = marriageEvents.length > 0 ? Number(marriageEvents[0].age || 38) : currentAge;
+
+    if (!partnerObj) {
+      partnerObj = {
+        id: 'spouse-partner',
+        type: 'person',
+        name: partnerName,
+        startAge: marriageAge,
+        endAge: lifeExpectancy,
+        properties: {
+          role: 'partner',
+          spouseCurrentAge: partnerAge,
+          partnerIncome: partnerIncome,
+          partnerSavings: Number(household.partnerSavings || 0),
+          partnerRetirement: Number(household.partnerRetirement || 0),
+          partnerDebts: Number(household.partnerDebts || 0),
+          status: household.status || inputs.filingStatus || 'married'
+        }
+      };
+      lifePlan.objects.push(partnerObj);
+    } else {
+      partnerObj.name = partnerName;
+      partnerObj.startAge = marriageAge;
+      partnerObj.endAge = lifeExpectancy;
+      partnerObj.properties = {
+        ...partnerObj.properties,
+        spouseCurrentAge: partnerAge,
+        partnerIncome: partnerIncome,
+        status: household.status || inputs.filingStatus || partnerObj.properties.status || 'married'
+      };
+    }
+  } else if (partnerObj) {
+    lifePlan.objects = lifePlan.objects.filter(o => o.id !== 'spouse-partner');
+  }
+
+  // 3. Sync Children
+  const inputsChildren = profile.children || inputs.children || [];
+  const childEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  const validChildIds = new Set();
+
+  inputsChildren.forEach((c, idx) => {
+    const id = c.id || `child-${idx}`;
+    validChildIds.add(id);
+    
+    let obj = lifePlan.objects.find(o => o.id === id);
+    const childAge = Number(c.age || 0);
+    const birthAge = currentAge - childAge;
+
+    if (!obj) {
+      obj = {
+        id,
+        type: 'child',
+        name: c.name || `Child ${idx + 1}`,
+        startAge: birthAge,
+        properties: {
+          arrivalAge: birthAge,
+          childcareCost: 15000,
+          dependencyEndAge: 18,
+          collegeCost: 25000,
+          includeCollege: !!c.includeCollege
+        }
+      };
+      lifePlan.objects.push(obj);
+    } else {
+      obj.name = c.name || obj.name;
+      obj.startAge = birthAge;
+      obj.properties = {
+        ...obj.properties,
+        arrivalAge: birthAge,
+        includeCollege: !!c.includeCollege
+      };
+    }
+  });
+
+  childEvents.forEach((ev, idx) => {
+    const id = ev.id || `child-event-${idx}`;
+    validChildIds.add(id);
+
+    let obj = lifePlan.objects.find(o => o.id === id);
+    const birthAge = Number(ev.birthAge || ev.age || currentAge);
+    const childName = ev.name ? ev.name.replace('Child: ', '') : `Child ${idx + 1}`;
+
+    if (!obj) {
+      obj = {
+        id,
+        type: 'child',
+        name: childName,
+        startAge: birthAge,
+        properties: {
+          arrivalAge: birthAge,
+          childcareCost: Number(ev.childcareCost || 15000),
+          dependencyEndAge: Number(ev.dependencyEndAge || 18),
+          collegeCost: Number(ev.collegeCost || 25000),
+          includeCollege: !!ev.includeCollege
+        }
+      };
+      lifePlan.objects.push(obj);
+    } else {
+      obj.name = childName;
+      obj.startAge = birthAge;
+      obj.properties = {
+        ...obj.properties,
+        arrivalAge: birthAge,
+        childcareCost: Number(ev.childcareCost || obj.properties.childcareCost || 15000),
+        dependencyEndAge: Number(ev.dependencyEndAge || obj.properties.dependencyEndAge || 18),
+        collegeCost: Number(ev.collegeCost || obj.properties.collegeCost || 25000),
+        includeCollege: !!ev.includeCollege
+      };
+    }
+  });
+
+  lifePlan.objects = lifePlan.objects.filter(obj => {
+    if (obj.type === 'child') {
+      const isDerivedFromEvent = obj.id.startsWith('child-event-') || (inputs.lifeEvents || []).some(e => e.id === obj.id);
+      const isDerivedFromProfile = obj.id.startsWith('child-input-') || (inputsChildren || []).some(c => c.id === obj.id);
+      if (isDerivedFromEvent || isDerivedFromProfile) {
+        return validChildIds.has(obj.id);
+      }
+    }
+    return true;
+  });
+
+  // 4. Sync future home properties and mortgages from buyHouse events
+  const buyHouseEvents = (inputs.lifeEvents || []).filter(e => e.type === 'buyHouse' && e.enabled);
+  const validHouseIds = new Set();
+  
+  buyHouseEvents.forEach((buyHouseEv, bhIdx) => {
+    const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
+    let homePrice = Number(buyHouseEv.homePrice || 300000);
+    if (buyHouseEv.houseId) {
+      const houseAsset = (inputs.houseAssets || []).find(h => h.id === buyHouseEv.houseId);
+      if (houseAsset && houseAsset.purchasePrice) {
+        homePrice = Number(houseAsset.purchasePrice);
+      }
+    }
+    const mortgageAmount = Number(buyHouseEv.mortgageAmount || (homePrice * 0.8));
+    const monthlyHousingCosts = Number(buyHouseEv.monthlyHousingCosts || 0);
+    const houseId = buyHouseEv.houseId || `future-home-property-${bhIdx}`;
+    
+    validHouseIds.add(houseId);
+
+    let propObj = lifePlan.objects.find(o => o.id === houseId);
+    if (!propObj) {
+      propObj = {
+        id: houseId,
+        type: 'property',
+        name: buyHouseEv.name || 'Future Home',
+        startAge: purchaseAge,
+        endAge: lifeExpectancy,
+        properties: {
+          homeValue: homePrice,
+          monthlyHousingCosts: monthlyHousingCosts,
+          hoa: Number(buyHouseEv.hoa || 0),
+          propertyTaxes: Number(buyHouseEv.propertyTaxes || 0),
+          insurance: Number(buyHouseEv.insurance || 0)
+        }
+      };
+      lifePlan.objects.push(propObj);
+    } else {
+      propObj.startAge = purchaseAge;
+      propObj.endAge = lifeExpectancy;
+      propObj.properties = {
+        ...propObj.properties,
+        homeValue: homePrice,
+        monthlyHousingCosts: monthlyHousingCosts,
+        hoa: Number(buyHouseEv.hoa || propObj.properties.hoa || 0),
+        propertyTaxes: Number(buyHouseEv.propertyTaxes || propObj.properties.propertyTaxes || 0),
+        insurance: Number(buyHouseEv.insurance || propObj.properties.insurance || 0)
+      };
+    }
+
+    if (mortgageAmount > 0) {
+      const mortgageId = `mortgage-${houseId}`;
+      let mortObj = lifePlan.objects.find(o => o.id === mortgageId);
+      if (!mortObj) {
+        mortObj = {
+          id: mortgageId,
+          type: 'debt',
+          name: `${propObj.name} Mortgage`,
+          startAge: purchaseAge,
+          properties: {
+            debtType: 'mortgage',
+            balance: mortgageAmount,
+            interestRate: Number(buyHouseEv.mortgageRate || 6.5),
+            monthlyPayment: Number(buyHouseEv.monthlyPayment || 0),
+            payoffPlan: 'standard'
+          }
+        };
+        lifePlan.objects.push(mortObj);
+      } else {
+        mortObj.startAge = purchaseAge;
+        mortObj.properties = {
+          ...mortObj.properties,
+          balance: mortgageAmount,
+          interestRate: Number(buyHouseEv.mortgageRate || mortObj.properties.interestRate || 6.5),
+          monthlyPayment: Number(buyHouseEv.monthlyPayment || mortObj.properties.monthlyPayment || 0)
+        };
+      }
+    }
+  });
+
+  // Sync sell house events
+  const sellHouseEvents = (inputs.lifeEvents || []).filter(e => e.type === 'sellHouse' && e.enabled);
+  lifePlan.events = (lifePlan.events || []).filter(e => e.type !== 'property.sell');
+  sellHouseEvents.forEach(sellEv => {
+    lifePlan.events.push({
+      id: sellEv.id || `event-sell-${sellEv.houseId}`,
+      type: 'property.sell',
+      age: Number(sellEv.age),
+      objectId: sellEv.houseId || 'future-home-property'
+    });
+  });
+
+  lifePlan.objects = lifePlan.objects.filter(obj => {
+    if (obj.type === 'property' && obj.id !== 'home-property' && obj.startAge > currentAge) {
+      return validHouseIds.has(obj.id);
+    }
+    if (obj.type === 'debt' && obj.id.startsWith('mortgage-') && obj.id !== 'mortgage-debt' && obj.startAge > currentAge) {
+      const houseId = obj.id.replace('mortgage-', '');
+      return validHouseIds.has(houseId);
+    }
+    return true;
+  });
+
+  // 5. Sync career change job objects
+  const careerChangeEvents = (inputs.lifeEvents || []).filter(e => e.type === 'careerChange' && e.enabled);
+  const validJobIds = new Set();
+  careerChangeEvents.forEach((ccEv, ccIdx) => {
+    const startAge = Number(ccEv.startAge || ccEv.age || 45);
+    const endAge = Number(ccEv.endAge || targetRetirementAge);
+    const jobId = ccEv.id || ccEv.jobId || `job-career-change-${ccIdx}`;
+    validJobIds.add(jobId);
+
+    let jobObj = lifePlan.objects.find(o => o.id === jobId);
+    if (!jobObj) {
+      jobObj = {
+        id: jobId,
+        type: 'job',
+        name: ccEv.name || 'New Job',
+        startAge,
+        endAge,
+        properties: {
+          annualIncome: Number(ccEv.amount || 0),
+          growthRate: Number(ccEv.growthRate !== undefined ? ccEv.growthRate * 100 : 3)
+        }
+      };
+      lifePlan.objects.push(jobObj);
+    } else {
+      jobObj.startAge = startAge;
+      jobObj.endAge = endAge;
+      jobObj.name = ccEv.name || jobObj.name;
+      jobObj.properties = {
+        ...jobObj.properties,
+        annualIncome: Number(ccEv.amount || jobObj.properties.annualIncome || 0),
+        growthRate: Number(ccEv.growthRate !== undefined ? ccEv.growthRate * 100 : jobObj.properties.growthRate || 3)
+      };
+    }
+  });
+
+  lifePlan.objects = lifePlan.objects.filter(obj => {
+    if (obj.type === 'job' && obj.id.startsWith('job-career-change-')) {
+      return validJobIds.has(obj.id);
+    }
+    return true;
+  });
+
+  // 6. Sync retirement goals
+  let retireGoal = lifePlan.objects.find(o => o.id === 'goal-retirement');
+  if (!retireGoal) {
+    retireGoal = {
+      id: 'goal-retirement',
+      type: 'goal',
+      name: 'Retirement',
+      startAge: targetRetirementAge,
+      endAge: lifeExpectancy,
+      properties: {
+        targetAge: targetRetirementAge,
+        spendingPercent: 70
+      }
+    };
+    lifePlan.objects.push(retireGoal);
+  } else {
+    retireGoal.startAge = targetRetirementAge;
+    retireGoal.endAge = lifeExpectancy;
+    retireGoal.properties = {
+      ...retireGoal.properties,
+      targetAge: targetRetirementAge
+    };
+  }
+
+  // 7. Sync Social Security claiming events
+  let planSsEvent = lifePlan.events.find(e => e.type === 'socialSecurity');
+  if (!planSsEvent) {
+    lifePlan.events.push({
+      id: ssEv?.id || 'event-social-security',
+      type: 'socialSecurity',
+      age: ssAge,
+      objectId: 'self-person',
+      mutation: {
+        claimingAge: ssAge,
+        monthlyBenefit: ssBenefit
+      }
+    });
+  } else {
+    planSsEvent.age = ssAge;
+    planSsEvent.mutation = {
+      ...planSsEvent.mutation,
+      claimingAge: ssAge,
+      monthlyBenefit: ssBenefit
+    };
+  }
+
+  return lifePlan;
+}
+
 export function initializeLifePlanIfMissing(inputs) {
   if (!inputs) return null;
   if (inputs.lifePlan) {
-    return inputs.lifePlan;
+    const cloned = JSON.parse(JSON.stringify(inputs.lifePlan));
+    return syncLifePlanWithInputs(cloned, inputs);
   }
 
-  const currentAge = Math.max(0, Number(inputs.currentAge) || 35);
+  const currentAge = Math.max(0,
+    Number(inputs.currentAge) ||
+    Number(inputs.age) ||
+    Number(inputs.householdModel?.people?.self?.demographics?.currentAge) ||
+    Number(inputs.householdModel?.people?.self?.age) ||
+    35
+  );
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
   const targetRetirementAge = Math.max(currentAge, Number(inputs.targetRetirementAge) || 65);
-  const simpleIncome = Number(inputs.simpleIncome) || 50000;
+  const simpleIncome = Number(inputs.simpleIncome) || 0;
 
   const objects = [];
   const events = [];
@@ -29,41 +408,52 @@ export function initializeLifePlanIfMissing(inputs) {
     properties: { role: 'self' }
   });
 
-  const profile = inputs.lifeProfile || {};
+  const isProfileMode = inputs.useLifeProfile === true || (inputs.useLifeProfile !== false && inputs.lifeProfile && Object.keys(inputs.lifeProfile).length > 0);
+  const profile = isProfileMode ? (inputs.lifeProfile || {}) : {};
 
   // 2. Add Partner if married/partnered
   const household = profile.household || {};
-  if (household.status === 'married' || household.status === 'partnered') {
+  const isMarried = household.status === 'married' || 
+                    household.status === 'partnered' || 
+                    (!isProfileMode && (inputs.filingStatus === 'married' || inputs.filingStatus === 'marriedFilingJointly')) ||
+                    !!inputs.householdModel?.people?.partner;
+
+  if (isMarried) {
+    const partnerInfo = inputs.householdModel?.people?.partner || {};
+    const partnerName = partnerInfo.displayName || 'Partner';
+    const partnerAge = Number(partnerInfo.currentAge) || Number(household.partnerAge) || currentAge;
     objects.push({
       id: 'spouse-partner',
       type: 'person',
-      name: 'Partner',
+      name: partnerName,
       startAge: currentAge,
       endAge: lifeExpectancy,
       properties: {
         role: 'partner',
-        partnerIncome: Number(household.partnerIncome || 0),
+        spouseCurrentAge: partnerAge,
+        partnerIncome: Number(household.partnerIncome || partnerInfo.partnerIncome || 0),
         partnerSavings: Number(household.partnerSavings || 0),
         partnerRetirement: Number(household.partnerRetirement || 0),
         partnerDebts: Number(household.partnerDebts || 0),
-        status: household.status
+        status: household.status || inputs.filingStatus || 'married'
       }
     });
   }
 
   // 3. Add Jobs (Income Sources)
-  const incomeSources = profile.incomeSources || [];
+  const incomeSources = isProfileMode ? (profile.incomeSources || []) : (inputs.incomeList || []);
+
   if (incomeSources.length > 0) {
     incomeSources.forEach((inc, idx) => {
       objects.push({
         id: inc.id || `job-${Date.now()}-${idx}`,
         type: 'job',
-        name: inc.name || `Job ${idx + 1}`,
+        name: inc.name || inc.label || `Job ${idx + 1}`,
         startAge: Number(inc.startAge !== undefined ? inc.startAge : currentAge),
         endAge: Number(inc.endAge !== undefined ? inc.endAge : targetRetirementAge),
         properties: {
-          annualIncome: Number(inc.amount || 0),
-          growthRate: Number(inc.growthRate !== undefined ? inc.growthRate : 3)
+          annualIncome: Number(inc.annualIncome ?? inc.salary ?? inc.currentSalary ?? inc.income ?? inc.amount ?? 0),
+          growthRate: Number(inc.growthRate !== undefined ? (inc.growthRate * (isProfileMode ? 1 : 100)) : 3)
         }
       });
     });
@@ -81,12 +471,30 @@ export function initializeLifePlanIfMissing(inputs) {
     });
   }
 
+  // Add careerChange events as jobs
+  const careerChangeEvents = (inputs.lifeEvents || []).filter(e => e.type === 'careerChange' && e.enabled);
+  careerChangeEvents.forEach((ccEv, ccIdx) => {
+    const startAge = Number(ccEv.startAge || ccEv.age || 45);
+    const endAge = Number(ccEv.endAge || targetRetirementAge);
+    objects.push({
+      id: ccEv.id || ccEv.jobId || `job-career-change-${ccIdx}`,
+      type: 'job',
+      name: ccEv.name || 'New Job',
+      startAge,
+      endAge,
+      properties: {
+        annualIncome: Number(ccEv.amount || 0),
+        growthRate: Number(ccEv.growthRate !== undefined ? ccEv.growthRate * 100 : 3)
+      }
+    });
+  });
+
   // 4. Add Accounts (Assets)
-  const profileAssets = profile.assets || {};
+  const profileAssets = isProfileMode ? (profile.assets || {}) : (inputs.assets || {});
   const assetKeys = ['cash', 'brokerage', 'trad401k', 'tradIra', 'rothIra', 'hsa', 'crypto', 'businessEquity'];
   
   assetKeys.forEach(key => {
-    const val = Number(profileAssets[key] || inputs.assets?.[key] || 0);
+    const val = Number(profileAssets[key] || 0);
     const contrib = Number(inputs.budgetDetails?.savings?.[key] || 0);
     if (val > 0 || contrib > 0 || (key === 'brokerage' && val === 0 && inputs.assets?.brokerage > 0)) {
       objects.push({
@@ -116,7 +524,7 @@ export function initializeLifePlanIfMissing(inputs) {
       endAge: lifeExpectancy,
       properties: {
         accountType: 'cash',
-        currentBalance: Number(profileAssets.cash || inputs.assets?.cash || 0),
+        currentBalance: Number(profileAssets.cash || 0),
         contributionAmount: Number(inputs.budgetDetails?.savings?.cash || 0),
         allocation: '100/0'
       }
@@ -125,6 +533,8 @@ export function initializeLifePlanIfMissing(inputs) {
 
   const hasBrokerage = objects.some(o => o.type === 'account' && o.properties?.accountType === 'brokerage');
   if (!hasBrokerage) {
+    const defaultBrokerageBal = (inputs.assets || inputs.lifeProfile) ? 5000 : 0;
+    const defaultBrokerageContrib = (inputs.assets || inputs.lifeProfile) ? 625 : 0;
     objects.push({
       id: 'account-brokerage',
       type: 'account',
@@ -133,8 +543,8 @@ export function initializeLifePlanIfMissing(inputs) {
       endAge: lifeExpectancy,
       properties: {
         accountType: 'brokerage',
-        currentBalance: Number(profileAssets.brokerage || inputs.assets?.brokerage || 5000),
-        contributionAmount: Number(inputs.budgetDetails?.savings?.brokerage || 625),
+        currentBalance: Number(profileAssets.brokerage || defaultBrokerageBal),
+        contributionAmount: Number(inputs.budgetDetails?.savings?.brokerage || defaultBrokerageContrib),
         allocation: '80/20'
       }
     });
@@ -178,17 +588,24 @@ export function initializeLifePlanIfMissing(inputs) {
   }
 
   // Future buy house event mapping
-  const buyHouseEv = (inputs.lifeEvents || []).find(e => e.type === 'buyHouse' && e.enabled);
-  if (buyHouseEv) {
+  const buyHouseEvents = (inputs.lifeEvents || []).filter(e => e.type === 'buyHouse' && e.enabled);
+  buyHouseEvents.forEach((buyHouseEv, bhIdx) => {
     const purchaseAge = Number(buyHouseEv.purchaseAge || buyHouseEv.age || 40);
-    const homePrice = Number(buyHouseEv.homePrice || 300000);
+    let homePrice = Number(buyHouseEv.homePrice || 300000);
+    if (buyHouseEv.houseId) {
+      const houseAsset = (inputs.houseAssets || []).find(h => h.id === buyHouseEv.houseId);
+      if (houseAsset && houseAsset.purchasePrice) {
+        homePrice = Number(houseAsset.purchasePrice);
+      }
+    }
     const mortgageAmount = Number(buyHouseEv.mortgageAmount || (homePrice * 0.8));
     const monthlyHousingCosts = Number(buyHouseEv.monthlyHousingCosts || 0);
 
+    const houseId = buyHouseEv.houseId || `future-home-property-${bhIdx}`;
     objects.push({
-      id: 'future-home-property',
+      id: houseId,
       type: 'property',
-      name: 'Future Home',
+      name: buyHouseEv.name || 'Future Home',
       startAge: purchaseAge,
       endAge: lifeExpectancy,
       properties: {
@@ -202,7 +619,7 @@ export function initializeLifePlanIfMissing(inputs) {
 
     if (mortgageAmount > 0) {
       objects.push({
-        id: 'future-mortgage-debt',
+        id: `mortgage-${houseId}`,
         type: 'debt',
         name: 'Future Mortgage',
         startAge: purchaseAge,
@@ -215,28 +632,66 @@ export function initializeLifePlanIfMissing(inputs) {
         }
       });
     }
-  }
+  });
+
+  // Future sell house event mapping to lifePlan.events
+  const sellHouseEvents = (inputs.lifeEvents || []).filter(e => e.type === 'sellHouse' && e.enabled);
+  sellHouseEvents.forEach(sellEv => {
+    events.push({
+      id: sellEv.id || `event-sell-${sellEv.houseId}`,
+      type: 'property.sell',
+      age: Number(sellEv.age),
+      objectId: sellEv.houseId || 'future-home-property'
+    });
+  });
+
+  // Future marriage event mapping to partner start age
+  const marriageEvents = (inputs.lifeEvents || []).filter(e => e.type === 'marriage' && e.enabled);
+  marriageEvents.forEach((marriageEv, mIdx) => {
+    const marriageAge = Number(marriageEv.age || 38);
+    // Only push if spouse-partner doesn't exist
+    if (!objects.some(o => o.id === 'spouse-partner')) {
+      objects.push({
+        id: 'spouse-partner',
+        type: 'person',
+        name: 'Partner',
+        startAge: marriageAge,
+        endAge: lifeExpectancy,
+        properties: {
+          role: 'partner',
+          partnerIncome: Number(marriageEv.spouseIncome || 0),
+          status: 'married'
+        }
+      });
+    }
+  });
 
   // 6. Add Debts
-  const debts = profile.debts || [];
+  const debts = isProfileMode ? (profile.debts || []) : (inputs.debtList || []);
+
   debts.forEach((debt, idx) => {
+    const balance = Number(debt.balance || 0);
+    const apr = Number(debt.interestRate || 0);
+    const payment = Number(debt.payment || debt.monthlyPayment || 0);
+    const startAge = Number(debt.startAge !== undefined ? debt.startAge : currentAge);
+
     objects.push({
       id: debt.id || `debt-${Date.now()}-${idx}`,
       type: 'debt',
       name: debt.name || `Debt ${idx + 1}`,
-      startAge: currentAge,
+      startAge,
       properties: {
-        debtType: 'other',
-        balance: Number(debt.balance || 0),
-        interestRate: Number(debt.interestRate || 0),
-        monthlyPayment: Number(debt.monthlyPayment || 0),
+        debtType: debt.type || 'other',
+        balance,
+        interestRate: apr,
+        monthlyPayment: payment,
         payoffPlan: 'standard'
       }
     });
   });
 
   // 7. Add Children
-  const children = profile.children || [];
+  const children = isProfileMode ? (profile.children || []) : [];
   children.forEach((c, idx) => {
     const childAge = Number(c.age || 0);
     objects.push({
@@ -250,6 +705,26 @@ export function initializeLifePlanIfMissing(inputs) {
         dependencyEndAge: 18,
         collegeCost: 25000,
         includeCollege: !!c.includeCollege
+      }
+    });
+  });
+
+  // Future child event mapping (haveChild)
+  const haveChildEvents = (inputs.lifeEvents || []).filter(e => e.type === 'haveChild' && e.enabled);
+  haveChildEvents.forEach((childEv, cIdx) => {
+    const birthAge = Number(childEv.birthAge || childEv.age || currentAge);
+    const childName = childEv.name ? childEv.name.replace('Child: ', '') : `Child ${cIdx + 1}`;
+    objects.push({
+      id: childEv.id || `child-event-${cIdx}`,
+      type: 'child',
+      name: childName,
+      startAge: birthAge,
+      properties: {
+        arrivalAge: birthAge,
+        childcareCost: Number(childEv.childcareCost || 15000),
+        dependencyEndAge: Number(childEv.dependencyEndAge || 18),
+        collegeCost: Number(childEv.collegeCost || 25000),
+        includeCollege: !!childEv.includeCollege
       }
     });
   });
@@ -551,6 +1026,10 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
   const jobs = objects.filter(o => o.type === 'job');
   jobs.forEach(job => {
     const p = job.properties || {};
+    const incomeVal = p.annualIncome ?? p.salary ?? p.currentSalary ?? p.income ?? p.amount;
+    if (incomeVal !== undefined && incomeVal !== null) {
+      p.annualIncome = Number(incomeVal);
+    }
     const jobEvents = events.filter(e => e.objectId === job.id);
     
     const baseSalary = Number(p.annualIncome || 0);

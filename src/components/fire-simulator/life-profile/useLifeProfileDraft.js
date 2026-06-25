@@ -45,6 +45,7 @@ export default function useLifeProfileDraft({
   const [localSimpleIncome, setLocalSimpleIncome] = useState(inputs.simpleIncome || 50000);
   const [localTargetRetirementAge, setLocalTargetRetirementAge] = useState(inputs.targetRetirementAge || 65);
   const [localLifePlan, setLocalLifePlan] = useState(null);
+  const [editingItemId, setEditingItemId] = useState(null);
   
   // Find social security event claiming age
   const initialSS = (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
@@ -424,6 +425,8 @@ export default function useLifeProfileDraft({
     triggerSave,
     handleSave,
     localLifePlan,
-    setLocalLifePlan
+    setLocalLifePlan,
+    editingItemId,
+    setEditingItemId
   };
 }

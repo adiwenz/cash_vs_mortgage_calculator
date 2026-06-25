@@ -5,9 +5,7 @@ export function buildEffectiveSimulationInputs(inputs) {
 
   let cloned = JSON.parse(JSON.stringify(inputs));
   if (cloned.useLifeProfile) {
-    if (!cloned.lifePlan) {
-      cloned.lifePlan = initializeLifePlanIfMissing(cloned);
-    }
+    cloned.lifePlan = initializeLifePlanIfMissing(cloned);
     if (cloned.lifePlan) {
       const derived = deriveLegacyInputsFromLifePlan(cloned.lifePlan, cloned);
       cloned = {
@@ -225,10 +223,23 @@ export function buildEffectiveSimulationInputs(inputs) {
 export function buildBaselineCurrentInputs(inputs) {
   if (!inputs) return inputs;
 
-  // 1. Deep clone/build effective simulation inputs which maps lifeProfile -> effective lists.
-  const effective = buildEffectiveSimulationInputs(inputs);
+  // 1. Clone inputs
+  let baselineInputs = JSON.parse(JSON.stringify(inputs));
 
-  // 2. Now, strip out all timeline event assumptions.
+  // 2. Strip out all timeline event assumptions from inputs first
+  if (baselineInputs.lifeEvents) {
+    baselineInputs.lifeEvents = baselineInputs.lifeEvents.filter(e => e.isDerived);
+  }
+
+  // 3. Clear lifePlan so it is forced to re-initialize from the filtered baseline profile/events.
+  if (baselineInputs.lifePlan) {
+    delete baselineInputs.lifePlan;
+  }
+
+  // 4. Build effective simulation inputs which maps lifeProfile -> effective lists.
+  const effective = buildEffectiveSimulationInputs(baselineInputs);
+
+  // 5. Now, strip out all timeline event assumptions.
   // We keep only the derived events/debts/incomes/members which represent the manual baseline situation.
   if (inputs.useLifeProfile) {
     return {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -36,13 +36,25 @@ export default function LifeItemsWorkspace({
   setLocalLifePlan,
   currentAge,
   lifeExpectancy,
-  triggerSave
+  triggerSave,
+  editingItemId,
+  setEditingItemId
 }) {
   const [editingItem, setEditingItem] = useState(null); // { mode: 'add'|'edit', type, item }
   const [showTypeSelect, setShowTypeSelect] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // { mode: 'add'|'edit', objectId, eventType, event }
   
   const objects = localLifePlan?.objects || [];
+
+  useEffect(() => {
+    if (editingItemId && setEditingItemId) {
+      const item = objects.find(o => o.id === editingItemId);
+      if (item) {
+        setEditingItem({ mode: 'edit', type: item.type, item: JSON.parse(JSON.stringify(item)) });
+      }
+      setEditingItemId(null);
+    }
+  }, [editingItemId, objects, setEditingItemId]);
 
   const getEventDefaultLabel = (type) => {
     switch (type) {

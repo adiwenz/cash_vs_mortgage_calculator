@@ -1,4 +1,10 @@
+import React from 'react';
 import { formatCurrency } from '../helpers';
+import { 
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp
+} from 'lucide-react';
 
 export default function LifeSnapshotPanel({
   isMobile,
@@ -7,7 +13,8 @@ export default function LifeSnapshotPanel({
   selectedAge,
   currentAge,
   lifeExpectancy,
-  onSelectedAgeChange
+  onSelectedAgeChange,
+  onEditObject
 }) {
   const clampSelectedAge = (age) => {
     const min = Number(currentAge);
@@ -29,175 +36,151 @@ export default function LifeSnapshotPanel({
   const isDecrementDisabled = selectedAge <= Number(currentAge);
   const isIncrementDisabled = selectedAge >= Number(lifeExpectancy);
 
-  const getCategoryBg = (rowId) => {
-    switch (rowId) {
-      case 'relationship': return '#f3e8ff';
-      case 'housing': return '#dcfce7';
-      case 'children': return '#ffedd5';
-      case 'education': return '#dbeafe';
-      case 'debt': return '#fae8ff';
-      case 'income': return '#ccfbf1';
-      case 'assets': return '#fef9c3';
-      default: return '#f3f4f6';
-    }
-  };
+  // Derivations
+  const relStatus = snapshot?.relationshipStatus || 'single';
+  const relationshipValue = relStatus === 'married' ? 'Married' : (relStatus === 'partnered' ? 'Partnered' : 'Single');
 
-  const getMilestoneIcon = (category) => {
-    switch (category) {
-      case 'relationship': return '❤️';
-      case 'housing': return '🏠';
-      case 'children': return '👶';
-      case 'education': return '🎓';
-      case 'debt': return '💸';
-      case 'income': return '💼';
-      default: return '⭐️';
-    }
-  };
+  const properties = snapshot?.properties || [];
+  const housingValue = properties.length > 0 ? `Owns (${properties[0].name})` : 'Renting';
 
-  const getMilestoneIconBg = (category) => {
-    return getCategoryBg(category);
-  };
+  const childrenCount = snapshot?.children?.length || 0;
+  const childrenValue = childrenCount === 0 ? 'None' : (childrenCount === 1 ? '1 Child' : `${childrenCount} Children`);
 
-  const formatRelationshipStatus = (status) => {
-    return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Single';
-  };
+  const annualIncomeVal = snapshot?.income?.annualIncome || 0;
+  const annualIncomeValue = `${formatCurrency(annualIncomeVal)} / yr`;
 
-  const formatChildrenSnapshot = (children) => {
-    if (!children || children.length === 0) return 'None';
-    return children.map(c => `${c.name} (Age ${Math.floor(c.age)})`).join(', ');
-  };
+  const netWorthVal = snapshot?.financialSummary?.netWorth || 0;
+  const netWorthValue = formatCurrency(netWorthVal);
 
-  const formatNetWorthValue = (proj, age, fallback) => {
-    const assetsRow = proj.rows.find(r => r.id === 'assets');
-    const seriesItem = assetsRow?.items.find(item => item.type === 'series');
-    const points = seriesItem?.metadata?.points || [];
-    const pointAtAge = points.find(p => p.age === age);
-    const netWorthVal = pointAtAge ? pointAtAge.value : fallback;
-    return formatCurrency(netWorthVal);
-  };
+  const debts = snapshot?.debts?.activeDebts || [];
+  const totalDebtBalance = debts.reduce((sum, d) => sum + (d.balance || 0), 0);
+  const debtsValue = totalDebtBalance === 0 ? 'None' : formatCurrency(totalDebtBalance);
 
-  const formatDebtsList = (activeDebts) => {
-    if (!activeDebts || activeDebts.length === 0) return 'None';
-    return activeDebts.map(d => d.name).join(', ');
-  };
-
-  const renderSnapshotRow = (icon, label, value) => {
-    return (
-      <div className="life-snapshot-row-item" key={label}>
-        <div className="life-snapshot-row-item-left">
-          <div className="life-snapshot-row-item-icon-circle">
-            {icon}
-          </div>
-          <span className="life-snapshot-row-item-label">{label}</span>
-        </div>
-        <span className="life-snapshot-row-item-value">{value}</span>
-      </div>
-    );
-  };
+  const rows = [
+    { label: 'Relationship', icon: '❤️', value: relationshipValue },
+    { label: 'Housing', icon: '🏠', value: housingValue },
+    { label: 'Children', icon: '👶', value: childrenValue },
+    { label: 'Annual Income', icon: '💼', value: annualIncomeValue },
+    {
+      label: 'Net Worth',
+      icon: <TrendingUp size={16} color="#ef4444" style={{ transform: 'translateY(1px)' }} />,
+      value: netWorthValue
+    },
+    { label: 'Debts', icon: '💸', value: debtsValue }
+  ];
 
   return (
-    <div className="life-snapshot-panel" style={isMobile ? { padding: '1rem' } : undefined}>
-      <div className="life-snapshot-header">
-        <h4 style={{ 
-          fontSize: isMobile ? '1rem' : '1.05rem', 
-          fontWeight: '800', 
-          margin: 0, 
-          color: 'var(--text-primary)' 
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      background: '#ffffff',
+      border: '1px solid #e5e7eb',
+      borderRadius: '16px',
+      padding: '1.5rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+      maxWidth: '420px',
+      margin: '0 auto',
+      boxSizing: 'border-box'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.25rem' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#111827', margin: 0 }}>Life Snapshot</h3>
+          <span style={{ fontSize: '1rem', color: '#6b7280', fontWeight: '500' }}>- {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}</span>
+        </div>
+        <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>View your life at any age.</p>
+      </div>
+
+      {/* Age Selector */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+          padding: '0.5rem 0.75rem',
+          background: '#ffffff'
         }}>
-          <span>Life Snapshot</span>
-          <span style={{ 
-            marginLeft: '0.5rem', 
-            fontWeight: 'normal', 
-            color: 'var(--text-secondary)', 
-            fontSize: isMobile ? '0.8rem' : '0.85rem' 
-          }}>
-            - {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}
+          <button 
+            type="button" 
+            onClick={handleDecrementAge}
+            disabled={isDecrementDisabled}
+            aria-label="Previous age"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isDecrementDisabled ? 'not-allowed' : 'pointer',
+              color: isDecrementDisabled ? '#d1d5db' : '#6b7280',
+              padding: '0.25rem 0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '1.2rem',
+              fontWeight: 'bold',
+              transition: 'opacity 0.2s'
+            }}
+          >
+            ←
+          </button>
+          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1f2937' }}>
+            Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
           </span>
-        </h4>
-        <p style={{ 
-          fontSize: isMobile ? '0.75rem' : '0.78rem', 
-          color: 'var(--text-secondary)', 
-          margin: '2px 0 0 0' 
-        }}>
-          View your life at any age.
-        </p>
+          <button 
+            type="button" 
+            onClick={handleIncrementAge}
+            disabled={isIncrementDisabled}
+            aria-label="Next age"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isIncrementDisabled ? 'not-allowed' : 'pointer',
+              color: isIncrementDisabled ? '#d1d5db' : '#6b7280',
+              padding: '0.25rem 0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '1.2rem',
+              fontWeight: 'bold',
+              transition: 'opacity 0.2s'
+            }}
+          >
+            →
+          </button>
+        </div>
       </div>
 
-      {/* Selected Age Indicator */}
-      <div className="life-snapshot-age-selector-row" style={isMobile ? { margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' } : undefined}>
-        <button 
-          type="button" 
-          className="age-selector-arrow-btn" 
-          onClick={handleDecrementAge}
-          disabled={isDecrementDisabled}
-          aria-label="Previous age"
-          style={isDecrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-        >
-          &larr;
-        </button>
-        <span className="age-selector-text">
-          Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
-        </span>
-        <button 
-          type="button" 
-          className="age-selector-arrow-btn" 
-          onClick={handleIncrementAge}
-          disabled={isIncrementDisabled}
-          aria-label="Next age"
-          style={isIncrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-        >
-          &rarr;
-        </button>
-      </div>
-
-      {/* Snapshot Rows */}
-      <div className="life-snapshot-rows-list">
-        {renderSnapshotRow('❤️', 'Relationship', formatRelationshipStatus(snapshot.relationshipStatus))}
-        {renderSnapshotRow('🏠', 'Housing', snapshot.housingStatus === 'own' ? 'Homeowner' : 'Renting')}
-        {renderSnapshotRow('👶', 'Children', formatChildrenSnapshot(snapshot.children))}
-        {renderSnapshotRow('💼', 'Annual Income', formatCurrency(snapshot.income.annualIncome) + ' / yr')}
-        {renderSnapshotRow('📈', 'Net Worth', formatNetWorthValue(projection, selectedAge, snapshot.assets.investedAssets))}
-        {renderSnapshotRow('💸', 'Debts', formatDebtsList(snapshot.debts.activeDebts))}
-      </div>
-
-      {/* Upcoming Milestones */}
-      <div className="upcoming-milestones-container">
-        <h5 style={{ 
-          fontSize: isMobile ? '0.82rem' : '0.85rem', 
-          fontWeight: '800', 
-          margin: '0.5rem 0 0 0', 
-          color: 'var(--text-primary)' 
-        }}>
-          Upcoming Milestones
-        </h5>
-        {projection.upcomingMilestones.length === 0 ? (
-          <p style={{ 
-            fontSize: isMobile ? '0.72rem' : '0.75rem', 
-            color: 'var(--text-secondary)', 
-            margin: 0 
-          }}>
-            No upcoming milestones
-          </p>
-        ) : (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: isMobile ? '0.4rem' : '0.5rem', 
-            marginTop: '0.25rem' 
-          }}>
-            {projection.upcomingMilestones.map(m => (
-              <div key={m.id} className="upcoming-milestone-card">
-                <div className="upcoming-milestone-icon-circle" style={{ background: getMilestoneIconBg(m.category) }}>
-                  {getMilestoneIcon(m.category)}
-                </div>
-                <div className="upcoming-milestone-text-group">
-                  <span className="upcoming-milestone-title-text">{m.title}</span>
-                  <span className="upcoming-milestone-timing-text">Age {m.age} (In {m.age - projection.currentAge} years)</span>
-                </div>
+      {/* Snapshot List Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {rows.map((row, index) => (
+          <div 
+            key={row.label} 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.85rem 0',
+              borderTop: index === 0 ? '1px solid #f3f4f6' : 'none',
+              borderBottom: '1px solid #f3f4f6'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: '#f9fafb',
+                border: '1px solid #f3f4f6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.1rem'
+              }}>
+                {row.icon}
               </div>
-            ))}
+              <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#4b5563' }}>{row.label}</span>
+            </div>
+            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#111827', textAlign: 'right' }}>{row.value}</span>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

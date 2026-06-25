@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { useTimelineEvents } from '../../../hooks/useTimelineEvents';
 import { findMatchingEvent } from '../../../features/fire/events/handlers/eventHandlerUtils';
-import LifeSnapshotPanel from './LifeSnapshotPanel';
 
 function isGeneratedMainIncome(id) {
   if (!id || typeof id !== 'string') return false;

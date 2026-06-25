@@ -32,7 +32,7 @@ export function getTimelineProjection(inputs, options = {}) {
   }
 
   // 2. Normalize and retrieve raw timeline items
-  const items = getTimelineItems(inputs || {});
+  const items = getTimelineItems(effective);
 
   // 3. Resolve minAge and maxAge
   const lifeExpectancy = Math.max(currentAge + 1, Number(effective.lifeExpectancy) || 85);
@@ -126,6 +126,8 @@ export function getTimelineProjection(inputs, options = {}) {
         : (item.metadata?.value !== undefined ? item.metadata.value : null),
       sourceType: item.sourceType || null,
       sourceId: item.sourceId || null,
+      objectType: item.objectType || null,
+      objectId: item.objectId || null,
       metadata: item.metadata || {}
     };
   });
