@@ -53,7 +53,12 @@ describe('Mobile Life Profile Modal Redesign', () => {
       />
     );
 
-    // Find and modify Your Age input
+    // Find and click the Edit button for the You card
+    const editButtons = screen.getAllByTitle('Edit Item');
+    expect(editButtons.length).toBeGreaterThan(0);
+    fireEvent.click(editButtons[0]);
+
+    // Find and modify Your Age input in the edit form
     const ageLabel = screen.getByText('Your Age');
     const parent = ageLabel.parentElement;
     const input = parent.querySelector('input');
@@ -62,6 +67,10 @@ describe('Mobile Life Profile Modal Redesign', () => {
 
     // Change to 42
     fireEvent.change(input, { target: { value: '42' } });
+
+    // Click Save Item to commit changes
+    const saveButton = screen.getByText('Save Item');
+    fireEvent.click(saveButton);
 
     // Assert updateInput was called with new lifePlan containing currentAge: 42
     expect(updateInputMock).toHaveBeenCalledWith(
@@ -90,6 +99,6 @@ describe('Mobile Life Profile Modal Redesign', () => {
     expect(screen.getByText('Homes & Property')).toBeDefined();
     expect(screen.getByText('Accounts & Assets')).toBeDefined();
     expect(screen.getByText('Debts')).toBeDefined();
-    expect(screen.getByText('Goals')).toBeDefined();
+    expect(screen.getByText('Other')).toBeDefined();
   });
 });
