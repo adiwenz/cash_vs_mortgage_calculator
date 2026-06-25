@@ -464,7 +464,9 @@ export default function LifePlanScreen({
               inputs={inputs}
               handleSetBudgetClick={handleSetBudgetClick}
               onOpenLifeProfile={(tab) => {
-                setLifeProfileTab(tab);
+                if (tab) {
+                  setLifeProfileTab(tab);
+                }
                 setIsLifeProfileOpen(true);
               }}
               handleCreateEvent={handleCreateEvent}

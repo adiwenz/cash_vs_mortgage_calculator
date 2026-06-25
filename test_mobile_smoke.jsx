@@ -47,8 +47,8 @@ describe('Mobile Fire Simulator Smoke Tests', () => {
     expect(resultsTab).toBeDefined();
     expect(detailsTab).toBeDefined();
 
-    // 4. Action buttons render (like "Add Life Event", "Edit Budget")
-    expect(screen.getByText(/Add Life Event/i)).toBeDefined();
+    // 4. Action buttons render (like "Open Life Planner", "Edit Budget")
+    expect(screen.getByText(/Open Life Planner/i)).toBeDefined();
     expect(screen.getByText(/Edit Budget/i)).toBeDefined();
   });
 
@@ -114,6 +114,6 @@ describe('Mobile Fire Simulator Smoke Tests', () => {
     expect(screen.getByText('Finley')).toBeDefined();
     expect(screen.getByText(/When would you like to stop working\?/i)).toBeDefined();
     expect(screen.getByText('Plan', { selector: '.mobile-nav-item' })).toBeDefined();
-    expect(screen.getByText(/Add Life Event/i)).toBeDefined();
+    expect(screen.getByText(/Open Life Planner/i)).toBeDefined();
   });
 });

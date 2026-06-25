@@ -66,11 +66,11 @@ describe('Mobile Event Wizard & Flow', () => {
       />
     );
 
-    // 1. FAB button "➕ Add Life Event"
-    const fabBtn = screen.getByRole('button', { name: /^➕ Add Life Event/i });
-    expect(fabBtn).toBeDefined();
-    fireEvent.click(fabBtn);
-    expect(setEditingEvent).toHaveBeenCalledWith({ type: 'selectType', isNew: true });
+    // 1. Button "Open Life Planner"
+    const openPlannerBtn = screen.getByRole('button', { name: /^💼 Open Life Planner/i });
+    expect(openPlannerBtn).toBeDefined();
+    fireEvent.click(openPlannerBtn);
+    expect(screen.getAllByText('Life Items').length).toBeGreaterThan(0);
   });
 
   test('Wizard overlay hides bottom navigation bar', () => {
