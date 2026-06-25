@@ -285,7 +285,7 @@ export function getTimelineProjection(inputs, options = {}) {
   periodCandidates.forEach(item => {
     const isBaseline = item.sourceType === 'baseline' || !item.sourceId;
     const isDuplicate = !isBaseline && upcomingMilestones.some(m => m.sourceId === item.sourceId);
-    if (!isDuplicate) {
+    if (!isDuplicate && item.sourceId !== 'spouse-partner') {
       addMilestone(`start-${item.id}`, `${item.title} (Start)`, item.startAge, item.category, item.sourceId, item.sourceType);
     }
   });

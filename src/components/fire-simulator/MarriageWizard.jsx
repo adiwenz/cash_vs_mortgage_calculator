@@ -312,8 +312,8 @@ export default function MarriageWizard({
                       type="number"
                       className="input-number-box"
                       style={{ width: '100%' }}
-                      value={editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? editingEvent.spouseCurrentAge : editingEvent.age}
-                      onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseCurrentAge: parseInt(e.target.value) || editingEvent.age }))}
+                      value={editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' ? editingEvent.spouseCurrentAge : inputs.currentAge}
+                      onChange={(e) => setEditingEvent(Object.assign({}, editingEvent, { spouseCurrentAge: parseInt(e.target.value) || inputs.currentAge }))}
                     />
                   </div>
                   <div className="input-wrapper">

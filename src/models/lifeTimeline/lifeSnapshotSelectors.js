@@ -27,22 +27,30 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
   };
 
   let partner = null;
-  const partnerObj = lifePlan?.objects?.find(o => o.type === 'person' && o.properties?.role === 'partner');
-  if (partnerObj && targetAge >= Number(partnerObj.startAge || currentAge)) {
-    const yearsElapsed = targetAge - currentAge;
-    let partnerAgeAtTarget = targetAge;
-    if (partnerObj.properties?.spouseCurrentAge !== undefined && partnerObj.properties?.spouseCurrentAge !== null) {
-      partnerAgeAtTarget = Number(partnerObj.properties.spouseCurrentAge) + yearsElapsed;
-    }
+  const partnerObj = lifePlan?.objects?.find(o => o.type === 'person' && (o.role === 'partner' || o.properties?.role === 'partner'));
+  if (partnerObj) {
+    const spouseStartAge = partnerObj.startsAtAge !== undefined ? Number(partnerObj.startsAtAge) : Number(partnerObj.startAge || currentAge);
+    const spouseEndAge = partnerObj.endsAtAge !== undefined && partnerObj.endsAtAge !== null ? Number(partnerObj.endsAtAge) : (partnerObj.endAge !== undefined ? Number(partnerObj.endAge) : lifeExpectancy);
     
-    // Apply spouse mutations at target age
-    const mutatedSpouse = applyObjectMutations(partnerObj, lifePlan.events, targetAge);
-    partner = {
-      role: 'partner',
-      displayName: partnerObj.name || 'Partner',
-      currentAge: partnerAgeAtTarget,
-      ...mutatedSpouse.properties
-    };
+    if (targetAge >= spouseStartAge && targetAge < spouseEndAge) {
+      const yearsElapsed = targetAge - currentAge;
+      let partnerAgeAtTarget = targetAge;
+      if (partnerObj.properties?.spouseCurrentAge !== undefined && partnerObj.properties?.spouseCurrentAge !== null) {
+        partnerAgeAtTarget = Number(partnerObj.properties.spouseCurrentAge) + yearsElapsed;
+      }
+      
+      // Apply spouse mutations at target age
+      const mutatedSpouse = applyObjectMutations(partnerObj, lifePlan.events, targetAge);
+      partner = {
+        role: 'partner',
+        displayName: partnerObj.name || 'Partner',
+        currentAge: partnerAgeAtTarget,
+        startsAtAge: spouseStartAge,
+        endsAtAge: spouseEndAge,
+        status: mutatedSpouse.status || mutatedSpouse.properties?.status || 'married',
+        ...mutatedSpouse.properties
+      };
+    }
   }
 
   const people = { self, partner };

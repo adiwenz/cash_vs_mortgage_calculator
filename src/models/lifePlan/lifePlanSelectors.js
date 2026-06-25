@@ -14,10 +14,14 @@ export function getActiveObjectsAtAge(lifePlan, age) {
     const mutated = applyObjectMutations(obj, events, targetAge);
     if (!mutated) return;
 
-    const startAge = mutated.startAge !== undefined ? Number(mutated.startAge) : Number(lifePlan.currentAge || 35);
+    const startAge = mutated.startsAtAge !== undefined
+      ? Number(mutated.startsAtAge)
+      : (mutated.startAge !== undefined ? Number(mutated.startAge) : Number(lifePlan.currentAge || 35));
     let endAge = lifeExpectancy;
 
-    if (mutated.effectiveEndAge !== undefined) {
+    if (mutated.endsAtAge !== undefined) {
+      endAge = mutated.endsAtAge === null ? lifeExpectancy : Number(mutated.endsAtAge);
+    } else if (mutated.effectiveEndAge !== undefined) {
       endAge = mutated.effectiveEndAge;
     } else if (mutated.endAge !== null && mutated.endAge !== undefined) {
       endAge = Number(mutated.endAge);
@@ -118,12 +122,12 @@ export function getActiveGoals(lifePlan, age) {
 export function getRelationshipAtAge(lifePlan, age) {
   if (!lifePlan) return 'single';
   const targetAge = Number(age);
-  const spouse = lifePlan.objects?.find(o => o.type === 'person' && o.properties?.role === 'partner');
+  const spouse = lifePlan.objects?.find(o => o.type === 'person' && (o.role === 'partner' || o.properties?.role === 'partner'));
   if (!spouse) return 'single';
 
-  const startAge = spouse.startAge !== undefined ? Number(spouse.startAge) : Number(lifePlan.currentAge || 35);
+  const startAge = spouse.startsAtAge !== undefined ? Number(spouse.startsAtAge) : (spouse.startAge !== undefined ? Number(spouse.startAge) : Number(lifePlan.currentAge || 35));
   if (targetAge < startAge) return 'single';
 
   const mutatedSpouse = applyObjectMutations(spouse, lifePlan.events, targetAge);
-  return mutatedSpouse?.properties?.status || 'married';
+  return mutatedSpouse?.status || mutatedSpouse?.properties?.status || 'married';
 }

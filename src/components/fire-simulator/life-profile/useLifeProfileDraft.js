@@ -138,6 +138,16 @@ export default function useLifeProfileDraft({
     }
   }, [isOpen, inputs, initialTab]);
 
+  // Keep localLifePlan in sync with parent inputs (e.g. when events are added/edited in overlays)
+  useEffect(() => {
+    if (isOpen) {
+      const nextPlan = inputs.lifePlan ? JSON.parse(JSON.stringify(inputs.lifePlan)) : initializeLifePlanIfMissing(inputs);
+      if (JSON.stringify(localLifePlan) !== JSON.stringify(nextPlan)) {
+        setLocalLifePlan(nextPlan);
+      }
+    }
+  }, [inputs.lifePlan, inputs.lifeEvents, inputs.householdMembers, isOpen, localLifePlan]);
+
   // Enforce selectedAge safety boundaries when localAge (currentAge) or localLifeExpectancy changes
   useEffect(() => {
     setSelectedAge(prev => {

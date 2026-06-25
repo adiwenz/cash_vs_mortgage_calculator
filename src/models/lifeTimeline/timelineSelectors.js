@@ -48,16 +48,23 @@ export function getTimelineItems(inputs) {
 
     // 1. Process Objects -> Periods
     lifePlan.objects.forEach(obj => {
+      if (obj.type === 'relationship') return; // Skip relationship objects
+      if (obj.type === 'person' && (obj.role === 'self' || obj.properties?.role === 'self')) return; // Skip self person
+
       let category = 'relationship';
       if (obj.type === 'job') category = 'income';
       else if (obj.type === 'property') category = 'housing';
-      else if (obj.type === 'child' || (obj.type === 'person' && obj.properties?.role === 'child') || obj.type === 'dependent') category = 'children';
+      else if (obj.type === 'child' || (obj.type === 'person' && (obj.role === 'child' || obj.properties?.role === 'child')) || obj.type === 'dependent') category = 'children';
       else if (obj.type === 'debt') category = 'debt';
       else if (obj.type === 'account' || obj.type === 'business') category = 'assets';
       else if (obj.type === 'goal') category = 'goals';
 
-      const startAge = obj.startAge !== undefined ? Number(obj.startAge) : currentAge;
-      let endAge = obj.endAge !== undefined ? Number(obj.endAge) : lifeExpectancy;
+      const startAge = obj.startsAtAge !== undefined
+        ? Number(obj.startsAtAge)
+        : (obj.startAge !== undefined ? Number(obj.startAge) : currentAge);
+      let endAge = obj.endsAtAge !== undefined
+        ? (obj.endsAtAge === null ? lifeExpectancy : Number(obj.endsAtAge))
+        : (obj.endAge !== undefined ? Number(obj.endAge) : lifeExpectancy);
 
       if (obj.type === 'job') {
         const endEv = lifePlan.events.find(e => e.objectId === obj.id && e.type === 'job.end');
@@ -241,6 +248,41 @@ export function getTimelineItems(inputs) {
       age: null,
       startAge: currentAge,
       endAge: null,
+      isDerived: true,
+      metadata: {}
+    });
+  }
+
+  // Add partner period bar in legacy mode
+  let hasPartner = false;
+  let partnerStartAge = currentAge;
+  let partnerName = 'Partner';
+
+  if (baselineMarried) {
+    hasPartner = true;
+    partnerStartAge = currentAge;
+  } else if (marriageAge !== null) {
+    hasPartner = true;
+    partnerStartAge = marriageAge;
+  }
+
+  if (hasPartner) {
+    if (marriageEvents.length > 0 && marriageEvents[0].spouseName) {
+      partnerName = marriageEvents[0].spouseName;
+    }
+    items.push({
+      id: 'period-relationship-partner',
+      sourceId: 'spouse-partner',
+      sourceType: 'lifeObject',
+      kind: TIMELINE_ITEM_KIND.PERIOD,
+      category: TIMELINE_CATEGORY.RELATIONSHIP,
+      label: partnerName,
+      description: `${partnerName} lifecycle`,
+      age: null,
+      startAge: partnerStartAge,
+      endAge: lifeExpectancy,
+      objectType: 'person',
+      objectId: 'spouse-partner',
       isDerived: true,
       metadata: {}
     });

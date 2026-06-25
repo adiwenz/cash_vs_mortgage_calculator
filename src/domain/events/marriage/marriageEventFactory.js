@@ -9,7 +9,7 @@ export function createSpouseRecord(editingEvent, inputs) {
 
   const spouseCurrentAge = editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' 
     ? Number(editingEvent.spouseCurrentAge) 
-    : Number(editingEvent.age);
+    : Number(inputs.currentAge || 35);
   
   const userCurrentAge = Number(inputs.currentAge || 35);
   const targetRetirementAge = Number(inputs.targetRetirementAge || 65);
@@ -73,7 +73,7 @@ export function createMarriageEventObject(editingEvent, inputs) {
 
   const spouseCurrentAge = editingEvent.spouseCurrentAge !== undefined && editingEvent.spouseCurrentAge !== '' 
     ? Number(editingEvent.spouseCurrentAge) 
-    : Number(editingEvent.age);
+    : Number(inputs.currentAge || 35);
 
   const spouseDesiredRetirementAge = editingEvent.spouseDesiredRetirementAge !== undefined && editingEvent.spouseDesiredRetirementAge !== '' && editingEvent.spouseDesiredRetirementAge !== null 
     ? Number(editingEvent.spouseDesiredRetirementAge) 

@@ -112,9 +112,19 @@ export default function LifeProfileModal({
     { id: 'settings', label: '⚙️ Settings', icon: '⚙️' }
   ];
 
-  // Derive projection and snapshot
-  const projection = getTimelineProjection(inputs, { selectedAge, simulation });
-  const snapshot = getLifeSnapshotAtAge(inputs, selectedAge);
+  // Derive projection and snapshot using the draft state so edits are reflected in real-time
+  const draftInputs = {
+    ...inputs,
+    currentAge: localAge,
+    lifeExpectancy: localLifeExpectancy,
+    simpleIncome: localSimpleIncome,
+    targetRetirementAge: localTargetRetirementAge,
+    lifeProfile: localProfile,
+    lifePlan: localLifePlan,
+    useLifeProfile: true
+  };
+  const projection = getTimelineProjection(draftInputs, { selectedAge, simulation });
+  const snapshot = getLifeSnapshotAtAge(draftInputs, selectedAge);
 
   // Mobile layout rendering
   if (isMobile) {

@@ -477,11 +477,13 @@ export default function LifeItemsWorkspace({
       
       fields.push({ label: 'Role', value: p.role === 'self' ? 'Self' : 'Partner' });
       if (p.role === 'self') {
-        fields.push({ label: 'Your Age', value: `${item.startAge}` });
-        fields.push({ label: 'Life Expectancy', value: `${item.endAge}` });
+        const selfAge = item.startsAtAge !== undefined ? item.startsAtAge : item.startAge;
+        const selfLifeExp = item.endsAtAge !== undefined && item.endsAtAge !== null ? item.endsAtAge : item.endAge;
+        fields.push({ label: 'Your Age', value: `${selfAge}` });
+        fields.push({ label: 'Life Expectancy', value: `${selfLifeExp}` });
       } else {
-        const partnerAge = p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : item.startAge;
-        const partnerLifeExp = p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : lifeExpectancy;
+        const partnerAge = p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : (item.startsAtAge !== undefined ? item.startsAtAge : item.startAge);
+        const partnerLifeExp = p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : (item.endsAtAge !== undefined && item.endsAtAge !== null ? item.endsAtAge : lifeExpectancy);
         fields.push({ label: 'Age', value: `${partnerAge}` });
         fields.push({ label: 'Life Expectancy', value: `${partnerLifeExp}` });
         fields.push({ label: 'Salary', value: `${formatCurrency(p.partnerIncome)}/yr` });

@@ -489,7 +489,7 @@ export function buildTimelineRows(inputs) {
     const objects = lifePlan.objects || [];
 
     // 1. Relationship / Household
-    const people = objects.filter(o => o.type === 'person' && o.properties?.role !== 'child');
+    const people = objects.filter(o => o.type === 'person' && o.role !== 'child' && o.properties?.role !== 'child' && o.role !== 'self' && o.properties?.role !== 'self');
     rows.push(createRow({ type: 'category', id: 'relationship', parent: null, label: 'Relationship', icon: '❤️', count: people.length }));
     people.forEach(p => {
       rows.push(createRow({ type: 'object', id: p.id, parent: 'relationship', label: p.name, icon: '👤', objectType: p.type, objectId: p.id }));
@@ -503,7 +503,7 @@ export function buildTimelineRows(inputs) {
     });
 
     // 3. Children
-    const children = objects.filter(o => o.type === 'child' || (o.type === 'person' && o.properties?.role === 'child') || o.type === 'dependent');
+    const children = objects.filter(o => o.type === 'child' || (o.type === 'person' && (o.role === 'child' || o.properties?.role === 'child')) || o.type === 'dependent');
     rows.push(createRow({ type: 'category', id: 'children', parent: null, label: 'Children', icon: '👶', count: children.length }));
     children.forEach(c => {
       rows.push(createRow({ type: 'object', id: c.id, parent: 'children', label: c.name || 'Child', icon: '👶', objectType: c.type, objectId: c.id }));
@@ -551,14 +551,48 @@ export function buildTimelineRows(inputs) {
   const education = getEducationObjects(actualInputs);
 
   // 1. Relationship
+  let hasPartner = false;
+  let partnerName = 'Partner';
+  
+  if (actualInputs.useLifeProfile && actualInputs.lifeProfile?.household) {
+    const status = actualInputs.lifeProfile.household.status;
+    hasPartner = status === 'married' || status === 'partnered';
+  } else {
+    const filingStatus = actualInputs.filingStatus || actualInputs.householdModel?.people?.self?.filingStatus;
+    hasPartner = filingStatus === 'married' || filingStatus === 'marriedFilingJointly' || filingStatus === 'jointly' || !!actualInputs.householdModel?.people?.partner;
+  }
+  
+  const enabledEvents = (actualInputs.lifeEvents || []).filter(e => e.enabled !== false);
+  const marriageEvents = enabledEvents.filter(e => e.type === 'marriage' || e.type === 'getMarried');
+  if (marriageEvents.length > 0) {
+    hasPartner = true;
+    if (marriageEvents[0].spouseName) {
+      partnerName = marriageEvents[0].spouseName;
+    }
+  }
+
+  const relationshipRows = [];
+  if (hasPartner) {
+    relationshipRows.push(createRow({
+      type: 'object',
+      id: 'spouse-partner',
+      parent: 'relationship',
+      label: partnerName,
+      icon: '👤',
+      objectType: 'person',
+      objectId: 'spouse-partner'
+    }));
+  }
+
   rows.push(createRow({
     type: 'category',
     id: 'relationship',
     parent: null,
     label: 'Relationship',
     icon: '❤️',
-    count: 0
+    count: relationshipRows.length
   }));
+  rows.push(...relationshipRows);
 
   // 2. Housing
   rows.push(createRow({

@@ -57,22 +57,33 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
                     (!isProfileMode && (inputs.filingStatus === 'married' || inputs.filingStatus === 'marriedFilingJointly')) ||
                     !!inputs.householdModel?.people?.partner;
   const hasPartner = isMarried || marriageEvents.length > 0;
-  let partnerObj = lifePlan.objects.find(o => o.id === 'spouse-partner');
+  let partnerObj = lifePlan.objects.find(o => o.type === 'person' && (o.id === 'spouse-partner' || o.role === 'partner' || o.properties?.role === 'partner'));
   if (hasPartner) {
     const partnerInfo = inputs.householdModel?.people?.partner || {};
     const partnerName = partnerInfo.displayName || 'Partner';
-    const partnerAge = Number(partnerInfo.currentAge) || Number(household.partnerAge) || currentAge;
-    const partnerLifeExpectancy = Number(partnerInfo.spouseLifeExpectancy) || Number(partnerInfo.lifeExpectancy) || Number(household.partnerLifeExpectancy) || (marriageEvents[0] && Number(marriageEvents[0].spouseLifeExpectancy)) || lifeExpectancy;
+    
+    // Determine age properties, prioritizing any existing properties on partnerObj
+    const marriageAge = partnerObj?.startsAtAge !== undefined
+      ? Number(partnerObj.startsAtAge)
+      : (partnerObj?.startAge !== undefined ? Number(partnerObj.startAge) : (marriageEvents.length > 0 ? Number(marriageEvents[0].age || 38) : currentAge));
+    
+    const partnerAge = Number(partnerInfo.currentAge) || Number(household.partnerAge) || (marriageEvents[0] && (marriageEvents[0].spouseCurrentAge !== undefined && marriageEvents[0].spouseCurrentAge !== null ? Number(marriageEvents[0].spouseCurrentAge) : currentAge)) || currentAge;
+    
+    const partnerLifeExpectancy = partnerObj?.endsAtAge !== undefined && partnerObj.endsAtAge !== null
+      ? Number(partnerObj.endsAtAge)
+      : (partnerObj?.endAge !== undefined ? Number(partnerObj.endAge) : (Number(partnerInfo.spouseLifeExpectancy) || Number(partnerInfo.lifeExpectancy) || Number(household.partnerLifeExpectancy) || (marriageEvents[0] && Number(marriageEvents[0].spouseLifeExpectancy)) || lifeExpectancy));
+    
     const partnerIncome = Number(household.partnerIncome || partnerInfo.partnerIncome || (marriageEvents[0]?.spouseIncome) || 0);
-    const marriageAge = marriageEvents.length > 0 ? Number(marriageEvents[0].age || 38) : currentAge;
 
     if (!partnerObj) {
       partnerObj = {
         id: 'spouse-partner',
         type: 'person',
+        role: 'partner',
         name: partnerName,
-        startAge: marriageAge,
-        endAge: lifeExpectancy,
+        startsAtAge: marriageAge,
+        endsAtAge: partnerLifeExpectancy,
+        status: household.status || inputs.filingStatus || 'married',
         properties: {
           role: 'partner',
           spouseCurrentAge: partnerAge,
@@ -84,21 +95,73 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
           status: household.status || inputs.filingStatus || 'married'
         }
       };
+      if (marriageEvents[0]?.id) {
+        partnerObj.metadata = { createdFromEventId: marriageEvents[0].id };
+      }
       lifePlan.objects.push(partnerObj);
     } else {
+      partnerObj.role = 'partner';
       partnerObj.name = partnerName;
-      partnerObj.startAge = marriageAge;
-      partnerObj.endAge = lifeExpectancy;
+      partnerObj.startsAtAge = marriageAge;
+      partnerObj.endsAtAge = partnerLifeExpectancy;
+      partnerObj.status = household.status || inputs.filingStatus || partnerObj.status || 'married';
+      if (marriageEvents[0]?.id) {
+        partnerObj.metadata = partnerObj.metadata || {};
+        partnerObj.metadata.createdFromEventId = marriageEvents[0].id;
+      }
       partnerObj.properties = {
         ...partnerObj.properties,
+        role: 'partner',
         spouseCurrentAge: partnerAge,
         spouseLifeExpectancy: partnerLifeExpectancy,
         partnerIncome: partnerIncome,
         status: household.status || inputs.filingStatus || partnerObj.properties.status || 'married'
       };
     }
-  } else if (partnerObj) {
-    lifePlan.objects = lifePlan.objects.filter(o => o.id !== 'spouse-partner');
+
+    // Now, ensure deterministic relationship object exists
+    const relId = `relationship_${selfPerson.id}_${partnerObj.id}`;
+    const taxFilingStatus = (marriageEvents[0]?.filingStatus === 'jointly' || inputs.filingStatus === 'married' || inputs.filingStatus === 'marriedFilingJointly' || household.status === 'married') ? 'marriedJointly' : 'single';
+    
+    let relObj = lifePlan.objects.find(o => o.type === 'relationship' || o.id === relId);
+    if (!relObj) {
+      relObj = {
+        id: relId,
+        type: 'relationship',
+        relationshipType: marriageEvents.length > 0 ? 'marriage' : 'domesticPartnership',
+        participantIds: [selfPerson.id, partnerObj.id],
+        startsAtAge: marriageAge,
+        endsAtAge: null,
+        status: 'active',
+        taxFilingStatusDuringRelationship: taxFilingStatus,
+        sharedBudgetMode: 'combined'
+      };
+      if (marriageEvents[0]?.id) {
+        relObj.metadata = { createdFromEventId: marriageEvents[0].id };
+      }
+      lifePlan.objects.push(relObj);
+    } else {
+      relObj.id = relId;
+      relObj.type = 'relationship';
+      relObj.relationshipType = relObj.relationshipType || (marriageEvents.length > 0 ? 'marriage' : 'domesticPartnership');
+      relObj.participantIds = [selfPerson.id, partnerObj.id];
+      relObj.startsAtAge = relObj.startsAtAge !== undefined ? Number(relObj.startsAtAge) : marriageAge;
+      relObj.endsAtAge = relObj.endsAtAge !== undefined ? relObj.endsAtAge : null;
+      relObj.status = relObj.status || 'active';
+      relObj.taxFilingStatusDuringRelationship = relObj.taxFilingStatusDuringRelationship || taxFilingStatus;
+      relObj.sharedBudgetMode = relObj.sharedBudgetMode || 'combined';
+      if (marriageEvents[0]?.id) {
+        relObj.metadata = relObj.metadata || {};
+        relObj.metadata.createdFromEventId = marriageEvents[0].id;
+      }
+    }
+  } else {
+    // Filter out partner person and relationship objects
+    lifePlan.objects = lifePlan.objects.filter(o => 
+      o.id !== 'spouse-partner' && 
+      !(o.type === 'person' && (o.role === 'partner' || o.properties?.role === 'partner')) && 
+      o.type !== 'relationship'
+    );
   }
 
   // 3. Sync Children
@@ -433,12 +496,14 @@ export function initializeLifePlanIfMissing(inputs) {
     const partnerName = partnerInfo.displayName || 'Partner';
     const partnerAge = Number(partnerInfo.currentAge) || Number(household.partnerAge) || currentAge;
     const partnerLifeExpectancy = Number(partnerInfo.spouseLifeExpectancy) || Number(partnerInfo.lifeExpectancy) || Number(household.partnerLifeExpectancy) || lifeExpectancy;
-    objects.push({
+    const partnerObj = {
       id: 'spouse-partner',
       type: 'person',
+      role: 'partner',
       name: partnerName,
-      startAge: currentAge,
-      endAge: lifeExpectancy,
+      startsAtAge: currentAge,
+      endsAtAge: partnerLifeExpectancy,
+      status: household.status || inputs.filingStatus || 'married',
       properties: {
         role: 'partner',
         spouseCurrentAge: partnerAge,
@@ -449,6 +514,21 @@ export function initializeLifePlanIfMissing(inputs) {
         partnerDebts: Number(household.partnerDebts || 0),
         status: household.status || inputs.filingStatus || 'married'
       }
+    };
+    objects.push(partnerObj);
+
+    // Add deterministic relationship object
+    const filingStatus = inputs.filingStatus || 'single';
+    objects.push({
+      id: `relationship_self-person_${partnerObj.id}`,
+      type: 'relationship',
+      relationshipType: 'marriage',
+      participantIds: ['self-person', partnerObj.id],
+      startsAtAge: currentAge,
+      endsAtAge: null,
+      status: 'active',
+      taxFilingStatusDuringRelationship: filingStatus === 'married' || filingStatus === 'marriedFilingJointly' || filingStatus === 'jointly' ? 'marriedJointly' : 'single',
+      sharedBudgetMode: 'combined'
     });
   }
 
@@ -606,19 +686,53 @@ export function initializeLifePlanIfMissing(inputs) {
   marriageEvents.forEach((marriageEv, mIdx) => {
     const marriageAge = Number(marriageEv.age || 38);
     // Only push if spouse-partner doesn't exist
-    if (!objects.some(o => o.id === 'spouse-partner')) {
-      objects.push({
+    if (!objects.some(o => o.type === 'person' && (o.id === 'spouse-partner' || o.role === 'partner' || o.properties?.role === 'partner'))) {
+      const pCurrentAge = marriageEv.spouseCurrentAge !== undefined && marriageEv.spouseCurrentAge !== null
+        ? Number(marriageEv.spouseCurrentAge)
+        : currentAge;
+      const pLifeExpectancy = marriageEv.spouseLifeExpectancy !== undefined && marriageEv.spouseLifeExpectancy !== null
+        ? Number(marriageEv.spouseLifeExpectancy)
+        : lifeExpectancy;
+
+      const partnerObj = {
         id: 'spouse-partner',
         type: 'person',
+        role: 'partner',
         name: 'Partner',
-        startAge: marriageAge,
-        endAge: lifeExpectancy,
+        startsAtAge: marriageAge,
+        endsAtAge: pLifeExpectancy,
+        status: 'married',
         properties: {
           role: 'partner',
+          spouseCurrentAge: pCurrentAge,
+          spouseLifeExpectancy: pLifeExpectancy,
           partnerIncome: Number(marriageEv.spouseIncome || 0),
           status: 'married'
         }
-      });
+      };
+      if (marriageEv.id) {
+        partnerObj.metadata = { createdFromEventId: marriageEv.id };
+      }
+      objects.push(partnerObj);
+
+      // Add deterministic relationship object
+      const filingStatus = inputs.filingStatus || 'single';
+      const relId = `relationship_self-person_${partnerObj.id}`;
+      const relObj = {
+        id: relId,
+        type: 'relationship',
+        relationshipType: 'marriage',
+        participantIds: ['self-person', partnerObj.id],
+        startsAtAge: marriageAge,
+        endsAtAge: null,
+        status: 'active',
+        taxFilingStatusDuringRelationship: marriageEv.filingStatus === 'jointly' || filingStatus === 'married' || filingStatus === 'marriedFilingJointly' || filingStatus === 'jointly' ? 'marriedJointly' : 'single',
+        sharedBudgetMode: 'combined'
+      };
+      if (marriageEv.id) {
+        relObj.metadata = { createdFromEventId: marriageEv.id };
+      }
+      objects.push(relObj);
     }
   });
 
@@ -647,7 +761,7 @@ export function initializeLifePlanIfMissing(inputs) {
   });
 
   // 7. Add Children
-  const children = isProfileMode ? (profile.children || []) : [];
+  const children = isProfileMode ? (profile.children || []) : (inputs.children || []);
   children.forEach((c, idx) => {
     const childAge = Number(c.age || 0);
     objects.push({
@@ -792,11 +906,13 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
   }
 
   // 2. Process People (Self and Partner)
-  const spouse = objects.find(o => o.type === 'person' && o.properties?.role === 'partner');
+  const spouse = objects.find(o => o.type === 'person' && (o.role === 'partner' || o.properties?.role === 'partner'));
   if (spouse) {
     const p = spouse.properties || {};
     const statusChangeEvents = events.filter(e => e.objectId === spouse.id && e.type === 'relationship.statusChange');
-    let spouseStatus = p.status || 'married';
+    let spouseStatus = spouse.status || p.status || 'married';
+    const spouseStartAge = spouse.startsAtAge !== undefined ? Number(spouse.startsAtAge) : Number(spouse.startAge);
+    const spouseEndAge = spouse.endsAtAge !== undefined && spouse.endsAtAge !== null ? Number(spouse.endsAtAge) : lifeExpectancy;
     
     lifeProfile.household = {
       status: spouseStatus,
@@ -804,8 +920,8 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
       partnerSavings: Number(p.partnerSavings || 0),
       partnerRetirement: Number(p.partnerRetirement || 0),
       partnerDebts: Number(p.partnerDebts || 0),
-      partnerAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouse.startAge),
-      partnerLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : lifeExpectancy)
+      partnerAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouseStartAge),
+      partnerLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : spouseEndAge)
     };
 
     if (spouseStatus === 'married' || spouseStatus === 'partnered') {
@@ -814,11 +930,11 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
         type: 'marriage',
         enabled: true,
         name: 'Marriage',
-        age: Number(spouse.startAge),
+        age: spouseStartAge,
         spouseIncome: Number(p.partnerIncome || 0),
         incomeGrowthRate: 3,
-        spouseCurrentAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouse.startAge),
-        spouseLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : lifeExpectancy),
+        spouseCurrentAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouseStartAge),
+        spouseLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : spouseEndAge),
         isDerived: true
       });
     }
@@ -833,8 +949,8 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
         age: getEvAge(ev),
         spouseIncome: Number(ev.mutation?.partnerIncome || p.partnerIncome || 0),
         incomeGrowthRate: 3,
-        spouseCurrentAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouse.startAge),
-        spouseLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : lifeExpectancy),
+        spouseCurrentAge: Number(p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : spouseStartAge),
+        spouseLifeExpectancy: Number(p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : spouseEndAge),
         isDerived: true
       });
     });
