@@ -163,6 +163,7 @@ export default function LifeProfileModal({
                 triggerSave={triggerSave}
                 editingItemId={editingItemId}
                 setEditingItemId={setEditingItemId}
+                initialTab={initialTab}
               />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
@@ -255,7 +256,7 @@ export default function LifeProfileModal({
         className="life-profile-modal-card" 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          maxWidth: (activeTab === 'timeline') ? '1400px' : '960px', 
+          maxWidth: (activeTab === 'timeline') ? '1400px' : (activeTab === 'lifeItems' || activeTab === 'events') ? '1280px' : '960px', 
           width: '95%', 
           transition: 'max-width 0.2s' 
         }}
@@ -272,7 +273,7 @@ export default function LifeProfileModal({
           isMobile={false}
         />
 
-        <div className={`life-profile-modal-body-layout ${(activeTab === 'timeline' || activeTab === 'events') ? 'timeline-active' : ''}`}>
+        <div className={`life-profile-modal-body-layout ${(activeTab === 'timeline' || activeTab === 'events' || activeTab === 'lifeItems') ? 'timeline-active' : ''}`}>
           {activeTab === 'timeline' ? (
             <TimelineSnapshotTab
               isMobile={false}
@@ -302,6 +303,7 @@ export default function LifeProfileModal({
                       triggerSave={triggerSave}
                       editingItemId={editingItemId}
                       setEditingItemId={setEditingItemId}
+                      initialTab={initialTab}
                     />
                   )}
 
@@ -398,7 +400,7 @@ export default function LifeProfileModal({
               </div>
 
               {/* Right Side: Summary Section */}
-              {activeTab !== 'events' && (
+              {activeTab !== 'events' && activeTab !== 'lifeItems' && (
                 <div className="life-profile-summary-column">
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>Your Profile Summary</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

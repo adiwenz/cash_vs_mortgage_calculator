@@ -380,6 +380,10 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
     };
   }
 
+  const profileAssets = isProfileMode ? (profile.assets || {}) : (inputs.assets || {});
+  const useDefaultBrokerageBal = !!(inputs.assets || inputs.lifeProfile || inputs.simpleInvestments);
+  ensureDefaultAccounts(lifePlan.objects, currentAge, lifeExpectancy, profileAssets, useDefaultBrokerageBal);
+
   return lifePlan;
 }
 
@@ -499,64 +503,8 @@ export function initializeLifePlanIfMissing(inputs) {
 
   // 4. Add Accounts (Assets)
   const profileAssets = isProfileMode ? (profile.assets || {}) : (inputs.assets || {});
-  const assetKeys = ['cash', 'brokerage', 'trad401k', 'tradIra', 'rothIra', 'hsa', 'crypto', 'businessEquity'];
-  
-  assetKeys.forEach(key => {
-    const val = Number(profileAssets[key] || 0);
-    const contrib = Number(inputs.budgetDetails?.savings?.[key] || 0);
-    if (val > 0 || contrib > 0 || (key === 'brokerage' && val === 0 && inputs.assets?.brokerage > 0)) {
-      objects.push({
-        id: `account-${key}`,
-        type: 'account',
-        name: key === 'trad401k' ? 'Traditional 401(k)' : key === 'rothIra' ? 'Roth IRA' : key === 'tradIra' ? 'Traditional IRA' : key.charAt(0).toUpperCase() + key.slice(1),
-        startAge: currentAge,
-        endAge: lifeExpectancy,
-        properties: {
-          accountType: key,
-          currentBalance: val,
-          contributionAmount: contrib,
-          allocation: '80/20'
-        }
-      });
-    }
-  });
-
-  // Ensure we always have cash and brokerage accounts by default
-  const hasCash = objects.some(o => o.type === 'account' && o.properties?.accountType === 'cash');
-  if (!hasCash) {
-    objects.push({
-      id: 'account-cash',
-      type: 'account',
-      name: 'Cash',
-      startAge: currentAge,
-      endAge: lifeExpectancy,
-      properties: {
-        accountType: 'cash',
-        currentBalance: Number(profileAssets.cash || 0),
-        contributionAmount: Number(inputs.budgetDetails?.savings?.cash || 0),
-        allocation: '100/0'
-      }
-    });
-  }
-
-  const hasBrokerage = objects.some(o => o.type === 'account' && o.properties?.accountType === 'brokerage');
-  if (!hasBrokerage) {
-    const defaultBrokerageBal = (inputs.assets || inputs.lifeProfile) ? 5000 : 0;
-    const defaultBrokerageContrib = (inputs.assets || inputs.lifeProfile) ? 625 : 0;
-    objects.push({
-      id: 'account-brokerage',
-      type: 'account',
-      name: 'Brokerage',
-      startAge: currentAge,
-      endAge: lifeExpectancy,
-      properties: {
-        accountType: 'brokerage',
-        currentBalance: Number(profileAssets.brokerage || defaultBrokerageBal),
-        contributionAmount: Number(inputs.budgetDetails?.savings?.brokerage || defaultBrokerageContrib),
-        allocation: '80/20'
-      }
-    });
-  }
+  const useDefaultBrokerageBal = !!(inputs.assets || inputs.lifeProfile || inputs.simpleInvestments);
+  ensureDefaultAccounts(objects, currentAge, lifeExpectancy, profileAssets, useDefaultBrokerageBal);
 
   // 5. Add Home / Property and mortgage
   const home = profile.home || {};
@@ -809,7 +757,7 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
     home: { status: 'rent', monthlyRent: 1500, homeValue: 0, mortgageBalance: 0, monthlyPayment: 0, propertyTaxes: 0, insurance: 0, hoa: 0 },
     children: [],
     debts: [],
-    assets: { cash: 0, brokerage: 0, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, crypto: 0, businessEquity: 0 },
+    assets: { cash: 0, emergencyFund: 0, brokerage: 0, trad401k: 0, tradIra: 0, rothIra: 0, hsa: 0, savings529: 0, crypto: 0, businessEquity: 0 },
     incomeSources: []
   };
 
@@ -1134,6 +1082,16 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
     }
   });
 
+  // Preserve non-registry assets (like crypto and businessEquity) from original inputs
+  if (originalInputs.lifeProfile?.assets) {
+    const registryTypes = ['brokerage', 'tradIra', 'rothIra', 'trad401k', 'hsa', 'cash', 'emergencyFund', 'savings529'];
+    Object.entries(originalInputs.lifeProfile.assets).forEach(([key, val]) => {
+      if (!registryTypes.includes(key)) {
+        lifeProfile.assets[key] = Number(val || 0);
+      }
+    });
+  }
+
   // Collect all boundary ages for budget phases
   const budgetBoundaries = new Set([currentAge, lifeExpectancy, targetRetirementAge]);
 
@@ -1309,12 +1267,14 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
       ...originalInputs.assets,
       ...assets,
       cash: Number(lifeProfile.assets.cash || 0),
+      emergencyFund: Number(lifeProfile.assets.emergencyFund || 0),
       brokerage: Number(lifeProfile.assets.brokerage || 0),
       trad401k: Number(lifeProfile.assets.trad401k || 0),
       tradIra: Number(lifeProfile.assets.tradIra || 0),
       rothIra: Number(lifeProfile.assets.rothIra || 0),
       hsa: Number(lifeProfile.assets.hsa || 0),
-      other: Number(lifeProfile.assets.crypto || 0) + Number(lifeProfile.assets.businessEquity || 0)
+      savings529: Number(lifeProfile.assets.savings529 || 0),
+      other: Number(lifeProfile.assets.crypto || 0) + Number(lifeProfile.assets.businessEquity || 0) + Number(lifeProfile.assets.savings529 || 0)
     },
     budgetDetails,
     useLifeProfile: true,
@@ -1337,4 +1297,54 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
 
 function originalEventsWithoutDerived(events) {
   return events.filter(e => !e.isDerived);
+}
+
+export function ensureDefaultAccounts(objects, currentAge, lifeExpectancy, profileAssets, useDefaultBrokerageBal = true) {
+  const DEFAULT_REGISTRY = [
+    { id: 'account-brokerage', name: 'Taxable Brokerage', type: 'brokerage', defaultAllocation: '80/20', defaultBalance: useDefaultBrokerageBal ? 5000 : 0 },
+    { id: 'account-tradIra', name: 'Traditional IRA', type: 'tradIra', defaultAllocation: '100/0', defaultBalance: 0 },
+    { id: 'account-rothIra', name: 'Roth IRA', type: 'rothIra', defaultAllocation: '100/0', defaultBalance: 0 },
+    { id: 'account-trad401k', name: '401(k)', type: 'trad401k', defaultAllocation: 'Target Date', defaultBalance: 0 },
+    { id: 'account-hsa', name: 'HSA', type: 'hsa', defaultAllocation: '100/0', defaultBalance: 0 },
+    { id: 'account-cash', name: 'Cash', type: 'cash', defaultAllocation: '100/0', defaultBalance: 0 },
+    { id: 'account-emergencyFund', name: 'Emergency Fund', type: 'emergencyFund', defaultAllocation: '100/0', defaultBalance: 0 },
+    { id: 'account-savings529', name: '529 College Savings', type: 'savings529', defaultAllocation: '100/0', defaultBalance: 0 }
+  ];
+
+  DEFAULT_REGISTRY.forEach(reg => {
+    let existing = objects.find(o => o.id === reg.id || (o.type === 'account' && o.properties?.accountType === reg.type));
+    if (!existing) {
+      const balance = (profileAssets && profileAssets[reg.type] !== undefined)
+        ? Number(profileAssets[reg.type])
+        : reg.defaultBalance;
+      objects.push({
+        id: reg.id,
+        type: 'account',
+        name: reg.name,
+        startAge: currentAge,
+        endAge: lifeExpectancy,
+        properties: {
+          accountType: reg.type,
+          currentBalance: balance,
+          allocation: reg.defaultAllocation
+        }
+      });
+    } else {
+      existing.id = reg.id;
+      existing.name = reg.name;
+      existing.type = 'account';
+      existing.startAge = currentAge;
+      existing.endAge = lifeExpectancy;
+      if (!existing.properties) existing.properties = {};
+      existing.properties.accountType = reg.type;
+      if (existing.properties.currentBalance === undefined) {
+        existing.properties.currentBalance = (profileAssets && profileAssets[reg.type] !== undefined)
+          ? Number(profileAssets[reg.type])
+          : reg.defaultBalance;
+      }
+      if (existing.properties.allocation === undefined) {
+        existing.properties.allocation = reg.defaultAllocation;
+      }
+    }
+  });
 }

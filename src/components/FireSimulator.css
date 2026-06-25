@@ -3809,6 +3809,235 @@
   gap: 1rem;
 }
 
+/* Life Items Sidebar & Workspace Redesign */
+.life-items-container {
+  display: flex;
+  gap: 1.5rem;
+  align-items: stretch;
+  margin-top: 1rem;
+}
+
+.life-items-sidebar {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  padding-right: 1rem;
+}
+
+.life-items-sidebar-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.life-items-sidebar-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.life-items-sidebar-btn.active {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.life-items-sidebar-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.life-items-sidebar-btn.active .life-items-sidebar-count {
+  background: rgba(22, 163, 74, 0.15);
+  color: var(--primary);
+}
+
+.life-items-workspace-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0; /* prevent layout overflow */
+}
+
+/* Mobile Segmented Nav */
+.life-items-mobile-nav {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+  scrollbar-width: none;
+}
+.life-items-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.life-items-mobile-nav-btn {
+  white-space: nowrap;
+  padding: 0.45rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.life-items-mobile-nav-btn.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+/* Premium Object Cards */
+.life-object-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.life-object-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.life-object-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.life-object-card-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+}
+
+.life-object-card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.05em;
+}
+
+/* Color schemes for badges */
+.badge-people { background: rgba(30, 58, 95, 0.08); color: var(--secondary); }
+.badge-jobs { background: rgba(22, 163, 74, 0.08); color: var(--primary); }
+.badge-accounts { background: rgba(2, 132, 199, 0.08); color: #0284c7; }
+.badge-property { background: rgba(245, 158, 11, 0.08); color: var(--warning); }
+.badge-debts { background: rgba(220, 38, 38, 0.08); color: var(--danger); }
+.badge-insurance { background: rgba(124, 58, 237, 0.08); color: #7c3aed; }
+.badge-other { background: rgba(107, 114, 128, 0.08); color: var(--text-secondary); }
+
+.life-object-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 0;
+}
+
+.life-object-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.life-object-card-label {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.life-object-card-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.life-object-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.life-object-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-dot.active { background-color: var(--success); }
+.status-dot.completed { background-color: var(--text-secondary); }
+.status-dot.future { background-color: var(--warning); }
+
+.life-object-card-events-count {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.life-object-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-card-action {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-card-action:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.btn-card-action.delete:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
 .life-profile-actions {
   display: flex;
   justify-content: flex-end;

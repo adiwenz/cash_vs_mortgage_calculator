@@ -100,6 +100,6 @@ describe('Mobile Life Profile Modal Redesign', () => {
     expect(screen.getByText('Homes & Property')).toBeDefined();
     expect(screen.getByText('Accounts & Assets')).toBeDefined();
     expect(screen.getByText('Debts')).toBeDefined();
-    expect(screen.getByText('Goals')).toBeDefined();
+    expect(screen.getByText('Other')).toBeDefined();
   });
 });
