@@ -176,6 +176,7 @@ describe('lifeSnapshotSelectors', () => {
     const inputsWithIncomeList = {
       currentAge: 35,
       inflationRate: 0,
+      isAdvancedMode: true,
       incomeList: [
         { id: 'inc-1', name: 'Salary', amount: 80000, startAge: 35, endAge: 65, growthRate: 0 }
       ],
@@ -243,7 +244,7 @@ describe('lifeSnapshotSelectors', () => {
         ]
       },
       lifeEvents: [
-        { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true, growthRate: 0 }
+        { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true, growthRate: 0.03 }
       ]
     };
 
@@ -296,7 +297,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               annualIncome: 50000,
-              growthRate: 0
+              growthRate: 3
             }
           }
         ],
@@ -332,7 +333,7 @@ describe('lifeSnapshotSelectors', () => {
               endAge: 65,
               properties: {
                 [alias]: 50000,
-                growthRate: 0
+                growthRate: 3
               }
             }
           ],
@@ -400,7 +401,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               annualIncome: 50000,
-              growthRate: 0
+              growthRate: 3
             }
           },
           {
@@ -411,7 +412,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               salary: 30000,
-              growthRate: 0
+              growthRate: 3
             }
           },
           {
@@ -422,7 +423,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 50,
             properties: {
               annualIncome: 40000,
-              growthRate: 0
+              growthRate: 3
             }
           }
         ],
@@ -670,6 +671,7 @@ describe('lifeSnapshotSelectors', () => {
       currentAge: 35,
       useLifeProfile: true,
       inflationRate: 3.0,
+      socialSecurity: { enabled: false },
       lifeEvents: [
         { id: 'ss-1', type: 'socialSecurity', enabled: false, monthlyBenefit: 0, claimingAge: 67 }
       ],
@@ -690,7 +692,9 @@ describe('lifeSnapshotSelectors', () => {
           }
         ],
         events: [],
-        assumptions: {}
+        settings: {
+          socialSecurityEnabled: false
+        }
       }
     };
 

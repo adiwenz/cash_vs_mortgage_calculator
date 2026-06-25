@@ -67,10 +67,10 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs, optio
   const displayMode = options.displayMode || originalInputs?.displayMode;
   const isNominal = displayMode !== 'today';
 
-  if (originalInputs) {
+  if (originalInputs && Object.keys(originalInputs).length > 0) {
     const simInputs = {
       ...originalInputs,
-      useLifeProfile: true,
+      useLifeProfile: originalInputs?.useLifeProfile,
       lifePlan: lifePlan
     };
     const sim = runFireSimulation(simInputs);
