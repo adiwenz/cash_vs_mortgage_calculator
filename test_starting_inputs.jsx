@@ -50,12 +50,12 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     // Verify Life Profile modal is open
     expect(screen.getByText(/Life Planner/i)).toBeDefined();
 
-    // Click the Edit button for the You card
-    const editButtons = screen.getAllByTitle('Edit Item');
-    expect(editButtons.length).toBeGreaterThan(0);
-    fireEvent.click(editButtons[0]);
+    // Click Edit button on the "You" card
+    const editBtn = screen.getByTitle('Edit You');
+    expect(editBtn).toBeDefined();
+    fireEvent.click(editBtn);
 
-    // Find and modify Your Age input in the edit form
+    // Find and modify Your Age input
     const ageLabel = screen.getByText('Your Age');
     const parent = ageLabel.parentElement;
     const input = parent.querySelector('input');
@@ -68,9 +68,10 @@ describe('Starting Inputs Redesigned Sidebar Layout Flow', () => {
     fireEvent.change(input, { target: { value: '42' } });
     fireEvent.blur(input);
 
-    // Save item
-    const saveItemButton = screen.getByText('Save Item');
-    fireEvent.click(saveItemButton);
+    // Save the item
+    const saveItemBtn = screen.getByRole('button', { name: /Save Item/i });
+    expect(saveItemBtn).toBeDefined();
+    fireEvent.click(saveItemBtn);
 
     // Save profile
     const saveButton = screen.getByRole('button', { name: /Save Profile/i });

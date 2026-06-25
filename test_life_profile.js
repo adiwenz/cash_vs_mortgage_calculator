@@ -75,6 +75,80 @@ describe('buildEffectiveSimulationInputs runtime derivation', () => {
     expect(marriageEvent.isDerived).toBe(true);
   });
 
+  test('maps spouse demographics (age, life expectancy) from lifeProfile.household to derived events and householdMembers', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifeProfile: {
+        ...DEFAULT_FIRE_INPUTS.lifeProfile,
+        household: {
+          status: 'married',
+          partnerIncome: 75000,
+          partnerSavings: 15000,
+          partnerRetirement: 25000,
+          partnerDebts: 5000,
+          partnerAge: 38,
+          partnerLifeExpectancy: 88
+        }
+      }
+    };
+
+    const effective = buildEffectiveSimulationInputs(inputs);
+
+    const spouse = effective.householdMembers.find(m => m.id === 'spouse');
+    expect(spouse).toBeDefined();
+    expect(spouse.currentAge).toBe(38);
+    expect(spouse.lifeExpectancy).toBe(88);
+
+    const marriageEvent = effective.lifeEvents.find(e => e.type === 'marriage');
+    expect(marriageEvent).toBeDefined();
+    expect(marriageEvent.spouseCurrentAge).toBe(38);
+    expect(marriageEvent.spouseLifeExpectancy).toBe(88);
+  });
+
+  test('roundtrips spouse demographics through lifePlan serialization and derivation', () => {
+    const { deriveLegacyInputsFromLifePlan } = require('./src/models/lifePlan/lifePlanNormalization.js');
+    const lifePlan = {
+      currentAge: 35,
+      lifeExpectancy: 85,
+      objects: [
+        {
+          id: 'self-person',
+          type: 'person',
+          name: 'You',
+          startAge: 35,
+          endAge: 85,
+          properties: { role: 'self' }
+        },
+        {
+          id: 'spouse-partner',
+          type: 'person',
+          name: 'Partner',
+          startAge: 35,
+          endAge: 85,
+          properties: {
+            role: 'partner',
+            spouseCurrentAge: 38,
+            spouseLifeExpectancy: 88,
+            partnerIncome: 75000,
+            status: 'married'
+          }
+        }
+      ],
+      events: []
+    };
+
+    const derived = deriveLegacyInputsFromLifePlan(lifePlan);
+    expect(derived.lifeProfile.household.partnerAge).toBe(38);
+    expect(derived.lifeProfile.household.partnerLifeExpectancy).toBe(88);
+
+    const marriageEvent = derived.lifeEvents.find(e => e.type === 'marriage');
+    expect(marriageEvent).toBeDefined();
+    expect(marriageEvent.spouseCurrentAge).toBe(38);
+    expect(marriageEvent.spouseLifeExpectancy).toBe(88);
+  });
+
   test('maps Home Owning status: updates realEstate asset, adds mortgage debt, and sets non-mortgage housing budget expenses', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,

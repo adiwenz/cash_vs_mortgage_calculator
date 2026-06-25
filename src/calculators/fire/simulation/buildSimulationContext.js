@@ -7,6 +7,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
   const lifeExpectancy = profile.lifeExpectancy;
   const expectedReturn = profile.expectedReturn;
   const postRetirementReturn = profile.postRetirementReturn;
+  const accountReturnOverrides = profile.accountReturnOverrides || {};
   const inflationRate = profile.inflationRate;
   const cashReturnRate = profile.cashReturnRate !== undefined ? profile.cashReturnRate : 0.02;
   const lifestyleUpgrades = profile.lifestyleUpgrades;
@@ -272,6 +273,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     spouseSocialSecurityDetails,
     combinedIncomeList,
     enabledEvents,
-    useLifeProfile
+    useLifeProfile,
+    accountReturnOverrides
   };
 }

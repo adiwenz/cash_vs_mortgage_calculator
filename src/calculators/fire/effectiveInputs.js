@@ -78,8 +78,8 @@ export function buildEffectiveSimulationInputs(inputs) {
           other: Number(household.partnerDebts || 0)
         },
         savingsRate: 0,
-        currentAge: currentAge,
-        lifeExpectancy: Number(effective.lifeExpectancy || 85),
+        currentAge: Number(household.partnerAge !== undefined ? household.partnerAge : currentAge),
+        lifeExpectancy: Number(household.partnerLifeExpectancy !== undefined ? household.partnerLifeExpectancy : (effective.lifeExpectancy || 85)),
         spouseSocialSecurityAge: 67,
         spouseEstimatedSocialSecurityBenefit: 0,
         spouseDesiredRetirementAge: null,
@@ -104,8 +104,8 @@ export function buildEffectiveSimulationInputs(inputs) {
         age: currentAge,
         spouseIncome: Number(household.partnerIncome || 0),
         incomeGrowthRate: 3,
-        spouseCurrentAge: currentAge,
-        spouseLifeExpectancy: Number(effective.lifeExpectancy || 85),
+        spouseCurrentAge: Number(household.partnerAge !== undefined ? household.partnerAge : currentAge),
+        spouseLifeExpectancy: Number(household.partnerLifeExpectancy !== undefined ? household.partnerLifeExpectancy : (effective.lifeExpectancy || 85)),
         isDerived: true
       });
     }

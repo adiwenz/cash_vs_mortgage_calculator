@@ -95,7 +95,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     spouseSocialSecurityDetails,
     combinedIncomeList,
     enabledEvents,
-    useLifeProfile
+    useLifeProfile,
+    accountReturnOverrides
   } = context;
 
   let checkingBalance = context.checkingBalance;
@@ -322,16 +323,30 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     if (year > 0) {
       const activeReturnRate = (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
       const activeCashReturnRate = cashReturnRate;
+
+      const getReturnRate = (accountType) => {
+        if (accountReturnOverrides && accountReturnOverrides[accountType] !== undefined && accountReturnOverrides[accountType] !== null) {
+          return accountReturnOverrides[accountType];
+        }
+        return (age - 1) >= targetRetirementAge ? postRetirementReturn : expectedReturn;
+      };
+
+      const brokerageReturnRate = getReturnRate('brokerage');
+      const trad401kReturnRate = getReturnRate('trad401k');
+      const tradIraReturnRate = getReturnRate('tradIra');
+      const rothIraReturnRate = getReturnRate('rothIra');
+      const hsaReturnRate = getReturnRate('hsa');
+      const otherReturnRate = getReturnRate('other');
       
       checkingGrowth = checkingBalance * activeCashReturnRate;
       hysaGrowth = hysaBalance * activeCashReturnRate;
       emergencyGrowth = (balances.emergencyFund || 0) * activeCashReturnRate;
-      brokerageGrowth = (balances.brokerage || 0) * activeReturnRate;
-      trad401kGrowth = (balances.trad401k || 0) * activeReturnRate;
-      const tradIraGrowth = (balances.tradIra || 0) * activeReturnRate;
-      rothIraGrowth = (balances.rothIra || 0) * activeReturnRate;
-      hsaGrowth = (balances.hsa || 0) * activeReturnRate;
-      const otherGrowth = (balances.other || 0) * activeReturnRate;
+      brokerageGrowth = (balances.brokerage || 0) * brokerageReturnRate;
+      trad401kGrowth = (balances.trad401k || 0) * trad401kReturnRate;
+      const tradIraGrowth = (balances.tradIra || 0) * tradIraReturnRate;
+      rothIraGrowth = (balances.rothIra || 0) * rothIraReturnRate;
+      hsaGrowth = (balances.hsa || 0) * hsaReturnRate;
+      const otherGrowth = (balances.other || 0) * otherReturnRate;
       const cashGrowth = (balances.cash || 0) * activeCashReturnRate;
       const emergencyFundGrowth = emergencyGrowth;
 
@@ -341,7 +356,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       customAssets.forEach(ca => {
         if (ca.type === 'brokerage' && ca.balance > 0) {
           if (ca.endAge !== null && age > ca.endAge) return;
-          let rateToApply = ca.growthRate !== null ? ca.growthRate : activeReturnRate;
+          let rateToApply = ca.growthRate !== null ? ca.growthRate : getReturnRate('brokerage');
           customBrokerageGrowthVal += ca.balance * rateToApply;
         }
       });
@@ -350,12 +365,12 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       checkingBalance += checkingGrowth;
       hysaBalance += hysaGrowth;
 
-      balances.brokerage *= (1 + activeReturnRate);
-      balances.trad401k *= (1 + activeReturnRate);
-      balances.tradIra *= (1 + activeReturnRate);
-      balances.rothIra *= (1 + activeReturnRate);
-      balances.hsa *= (1 + activeReturnRate);
-      balances.other *= (1 + activeReturnRate);
+      balances.brokerage *= (1 + brokerageReturnRate);
+      balances.trad401k *= (1 + trad401kReturnRate);
+      balances.tradIra *= (1 + tradIraReturnRate);
+      balances.rothIra *= (1 + rothIraReturnRate);
+      balances.hsa *= (1 + hsaReturnRate);
+      balances.other *= (1 + otherReturnRate);
       balances.cash = checkingBalance + hysaBalance;
       balances.emergencyFund *= (1 + activeCashReturnRate);
 
@@ -372,7 +387,15 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         }
         let rateToApply = ca.growthRate;
         if (rateToApply === null) {
-          rateToApply = activeReturnRate;
+          let typeKey = ca.type;
+          if (ca.type === 'retirement') {
+            typeKey = ca.subtype;
+          } else if (ca.type === 'checkingSavings') {
+            typeKey = 'cash';
+          } else if (ca.type === 'asset') {
+            typeKey = 'other';
+          }
+          rateToApply = getReturnRate(typeKey || 'brokerage');
         }
         state.yearInvestmentGrowth += ca.balance * rateToApply;
         ca.balance *= (1 + rateToApply);
@@ -1904,7 +1927,32 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       console.warn(`[Budget Drift Guardrail Warning] Age ${age}: income (${annualIncome + windfallReceived}) does not match expenses (${annualExpenses}) + savings (${savingsContribution}) + taxes (${taxes}) + extra debt payments (${annualExtraPayments}). Drift: ${currentDrift}`);
     }
 
+    const debtBalances = {};
+    activeLoans.forEach(loan => {
+      debtBalances[loan.id] = loan.balance;
+    });
+
+    const mortgageBalances = {};
+    const homeValues = {};
+    homeValues['home-property'] = homeEquityBaseline * nominalFactor;
+    
+    const derivedMortgageLoan = activeLoans.find(l => l.id === 'derived-mortgage' || l.id === 'mortgage-debt');
+    if (derivedMortgageLoan) {
+      mortgageBalances['derived-mortgage'] = derivedMortgageLoan.balance;
+      mortgageBalances['mortgage-debt'] = derivedMortgageLoan.balance;
+    }
+    
+    purchasedProperties.forEach(prop => {
+      homeValues[prop.id] = prop.currentValue;
+      if (prop.purchaseType === 'mortgage') {
+        mortgageBalances[`mortgage-${prop.id}`] = prop.mortgageBalance;
+      }
+    });
+
     logs.push({
+      debtBalances,
+      mortgageBalances,
+      homeValues,
       intervalId: activePhaseForAge ? activePhaseForAge.id : null,
       year,
       age,

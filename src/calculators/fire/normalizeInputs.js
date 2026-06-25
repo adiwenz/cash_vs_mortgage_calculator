@@ -19,6 +19,19 @@ export function getProfileFromInputs(inputs) {
     hasCustomizedSavingsAllocation = false;
   }
 
+  const accountReturnOverrides = {};
+  if (inputs.lifePlan && inputs.lifePlan.objects) {
+    inputs.lifePlan.objects
+      .filter(o => o.type === 'account')
+      .forEach(acc => {
+        const type = acc.properties?.accountType || 'brokerage';
+        const override = acc.properties?.expectedReturnOverride;
+        if (override !== undefined && override !== null && override !== '') {
+          accountReturnOverrides[type] = Number(override) / 100;
+        }
+      });
+  }
+
   return {
     useLifeProfile: !!inputs.useLifeProfile,
     currentAge,
@@ -52,6 +65,8 @@ export function getProfileFromInputs(inputs) {
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],
     isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1),
+    useLifeProfile: inputs.useLifeProfile,
+    accountReturnOverrides,
     lifeEvents: (inputs.lifeEvents || []).map(e => {
       const cloned = e.type === 'socialSecurity' ? normalizeSocialSecurityEvent(e, inputs) : { ...e };
       if (cloned.growthRate !== undefined) {

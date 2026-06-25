@@ -11,7 +11,7 @@ import { formatCurrency } from '../helpers';
 import { getTimelineProjection, getLifeSnapshotAtAge } from '../../../models/lifeTimeline/index.js';
 import { getProfileTotals, getProfileCompletion } from './lifeProfileDraftUtils';
 import LifeItemsWorkspace from './LifeItemsWorkspace';
-import AssumptionsPanel from '../../AssumptionsPanel';
+import SettingsPanel from './SettingsPanel';
 import LifeSnapshotPanel from './LifeSnapshotPanel';
 import {
   LifeProfileHeader,
@@ -110,7 +110,7 @@ export default function LifeProfileModal({
     { id: 'lifeItems', label: '📁 Life Items', icon: '📁' },
     { id: 'events', label: '📅 Events', icon: '📅' },
     { id: 'snapshot', label: '📋 Snapshot', icon: '📋' },
-    { id: 'assumptions', label: '⚙️ Assumptions', icon: '⚙️' }
+    { id: 'settings', label: '⚙️ Settings', icon: '⚙️' }
   ];
 
   // Derive projection and snapshot
@@ -129,7 +129,7 @@ export default function LifeProfileModal({
             navStack={navStack}
             popScreenAndSave={popScreenAndSave}
             onClose={onClose}
-            mobileScreenTitle={activeTab === 'timeline' ? 'Timeline' : activeTab === 'lifeItems' ? 'Life Items' : activeTab === 'events' ? 'Events' : activeTab === 'snapshot' ? 'Snapshot' : 'Assumptions'}
+            mobileScreenTitle={activeTab === 'timeline' ? 'Timeline' : activeTab === 'lifeItems' ? 'Life Items' : activeTab === 'events' ? 'Events' : activeTab === 'snapshot' ? 'Snapshot' : 'Settings'}
           />
 
           <LifeProfileTabs
@@ -164,6 +164,7 @@ export default function LifeProfileModal({
                 triggerSave={triggerSave}
                 editingItemId={editingItemId}
                 setEditingItemId={setEditingItemId}
+                initialTab={initialTab}
               />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
@@ -196,16 +197,16 @@ export default function LifeProfileModal({
                   setActiveTab('lifeItems');
                 }}
               />
-            ) : activeTab === 'assumptions' ? (
+            ) : activeTab === 'settings' ? (
               <div style={{ padding: '1rem' }}>
-                <AssumptionsPanel
-                  inputs={localLifePlan ? { ...inputs, ...localLifePlan.assumptions } : inputs}
+                <SettingsPanel
+                  settings={localLifePlan ? (localLifePlan.settings || localLifePlan.assumptions) : {}}
                   onChange={(key, val) => {
                     if (localLifePlan) {
                       const updated = {
                         ...localLifePlan,
-                        assumptions: {
-                          ...localLifePlan.assumptions,
+                        settings: {
+                          ...(localLifePlan.settings || localLifePlan.assumptions),
                           [key]: val
                         }
                       };
@@ -217,16 +218,22 @@ export default function LifeProfileModal({
                     if (localLifePlan) {
                       const updated = {
                         ...localLifePlan,
-                        assumptions: {
+                        settings: {
                           expectedReturn: 7.0,
                           postRetirementReturn: 5.0,
                           inflationRate: 3.0,
+                          salaryGrowthRate: 3.0,
                           cashReturnRate: 2.0,
                           lifestyleUpgrades: 0.0,
                           swr: 4.0,
-                          includeTaxes: false,
-                          preMedicarePremium: 10000,
-                          medicarePremium: 4000
+                          lifeExpectancy: 85,
+                          socialSecurityEnabled: true,
+                          socialSecurityClaimingAge: 67,
+                          taxMode: false,
+                          taxState: 'CA',
+                          filingStatus: 'single',
+                          timestep: 'yearly',
+                          cashFlowTiming: 'endOfYear'
                         }
                       };
                       setLocalLifePlan(updated);
@@ -250,7 +257,7 @@ export default function LifeProfileModal({
         className="life-profile-modal-card" 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          maxWidth: (activeTab === 'timeline') ? '1400px' : '960px', 
+          maxWidth: (activeTab === 'timeline') ? '1400px' : (activeTab === 'lifeItems' || activeTab === 'events') ? '1280px' : '960px', 
           width: '95%', 
           transition: 'max-width 0.2s' 
         }}
@@ -297,6 +304,7 @@ export default function LifeProfileModal({
                       triggerSave={triggerSave}
                       editingItemId={editingItemId}
                       setEditingItemId={setEditingItemId}
+                      initialTab={initialTab}
                     />
                   )}
 
@@ -335,15 +343,15 @@ export default function LifeProfileModal({
                     />
                   )}
 
-                  {activeTab === 'assumptions' && (
-                    <AssumptionsPanel
-                      inputs={localLifePlan ? { ...inputs, ...localLifePlan.assumptions } : inputs}
+                  {activeTab === 'settings' && (
+                    <SettingsPanel
+                      settings={localLifePlan ? (localLifePlan.settings || localLifePlan.assumptions) : {}}
                       onChange={(key, val) => {
                         if (localLifePlan) {
                           const updated = {
                             ...localLifePlan,
-                            assumptions: {
-                              ...localLifePlan.assumptions,
+                            settings: {
+                              ...(localLifePlan.settings || localLifePlan.assumptions),
                               [key]: val
                             }
                           };
@@ -355,16 +363,22 @@ export default function LifeProfileModal({
                         if (localLifePlan) {
                           const updated = {
                             ...localLifePlan,
-                            assumptions: {
+                            settings: {
                               expectedReturn: 7.0,
                               postRetirementReturn: 5.0,
                               inflationRate: 3.0,
+                              salaryGrowthRate: 3.0,
                               cashReturnRate: 2.0,
                               lifestyleUpgrades: 0.0,
                               swr: 4.0,
-                              includeTaxes: false,
-                              preMedicarePremium: 10000,
-                              medicarePremium: 4000
+                              lifeExpectancy: 85,
+                              socialSecurityEnabled: true,
+                              socialSecurityClaimingAge: 67,
+                              taxMode: false,
+                              taxState: 'CA',
+                              filingStatus: 'single',
+                              timestep: 'yearly',
+                              cashFlowTiming: 'endOfYear'
                             }
                           };
                           setLocalLifePlan(updated);
