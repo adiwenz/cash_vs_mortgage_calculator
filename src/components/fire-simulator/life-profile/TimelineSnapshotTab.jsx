@@ -184,6 +184,139 @@ export default function TimelineSnapshotTab({
     );
   };
 
+  const getTooltipAgeString = (item) => {
+    const start = item.startAge !== undefined && item.startAge !== null ? item.startAge : item.age;
+    const end = item.endAge !== undefined && item.endAge !== null ? item.endAge : null;
+    if (end !== null && end !== start) {
+      return `Age ${start}–${end}`;
+    }
+    return `Starts Age ${start}`;
+  };
+
+  const renderCompactBar = (item, minAge, maxAge, itemTop, trackHeight, categoryId) => {
+    const barStyle = getTimelineBarStyle({
+      startAge: item.startAge ?? item.age,
+      endAge: item.endAge ?? item.endAgeExclusive ?? item.endAgeInclusive,
+      minAge,
+      maxAge
+    });
+
+    if (!barStyle) return null;
+
+    return (
+      <div 
+        key={item.id}
+        className="timeline-compact-bar-wrapper timeline-bar-transition-wrapper"
+        tabIndex={0}
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpandedCategories(prev => ({
+            ...prev,
+            [categoryId]: true
+          }));
+        }}
+        style={{
+          position: 'absolute',
+          left: barStyle.left,
+          width: barStyle.width,
+          top: `${itemTop}px`,
+          height: `${trackHeight}px`,
+          cursor: 'pointer',
+          outline: 'none',
+          zIndex: 20
+        }}
+        aria-label={`${item.title}, ${getTooltipAgeString(item)}`}
+      >
+        <div 
+          className={`timeline-compact-bar cat-${item.category || categoryId}`} 
+          style={{ 
+            width: '100%', 
+            height: '100%', 
+            borderRadius: '100px',
+            opacity: 0.65,
+            border: 'none',
+            boxShadow: 'none'
+          }}
+        />
+        
+        {/* Hover / Focus Tooltip */}
+        <div className="timeline-tooltip" style={{ pointerEvents: 'none' }}>
+          <div style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+            {item.title}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.68rem', marginTop: '2px', whiteSpace: 'nowrap' }}>
+            {getTooltipAgeString(item)}
+          </div>
+          {item.subtitle && (
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.62rem', marginTop: '1px', whiteSpace: 'nowrap' }}>
+              {item.subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCompactPoint = (item, minAge, maxAge, itemTop, trackHeight, categoryId) => {
+    const range = maxAge - minAge || 1;
+    const age = item.age !== null ? item.age : item.startAge;
+    if (age < minAge || age > maxAge) return null;
+    const left = ((age - minAge) / range) * 100;
+
+    return (
+      <div 
+        key={item.id}
+        className="timeline-compact-bar-wrapper timeline-bar-transition-wrapper"
+        tabIndex={0}
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpandedCategories(prev => ({
+            ...prev,
+            [categoryId]: true
+          }));
+        }}
+        style={{
+          position: 'absolute',
+          left: `${left}%`,
+          top: `${itemTop}px`,
+          height: `${trackHeight}px`,
+          transform: 'translateX(-50%)',
+          cursor: 'pointer',
+          outline: 'none',
+          zIndex: 20
+        }}
+        aria-label={`${item.title}, ${getTooltipAgeString(item)}`}
+      >
+        <div 
+          className={`timeline-point-dot dot-${item.category || categoryId}`} 
+          style={{ 
+            width: `${trackHeight}px`, 
+            height: `${trackHeight}px`, 
+            borderRadius: '50%',
+            opacity: 0.65,
+            border: 'none',
+            boxShadow: 'none'
+          }}
+        />
+        
+        {/* Hover / Focus Tooltip */}
+        <div className="timeline-tooltip" style={{ pointerEvents: 'none' }}>
+          <div style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+            {item.title}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.68rem', marginTop: '2px', whiteSpace: 'nowrap' }}>
+            {getTooltipAgeString(item)}
+          </div>
+          {item.subtitle && (
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.62rem', marginTop: '1px', whiteSpace: 'nowrap' }}>
+              {item.subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderPeriodBar = (item, minAge, maxAge) => {
     const barStyle = getTimelineBarStyle({
       startAge: item.startAge ?? item.age,
@@ -200,6 +333,7 @@ export default function TimelineSnapshotTab({
     return (
       <div 
         key={item.id}
+        className="timeline-bar-transition-wrapper"
         style={{ 
           position: 'absolute', 
           left: barStyle.left, 
@@ -406,8 +540,8 @@ export default function TimelineSnapshotTab({
             const isExpanded = !!expandedCategories[descriptor.id];
             const parentItems = normalizedItemsByCategoryId[descriptor.id] || [];
 
-            // If expanded, render only category-level items (rowKey is null)
-            // If collapsed, render all items in the category
+            // If expanded, render only category-level items (rowKey is null) inside the parent category row.
+            // If collapsed, stack ALL items (both category-level and child items with rowKey) as compact overview elements.
             const visibleItems = isExpanded
               ? parentItems.filter(item => !item.rowKey)
               : parentItems;
@@ -436,7 +570,7 @@ export default function TimelineSnapshotTab({
                     {descriptor.label}
                     {descriptor.count > 0 && (
                       <span className="category-count-badge" style={{ color: 'var(--text-tertiary)', marginLeft: '4px', fontSize: '0.72rem' }}>
-                        [{descriptor.count}]
+                        ({descriptor.count})
                       </span>
                     )}
                   </span>
@@ -458,15 +592,41 @@ export default function TimelineSnapshotTab({
                       </div>
                     )
                   ) : (
-                    visibleItems.map(item => {
-                      if (item.type === 'period') {
-                        return renderPeriodBar(item, minAge, maxAge);
-                      }
-                      if (item.type === 'point') {
-                        return renderPointMarker(item, minAge, maxAge);
-                      }
-                      return null;
-                    })
+                    isExpanded ? (
+                      visibleItems.map(item => {
+                        if (item.type === 'period') {
+                          return renderPeriodBar(item, minAge, maxAge);
+                        }
+                        if (item.type === 'point') {
+                          return renderPointMarker(item, minAge, maxAge);
+                        }
+                        return null;
+                      })
+                    ) : (
+                      // Render collapsed compact stacked overview elements
+                      (() => {
+                        const uniqueKeys = Array.from(new Set(visibleItems.map(item => item.rowKey || 'parent')));
+                        const totalTracks = uniqueKeys.length;
+                        const trackHeight = 4;
+                        const trackGap = 3;
+                        const totalStackHeight = totalTracks * trackHeight + (totalTracks - 1) * trackGap;
+                        const rowHeight = 48;
+                        const startTop = (rowHeight - totalStackHeight) / 2;
+
+                        return visibleItems.map(item => {
+                          const trackIdx = uniqueKeys.indexOf(item.rowKey || 'parent');
+                          const itemTop = startTop + trackIdx * (trackHeight + trackGap);
+
+                          if (item.type === 'period') {
+                            return renderCompactBar(item, minAge, maxAge, itemTop, trackHeight, descriptor.id);
+                          }
+                          if (item.type === 'point') {
+                            return renderCompactPoint(item, minAge, maxAge, itemTop, trackHeight, descriptor.id);
+                          }
+                          return null;
+                        });
+                      })()
+                    )
                   )}
                 </div>
               </div>
@@ -527,7 +687,7 @@ export default function TimelineSnapshotTab({
       ticks.push(a);
     }
     return (
-      <div className="timeline-row-track" style={{ height: '32px', borderBottom: '1px solid #f3f4f6', marginBottom: '8px' }}>
+      <div className="timeline-row-track" style={{ height: '24px', borderBottom: '1px solid #f3f4f6', marginBottom: '4px' }}>
         <div className="timeline-row-label-col">
           <span className="timeline-row-label-text" style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Age</span>
         </div>
@@ -622,11 +782,10 @@ export default function TimelineSnapshotTab({
 
   if (isMobile) {
     return (
-      <div className="timeline-workspace-container" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
+      <div className="timeline-workspace-container timeline-tab-active" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
         <div className="timeline-canvas-card" style={{ padding: '1rem' }}>
           <div className="timeline-header-section" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
             <h4 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>Timeline</h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>See how the major aspects of your life change over time.</p>
           </div>
           <div className="timeline-canvas-body" style={{ marginTop: '0.5rem', overflowX: 'auto' }}>
             <div style={{ minWidth: '600px', position: 'relative' }}>
@@ -651,13 +810,12 @@ export default function TimelineSnapshotTab({
 
   // Desktop view
   return (
-    <div className="timeline-workspace-container">
+    <div className="timeline-workspace-container timeline-tab-active">
       {/* Left Column: Timeline Canvas */}
       <div className="timeline-canvas-card">
-        <div className="timeline-header-section">
+        <div className="timeline-header-section" style={{ alignItems: 'center' }}>
           <div>
             <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Timeline</h4>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>See how the major aspects of your life change over time.</p>
           </div>
           
           <div className="timeline-controls-row">
@@ -669,7 +827,7 @@ export default function TimelineSnapshotTab({
           </div>
         </div>
 
-        <div className="timeline-canvas-body" style={{ marginTop: '1rem' }}>
+        <div className="timeline-canvas-body" style={{ marginTop: '0.5rem' }}>
           {renderAgeAxis(projection.minAge, projection.maxAge, projection.currentAge)}
           {renderTimelineRows(projection, selectedAge)}
         </div>
