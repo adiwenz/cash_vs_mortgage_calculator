@@ -34,11 +34,11 @@ describe('Mobile Life Profile Modal Redesign', () => {
     expect(screen.getByText('📈 Timeline')).toBeDefined();
     expect(screen.getByText('📁 Life Items')).toBeDefined();
     expect(screen.getByText('📋 Snapshot')).toBeDefined();
-    expect(screen.getByText('⚙️ Assumptions')).toBeDefined();
+    expect(screen.getByText('⚙️ Settings')).toBeDefined();
 
-    // Assert Basics section is visible
-    expect(screen.getByText('Your Age')).toBeDefined();
-    expect(screen.getByText('Life Expectancy')).toBeDefined();
+    // Assert self-person card is visible
+    expect(screen.getByText('You')).toBeDefined();
+    expect(screen.getByText(/Age: 35 · Life Expectancy: 85/)).toBeDefined();
   });
 
   test('edits You Age with auto-save on mobile', () => {
@@ -53,6 +53,11 @@ describe('Mobile Life Profile Modal Redesign', () => {
       />
     );
 
+    // Click Edit button on the "You" card
+    const editBtn = screen.getByTitle('Edit You');
+    expect(editBtn).toBeDefined();
+    fireEvent.click(editBtn);
+
     // Find and modify Your Age input
     const ageLabel = screen.getByText('Your Age');
     const parent = ageLabel.parentElement;
@@ -62,6 +67,11 @@ describe('Mobile Life Profile Modal Redesign', () => {
 
     // Change to 42
     fireEvent.change(input, { target: { value: '42' } });
+
+    // Save the item
+    const saveItemBtn = screen.getByRole('button', { name: /Save Item/i });
+    expect(saveItemBtn).toBeDefined();
+    fireEvent.click(saveItemBtn);
 
     // Assert updateInput was called with new lifePlan containing currentAge: 42
     expect(updateInputMock).toHaveBeenCalledWith(

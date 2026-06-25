@@ -209,7 +209,7 @@ export function normalizeInputsStage(inputs) {
   }
 
   const isAdvanced = inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
-  if (!isAdvanced) {
+  if (!isAdvanced && !inputs.useLifeProfile) {
     const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
     incomeList = incomeList.map(inc => {
       if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {

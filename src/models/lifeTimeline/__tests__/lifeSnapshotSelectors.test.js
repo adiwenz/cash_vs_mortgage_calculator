@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
-import { getLifeSnapshotAtAge } from '../lifeSnapshotSelectors.js';
+import { getLifeSnapshotAtAge, getLifeSnapshotFromLifePlan } from '../lifeSnapshotSelectors.js';
+import { initializeLifePlanIfMissing } from '../../lifePlan/lifePlanNormalization.js';
 
 describe('lifeSnapshotSelectors', () => {
   test('getLifeSnapshotAtAge safely handles empty or minimal inputs', () => {
@@ -96,13 +97,11 @@ describe('lifeSnapshotSelectors', () => {
         cash: 2000
       }
     };
-    
-    const snapshot = getLifeSnapshotAtAge(inputs, 50);
+    const lifePlan = initializeLifePlanIfMissing(inputs);
+    const snapshot = getLifeSnapshotFromLifePlan(lifePlan, 50); // No third argument (originalInputs)
     
     // Invested assets should equal starting baseline assets
     expect(snapshot.assets.investedAssets).toBe(12000);
-    // Does not perform projection calculations
-    expect(snapshot.assets.investedAssets).not.toBeGreaterThan(12000);
   });
 
   test('getLifeSnapshotAtAge does not mutate inputs', () => {
@@ -166,23 +165,27 @@ describe('lifeSnapshotSelectors', () => {
   test('getLifeSnapshotAtAge sums annualIncome and falls back correctly', () => {
     const inputsNoIncomeList = {
       currentAge: 35,
-      simpleIncome: 100000
+      simpleIncome: 100000,
+      salaryGrowthRate: 0,
+      inflationRate: 0
     };
     const snapshotNoList = getLifeSnapshotAtAge(inputsNoIncomeList, 40);
     expect(snapshotNoList.income.annualIncome).toBe(100000);
 
     const inputsWithIncomeList = {
       currentAge: 35,
+      inflationRate: 0,
       incomeList: [
-        { id: 'inc-1', name: 'Salary', amount: 80000, startAge: 35, endAge: 65 }
-      ]
+        { id: 'inc-1', name: 'Salary', amount: 80000, startAge: 35, endAge: 65, growthRate: 0 }
+      ],
+      socialSecurity: { enabled: false }
     };
     const snapshotWithList = getLifeSnapshotAtAge(inputsWithIncomeList, 40);
     expect(snapshotWithList.income.annualIncome).toBe(80000);
 
-    // Active at 40, but retired at 70 (activeIncomeItems is empty, so falls back to currentAnnualIncome (80000))
+    // Active at 40, but retired at 70 (activeIncomeItems is empty, so falls back to 0)
     const snapshotRetired = getLifeSnapshotAtAge(inputsWithIncomeList, 70);
-    expect(snapshotRetired.income.annualIncome).toBe(80000);
+    expect(snapshotRetired.income.annualIncome).toBe(0);
   });
 
   test('getLifeSnapshotAtAge derives activeDebts from active periods', () => {
@@ -232,22 +235,23 @@ describe('lifeSnapshotSelectors', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
       currentAge: 35,
+      inflationRate: 0,
       useLifeProfile: false,
       incomeList: [
-        { id: 'inc-1', name: 'Salary', amount: 50000, startAge: 35, endAge: 45 }
+        { id: 'inc-1', name: 'Salary', amount: 50000, startAge: 35, endAge: 45, growthRate: 0 }
       ],
       lifeEvents: [
-        { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true }
+        { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true, growthRate: 0 }
       ]
     };
 
     // Age 40: Should be original salary
     const snapshot40 = getLifeSnapshotAtAge(inputs, 40);
-    expect(snapshot40.income.annualIncome).toBe(50000);
+    expect(snapshot40.income.annualIncome).toBeCloseTo(50000, 0);
 
     // Age 46: Should be new job salary
     const snapshot46 = getLifeSnapshotAtAge(inputs, 46);
-    expect(snapshot46.income.annualIncome).toBe(80000);
+    expect(snapshot46.income.annualIncome).toBeCloseTo(80000, 0);
   });
 
   test('getLifeSnapshotAtAge housing status regression: Buy (51) and Sell (85) events', () => {
@@ -276,6 +280,7 @@ describe('lifeSnapshotSelectors', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
       currentAge: 35,
+      inflationRate: 0,
       useLifeProfile: true,
       lifePlan: {
         currentAge: 35,
@@ -289,12 +294,14 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               annualIncome: 50000,
-              growthRate: 3
+              growthRate: 0
             }
           }
         ],
         events: [],
-        assumptions: {}
+        assumptions: {
+          inflationRate: 0
+        }
       }
     };
 
@@ -308,6 +315,7 @@ describe('lifeSnapshotSelectors', () => {
       const inputs = {
         ...DEFAULT_FIRE_INPUTS,
         currentAge: 35,
+        inflationRate: 0,
         useLifeProfile: true,
         lifePlan: {
           currentAge: 35,
@@ -321,12 +329,14 @@ describe('lifeSnapshotSelectors', () => {
               endAge: 65,
               properties: {
                 [alias]: 50000,
-                growthRate: 3
+                growthRate: 0
               }
             }
           ],
           events: [],
-          assumptions: {}
+          assumptions: {
+            inflationRate: 0
+          }
         }
       };
 
@@ -373,6 +383,7 @@ describe('lifeSnapshotSelectors', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
       currentAge: 35,
+      inflationRate: 0,
       useLifeProfile: true,
       lifePlan: {
         currentAge: 35,
@@ -386,7 +397,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               annualIncome: 50000,
-              growthRate: 3
+              growthRate: 0
             }
           },
           {
@@ -397,7 +408,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 65,
             properties: {
               salary: 30000,
-              growthRate: 3
+              growthRate: 0
             }
           },
           {
@@ -408,7 +419,7 @@ describe('lifeSnapshotSelectors', () => {
             endAge: 50,
             properties: {
               annualIncome: 40000,
-              growthRate: 3
+              growthRate: 0
             }
           }
         ],
@@ -420,7 +431,9 @@ describe('lifeSnapshotSelectors', () => {
             age: 50
           }
         ],
-        assumptions: {}
+        assumptions: {
+          inflationRate: 0
+        }
       }
     };
 
@@ -435,5 +448,64 @@ describe('lifeSnapshotSelectors', () => {
     // Age 52: job-ended is still ended. Total income = 80000
     const snapshot52 = getLifeSnapshotAtAge(inputs, 52);
     expect(snapshot52.income.annualIncome).toBe(80000);
+  });
+
+  test('Snapshot account balances: account return override is respected', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      inflationRate: 0,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'account-brokerage',
+            type: 'account',
+            name: 'Brokerage with override',
+            startAge: 35,
+            properties: {
+              accountType: 'brokerage',
+              currentBalance: 10000,
+              expectedReturnOverride: 10 // 10% override
+            }
+          },
+          {
+            id: 'account-trad401k',
+            type: 'account',
+            name: '401k with default',
+            startAge: 35,
+            properties: {
+              accountType: 'trad401k',
+              currentBalance: 10000
+              // no override, should use global expectedReturn default
+            }
+          }
+        ],
+        events: [],
+        settings: {
+          inflationRate: 0,
+          expectedReturn: 5, // 5% default
+          postRetirementReturn: 5
+        }
+      }
+    };
+
+    // Age 35: both have starting balance of 10000
+    const snapshot35 = getLifeSnapshotAtAge(inputs, 35);
+    const brokerage35 = snapshot35.accounts.find(a => a.id === 'account-brokerage');
+    const trad401k35 = snapshot35.accounts.find(a => a.id === 'account-trad401k');
+    expect(brokerage35.properties.currentBalance).toBe(10000);
+    expect(trad401k35.properties.currentBalance).toBe(10000);
+
+    // Age 36 (after 1 year growth):
+    // Brokerage (10% override) -> 10000 * 1.10 = 11000
+    // trad401k (5% default) -> 10000 * 1.05 = 10500
+    const snapshot36 = getLifeSnapshotAtAge(inputs, 36);
+    const brokerage36 = snapshot36.accounts.find(a => a.id === 'account-brokerage');
+    const trad401k36 = snapshot36.accounts.find(a => a.id === 'account-trad401k');
+    expect(brokerage36.properties.currentBalance).toBe(11000);
+    expect(trad401k36.properties.currentBalance).toBe(10500);
   });
 });

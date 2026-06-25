@@ -60,10 +60,16 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
   let portfolio = 0;
   let cashFlow = 0;
   let savings = 0;
+  let point = null;
 
   if (originalInputs) {
-    const sim = runFireSimulation(originalInputs);
-    const point = sim?.data?.find(d => Number(d.age) === targetAge);
+    const simInputs = {
+      ...originalInputs,
+      useLifeProfile: true,
+      lifePlan: lifePlan
+    };
+    const sim = runFireSimulation(simInputs);
+    point = sim?.data?.find(d => Number(d.age) === targetAge);
     if (point) {
       netWorth = point.netWorth;
       portfolio = point.portfolio;
@@ -98,30 +104,93 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
   });
 
   let annualIncome = 0;
-  if (originalInputs?.lifePlan) {
-    annualIncome = jobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+  if (point) {
+    annualIncome = point.income;
   } else {
     annualIncome = jobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
-    if (jobs.length === 0) {
-      const allJobs = lifePlan?.objects?.filter(o => o.type === 'job') || [];
-      annualIncome = allJobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+    if (partner) {
+      annualIncome += Number(partner.partnerIncome || 0);
     }
   }
-  if (partner) {
-    annualIncome += Number(partner.partnerIncome || 0);
+
+  const activeDebts = debts.map(d => {
+    let balance = Number(d.properties?.balance || 0);
+    if (point) {
+      if (point.debtBalances && point.debtBalances[d.id] !== undefined) {
+        balance = point.debtBalances[d.id];
+      } else if (point.mortgageBalances && point.mortgageBalances[d.id] !== undefined) {
+        balance = point.mortgageBalances[d.id];
+      } else if (d.properties?.debtType === 'mortgage') {
+        balance = point.mortgageBalance;
+      }
+    }
+    return {
+      id: d.id,
+      name: d.name,
+      type: d.properties?.debtType || 'debt',
+      monthlyPayment: Math.round(Number(d.properties?.monthlyPayment || 0)),
+      interestRate: Number(d.properties?.interestRate || 0),
+      balance: Math.round(balance),
+      payoffAge: d.properties?.payoffAge
+    };
+  });
+
+  let investedAssets = 0;
+  if (point) {
+    investedAssets = (point.brokerageBalance || 0) + (point.trad401kBalance || 0) + (point.tradIraBalance || 0) + (point.rothIraBalance || 0) + (point.hsaBalance || 0) + (point.otherBalance || 0) + (point.cashBalance || 0) + (point.emergencyFundBalance || 0);
+  } else {
+    investedAssets = accounts.reduce((sum, a) => sum + Number(a.properties?.currentBalance || 0), 0);
   }
 
-  const activeDebts = debts.map(d => ({
-    id: d.id,
-    name: d.name,
-    type: d.properties?.debtType || 'debt',
-    monthlyPayment: Math.round(Number(d.properties?.monthlyPayment || 0)),
-    interestRate: Number(d.properties?.interestRate || 0),
-    balance: Number(d.properties?.balance || 0),
-    payoffAge: d.properties?.payoffAge
-  }));
+  const projectedAccounts = accounts.map(a => {
+    const type = a.properties?.accountType || 'brokerage';
+    let balance = Number(a.properties?.currentBalance || 0);
+    if (point) {
+      if (type === 'cash') balance = point.cashBalance;
+      else if (type === 'emergencyFund') balance = point.emergencyFundBalance;
+      else if (type === 'brokerage') balance = point.brokerageBalance;
+      else if (type === 'trad401k') balance = point.trad401kBalance;
+      else if (type === 'tradIra') balance = point.tradIraBalance;
+      else if (type === 'rothIra') balance = point.rothIraBalance;
+      else if (type === 'hsa') balance = point.hsaBalance;
+      else balance = point.otherBalance;
+    }
+    return {
+      ...a,
+      properties: {
+        ...a.properties,
+        currentBalance: Math.round(balance)
+      }
+    };
+  });
 
-  const investedAssets = accounts.reduce((sum, a) => sum + Number(a.properties?.currentBalance || 0), 0);
+  const projectedProperties = properties.map(p => {
+    let homeValue = Number(p.properties?.homeValue || 0);
+    let mortgageBalance = 0;
+    if (point) {
+      if (point.homeValues && point.homeValues[p.id] !== undefined) {
+        homeValue = point.homeValues[p.id];
+      } else if (p.id === 'home-property') {
+        homeValue = point.homeValue;
+      }
+      
+      const mortgageId = `mortgage-${p.id}`;
+      if (point.mortgageBalances && point.mortgageBalances[mortgageId] !== undefined) {
+        mortgageBalance = point.mortgageBalances[mortgageId];
+      } else if (p.id === 'home-property' && point.mortgageBalances && point.mortgageBalances['mortgage-debt'] !== undefined) {
+        mortgageBalance = point.mortgageBalances['mortgage-debt'];
+      }
+    }
+    return {
+      ...p,
+      properties: {
+        ...p.properties,
+        homeValue: Math.round(homeValue),
+        mortgageBalance: Math.round(mortgageBalance),
+        homeEquity: Math.round(Math.max(0, homeValue - mortgageBalance))
+      }
+    };
+  });
 
   return {
     age: targetAge,
@@ -145,10 +214,10 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
       investedAssets
     },
     jobs,
-    accounts,
-    properties,
+    accounts: projectedAccounts,
+    properties: projectedProperties,
     goals,
-    assumptions: lifePlan?.assumptions || {},
+    settings: lifePlan?.settings || lifePlan?.assumptions || {},
     financialSummary,
     activeEvents: [],
     activePeriods: []

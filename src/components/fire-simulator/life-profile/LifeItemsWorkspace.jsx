@@ -93,13 +93,14 @@ export default function LifeItemsWorkspace({
 
   const handleStartAdd = (type) => {
     setShowTypeSelect(false);
+    const settings = localLifePlan?.settings || localLifePlan?.assumptions || {};
     const newItem = {
       id: `${type}-${Date.now()}`,
       type,
       name: getPlaceholderName(type),
       startAge: currentAge,
       endAge: type === 'job' ? 65 : type === 'goal' ? lifeExpectancy : null,
-      properties: getInitialProperties(type, currentAge)
+      properties: getInitialProperties(type, currentAge, settings)
     };
     setEditingItem({ mode: 'add', type, item: newItem });
   };
@@ -231,6 +232,10 @@ export default function LifeItemsWorkspace({
       ...localLifePlan,
       objects: updatedObjects
     };
+    if (item.properties?.role === 'self') {
+      updatedPlan.currentAge = Number(item.startAge);
+      updatedPlan.lifeExpectancy = Number(item.endAge);
+    }
     setLocalLifePlan(updatedPlan);
     setEditingItem(null);
     triggerSave({ lifePlan: updatedPlan });
@@ -251,12 +256,13 @@ export default function LifeItemsWorkspace({
     }
   };
 
-  const getInitialProperties = (type, age) => {
+  const getInitialProperties = (type, age, settings = {}) => {
+    const defaultReturn = settings.expectedReturn !== undefined ? settings.expectedReturn : 7;
     switch (type) {
-      case 'job': return { annualIncome: 80000, growthRate: 3 };
-      case 'property': return { homeValue: 350000, downPayment: 70000, mortgageAmount: 280000, interestRate: 6.5, monthlyPayment: 1770, propertyTaxes: 4000, insurance: 1200, hoa: 0 };
-      case 'account': return { accountType: 'brokerage', currentBalance: 10000, contributionAmount: 500, allocation: '80/20' };
-      case 'debt': return { debtType: 'student', balance: 25000, interestRate: 5.5, monthlyPayment: 300, payoffPlan: 'standard' };
+      case 'job': return { annualIncome: 80000, growthRate: 3, bonus: 0, employerMatch: 0 };
+      case 'property': return { homeValue: 350000, downPayment: 70000, mortgageAmount: 280000, interestRate: 6.5, monthlyPayment: 1770, propertyTaxes: 4000, insurance: 1200, hoa: 0, appreciationRate: 3, maintenance: 0, closingCosts: 0, loanTerm: 30 };
+      case 'account': return { accountType: 'brokerage', currentBalance: 10000, contributionAmount: 500, allocation: '80/20', expectedReturnOverride: null, contributionStrategy: 'fixed' };
+      case 'debt': return { debtType: 'student', balance: 25000, interestRate: 5.5, monthlyPayment: 300, payoffPlan: 'standard', paymentStrategy: 'standard', remainingTerm: 10, minimumPayment: 300 };
       case 'child': return { arrivalAge: age, childcareCost: 15000, dependencyEndAge: 18, includeCollege: false, collegeCost: 25000 };
       case 'person': return { role: 'partner', partnerIncome: 60000, partnerSavings: 10000, partnerRetirement: 25000, partnerDebts: 0, status: 'married' };
       case 'goal': return { targetAge: 65, spendingPercent: 70 };
@@ -316,8 +322,15 @@ export default function LifeItemsWorkspace({
     let details = '';
 
     if (item.type === 'person') {
-      subtitle = `${item.properties?.role === 'self' ? 'You' : 'Partner'} · Age ${item.startAge}`;
-      details = item.properties?.role === 'partner' ? `Salary: ${formatCurrency(p.partnerIncome)}/yr · Assets: ${formatCurrency(Number(p.partnerSavings) + Number(p.partnerRetirement))}` : 'Self clock basics';
+      const isSelf = item.properties?.role === 'self';
+      subtitle = isSelf ? 'Self' : 'Partner';
+      if (isSelf) {
+        details = `Age: ${item.startAge} · Life Expectancy: ${item.endAge}`;
+      } else {
+        const partnerAge = p.spouseCurrentAge !== undefined ? p.spouseCurrentAge : item.startAge;
+        const partnerLifeExp = p.spouseLifeExpectancy !== undefined ? p.spouseLifeExpectancy : lifeExpectancy;
+        details = `Age: ${partnerAge} · Life Expectancy: ${partnerLifeExp} · Salary: ${formatCurrency(p.partnerIncome)}/yr · Assets: ${formatCurrency(Number(p.partnerSavings) + Number(p.partnerRetirement))}`;
+      }
     } else if (item.type === 'child') {
       subtitle = `Child · Age ${currentAge - item.startAge}`;
       details = `Arrival Age: ${item.startAge} · childcare Cost: ${formatCurrency(p.childcareCost)}/yr ${p.includeCollege ? '· 🎓 College planned' : ''}`;
@@ -355,15 +368,13 @@ export default function LifeItemsWorkspace({
             <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{details}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button type="button" className="btn-secondary" onClick={() => handleStartEdit(item)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem' }} title={`Edit ${item.name}`}>
+              <Edit2 size={12} />
+            </button>
             {item.properties?.role !== 'self' && (
-              <>
-                <button type="button" className="btn-secondary" onClick={() => handleStartEdit(item)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem' }}>
-                  <Edit2 size={12} />
-                </button>
-                <button type="button" className="btn-secondary text-danger" onClick={() => handleDelete(item.id)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', color: '#ef4444' }}>
-                  <Trash2 size={12} />
-                </button>
-              </>
+              <button type="button" className="btn-secondary text-danger" onClick={() => handleDelete(item.id)} style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', color: '#ef4444' }}>
+                <Trash2 size={12} />
+              </button>
             )}
           </div>
         </div>
@@ -625,45 +636,6 @@ export default function LifeItemsWorkspace({
         </div>
       </div>
 
-      {/* Basics Section */}
-      <div className="life-profile-basics-section" style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '1rem', display: 'flex', gap: '1rem' }}>
-        <div className="life-profile-form-group" style={{ flex: 1, marginBottom: 0 }}>
-          <label className="life-profile-label-small" style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Your Age</label>
-          <input 
-            type="number" 
-            className="life-profile-input-field" 
-            value={localLifePlan?.currentAge !== undefined ? localLifePlan.currentAge : currentAge} 
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              const updated = {
-                ...localLifePlan,
-                currentAge: val
-              };
-              setLocalLifePlan(updated);
-              triggerSave({ lifePlan: updated });
-            }} 
-            style={{ width: '100%', marginTop: '4px' }}
-          />
-        </div>
-        <div className="life-profile-form-group" style={{ flex: 1, marginBottom: 0 }}>
-          <label className="life-profile-label-small" style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Life Expectancy</label>
-          <input 
-            type="number" 
-            className="life-profile-input-field" 
-            value={localLifePlan?.lifeExpectancy !== undefined ? localLifePlan.lifeExpectancy : lifeExpectancy} 
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              const updated = {
-                ...localLifePlan,
-                lifeExpectancy: val
-              };
-              setLocalLifePlan(updated);
-              triggerSave({ lifePlan: updated });
-            }} 
-            style={{ width: '100%', marginTop: '4px' }}
-          />
-        </div>
-      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {renderSectionHeader('People & Household', '👥')}
@@ -737,28 +709,71 @@ function renderEditorForm(item, onChange, onSave) {
       </div>
 
       <div className="life-profile-row-two-col" style={{ display: 'flex', gap: '0.75rem' }}>
-        <div className="life-profile-form-group" style={{ flex: 1 }}>
-          <label className="life-profile-label-small">Start Age</label>
-          <input 
-            type="number" 
-            className="life-profile-input-field" 
-            value={item.startAge !== null ? item.startAge : ''} 
-            onChange={(e) => onChange({ ...item, startAge: Number(e.target.value) })} 
-            required 
-            style={{ width: '100%' }}
-          />
-        </div>
-        {item.type === 'job' && (
-          <div className="life-profile-form-group" style={{ flex: 1 }}>
-            <label className="life-profile-label-small">End Age</label>
-            <input 
-              type="number" 
-              className="life-profile-input-field" 
-              value={item.endAge !== null ? item.endAge : ''} 
-              onChange={(e) => onChange({ ...item, endAge: Number(e.target.value) })} 
-              style={{ width: '100%' }}
-            />
-          </div>
+        {item.properties?.role === 'self' ? (
+          <>
+            <div className="life-profile-form-group" style={{ flex: 1 }}>
+              <label className="life-profile-label-small">Your Age</label>
+              <input 
+                type="number" 
+                className="life-profile-input-field" 
+                value={item.startAge !== null ? item.startAge : ''} 
+                onChange={(e) => onChange({ ...item, startAge: Number(e.target.value) })} 
+                required 
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div className="life-profile-form-group" style={{ flex: 1 }}>
+              <label className="life-profile-label-small">Life Expectancy</label>
+              <input 
+                type="number" 
+                className="life-profile-input-field" 
+                value={item.endAge !== null ? item.endAge : ''} 
+                onChange={(e) => onChange({ ...item, endAge: Number(e.target.value) })} 
+                required 
+                style={{ width: '100%' }}
+              />
+            </div>
+          </>
+        ) : item.properties?.role === 'partner' ? (
+          <>
+            <div className="life-profile-form-group" style={{ flex: 1 }}>
+              <label className="life-profile-label-small">Marriage Age (Start Age)</label>
+              <input 
+                type="number" 
+                className="life-profile-input-field" 
+                value={item.startAge !== null ? item.startAge : ''} 
+                onChange={(e) => onChange({ ...item, startAge: Number(e.target.value) })} 
+                required 
+                style={{ width: '100%' }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="life-profile-form-group" style={{ flex: 1 }}>
+              <label className="life-profile-label-small">Start Age</label>
+              <input 
+                type="number" 
+                className="life-profile-input-field" 
+                value={item.startAge !== null ? item.startAge : ''} 
+                onChange={(e) => onChange({ ...item, startAge: Number(e.target.value) })} 
+                required 
+                style={{ width: '100%' }}
+              />
+            </div>
+            {item.type === 'job' && (
+              <div className="life-profile-form-group" style={{ flex: 1 }}>
+                <label className="life-profile-label-small">End Age</label>
+                <input 
+                  type="number" 
+                  className="life-profile-input-field" 
+                  value={item.endAge !== null ? item.endAge : ''} 
+                  onChange={(e) => onChange({ ...item, endAge: Number(e.target.value) })} 
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -766,6 +781,8 @@ function renderEditorForm(item, onChange, onSave) {
         <>
           {renderField('Annual Salary', 'annualIncome', 'number', '/ yr')}
           {renderField('Annual Growth', 'growthRate', 'number', '%')}
+          {renderField('Annual Bonus', 'bonus', 'number', '/ yr')}
+          {renderField('Employer Match Rate / Amount', 'employerMatch', 'number', '/ yr')}
         </>
       )}
 
@@ -777,7 +794,7 @@ function renderEditorForm(item, onChange, onSave) {
               className="life-profile-select-field" 
               value={p.accountType || 'brokerage'} 
               onChange={(e) => updateProp('accountType', e.target.value)}
-              style={{ width: '100%' }}
+              style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px' }}
             >
               <option value="cash">Cash / HYSA</option>
               <option value="brokerage">Taxable Brokerage</option>
@@ -792,6 +809,20 @@ function renderEditorForm(item, onChange, onSave) {
           {renderField('Current Balance', 'currentBalance', 'number', '$')}
           {renderField('Monthly Contribution', 'contributionAmount', 'number', '/ mo')}
           {renderField('Allocation (Stocks/Bonds)', 'allocation', 'text')}
+          {renderField('Expected Return Override (leave empty to inherit)', 'expectedReturnOverride', 'number', '%')}
+          <div className="life-profile-form-group" style={{ marginBottom: '0.75rem' }}>
+            <label className="life-profile-label-small">Contribution Strategy</label>
+            <select 
+              className="life-profile-select-field" 
+              value={p.contributionStrategy || 'fixed'} 
+              onChange={(e) => updateProp('contributionStrategy', e.target.value)}
+              style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px' }}
+            >
+              <option value="fixed">Fixed Amount</option>
+              <option value="maxOut">Maximize Contribution</option>
+              <option value="percentage">Percentage of Income</option>
+            </select>
+          </div>
         </>
       )}
 
@@ -803,7 +834,7 @@ function renderEditorForm(item, onChange, onSave) {
               className="life-profile-select-field" 
               value={p.debtType || 'student'} 
               onChange={(e) => updateProp('debtType', e.target.value)}
-              style={{ width: '100%' }}
+              style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px' }}
             >
               <option value="student">Student Loan</option>
               <option value="credit">Credit Card</option>
@@ -815,6 +846,22 @@ function renderEditorForm(item, onChange, onSave) {
           {renderField('Current Balance', 'balance', 'number', '$')}
           {renderField('Interest Rate', 'interestRate', 'number', '%')}
           {renderField('Monthly Payment', 'monthlyPayment', 'number', '/ mo')}
+          {renderField('Minimum Payment', 'minimumPayment', 'number', '/ mo')}
+          {renderField('Remaining Term', 'remainingTerm', 'number', 'yrs')}
+          <div className="life-profile-form-group" style={{ marginBottom: '0.75rem' }}>
+            <label className="life-profile-label-small">Payment Strategy</label>
+            <select 
+              className="life-profile-select-field" 
+              value={p.paymentStrategy || 'standard'} 
+              onChange={(e) => updateProp('paymentStrategy', e.target.value)}
+              style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px' }}
+            >
+              <option value="standard">Standard (Minimums)</option>
+              <option value="avalanche">Debt Avalanche (Highest APR first)</option>
+              <option value="snowball">Debt Snowball (Lowest balance first)</option>
+              <option value="aggressive">Aggressive Paydown</option>
+            </select>
+          </div>
         </>
       )}
 
@@ -824,10 +871,14 @@ function renderEditorForm(item, onChange, onSave) {
           {renderField('Down Payment', 'downPayment', 'number', '$')}
           {renderField('Mortgage Amount', 'mortgageAmount', 'number', '$')}
           {renderField('Mortgage Rate', 'interestRate', 'number', '%')}
+          {renderField('Mortgage Loan Term', 'loanTerm', 'number', 'yrs')}
           {renderField('Monthly Mortgage Payment', 'monthlyPayment', 'number', '/ mo')}
           {renderField('Monthly HOA Costs', 'hoa', 'number', '/ mo')}
           {renderField('Annual Property Taxes', 'propertyTaxes', 'number', '/ yr')}
           {renderField('Annual Home Insurance', 'insurance', 'number', '/ yr')}
+          {renderField('Appreciation Rate', 'appreciationRate', 'number', '%')}
+          {renderField('Annual Maintenance', 'maintenance', 'number', '/ yr')}
+          {renderField('Closing Costs', 'closingCosts', 'number', '$')}
         </>
       )}
 
@@ -848,8 +899,16 @@ function renderEditorForm(item, onChange, onSave) {
         </>
       )}
 
-      {item.type === 'person' && (
+      {item.type === 'person' && item.properties?.role === 'partner' && (
         <>
+          <div className="life-profile-row-two-col" style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ flex: 1 }}>
+              {renderField("Partner's Age", 'spouseCurrentAge', 'number')}
+            </div>
+            <div style={{ flex: 1 }}>
+              {renderField("Partner's Life Expectancy", 'spouseLifeExpectancy', 'number')}
+            </div>
+          </div>
           <div className="life-profile-form-group">
             <label className="life-profile-label-small">Filing / Household status</label>
             <select 
