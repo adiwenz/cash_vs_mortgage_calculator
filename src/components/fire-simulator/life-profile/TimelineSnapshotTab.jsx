@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatCompactCurrency } from '../helpers';
 import { buildTimelineRows, getTimelineItemObjectKey, resolveHouseIdForEvent } from '../../../utils/timelineRowBuilder.js';
+import LifeSnapshotPanel from './LifeSnapshotPanel';
+
 
 export const ageToTimelinePercent = (age, minAge, maxAge) => {
   if (age === null || age === undefined || minAge === null || minAge === undefined || maxAge === null || maxAge === undefined) {
@@ -632,71 +634,15 @@ export default function TimelineSnapshotTab({
           </div>
         </div>
         
-        <div className="life-snapshot-panel" style={{ padding: '1rem' }}>
-          <div className="life-snapshot-header">
-            <h4 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>
-              <span>Life Snapshot</span>
-              <span style={{ marginLeft: '0.5rem', fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                - {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}
-              </span>
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>View your life at any age.</p>
-          </div>
-          <div className="life-snapshot-age-selector-row" style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button 
-              type="button" 
-              className="age-selector-arrow-btn" 
-              onClick={handleDecrementAge}
-              disabled={isDecrementDisabled}
-              aria-label="Previous age"
-              style={isDecrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-            >
-              &larr;
-            </button>
-            <span className="age-selector-text">
-              Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
-            </span>
-            <button 
-              type="button" 
-              className="age-selector-arrow-btn" 
-              onClick={handleIncrementAge}
-              disabled={isIncrementDisabled}
-              aria-label="Next age"
-              style={isIncrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-            >
-              &rarr;
-            </button>
-          </div>
-          <div className="life-snapshot-rows-list">
-            {renderSnapshotRow('❤️', 'Relationship', formatRelationshipStatus(snapshot.relationshipStatus))}
-            {renderSnapshotRow('🏠', 'Housing', snapshot.housingStatus === 'own' ? 'Homeowner' : 'Renting')}
-            {renderSnapshotRow('👶', 'Children', formatChildrenSnapshot(snapshot.children))}
-            {renderSnapshotRow('💼', 'Annual Income', formatCurrency(snapshot.income.annualIncome) + ' / yr')}
-            {renderSnapshotRow('📈', 'Net Worth', formatNetWorthValue(projection, selectedAge, snapshot.assets.investedAssets))}
-            {renderSnapshotRow('💸', 'Debts', formatDebtsList(snapshot.debts.activeDebts))}
-          </div>
-          
-          <div className="upcoming-milestones-container">
-            <h5 style={{ fontSize: '0.82rem', fontWeight: '800', margin: '0.5rem 0 0 0' }}>Upcoming Milestones</h5>
-            {projection.upcomingMilestones.length === 0 ? (
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>No upcoming milestones</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
-                {projection.upcomingMilestones.map(m => (
-                  <div key={m.id} className="upcoming-milestone-card">
-                    <div className="upcoming-milestone-icon-circle" style={{ background: getMilestoneIconBg(m.category) }}>
-                      {getMilestoneIcon(m.category)}
-                    </div>
-                    <div className="upcoming-milestone-text-group">
-                      <span className="upcoming-milestone-title-text">{m.title}</span>
-                      <span className="upcoming-milestone-timing-text">Age {m.age} (In {m.age - projection.currentAge} years)</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <LifeSnapshotPanel
+          isMobile={true}
+          projection={projection}
+          snapshot={snapshot}
+          selectedAge={selectedAge}
+          currentAge={currentAge}
+          lifeExpectancy={lifeExpectancy}
+          onSelectedAgeChange={onSelectedAgeChange}
+        />
       </div>
     );
   }
@@ -728,80 +674,15 @@ export default function TimelineSnapshotTab({
       </div>
 
       {/* Right Column: Life Snapshot */}
-      <div className="life-snapshot-panel">
-        <div className="life-snapshot-header">
-          <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-            <span>Life Snapshot</span>
-            <span style={{ marginLeft: '0.5rem', fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-              - {selectedAge === Number(currentAge) ? 'Today' : `Age ${selectedAge}`}
-            </span>
-          </h4>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>View your life at any age.</p>
-        </div>
-
-        {/* Selected Age Indicator */}
-        <div className="life-snapshot-age-selector-row">
-          <button 
-            type="button" 
-            className="age-selector-arrow-btn" 
-            onClick={handleDecrementAge}
-            disabled={isDecrementDisabled}
-            aria-label="Previous age"
-            style={isDecrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-          >
-            &larr;
-          </button>
-          <span className="age-selector-text">
-            Age {selectedAge} {selectedAge === Number(currentAge) ? '(Today)' : ''}
-          </span>
-          <button 
-            type="button" 
-            className="age-selector-arrow-btn" 
-            onClick={handleIncrementAge}
-            disabled={isIncrementDisabled}
-            aria-label="Next age"
-            style={isIncrementDisabled ? { opacity: 0.3, cursor: 'not-allowed' } : { cursor: 'pointer' }}
-          >
-            &rarr;
-          </button>
-        </div>
-
-        {/* Snapshot Rows */}
-        <div className="life-snapshot-rows-list">
-          {renderSnapshotRow('❤️', 'Relationship', formatRelationshipStatus(snapshot.relationshipStatus))}
-          {renderSnapshotRow('🏠', 'Housing', snapshot.housingStatus === 'own' ? 'Homeowner' : 'Renting')}
-          {renderSnapshotRow('👶', 'Children', formatChildrenSnapshot(snapshot.children))}
-          {renderSnapshotRow('💼', 'Annual Income', formatCurrency(snapshot.income.annualIncome) + ' / yr')}
-          {renderSnapshotRow('📈', 'Net Worth', formatNetWorthValue(projection, selectedAge, snapshot.assets.investedAssets))}
-          {renderSnapshotRow('💸', 'Debts', formatDebtsList(snapshot.debts.activeDebts))}
-        </div>
-
-        {/* Upcoming Milestones */}
-        <div className="upcoming-milestones-container">
-          <h5 style={{ fontSize: '0.85rem', fontWeight: '800', margin: '0.5rem 0 0 0', color: 'var(--text-primary)' }}>Upcoming Milestones</h5>
-          {projection.upcomingMilestones.length === 0 ? (
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>No upcoming milestones</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-              {projection.upcomingMilestones.map(m => (
-                <div key={m.id} className="upcoming-milestone-card">
-                  <div className="upcoming-milestone-icon-circle" style={{ background: getMilestoneIconBg(m.category) }}>
-                    {getMilestoneIcon(m.category)}
-                  </div>
-                  <div className="upcoming-milestone-text-group">
-                    <span className="upcoming-milestone-title-text">{m.title}</span>
-                    <span className="upcoming-milestone-timing-text">Age {m.age} (In {m.age - projection.currentAge} years)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <button type="button" className="timeline-btn" disabled style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center' }}>
-            View Full Events List
-          </button>
-        </div>
-      </div>
+      <LifeSnapshotPanel
+        isMobile={false}
+        projection={projection}
+        snapshot={snapshot}
+        selectedAge={selectedAge}
+        currentAge={currentAge}
+        lifeExpectancy={lifeExpectancy}
+        onSelectedAgeChange={onSelectedAgeChange}
+      />
     </div>
   );
 }

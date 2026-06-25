@@ -243,6 +243,7 @@ export default function MobileModalLayer({
         simulation={simulation?.activeResults}
         handleCreateEvent={eventController?.handleCreateEvent}
         handleEditRoadmapEvent={eventController?.handleEditRoadmapEvent}
+        handleDeleteEvent={eventController?.handleDeleteEvent || handleDeleteEvent}
       />
 
       {notification && (() => {
