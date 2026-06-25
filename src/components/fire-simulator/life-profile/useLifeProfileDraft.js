@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { defaultProfile } from './lifeProfileDraftUtils';
 import { getSaveUpdates } from './lifeProfileSaveAdapter';
 import { setLastChartChangeType } from '../changeTypeTracker';
+import { buildTimelineRows } from '../../../utils/timelineRowBuilder.js';
+import { getTimelineProjection } from '../../../models/lifeTimeline/index.js';
 
 export default function useLifeProfileDraft({
   isOpen,
@@ -12,15 +14,39 @@ export default function useLifeProfileDraft({
   isMobile = false
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [expandedCategories, setExpandedCategories] = useState({
-    children: true,
-    housing: true,
-    income: true,
-    relationship: true,
-    education: true,
-    debt: true,
-    assets: true,
-    'major-events': true
+  const [expandedCategories, setExpandedCategories] = useState(() => {
+    try {
+      const proj = getTimelineProjection(inputs, { selectedAge: inputs.currentAge || 35 });
+      const allDescriptors = buildTimelineRows(inputs);
+      const defaultExpanded = {};
+      const categories = ['relationship', 'housing', 'children', 'education', 'debt', 'income', 'major-events', 'assets'];
+      
+      categories.forEach(catId => {
+        const hasChildRows = allDescriptors.some(d => d.type === 'object' && d.parent === catId);
+        const categoryRow = proj.rows.find(r => r.id === catId);
+        let hasItems = false;
+        if (categoryRow) {
+          let items = categoryRow.items || [];
+          if (catId === 'housing') {
+            items = items.filter(item => !String(item.id || '').startsWith('status-housing-'));
+          }
+          hasItems = items.length > 0;
+        }
+        defaultExpanded[catId] = !!(hasChildRows || hasItems);
+      });
+      return defaultExpanded;
+    } catch (e) {
+      return {
+        children: true,
+        housing: true,
+        income: true,
+        relationship: true,
+        education: true,
+        debt: true,
+        assets: true,
+        'major-events': true
+      };
+    }
   });
   const [showAdvancedHome, setShowAdvancedHome] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);

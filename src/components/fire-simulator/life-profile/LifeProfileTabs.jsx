@@ -19,7 +19,7 @@ export default function LifeProfileTabs({ tabs, activeTab, setActiveTab, isMobil
   }
 
   return (
-    <div className="life-profile-tabs-row" style={{ padding: '0.5rem 1.5rem', borderBottom: '1px solid var(--border-color, #e5e7eb)', background: '#ffffff' }}>
+    <div className="life-profile-tabs-row" style={{ padding: '0.35rem 1.5rem', borderBottom: '1px solid var(--border-color, #e5e7eb)', background: '#ffffff' }}>
       {tabs.map(t => (
         <button
           key={t.id}
