@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --pool=forks",
     "test:watch": "vitest",
     "test:changed": "vitest run --changed=main",
     "test:e2e": "playwright test",
