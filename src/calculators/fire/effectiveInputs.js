@@ -200,7 +200,7 @@ export function buildEffectiveSimulationInputs(inputs) {
   if (profile.incomeSources && Array.isArray(profile.incomeSources)) {
     profile.incomeSources.forEach((inc, index) => {
       const incId = inc.id || `derived-income-${index}`;
-      const hasIncome = effective.incomeList.some(i => i.id === incId);
+      const hasIncome = effective.incomeList.some(i => i.id === incId || i.id.startsWith(incId + '-segment-'));
       if (!hasIncome) {
         effective.incomeList.push({
           id: incId,
@@ -209,7 +209,7 @@ export function buildEffectiveSimulationInputs(inputs) {
           frequency: 'yearly',
           startAge: Number(inc.startAge !== undefined ? inc.startAge : currentAge),
           endAge: Number(inc.endAge !== undefined ? inc.endAge : effective.targetRetirementAge),
-          growthRate: Number(inc.growthRate !== undefined ? inc.growthRate : 3) / 100,
+          growthRate: Number(inc.growthRate !== undefined ? inc.growthRate : 0) / 100,
           isTaxable: inc.isTaxable !== false,
           isDerived: true
         });

@@ -49,7 +49,7 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
   const marriageEvents = (inputs.lifeEvents || []).filter(e => e.type === 'marriage' && e.enabled);
   const ssEv = (inputs.lifeEvents || []).find(e => e.type === 'socialSecurity');
   const ssAge = ssEv ? ssEv.claimingAge || 67 : 67;
-  const ssBenefit = ssEv ? ssEv.monthlyBenefit || 2000 : 2000;
+  const ssBenefit = ssEv ? (ssEv.monthlyBenefit !== undefined && ssEv.monthlyBenefit !== null && ssEv.monthlyBenefit !== '' ? Number(ssEv.monthlyBenefit) : 2000) : 2000;
 
   const isMarried = household.status === 'married' || 
                     household.status === 'partnered' || 
@@ -360,6 +360,7 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
       type: 'socialSecurity',
       age: ssAge,
       objectId: 'self-person',
+      enabled: ssEv ? ssEv.enabled !== false : true,
       mutation: {
         claimingAge: ssAge,
         monthlyBenefit: ssBenefit
@@ -367,6 +368,7 @@ export function syncLifePlanWithInputs(lifePlan, inputs) {
     });
   } else {
     planSsEvent.age = ssAge;
+    planSsEvent.enabled = ssEv ? ssEv.enabled !== false : true;
     planSsEvent.mutation = {
       ...planSsEvent.mutation,
       claimingAge: ssAge,
@@ -749,9 +751,10 @@ export function initializeLifePlanIfMissing(inputs) {
     type: 'socialSecurity',
     age: ssEv ? ssEv.claimingAge || 67 : 67,
     objectId: 'self-person',
+    enabled: ssEv ? ssEv.enabled !== false : true,
     mutation: {
       claimingAge: ssEv ? ssEv.claimingAge || 67 : 67,
-      monthlyBenefit: ssEv ? ssEv.monthlyBenefit || 2000 : 2000
+      monthlyBenefit: ssEv ? (ssEv.monthlyBenefit !== undefined && ssEv.monthlyBenefit !== null && ssEv.monthlyBenefit !== '' ? Number(ssEv.monthlyBenefit) : 2000) : 2000
     }
   });
 
@@ -1033,7 +1036,7 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
     const jobEvents = events.filter(e => e.objectId === job.id);
     
     const baseSalary = Number(p.annualIncome || 0);
-    const growthRate = Number(p.growthRate || 3);
+    const growthRate = p.growthRate !== undefined && p.growthRate !== null && p.growthRate !== '' ? Number(p.growthRate) : 0;
     const jobStart = Number(job.startAge);
     const jobEnd = job.endAge ? Number(job.endAge) : lifeExpectancy;
 
@@ -1238,11 +1241,11 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
       lifeEvents.push({
         id: ev.id,
         type: 'socialSecurity',
-        enabled: true,
+        enabled: ev.enabled !== false,
         name: 'Social Security',
         claimingAge: getEvAge(ev),
         age: getEvAge(ev),
-        monthlyBenefit: Number(ev.mutation?.monthlyBenefit || 2000),
+        monthlyBenefit: Number(ev.mutation?.monthlyBenefit !== undefined && ev.mutation?.monthlyBenefit !== null && ev.mutation?.monthlyBenefit !== '' ? ev.mutation.monthlyBenefit : 2000),
         inflationAdjusted: true,
         ageStartedWorking: 22,
         isDerived: true

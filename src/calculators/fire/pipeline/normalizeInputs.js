@@ -208,7 +208,7 @@ export function normalizeInputsStage(inputs) {
     }
   }
 
-  const isAdvanced = inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
+  const isAdvanced = inputs.isAdvancedMode === true || inputs.useLifeProfile === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
   if (!isAdvanced) {
     const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
     incomeList = incomeList.map(inc => {

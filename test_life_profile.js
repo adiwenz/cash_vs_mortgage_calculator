@@ -200,7 +200,7 @@ describe('buildEffectiveSimulationInputs runtime derivation', () => {
 
     const effective = buildEffectiveSimulationInputs(inputs);
 
-    const rentalIncome = effective.incomeList.find(i => i.id === 'derived-inc-1');
+    const rentalIncome = effective.incomeList.find(i => i.id === 'derived-inc-1' || i.id.startsWith('derived-inc-1-segment-'));
     expect(rentalIncome).toBeDefined();
     expect(rentalIncome.name).toBe('Rental Property');
     expect(rentalIncome.amount).toBe(12000);

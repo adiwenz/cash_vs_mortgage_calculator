@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
 import { getLifeSnapshotAtAge } from '../lifeSnapshotSelectors.js';
+import { runFireSimulation } from '../../../calculators/fire/index.js';
 
 describe('lifeSnapshotSelectors', () => {
   test('getLifeSnapshotAtAge safely handles empty or minimal inputs', () => {
@@ -169,7 +170,7 @@ describe('lifeSnapshotSelectors', () => {
       simpleIncome: 100000
     };
     const snapshotNoList = getLifeSnapshotAtAge(inputsNoIncomeList, 40);
-    expect(snapshotNoList.income.annualIncome).toBe(100000);
+    expect(Math.round(snapshotNoList.income.annualIncome)).toBe(115927);
 
     const inputsWithIncomeList = {
       currentAge: 35,
@@ -232,22 +233,24 @@ describe('lifeSnapshotSelectors', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
       currentAge: 35,
-      useLifeProfile: false,
-      incomeList: [
-        { id: 'inc-1', name: 'Salary', amount: 50000, startAge: 35, endAge: 45 }
-      ],
+      useLifeProfile: true,
+      lifeProfile: {
+        incomeSources: [
+          { id: 'inc-1', name: 'Salary', amount: 50000, startAge: 35, endAge: 45 }
+        ]
+      },
       lifeEvents: [
         { id: 'inc-change', type: 'careerChange', name: 'New Job', startAge: 45, amount: 80000, endAge: 65, enabled: true }
       ]
     };
 
-    // Age 40: Should be original salary
+    // Age 40: Should be original salary with 3% growth
     const snapshot40 = getLifeSnapshotAtAge(inputs, 40);
-    expect(snapshot40.income.annualIncome).toBe(50000);
+    expect(Math.round(snapshot40.income.annualIncome)).toBe(57964);
 
-    // Age 46: Should be new job salary
+    // Age 46: Should be new job salary with 3% growth (1 year)
     const snapshot46 = getLifeSnapshotAtAge(inputs, 46);
-    expect(snapshot46.income.annualIncome).toBe(80000);
+    expect(Math.round(snapshot46.income.annualIncome)).toBe(82400);
   });
 
   test('getLifeSnapshotAtAge housing status regression: Buy (51) and Sell (85) events', () => {
@@ -299,7 +302,8 @@ describe('lifeSnapshotSelectors', () => {
     };
 
     const snapshot = getLifeSnapshotAtAge(inputs, 52);
-    expect(snapshot.income.annualIncome).toBe(50000);
+    expect(Math.round(snapshot.income.annualIncome)).toBe(82642);
+    expect(Math.round(snapshot.income.activeIncomeItems[0].metadata.amount)).toBe(82642);
   });
 
   test('Salary aliases normalize correctly', () => {
@@ -331,7 +335,7 @@ describe('lifeSnapshotSelectors', () => {
       };
 
       const snapshot = getLifeSnapshotAtAge(inputs, 52);
-      expect(snapshot.income.annualIncome).toBe(50000);
+      expect(Math.round(snapshot.income.annualIncome)).toBe(82642);
     });
   });
 
@@ -424,16 +428,330 @@ describe('lifeSnapshotSelectors', () => {
       }
     };
 
-    // Age 49: all three jobs are active. Total income = 50000 + 30000 + 40000 = 120000
+    // Age 49: all three jobs are active. Total nominal projected income = ~181511
     const snapshot49 = getLifeSnapshotAtAge(inputs, 49);
-    expect(snapshot49.income.annualIncome).toBe(120000);
+    expect(Math.round(snapshot49.income.annualIncome)).toBe(181511);
 
-    // Age 50: job-ended is no longer active (ended at age 50). Total income = 50000 + 30000 = 80000
+    // Age 50: job-ended is no longer active. Total nominal projected income = ~124637
     const snapshot50 = getLifeSnapshotAtAge(inputs, 50);
-    expect(snapshot50.income.annualIncome).toBe(80000);
+    expect(Math.round(snapshot50.income.annualIncome)).toBe(124637);
 
-    // Age 52: job-ended is still ended. Total income = 80000
+    // Age 52: job-ended is still ended. Total nominal projected income = ~132228
     const snapshot52 = getLifeSnapshotAtAge(inputs, 52);
-    expect(snapshot52.income.annualIncome).toBe(80000);
+    expect(Math.round(snapshot52.income.annualIncome)).toBe(132228);
+  });
+
+  test('A $50,000 salary starting at age 35 with 3% annual growth produces approximately $54,636 at age 38', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-main',
+            type: 'job',
+            name: 'Job',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 38);
+    expect(Math.round(snapshot.income.annualIncome)).toBe(54636);
+  });
+
+  test('Multiple active jobs sum correctly', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          },
+          {
+            id: 'job-2',
+            type: 'job',
+            name: 'Job 2',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 30000,
+              growthRate: 2
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    // Age 38: Job 1 is ~54636, Job 2 is ~31836 (30000 * 1.02^3 = 31836.24). Total = ~86472
+    const snapshot = getLifeSnapshotAtAge(inputs, 38);
+    expect(Math.round(snapshot.income.annualIncome)).toBe(86473);
+  });
+
+  test('Jobs outside their active period are excluded', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 40,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [
+          { id: 'job-ended', objectId: 'job-1', type: 'job.end', age: 40 }
+        ],
+        assumptions: {}
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 41);
+    expect(snapshot.income.annualIncome).toBe(0);
+  });
+
+  test('Missing growth rate defaults to 0%', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: undefined
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const snapshot = getLifeSnapshotAtAge(inputs, 38);
+    expect(snapshot.income.annualIncome).toBe(50000);
+  });
+
+  test('Timeline, charts, and Life Snapshot all display identical projected income at the same age', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    const sim = runFireSimulation(inputs);
+    const nominalPoint = sim.nominalData.find(d => d.age === 38);
+    const snapshot = getLifeSnapshotAtAge(inputs, 38);
+    expect(Math.round(snapshot.income.annualIncome)).toBe(Math.round(nominalPoint.projectedJobIncome));
+  });
+
+  test('getLifeSnapshotAtAge respects displayMode options', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      inflationRate: 3.0,
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    // Age 38: 3 years of inflation and growth
+    // Nominal salary: 50000 * 1.03^3 = 54636
+    // Deflated salary: 54636 / 1.03^3 = 50000
+    const snapshotFuture = getLifeSnapshotAtAge(inputs, 38, { displayMode: 'future' });
+    const snapshotToday = getLifeSnapshotAtAge(inputs, 38, { displayMode: 'today' });
+
+    expect(Math.round(snapshotFuture.income.annualIncome)).toBe(54636);
+    expect(Math.round(snapshotToday.income.annualIncome)).toBe(50000);
+
+    // Verify Net Worth matches displayMode
+    const sim = runFireSimulation(inputs);
+    const nominalPoint = sim.nominalData.find(d => d.age === 38);
+    const deflatedPoint = sim.data.find(d => d.age === 38);
+
+    expect(snapshotFuture.financialSummary.netWorth).toBe(nominalPoint.netWorth);
+    expect(snapshotToday.financialSummary.netWorth).toBe(deflatedPoint.netWorth);
+  });
+
+  test('Life Snapshot Income Still Uses Static Input reproduction test', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      inflationRate: 3.0,
+      lifeEvents: [
+        { id: 'ss-1', type: 'socialSecurity', enabled: false, monthlyBenefit: 0, claimingAge: 67 }
+      ],
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [],
+        assumptions: {}
+      }
+    };
+
+    // Age 78: job ended at 65, so active job income = 0 and job-1 is excluded
+    const snapshot78 = getLifeSnapshotAtAge(inputs, 78);
+    expect(snapshot78.income.annualIncome).toBe(0);
+    expect(snapshot78.income.activeIncomeItems.find(j => j.id === 'job-1')).toBeUndefined();
+
+    // Age 44: job is active, annual income should be projected above $50,000 (nominal)
+    const snapshot44Nominal = getLifeSnapshotAtAge(inputs, 44, { displayMode: 'future' });
+    expect(snapshot44Nominal.income.annualIncome).toBeGreaterThan(50000);
+    expect(Math.round(snapshot44Nominal.income.annualIncome)).toBe(65239); // 50000 * 1.03^9 = 65238.68
+    expect(snapshot44Nominal.income.activeIncomeItems.find(j => j.id === 'job-1')).toBeDefined();
+
+    // Age 44 today/deflated: salary grown at 3% but deflated at 3% is exactly 50000
+    const snapshot44Deflated = getLifeSnapshotAtAge(inputs, 44, { displayMode: 'today' });
+    expect(Math.round(snapshot44Deflated.income.annualIncome)).toBe(50000);
+  });
+
+  test('Social Security is included in Snapshot annualIncome only after claiming age', () => {
+    const inputs = {
+      ...DEFAULT_FIRE_INPUTS,
+      currentAge: 35,
+      useLifeProfile: true,
+      lifeEvents: [
+        { id: 'ss-event', type: 'socialSecurity', claimingAge: 67, monthlyBenefit: 2000, enabled: true }
+      ],
+      lifePlan: {
+        currentAge: 35,
+        lifeExpectancy: 85,
+        objects: [
+          {
+            id: 'job-1',
+            type: 'job',
+            name: 'Job 1',
+            startAge: 35,
+            endAge: 65,
+            properties: {
+              annualIncome: 50000,
+              growthRate: 3
+            }
+          }
+        ],
+        events: [
+          {
+            id: 'event-ss',
+            type: 'socialSecurity',
+            age: 67,
+            objectId: 'self-person',
+            mutation: {
+              claimingAge: 67,
+              monthlyBenefit: 2000
+            }
+          }
+        ],
+        assumptions: {}
+      }
+    };
+
+    // Age 66: job ended (0), SS not claimed yet (0)
+    const snapshot66 = getLifeSnapshotAtAge(inputs, 66);
+    expect(snapshot66.income.annualIncome).toBe(0);
+    expect(snapshot66.income.activeIncomeItems.length).toBe(0);
+
+    // Age 67: job ended (0), SS claimed (2000/mo * 12 = 24000/yr nominal or deflated)
+    // SS benefit in nominal is 24000 * 1.03^32 = 61802.04
+    const snapshot67Nominal = getLifeSnapshotAtAge(inputs, 67, { displayMode: 'future' });
+    expect(Math.round(snapshot67Nominal.income.annualIncome)).toBe(61802);
+    expect(snapshot67Nominal.income.activeIncomeItems.find(i => i.id === 'derived-social-security')).toBeDefined();
+
+    // Today/deflated: SS benefit is exactly 24000
+    const snapshot67Today = getLifeSnapshotAtAge(inputs, 67, { displayMode: 'today' });
+    expect(Math.round(snapshot67Today.income.annualIncome)).toBe(24000);
+    expect(snapshot67Today.income.activeIncomeItems.find(i => i.id === 'derived-social-security')).toBeDefined();
   });
 });
