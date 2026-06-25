@@ -123,7 +123,24 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
       tradIraBalance: log.tradIraBalance / factor,
       rothIraBalance: log.rothIraBalance / factor,
       hsaBalance: log.hsaBalance / factor,
-      otherBalance: log.otherBalance / factor
+      otherBalance: log.otherBalance / factor,
+      projectedJobIncome: log.projectedJobIncome !== undefined ? (log.projectedJobIncome / factor) : 0,
+      projectedPartnerIncome: log.projectedPartnerIncome !== undefined ? (log.projectedPartnerIncome / factor) : 0,
+      earnedIncome: log.earnedIncome !== undefined ? (log.earnedIncome / factor) : 0,
+      jobIncome: log.jobIncome !== undefined ? (log.jobIncome / factor) : 0,
+      partnerIncome: log.partnerIncome !== undefined ? (log.partnerIncome / factor) : 0,
+      socialSecurityIncome: log.socialSecurityIncome !== undefined ? (log.socialSecurityIncome / factor) : 0,
+      pensionIncome: log.pensionIncome !== undefined ? (log.pensionIncome / factor) : 0,
+      passiveIncome: log.passiveIncome !== undefined ? (log.passiveIncome / factor) : 0,
+      annualIncome: log.annualIncome !== undefined ? (log.annualIncome / factor) : 0,
+      activeJobs: log.activeJobs ? log.activeJobs.map(aj => ({
+        ...aj,
+        projectedSalary: aj.projectedSalary / factor
+      })) : [],
+      activeIncomeItems: log.activeIncomeItems ? log.activeIncomeItems.map(aii => ({
+        ...aii,
+        annualAmount: aii.annualAmount / factor
+      })) : []
     };
   });
 

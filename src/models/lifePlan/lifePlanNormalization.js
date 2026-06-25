@@ -1122,7 +1122,7 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}) {
     const jobEvents = events.filter(e => e.objectId === job.id);
     
     const baseSalary = Number(p.annualIncome || 0);
-    const growthRate = p.growthRate !== undefined && p.growthRate !== null ? Number(p.growthRate) : 3;
+    const growthRate = p.growthRate !== undefined && p.growthRate !== null && p.growthRate !== '' ? Number(p.growthRate) : 0;
     const jobStart = Number(job.startAge);
     const jobEnd = job.endAge ? Number(job.endAge) : lifeExpectancy;
 

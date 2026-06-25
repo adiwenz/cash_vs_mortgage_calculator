@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import TimelineSnapshotTab, { ageToTimelinePercent, getTimelineBarStyle } from './TimelineSnapshotTab';
+import { getLifeSnapshotAtAge } from '../../../models/lifeTimeline/lifeSnapshotSelectors.js';
+import { DEFAULT_FIRE_INPUTS } from '../../../defaultInputs.js';
 
 afterEach(cleanup);
 
@@ -222,6 +224,69 @@ describe('TimelineSnapshotTab', () => {
 
       // Out of bounds end age <= minAge
       expect(getTimelineBarStyle({ startAge: 20, endAge: 30, minAge: 35, maxAge: 85 })).toBeNull();
+    });
+  });
+
+  describe('Snapshot Income render verification check', () => {
+    it('verifies snapshot render output at age 44, 66, and 78', () => {
+      const inputs = {
+        ...DEFAULT_FIRE_INPUTS,
+        currentAge: 35,
+        useLifeProfile: true,
+        inflationRate: 3.0,
+        lifeEvents: [
+          { id: 'ss-1', type: 'socialSecurity', enabled: true, monthlyBenefit: 2000, claimingAge: 67 }
+        ],
+        lifePlan: {
+          currentAge: 35,
+          lifeExpectancy: 85,
+          objects: [
+            {
+              id: 'job-1',
+              type: 'job',
+              name: 'Job 1',
+              startAge: 35,
+              endAge: 65,
+              properties: {
+                annualIncome: 50000,
+                growthRate: 3
+              }
+            }
+          ],
+          events: [
+            {
+              id: 'event-ss',
+              type: 'socialSecurity',
+              age: 67,
+              objectId: 'self-person',
+              mutation: {
+                claimingAge: 67,
+                monthlyBenefit: 2000
+              }
+            }
+          ],
+          assumptions: {}
+        }
+      };
+
+      const ages = [44, 66, 78];
+      ages.forEach(age => {
+        const snapshot = getLifeSnapshotAtAge(inputs, age, { displayMode: 'future' });
+        render(
+          <TimelineSnapshotTab
+            isMobile={false}
+            inputs={inputs}
+            projection={defaultProjection}
+            snapshot={snapshot}
+            selectedAge={age}
+            currentAge={35}
+            lifeExpectancy={85}
+            onSelectedAgeChange={onSelectedAgeChangeMock}
+            expandedCategories={{}}
+            setExpandedCategories={() => {}}
+          />
+        );
+      });
     });
   });
 });

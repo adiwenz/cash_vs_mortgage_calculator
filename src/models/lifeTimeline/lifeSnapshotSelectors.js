@@ -11,7 +11,7 @@ import {
 } from '../lifePlan/lifePlanSelectors.js';
 import { runFireSimulation } from '../../calculators/fire/index.js';
 
-export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
+export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs, options = {}) {
   const targetAge = Number(age);
   const currentAge = Number(lifePlan?.currentAge || 35);
   const lifeExpectancy = Number(lifePlan?.lifeExpectancy || 85);
@@ -70,14 +70,22 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
   let savings = 0;
   let point = null;
 
-  if (originalInputs) {
+  let nominalPoint = null;
+  let deflatedPoint = null;
+  const displayMode = options.displayMode || originalInputs?.displayMode;
+  const isNominal = displayMode !== 'today';
+
+  if (originalInputs && Object.keys(originalInputs).length > 0) {
     const simInputs = {
       ...originalInputs,
-      useLifeProfile: true,
+      useLifeProfile: originalInputs?.useLifeProfile,
       lifePlan: lifePlan
     };
     const sim = runFireSimulation(simInputs);
-    point = sim?.data?.find(d => Number(d.age) === targetAge);
+    deflatedPoint = sim?.data?.find(d => Number(d.age) === targetAge);
+    nominalPoint = sim?.nominalData?.find(d => Number(d.age) === targetAge);
+    
+    point = isNominal ? nominalPoint : deflatedPoint;
     if (point) {
       netWorth = point.netWorth;
       portfolio = point.portfolio;
@@ -111,14 +119,41 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
     };
   });
 
+  const hasIncomeSpecified = !!(
+    originalInputs?.simpleIncome !== undefined ||
+    (originalInputs?.incomeList && originalInputs.incomeList.length > 0) ||
+    (originalInputs?.lifePlan && originalInputs.lifePlan.objects && originalInputs.lifePlan.objects.some(o => o.type === 'job'))
+  );
+  const activePoint = hasIncomeSpecified ? (isNominal ? nominalPoint : deflatedPoint) : null;
+
   let annualIncome = 0;
-  if (point) {
-    annualIncome = point.income;
+  let activeIncomeItems = [];
+
+  if (activePoint) {
+    annualIncome = activePoint.annualIncome ?? 0;
+    activeIncomeItems = (activePoint.activeIncomeItems ?? []).map(aii => ({
+      id: aii.id && aii.id.includes('-segment-') ? aii.id.split('-segment-')[0] : aii.id,
+      label: aii.name,
+      metadata: { amount: aii.annualAmount }
+    }));
   } else {
-    annualIncome = jobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+    if (originalInputs?.lifePlan) {
+      annualIncome = jobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+    } else {
+      annualIncome = jobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+      if (jobs.length === 0) {
+        const allJobs = lifePlan?.objects?.filter(o => o.type === 'job') || [];
+        annualIncome = allJobs.reduce((sum, j) => sum + Number(j.properties?.annualIncome || 0), 0);
+      }
+    }
     if (partner) {
       annualIncome += Number(partner.partnerIncome || 0);
     }
+    activeIncomeItems = jobs.map(j => ({
+      id: j.id,
+      label: j.name,
+      metadata: { amount: j.properties?.annualIncome }
+    }));
   }
 
   const activeDebts = debts.map(d => {
@@ -209,11 +244,7 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
     children: legacyChildren,
     income: {
       annualIncome,
-      activeIncomeItems: jobs.map(j => ({
-        id: j.id,
-        label: j.name,
-        metadata: { amount: j.properties?.annualIncome }
-      }))
+      activeIncomeItems
     },
     debts: {
       activeDebts
@@ -232,8 +263,8 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs) {
   };
 }
 
-export function getLifeSnapshotAtAge(inputs, age) {
+export function getLifeSnapshotAtAge(inputs, age, options = {}) {
   if (!inputs) return {};
   const lifePlan = initializeLifePlanIfMissing(inputs);
-  return getLifeSnapshotFromLifePlan(lifePlan, age, inputs);
+  return getLifeSnapshotFromLifePlan(lifePlan, age, inputs, options);
 }

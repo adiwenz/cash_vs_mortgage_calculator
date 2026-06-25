@@ -34,6 +34,10 @@ import {
   buildSimulationContext
 } from './simulation/index.js';
 
+export function projectSalaryWithGrowth(baseSalary, growthRate, years) {
+  return baseSalary * Math.pow(1 + growthRate, years);
+}
+
 export function projectYearlyBalances(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
   const context = buildSimulationContext(profile, phases, events, targetRetirementAge, customLifeExpectancy);
   const {
@@ -91,6 +95,7 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     spouseSocialSecurityDetails,
     combinedIncomeList,
     enabledEvents,
+    useLifeProfile,
     accountReturnOverrides
   } = context;
 
@@ -461,8 +466,45 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
     state.taxableIncome = 0;
     let yearSocialSecurityIncome = 0;
 
+    let yearProjectedJobIncome = 0;
+    let yearProjectedPartnerIncome = 0;
+    let activeJobsThisYear = [];
+    let activeIncomeItemsThisYear = [];
+    let yearPensionIncome = 0;
+    let yearPassiveIncome = 0;
+
+    enabledEvents.forEach(ev => {
+      if (ev.type === 'pension') {
+        const claimingAge = Number(ev.claimingAge !== undefined ? ev.claimingAge : (ev.startAge !== undefined ? ev.startAge : ev.age)) || 65;
+        if (age >= claimingAge) {
+          const benefit = Number(ev.monthlyBenefit) || Number(ev.amount) || 0;
+          let annualAmt = benefit * 12;
+          annualAmt = annualAmt * nominalFactor;
+          yearPensionIncome += annualAmt;
+        }
+      }
+    });
+
     if (activePhaseForAge) {
       const yearsGrown = age - currentAge;
+
+      // Compute projected nominal salaries for each active job in combinedIncomeList
+      combinedIncomeList.forEach(inc => {
+        const start = inc.startAge !== undefined ? Number(inc.startAge) : currentAge;
+        const end = inc.endAge !== undefined ? Number(inc.endAge) : lifeExpectancy;
+        if (age >= start && age < end) {
+          const baseSalary = Number(inc.amount || 0);
+          const growth = inc.growthRate !== undefined ? Number(inc.growthRate) : 0.0;
+          const projectedSalary = projectSalaryWithGrowth(baseSalary, growth, age - start);
+          
+          yearProjectedJobIncome += projectedSalary;
+          activeJobsThisYear.push({
+            id: inc.id,
+            name: inc.name,
+            projectedSalary
+          });
+        }
+      });
 
       const userChildBoost = activePhaseForAge.childBoost || 0;
       const userSSBenefit = activePhaseForAge.ssMonthlyIncome || 0;
@@ -470,36 +512,8 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
       let userBaseSalaryNominal = 0;
       if (age < targetRetirementAge) {
-        if (profile.useLifeProfile) {
-          const activeJobs = enabledEvents.filter(inc => 
-            inc.type === 'incomeItem' && 
-            age >= inc.startAge && 
-            age < inc.endAge && 
-            !isGeneratedMainIncome(inc.id) &&
-            inc.incomeChangeType !== 'increaseByAmount' &&
-            inc.id.includes('-segment-')
-          );
-
-          activeJobs.forEach(job => {
-            const baseVal = Number(job.amount) || 0;
-            const yearsSinceStart = age - job.startAge;
-            const jobGrowthRate = job.growthRate !== undefined ? Number(job.growthRate) : 0.03;
-            const jobNominal = baseVal * Math.pow(1 + jobGrowthRate, yearsSinceStart);
-            userBaseSalaryNominal += jobNominal;
-          });
-
-          const activeRaises = enabledEvents.filter(inc => 
-            inc.type === 'incomeItem' && 
-            age >= inc.startAge && 
-            age < inc.endAge && 
-            inc.incomeChangeType === 'increaseByAmount'
-          );
-          activeRaises.forEach(inc => {
-            const increaseAmount = Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0;
-            const yearsSinceInc = age - inc.startAge;
-            const raiseGrowthRate = inc.growthRate !== undefined ? Number(inc.growthRate) : 0.03;
-            userBaseSalaryNominal += increaseAmount * Math.pow(1 + raiseGrowthRate, yearsSinceInc);
-          });
+        if (useLifeProfile && combinedIncomeList.length > 0) {
+          userBaseSalaryNominal = yearProjectedJobIncome;
         } else {
           const activeCareerChanges = enabledEvents.filter(inc => 
             inc.type === 'incomeItem' && 
@@ -513,15 +527,17 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
             .find(inc => inc.incomeChangeType !== 'increaseByAmount');
 
           if (latestReset) {
+            // Career-change salary is interpreted as nominal dollars at the event start age,
+            // not "today's dollars" inflated into the future.
             let baseVal = Number(latestReset.amount) || 0;
             let yearsSinceReset = age - latestReset.startAge;
-            userBaseSalaryNominal = baseVal * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceReset);
+            userBaseSalaryNominal = projectSalaryWithGrowth(baseVal, activePhaseForAge.incomeGrowthRate, yearsSinceReset);
 
             activeCareerChanges.forEach(inc => {
               if (inc.incomeChangeType === 'increaseByAmount' && inc.startAge > latestReset.startAge) {
                 const increaseAmount = Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0;
                 let yearsSinceInc = age - inc.startAge;
-                userBaseSalaryNominal += increaseAmount * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceInc);
+                userBaseSalaryNominal += projectSalaryWithGrowth(increaseAmount, activePhaseForAge.incomeGrowthRate, yearsSinceInc);
               }
             });
           } else {
@@ -533,22 +549,32 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
               }
             });
 
-            userBaseSalaryNominal = (standardBaseSalary * 12) * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsGrown);
+            userBaseSalaryNominal = projectSalaryWithGrowth(standardBaseSalary * 12, activePhaseForAge.incomeGrowthRate, yearsGrown);
 
             activeCareerChanges.forEach(inc => {
               if (inc.incomeChangeType === 'increaseByAmount') {
                 const increaseAmount = Number(inc.salaryIncrease !== undefined ? inc.salaryIncrease : inc.amount) || 0;
                 let yearsSinceInc = age - inc.startAge;
-                userBaseSalaryNominal += increaseAmount * Math.pow(1 + activePhaseForAge.incomeGrowthRate, yearsSinceInc);
+                userBaseSalaryNominal += projectSalaryWithGrowth(increaseAmount, activePhaseForAge.incomeGrowthRate, yearsSinceInc);
               }
             });
           }
         }
       }
 
+      if (combinedIncomeList.length === 0 && userBaseSalaryNominal > 0) {
+        yearProjectedJobIncome = userBaseSalaryNominal;
+        activeJobsThisYear.push({
+          id: 'main-salary-fallback',
+          name: 'Main Salary',
+          projectedSalary: userBaseSalaryNominal
+        });
+      }
+
       const userChildBoostNominal = (userChildBoost * 12) * nominalFactor;
       const userSSNominal = (userSSBenefit * 12) * nominalFactor;
       const userPassiveNominal = (userPassiveMonthly * 12) * nominalFactor;
+      yearPassiveIncome = userPassiveNominal;
 
       const userIncomeNominal = userBaseSalaryNominal + userChildBoostNominal + userSSNominal + userPassiveNominal;
       annualIncome += userIncomeNominal;
@@ -559,13 +585,88 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
         const spouseBaseSalary = (activePhaseForAge.spouseIncome || 0) - (activePhaseForAge.partnerSSMonthlyIncome || 0);
         const spouseSSBenefit = activePhaseForAge.partnerSSMonthlyIncome || 0;
 
-        const spouseBaseSalaryNominal = (spouseBaseSalary * 12) * Math.pow(1 + activePhaseForAge.spouseIncomeGrowthRate, yearsGrown);
+        yearProjectedPartnerIncome = projectSalaryWithGrowth(spouseBaseSalary * 12, activePhaseForAge.spouseIncomeGrowthRate, yearsGrown);
         const spouseSSNominal = (spouseSSBenefit * 12) * nominalFactor;
 
-        const spouseIncomeNominal = spouseBaseSalaryNominal + spouseSSNominal;
+        const spouseIncomeNominal = yearProjectedPartnerIncome + spouseSSNominal;
         annualIncome += spouseIncomeNominal;
         state.taxableIncome += spouseIncomeNominal;
         yearSocialSecurityIncome += spouseSSNominal;
+      }
+
+      // Populate activeIncomeItemsThisYear
+      combinedIncomeList.forEach(inc => {
+        const start = inc.startAge !== undefined ? Number(inc.startAge) : currentAge;
+        const end = inc.endAge !== undefined ? Number(inc.endAge) : lifeExpectancy;
+        if (age >= start && age < end) {
+          const baseSalary = Number(inc.amount || 0);
+          const growth = inc.growthRate !== undefined ? Number(inc.growthRate) : 0.0;
+          const projectedSalary = projectSalaryWithGrowth(baseSalary, growth, age - start);
+          
+          activeIncomeItemsThisYear.push({
+            id: inc.id,
+            name: inc.name,
+            type: 'job',
+            annualAmount: projectedSalary,
+            startAge: start,
+            endAge: end
+          });
+        }
+      });
+
+      if (combinedIncomeList.length === 0 && userBaseSalaryNominal > 0) {
+        activeIncomeItemsThisYear.push({
+          id: 'main-salary-fallback',
+          name: 'Main Salary',
+          type: 'job',
+          annualAmount: userBaseSalaryNominal,
+          startAge: currentAge,
+          endAge: targetRetirementAge
+        });
+      }
+
+      if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies && yearProjectedPartnerIncome > 0) {
+        activeIncomeItemsThisYear.push({
+          id: 'partner-salary',
+          name: 'Partner Salary',
+          type: 'job',
+          annualAmount: yearProjectedPartnerIncome,
+          startAge: marriageAge,
+          endAge: spouseRetirementAge
+        });
+      }
+
+      if (yearSocialSecurityIncome > 0) {
+        activeIncomeItemsThisYear.push({
+          id: 'derived-social-security',
+          name: 'Social Security',
+          type: 'socialSecurity',
+          annualAmount: yearSocialSecurityIncome,
+          startAge: socialSecurityDetails.claimingAge || 67,
+          endAge: lifeExpectancy
+        });
+      }
+
+      if (yearPensionIncome > 0) {
+        activeIncomeItemsThisYear.push({
+          id: 'derived-pension',
+          name: 'Pension',
+          type: 'pension',
+          annualAmount: yearPensionIncome,
+          startAge: 65,
+          endAge: lifeExpectancy
+        });
+      }
+
+      if (yearPassiveIncome > 0) {
+        activeIncomeItemsThisYear.push({
+          id: 'derived-passive-income',
+          name: 'Passive Income',
+          type: 'passive',
+          annualAmount: yearPassiveIncome,
+          startAge: currentAge,
+          endAge: lifeExpectancy
+        });
       }
     }
 
@@ -1858,6 +1959,17 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       income: annualIncome + windfallReceived,
       expenses: annualExpenses + taxes,
       taxes,
+      projectedJobIncome: yearProjectedJobIncome,
+      projectedPartnerIncome: yearProjectedPartnerIncome,
+      activeJobs: activeJobsThisYear,
+      earnedIncome: yearProjectedJobIncome,
+      jobIncome: yearProjectedJobIncome,
+      partnerIncome: yearProjectedPartnerIncome,
+      socialSecurityIncome: yearSocialSecurityIncome,
+      pensionIncome: yearPensionIncome,
+      passiveIncome: yearPassiveIncome,
+      annualIncome: yearProjectedJobIncome + yearProjectedPartnerIncome + yearSocialSecurityIncome + yearPensionIncome + yearPassiveIncome,
+      activeIncomeItems: activeIncomeItemsThisYear,
       weddingDebtBalance,
       debtPayoffAllocation: annualExtraPayments,
       minDebtPayment: annualMinPayments,

@@ -38,7 +38,8 @@ export default function LifeProfileModal({
   simulation,
   handleCreateEvent,
   handleEditRoadmapEvent,
-  handleDeleteEvent
+  handleDeleteEvent,
+  displayMode
 }) {
   const {
     activeTab,
@@ -124,7 +125,7 @@ export default function LifeProfileModal({
     useLifeProfile: true
   };
   const projection = getTimelineProjection(draftInputs, { selectedAge, simulation });
-  const snapshot = getLifeSnapshotAtAge(draftInputs, selectedAge);
+  const snapshot = getLifeSnapshotAtAge(draftInputs, selectedAge, { displayMode });
 
   // Mobile layout rendering
   if (isMobile) {

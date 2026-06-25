@@ -1855,6 +1855,7 @@ export default function LifePlanScreen({
         handleCreateEvent={handleCreateEvent}
         handleEditRoadmapEvent={handleEditRoadmapEvent}
         handleDeleteEvent={handleDeleteEvent}
+        displayMode={simulation?.displayMode}
       />
 
     </>

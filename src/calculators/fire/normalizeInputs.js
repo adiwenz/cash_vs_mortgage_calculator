@@ -33,6 +33,7 @@ export function getProfileFromInputs(inputs) {
   }
 
   return {
+    useLifeProfile: !!inputs.useLifeProfile,
     currentAge,
     lifeExpectancy,
     targetRetirementAge,

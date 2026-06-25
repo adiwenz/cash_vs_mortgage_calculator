@@ -2,6 +2,7 @@ import { derivePhasesFromEvents } from '../phases.js';
 import { initializeActiveLoans } from '../debts.js';
 
 export function buildSimulationContext(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
+  const useLifeProfile = !!profile.useLifeProfile;
   const currentAge = profile.currentAge;
   const lifeExpectancy = profile.lifeExpectancy;
   const expectedReturn = profile.expectedReturn;
@@ -272,6 +273,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     spouseSocialSecurityDetails,
     combinedIncomeList,
     enabledEvents,
+    useLifeProfile,
     accountReturnOverrides
   };
 }

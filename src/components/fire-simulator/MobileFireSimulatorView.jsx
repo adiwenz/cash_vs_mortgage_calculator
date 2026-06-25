@@ -2603,6 +2603,7 @@ export default function MobileFireSimulatorView({
         handleCreateEvent={eventController?.handleCreateEvent || legacyHandleCreateEvent}
         handleEditRoadmapEvent={eventController?.handleEditRoadmapEvent || legacyHandleEditRoadmapEvent}
         handleDeleteEvent={eventController?.handleDeleteEvent || legacyDeleteEvent}
+        displayMode={simulation?.displayMode || displayMode}
       />
 
       {notification && (() => {
