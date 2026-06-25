@@ -1462,11 +1462,14 @@ export default function MobileFireSimulatorView({
 
               {/* 5. ACTIONS SECTION */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem', marginBottom: '1rem' }}>
-                {/* Add Life Event Card */}
+                {/* Open Life Planner Card */}
                 <button 
                   type="button"
-                  aria-label="➕ Add Life Event"
-                  onClick={() => setEditingEvent({ type: 'selectType', isNew: true })}
+                  aria-label="💼 Open Life Planner"
+                  onClick={() => {
+                    setLifeProfileTab('lifeItems');
+                    setIsLifeProfileOpen(true);
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1488,19 +1491,19 @@ export default function MobileFireSimulatorView({
                       width: '36px',
                       height: '36px',
                       borderRadius: '50%',
-                      background: 'rgba(16, 185, 129, 0.1)',
+                      background: 'rgba(99, 102, 241, 0.1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#10b981',
+                      color: 'var(--primary, #6366f1)',
                       fontWeight: 'bold',
                       fontSize: '1.2rem'
                     }}>
-                      ＋
+                      💼
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-primary)' }}>Add Life Event</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Plan for future milestones</span>
+                      <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-primary)' }}>Open Life Planner</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Manage your goals and future milestones</span>
                     </div>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1543,47 +1546,6 @@ export default function MobileFireSimulatorView({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                       <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-primary)' }}>Edit Budget</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Review and update your spending</span>
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-
-                {/* Add Borrowing Card */}
-                <div 
-                  onClick={() => handleCreateEvent('borrowing')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '1rem 1.25rem',
-                    background: 'var(--bg-secondary, #ffffff)',
-                    border: '1px solid var(--border-color, #e5e7eb)',
-                    borderRadius: '16px',
-                    boxShadow: 'var(--shadow-sm)',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      background: 'rgba(139, 92, 246, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#8b5cf6',
-                      fontWeight: 'bold',
-                      fontSize: '1.1rem'
-                    }}>
-                      $
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-primary)' }}>Add Borrowing</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Add a loan or other debt</span>
                     </div>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

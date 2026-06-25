@@ -497,162 +497,17 @@ export default function CurrentSituationCard({
           </button>
         </div>
 
-        {/* Add Life Decision */}
-        <div className="action-card-container" style={{ position: 'relative' }}>
+        {/* Open Life Planner */}
+        <div style={{ position: 'relative' }}>
           <button
             type="button"
-            onClick={() => {
-              setActivePopover(activePopover === 'decision' ? null : 'decision');
-              setShowAdvancedEvents(false);
-            }}
-            style={{ ...actionRowStyle, borderBottom: '1px solid rgba(0,0,0,0.05)' }}
-            className="sidebar-navigation-row"
-          >
-            <span>Add Life Decision</span>
-            <span className="chevron">&rsaquo;</span>
-          </button>
-
-          {activePopover === 'decision' && (
-            <div style={popoverStyle}>
-              {(() => {
-                const allOpts = [
-                  { type: 'marriage', label: '💍 Get Married' },
-                  { type: 'buyHouse', label: '🏠 Buy a House' },
-                  { type: 'haveChild', label: '👶 Have a Child' },
-                  { type: 'careerChange', label: '💼 Income Change' },
-                  { type: 'move', label: '📍 Move / Relocate' },
-                  { 
-                     type: 'retire', 
-                     label: '🏖 Retire', 
-                     disabled: (inputs.lifeEvents || []).some(e => e.type === 'retire') 
-                  },
-                  { 
-                     type: 'socialSecurity', 
-                     label: '💰 Social Security', 
-                     disabled: inputs.includeSocialSecurity !== false 
-                  },
-                  { type: 'pension', label: '📜 Pension' },
-                  { type: 'rentalIncome', label: '🏢 Rental Income' },
-                  { type: 'annuity', label: '📈 Annuity' },
-                  { type: 'otherRetirementIncome', label: '💵 Other Income' },
-                  { type: 'windfall', label: '💰 Windfall' },
-                  { type: 'college', label: '🎓 College Costs' },
-                  { type: 'debtPayoff', label: '💸 Debt Payoff' },
-                  { type: 'custom', label: '➕ Custom Event' }
-                ];
-
-                const primaryKeys = ['marriage', 'buyHouse', 'haveChild', 'careerChange', 'move', 'windfall'];
-                const advancedKeys = ['retire', 'socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome', 'college', 'debtPayoff', 'custom'];
-
-                const primaryOpts = allOpts.filter(o => primaryKeys.includes(o.type));
-                const sortedPrimaryOpts = primaryKeys.map(k => primaryOpts.find(o => o.type === k)).filter(Boolean);
-
-                const advancedOpts = allOpts.filter(o => advancedKeys.includes(o.type));
-                const sortedAdvancedOpts = advancedKeys.map(k => advancedOpts.find(o => o.type === k)).filter(Boolean);
-
-                return (
-                  <>
-                    {sortedPrimaryOpts.map((opt) => (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        disabled={opt.disabled}
-                        onClick={() => {
-                          handleCreateEvent(opt.type);
-                          setActivePopover(null);
-                        }}
-                        style={popoverItemStyle(opt.disabled)}
-                        className="popover-item-hover"
-                      >
-                        {opt.label} {opt.disabled ? ' (Already Added)' : ''}
-                      </button>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedEvents(!showAdvancedEvents)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'center',
-                        padding: '0.4rem 0.75rem',
-                        background: 'none',
-                        border: '1px dashed var(--border-color)',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.78rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        borderRadius: '6px',
-                        display: 'block',
-                        marginTop: '0.25rem',
-                        marginBottom: '0.25rem',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      {showAdvancedEvents ? 'Show Less ↑' : 'Show More ↓'}
-                    </button>
-
-                    {showAdvancedEvents && (
-                      <>
-                        <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.35rem 0' }} />
-                        {sortedAdvancedOpts.map((opt) => (
-                          <button
-                            key={opt.type}
-                            type="button"
-                            disabled={opt.disabled}
-                            onClick={() => {
-                              handleCreateEvent(opt.type);
-                              setActivePopover(null);
-                            }}
-                            style={popoverItemStyle(opt.disabled)}
-                            className="popover-item-hover"
-                          >
-                            {opt.label} {opt.disabled ? ' (Already Added)' : ''}
-                          </button>
-                        ))}
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-
-        {/* Add Borrowing */}
-        <div className="action-card-container" style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setActivePopover(activePopover === 'borrowing' ? null : 'borrowing')}
+            onClick={() => onOpenLifeProfile()}
             style={{ ...actionRowStyle, borderBottom: 'none' }}
             className="sidebar-navigation-row"
           >
-            <span>Add Borrowing</span>
+            <span>Open Life Planner</span>
             <span className="chevron">&rsaquo;</span>
           </button>
-
-          {activePopover === 'borrowing' && (
-            <div style={popoverStyle}>
-              {[
-                { type: 'studentLoan', label: '🎓 Student Loan' },
-                { type: 'carLoan', label: '🚗 Car Loan' },
-                { type: 'personalLoan', label: '💵 Personal Loan' },
-                { type: 'creditCard', label: '💳 Credit Card Balance' }
-              ].map((opt) => (
-                <button
-                  key={opt.type}
-                  type="button"
-                  onClick={() => {
-                    handleCreateEvent(opt.type);
-                    setActivePopover(null);
-                  }}
-                  style={popoverItemStyle(false)}
-                  className="popover-item-hover"
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Debug button (DEV environment only) */}
