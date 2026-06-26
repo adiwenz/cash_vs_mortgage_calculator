@@ -14,3 +14,6 @@
 ## Single-Pass File Editing Default Instruction
 - Prefer single-pass file editing: read each relevant file once, collect all edit points, and apply related changes in one patch instead of repeatedly searching for nearby symbols.
 
+## No Legacy Modes Default Instruction
+- **Prefer replacement over compatibility. This project has no production users, so do not introduce feature flags, legacy code paths, migration layers, or compatibility wrappers unless explicitly requested. Maintain a single canonical implementation and remove obsolete code whenever practical.**
+
