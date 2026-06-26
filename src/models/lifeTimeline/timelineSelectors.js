@@ -129,6 +129,12 @@ export function getTimelineItems(inputs) {
         else if (obj.type === 'goal') category = 'goals';
       }
 
+      const isIncomeEvent = ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(ev.type);
+      if (isIncomeEvent) {
+        category = 'income';
+      }
+
+      // Point marker
       items.push({
         id: ev.id,
         sourceId: ev.id,
@@ -141,11 +147,32 @@ export function getTimelineItems(inputs) {
         age: Number(ev.age),
         startAge: null,
         endAge: null,
-        objectType: obj?.type || 'event',
-        objectId: ev.objectId,
+        objectType: isIncomeEvent ? 'income' : (obj?.type || 'event'),
+        objectId: isIncomeEvent ? ev.id : ev.objectId,
         isDerived: true,
         metadata: ev.mutation || {}
       });
+
+      // For income events, also push a period bar starting at the event age
+      if (isIncomeEvent && ev.enabled !== false) {
+        items.push({
+          id: `event-income-period-${ev.id}`,
+          sourceId: ev.id,
+          sourceType: 'lifeEvent',
+          kind: 'period',
+          category: 'income',
+          label: ev.label || ev.mutation?.name || ev.type,
+          title: ev.label || ev.mutation?.name || ev.type,
+          description: ev.description || ev.mutation?.description || ev.type,
+          age: null,
+          startAge: Number(ev.age),
+          endAge: ev.mutation?.endAge ? Number(ev.mutation.endAge) : lifeExpectancy,
+          objectType: 'income',
+          objectId: ev.id,
+          isDerived: true,
+          metadata: ev.mutation || {}
+        });
+      }
     });
 
     return items;
@@ -172,7 +199,7 @@ export function getTimelineItems(inputs) {
   }
 
   // Find marriage events
-  const marriageEvents = enabledEvents.filter(e => e.type === 'marriage' || e.type === 'getMarried');
+  const marriageEvents = enabledEvents.filter(e => ['marriage', 'getMarried', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
   const marriageAge = marriageEvents.length > 0 ? getEventAge(marriageEvents[0], currentAge) : null;
 
   if (baselineMarried) {
@@ -212,7 +239,7 @@ export function getTimelineItems(inputs) {
         sourceType: 'lifeEvent',
         kind: TIMELINE_ITEM_KIND.STATUS,
         category: TIMELINE_CATEGORY.RELATIONSHIP,
-        label: 'Married',
+        label: (marriageEvents[0].relationshipType || (marriageEvents[0].type === 'marriage' ? 'married' : 'partner')) === 'married' ? 'Married' : 'Partnered',
         description: 'Married / Partnered status',
         age: null,
         startAge: marriageAge,
@@ -227,7 +254,7 @@ export function getTimelineItems(inputs) {
         sourceType: 'lifeEvent',
         kind: TIMELINE_ITEM_KIND.STATUS,
         category: TIMELINE_CATEGORY.RELATIONSHIP,
-        label: 'Married',
+        label: (marriageEvents[0].relationshipType || (marriageEvents[0].type === 'marriage' ? 'married' : 'partner')) === 'married' ? 'Married' : 'Partnered',
         description: 'Married / Partnered status',
         age: null,
         startAge: currentAge,
@@ -604,14 +631,17 @@ export function getTimelineItems(inputs) {
     switch (event.type) {
       case 'marriage':
       case 'getMarried':
+      case 'domesticPartnership':
+      case 'relationshipBegins':
+        const lowerType = event.type.toLowerCase();
         items.push({
-          id: `event-marriage-point-${event.id}`,
+          id: `event-${lowerType === 'getmarried' ? 'marriage' : lowerType}-point-${event.id}`,
           sourceId: event.id,
           sourceType: 'lifeEvent',
           kind: TIMELINE_ITEM_KIND.POINT,
           category: TIMELINE_CATEGORY.RELATIONSHIP,
-          label: event.name || 'Marriage',
-          description: 'Wedding ceremony and marriage event',
+          label: event.name || (event.type === 'marriage' || event.type === 'getMarried' ? 'Marriage' : (event.type === 'domesticPartnership' ? 'Domestic Partnership' : 'Relationship Begins')),
+          description: event.type === 'marriage' || event.type === 'getMarried' ? 'Wedding ceremony and marriage event' : (event.type === 'domesticPartnership' ? 'Domestic partnership start' : 'Relationship begins event'),
           age: age,
           startAge: null,
           endAge: null,

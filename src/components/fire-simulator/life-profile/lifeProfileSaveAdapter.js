@@ -1,16 +1,26 @@
 import { clampAgeValue } from '../helpers';
 import { deriveLegacyInputsFromLifePlan } from '../../../models/lifePlan/lifePlanNormalization.js';
+import { syncBudgetDetails } from '../../../fireCalculations.js';
+import { restoreSinglePersonBudgetAfterPartnerRemoval } from '../../../models/lifePlan/restoreSinglePersonBudget.js';
 
 /**
  * Pure adapter mapping the local life profile draft state back to
  * scenario fields. Does not mutate any arguments.
  */
-export function getSaveUpdates(updates, inputs = {}) {
+export function getSaveUpdates(updates, inputs = {}, protectedPreDeleteSavingsRate = null) {
   if (updates.lifePlan) {
-    const derived = deriveLegacyInputsFromLifePlan(updates.lifePlan, inputs);
+    const effectiveInputs = {
+      ...inputs,
+      ...updates
+    };
+    const derived = deriveLegacyInputsFromLifePlan(updates.lifePlan, inputs, protectedPreDeleteSavingsRate);
+    const restoredSinglePersonBudgetFields = restoreSinglePersonBudgetAfterPartnerRemoval(effectiveInputs, {
+      protectedPreDeleteSavingsRate
+    });
     return {
+      ...updates,
       ...derived,
-      lifePlan: updates.lifePlan
+      ...restoredSinglePersonBudgetFields
     };
   }
 

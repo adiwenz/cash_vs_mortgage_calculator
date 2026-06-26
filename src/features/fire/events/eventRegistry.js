@@ -49,6 +49,36 @@ export const REGISTRY = [
     createDefaultEvent: null
   },
   {
+    type: 'domesticPartnership',
+    aliases: ['domesticPartnership', 'domestic_partnership'],
+    label: 'Domestic Partnership',
+    shortLabel: 'Dom. Partnership',
+    emoji: '👥',
+    category: 'household',
+    timelineCategory: 'relationship',
+    mobileFlow: null,
+    desktopModal: null,
+    isEditable: true,
+    isDraggable: true,
+    defaultAgeOffset: 0,
+    createDefaultEvent: null
+  },
+  {
+    type: 'relationshipBegins',
+    aliases: ['relationshipBegins', 'relationship_begins', 'partner', 'engaged'],
+    label: 'Relationship Begins',
+    shortLabel: 'Relationship',
+    emoji: '❤️',
+    category: 'household',
+    timelineCategory: 'relationship',
+    mobileFlow: null,
+    desktopModal: null,
+    isEditable: true,
+    isDraggable: true,
+    defaultAgeOffset: 0,
+    createDefaultEvent: null
+  },
+  {
     type: 'divorce',
     aliases: ['divorce'],
     label: 'Divorce',

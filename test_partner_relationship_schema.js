@@ -190,4 +190,110 @@ describe('Partner Person and Relationship Schema', () => {
       expect(mEvent.spouseIncome).toBe(60000);
     });
   });
+
+  describe('Cascade Deletion and Re-Adding Partner', () => {
+    it('successfully cascade deletes partner person, source event, relationship and updates timeline immediately, then supports re-adding', () => {
+      // 1. Add marriage event
+      const inputs = getBaseInputs();
+      let lifePlan = initializeLifePlanIfMissing(inputs);
+      let effectiveInputs = { ...inputs, lifePlan };
+
+      // 2. Verify partner appears on Timeline
+      let timelineItems = getTimelineItems(effectiveInputs);
+      let partnerItem = timelineItems.find(item => item.objectType === 'person' && item.metadata?.role === 'partner');
+      expect(partnerItem).toBeDefined();
+      expect(partnerItem.id).toBe('spouse-partner');
+
+      // 3. Delete partner object from Life Items (simulating cascade delete)
+      const partnerObj = lifePlan.objects.find(o => o.type === 'person' && o.role === 'partner');
+      const sourceEventId = partnerObj.metadata.createdFromEventId;
+      expect(sourceEventId).toBe('marriage-1');
+
+      // Cascade behavior:
+      // Filter out source event
+      const updatedEventsList = (effectiveInputs.lifeEvents || []).filter(e => e.id !== sourceEventId);
+
+      // Identify generated partner and relationship IDs
+      const isGeneratedByEvent = (obj) => {
+        const evId = obj.metadata?.createdFromEventId || obj.properties?.metadata?.createdFromEventId;
+        return evId === sourceEventId;
+      };
+
+      const deletedPartnerId = partnerObj.id;
+      const deletedRelationship = lifePlan.objects.find(o => isGeneratedByEvent(o) && o.type === 'relationship');
+      const deletedRelationshipId = deletedRelationship?.id;
+
+      // Filter out objects
+      const cleanObjects = lifePlan.objects.filter(o => o.id !== partnerObj.id && !isGeneratedByEvent(o));
+
+      // Clear references
+      const clearRefs = (item) => {
+        if (item.personId === deletedPartnerId) item.personId = null;
+        if (item.partnerPersonId === deletedPartnerId) item.partnerPersonId = null;
+        if (item.relationshipId === deletedRelationshipId) item.relationshipId = null;
+      };
+      cleanObjects.forEach(clearRefs);
+      updatedEventsList.forEach(clearRefs);
+
+      const cleanEvents = (lifePlan.events || []).filter(e => {
+        if (e.objectId === partnerObj.id) return false;
+        const obj = lifePlan.objects.find(o => o.id === e.objectId);
+        if (obj && isGeneratedByEvent(obj)) return false;
+        return true;
+      });
+      cleanEvents.forEach(clearRefs);
+
+      const updatedPlan = {
+        ...lifePlan,
+        objects: cleanObjects,
+        events: cleanEvents
+      };
+
+      // 5. Re-run normalization/sync
+      effectiveInputs.lifeEvents = updatedEventsList;
+      effectiveInputs.householdMembers = (effectiveInputs.householdMembers || []).filter(m => m.id !== 'spouse');
+      lifePlan = syncLifePlanWithInputs(updatedPlan, effectiveInputs);
+      effectiveInputs.lifePlan = lifePlan;
+
+      // Verify marriage event is deleted
+      const mEvent = effectiveInputs.lifeEvents.find(e => e.id === 'marriage-1');
+      expect(mEvent).toBeUndefined();
+
+      // Verify partner no longer appears on Timeline
+      timelineItems = getTimelineItems(effectiveInputs);
+      const partnerItemDeleted = timelineItems.find(item => item.objectType === 'person' && item.metadata?.role === 'partner');
+      expect(partnerItemDeleted).toBeUndefined();
+
+      // Verify relationship object is deleted/inactive
+      const relationshipObj = lifePlan.objects.find(o => o.type === 'relationship');
+      expect(relationshipObj).toBeUndefined();
+
+      // Verify partner income is removed
+      const legacy = deriveLegacyInputsFromLifePlan(lifePlan, effectiveInputs);
+      expect(legacy.lifeProfile?.household?.partnerIncome).toBe(0);
+
+      // 9. Add a new partner
+      const newMarriageEvent = {
+        id: 'marriage-2',
+        type: 'marriage',
+        enabled: true,
+        name: 'New Marriage Event',
+        age: 45,
+        spouseCurrentAge: 40,
+        spouseLifeExpectancy: 85,
+        spouseIncome: 75000,
+        filingStatus: 'jointly'
+      };
+      effectiveInputs.lifeEvents.push(newMarriageEvent);
+
+      // 10. Re-run normalization/sync and verify new partner appears on Timeline
+      lifePlan = syncLifePlanWithInputs(lifePlan, effectiveInputs);
+      effectiveInputs.lifePlan = lifePlan;
+
+      timelineItems = getTimelineItems(effectiveInputs);
+      const newPartnerItem = timelineItems.find(item => item.objectType === 'person' && item.metadata?.role === 'partner');
+      expect(newPartnerItem).toBeDefined();
+      expect(newPartnerItem.startAge).toBe(45);
+    });
+  });
 });

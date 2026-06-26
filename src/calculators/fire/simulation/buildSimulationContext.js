@@ -1,7 +1,14 @@
 import { derivePhasesFromEvents } from '../phases.js';
 import { initializeActiveLoans } from '../debts.js';
+import { isRelationshipStartEvent } from '../../../features/fire/events/eventTypeGuards.js';
 
 export function buildSimulationContext(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
+  const updatedEvents = events.map(e => {
+    if (e.type === 'retire') {
+      return { ...e, age: targetRetirementAge };
+    }
+    return e;
+  });
   const useLifeProfile = !!profile.useLifeProfile;
   const currentAge = profile.currentAge;
   const lifeExpectancy = profile.lifeExpectancy;
@@ -18,19 +25,19 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
   const enforceEarlyWithdrawalPenalty = true;
   const allocationRules = profile.allocationRules || [];
   const assets = profile.assets || {};
-  const retireEv = events.find(e => e.type === 'retire' && e.enabled !== false);
+  const retireEv = updatedEvents.find(e => e.type === 'retire' && e.enabled !== false);
   const retirementSpendingPercent = (retireEv?.spendingPercent !== undefined
     ? Number(retireEv.spendingPercent)
     : 70) / 100;
-  const currentConditions = events.filter(e => e.type === 'conditionItem');
+  const currentConditions = updatedEvents.filter(e => e.type === 'conditionItem');
   
   const customHousesStartingValue = currentConditions
     .filter(c => c.type === 'house')
     .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
   const homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
 
-  const marriageEvent = events.find(e => e.type === 'marriage');
-  const spouseMember = events.find(e => e.type === 'spouseMember');
+  const marriageEvent = updatedEvents.find(isRelationshipStartEvent);
+  const spouseMember = updatedEvents.find(e => e.type === 'spouseMember');
   const hasMarriage = !!marriageEvent;
   const marriageAge = marriageEvent ? (Number(marriageEvent.age) || 40) : 999;
   const weddingAge = marriageEvent ? (Number(marriageEvent.weddingAge) || marriageAge) : 999;
@@ -55,7 +62,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
   
   const simPhases = (targetRetirementAge === profile.targetRetirementAge && simLifeExpectancy === profile.lifeExpectancy)
     ? phases
-    : derivePhasesFromEvents({ ...profile, targetRetirementAge, lifeExpectancy: simLifeExpectancy }, events, profile.budgetDetails?.phases || []);
+    : derivePhasesFromEvents({ ...profile, targetRetirementAge, lifeExpectancy: simLifeExpectancy }, updatedEvents, profile.budgetDetails?.phases || []);
 
   let checkingBalance = (assets.checking !== undefined && !isNaN(Number(assets.checking))) ? Number(assets.checking) : (Number(assets.cash) || 0);
   let hysaBalance = (assets.hysa !== undefined && !isNaN(Number(assets.hysa))) ? Number(assets.hysa) : 0;
@@ -137,31 +144,40 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
 
   const brokerageExists = profile.assets && (profile.assets.brokerage !== undefined);
   const redirectDest = brokerageExists ? 'brokerage' : 'cash';
+
+  const isCombined = marriageEvent ? (marriageEvent.combineFinances !== false) : true;
+  const isLivingTogether = marriageEvent ? (marriageEvent.livingTogether !== false) : true;
+  const combinedSpendingAfterMarriage = isCombined ? (marriageEvent ? (Number(marriageEvent.combinedSpendingAfterMarriage) || 0) : 0) : 0;
+
   let initialSpending;
   
   const spendingPhases = profile.spendingPhases || [];
   const incomeList = profile.incomeList || [];
 
-  const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge);
-  if (initialPhase) {
-    if (initialPhase.frequency === 'monthly') {
-      initialSpending = (Number(initialPhase.amount) || 0) * 12;
-    } else if (initialPhase.frequency === 'yearly') {
-      initialSpending = Number(initialPhase.amount) || 0;
-    } else {
-      initialSpending = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
-    }
-  } else if (spendingPhases.length > 0) {
-    const firstPhase = spendingPhases[0];
-    if (firstPhase.frequency === 'monthly') {
-      initialSpending = (Number(firstPhase.amount) || 0) * 12;
-    } else if (firstPhase.frequency === 'yearly') {
-      initialSpending = Number(firstPhase.amount) || 0;
-    } else {
-      initialSpending = Number(firstPhase.annualSpending) || Number(firstPhase.amount) || 0;
-    }
+  if (marriageEvent && currentAge >= Number(marriageEvent.age) && isCombined && combinedSpendingAfterMarriage > 0) {
+    initialSpending = combinedSpendingAfterMarriage;
   } else {
-    initialSpending = Number(profile.simpleExpenses) || 42500;
+    const initialPhase = spendingPhases.find(p => currentAge >= p.startAge && currentAge < p.endAge);
+    if (initialPhase) {
+      if (initialPhase.frequency === 'monthly') {
+        initialSpending = (Number(initialPhase.amount) || 0) * 12;
+      } else if (initialPhase.frequency === 'yearly') {
+        initialSpending = Number(initialPhase.amount) || 0;
+      } else {
+        initialSpending = Number(initialPhase.annualSpending) || Number(initialPhase.amount) || 0;
+      }
+    } else if (spendingPhases.length > 0) {
+      const firstPhase = spendingPhases[0];
+      if (firstPhase.frequency === 'monthly') {
+        initialSpending = (Number(firstPhase.amount) || 0) * 12;
+      } else if (firstPhase.frequency === 'yearly') {
+        initialSpending = Number(firstPhase.amount) || 0;
+      } else {
+        initialSpending = Number(firstPhase.annualSpending) || Number(firstPhase.amount) || 0;
+      }
+    } else {
+      initialSpending = Number(profile.simpleExpenses) || 42500;
+    }
   }
 
   const isAdvanced = !!profile.isAdvancedMode;
@@ -169,27 +185,26 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     initialSpending = Math.max(0, initialSpending - (profile.year0Taxes || 0));
   }
 
-  let spouseIncome = spouseMember ? (Number(spouseMember.income) || 0) : (marriageEvent ? (Number(marriageEvent.spouseIncome) || 0) : 0);
-  let spouseGrowth = spouseMember 
+  let spouseIncome = isCombined ? (spouseMember ? (Number(spouseMember.income) || 0) : (marriageEvent ? (Number(marriageEvent.spouseIncome) || 0) : 0)) : 0;
+  let spouseGrowth = isCombined ? (spouseMember 
     ? (Number(spouseMember.incomeGrowthRate !== undefined ? spouseMember.incomeGrowthRate : spouseMember.growthRate) || 0)
-    : (marriageEvent ? (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0) : 0);
+    : (marriageEvent ? (Number(marriageEvent.incomeGrowthRate !== undefined ? marriageEvent.incomeGrowthRate : marriageEvent.growthRate) || 0) : 0)) : 0;
   if (spouseGrowth > 0.5) spouseGrowth /= 100;
   spouseGrowth = Math.min(0.25, Math.max(0, spouseGrowth));
 
-  let spouseSavingsRate = spouseMember ? (Number(spouseMember.savingsRate) || 0) : (marriageEvent ? (Number(marriageEvent.savingsRate) || 0) : 0);
-  let spouseCash = spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (marriageEvent ? (Number(marriageEvent.cash) || 0) : 0);
-  let spouseInvestments = spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (marriageEvent ? (Number(marriageEvent.investments) || 0) : 0);
-  let spouseRetirement = spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (marriageEvent ? (Number(marriageEvent.retirement) || 0) : 0);
+  let spouseSavingsRate = isCombined ? (spouseMember ? (Number(spouseMember.savingsRate) || 0) : (marriageEvent ? (Number(marriageEvent.savingsRate) || 0) : 0)) : 0;
+  let spouseCash = isCombined ? (spouseMember?.assets ? (Number(spouseMember.assets.cash) || 0) : (marriageEvent ? (Number(marriageEvent.cash) || 0) : 0)) : 0;
+  let spouseInvestments = isCombined ? (spouseMember?.assets ? (Number(spouseMember.assets.investments) || 0) : (marriageEvent ? (Number(marriageEvent.investments) || 0) : 0)) : 0;
+  let spouseRetirement = isCombined ? (spouseMember?.assets ? (Number(spouseMember.assets.retirement) || 0) : (marriageEvent ? (Number(marriageEvent.retirement) || 0) : 0)) : 0;
 
-  const spouseDebtStudent = Number(spouseMember?.debts?.student) || Number(marriageEvent?.debtStudent) || 0;
-  const spouseDebtCredit = Number(spouseMember?.debts?.credit) || Number(marriageEvent?.debtCredit) || 0;
-  const spouseDebtOther = Number(spouseMember?.debts?.other) || Number(marriageEvent?.debtOther) || 0;
+  const spouseDebtStudent = isCombined ? (Number(spouseMember?.debts?.student) || Number(marriageEvent?.debtStudent) || 0) : 0;
+  const spouseDebtCredit = isCombined ? (Number(spouseMember?.debts?.credit) || Number(marriageEvent?.debtCredit) || 0) : 0;
+  const spouseDebtOther = isCombined ? (Number(spouseMember?.debts?.other) || Number(marriageEvent?.debtOther) || 0) : 0;
 
-  const spouseRetirementSpendingNeed = spouseMember ? (Number(spouseMember.spouseRetirementSpending) || 0) : (marriageEvent ? (Number(marriageEvent.spouseRetirementSpending) || 0) : 0);
-  const combinedSpendingAfterMarriage = marriageEvent ? (Number(marriageEvent.combinedSpendingAfterMarriage) || 0) : 0;
-  const lifestyleAdjustment = marriageEvent ? (Number(marriageEvent.lifestyleAdjustment) || 0) : 0;
-  const housingSavings = marriageEvent ? (Number(marriageEvent.housingSavings) || 0) : 0;
-  const housingCost = marriageEvent ? (Number(marriageEvent.housingCost) || 0) : 0;
+  const spouseRetirementSpendingNeed = isCombined ? (spouseMember ? (Number(spouseMember.spouseRetirementSpending) || 0) : (marriageEvent ? (Number(marriageEvent.spouseRetirementSpending) || 0) : 0)) : 0;
+  const lifestyleAdjustment = isCombined ? (marriageEvent ? (Number(marriageEvent.lifestyleAdjustment) || 0) : 0) : 0;
+  const housingSavings = (isCombined && isLivingTogether) ? (marriageEvent ? (Number(marriageEvent.housingSavings) || 0) : 0) : 0;
+  const housingCost = (isCombined && isLivingTogether) ? (marriageEvent ? (Number(marriageEvent.housingCost) || 0) : 0) : 0;
 
   const socialSecurityDetails = profile.socialSecurityDetails || { monthlyBenefit: 0 };
   const spouseSocialSecurityDetails = profile.spouseSocialSecurityDetails;
@@ -208,7 +223,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     }));
   const combinedIncomeList = [...incomeList, ...customIncomes];
 
-  const enabledEvents = events.filter(e => e.enabled !== false);
+  const enabledEvents = updatedEvents.filter(e => e.enabled !== false);
 
   return {
     currentAge,

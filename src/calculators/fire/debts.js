@@ -216,7 +216,7 @@ export function getActiveDebtsForAge(profile, events, age) {
   });
 
   // 5. Wedding/Marriage Financed Debt
-  const marriageEvents = lifeEvents.filter(e => e.type === 'marriage' && e.enabled && e.includeWeddingCost && ['debt', 'finance', 'financed', 'loan'].includes(e.weddingFundingMethod));
+  const marriageEvents = lifeEvents.filter(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled && e.includeWeddingCost && ['debt', 'finance', 'financed', 'loan'].includes(e.weddingFundingMethod));
   marriageEvents.forEach(me => {
     const startAge = me.weddingAge !== undefined ? Number(me.weddingAge) : (me.age !== undefined ? Number(me.age) : currentAge);
     

@@ -512,7 +512,7 @@ export function useBudgetState(
         });
       }
 
-      const marriageEventIdx = (newInputs.lifeEvents || []).findIndex(e => e.type === 'marriage' && e.enabled);
+      const marriageEventIdx = (newInputs.lifeEvents || []).findIndex(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled);
       if (marriageEventIdx !== -1 && currentPhase) {
         const currentPhaseExpensesAnnual = Object.values(currentPhase.expenses).reduce((sum, v) => sum + v, 0) * 12;
         newInputs.lifeEvents[marriageEventIdx] = {

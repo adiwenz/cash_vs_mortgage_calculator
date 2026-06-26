@@ -25,9 +25,12 @@ export function createSpouseRecord(editingEvent, inputs) {
     ? Number(editingEvent.spouseDesiredRetirementAge) 
     : null;
 
+  const resolvedRelType = editingEvent.relationshipType || (editingEvent.type === 'marriage' ? 'married' : (editingEvent.type === 'domesticPartnership' ? 'domestic_partnership' : (editingEvent.type === 'relationshipBegins' ? 'partner' : 'married')));
+  const defaultName = resolvedRelType === 'married' ? 'Spouse' : 'Partner';
+
   return {
     id: 'spouse',
-    name: 'Spouse',
+    name: editingEvent.spouseName || defaultName,
     activeFromDate: Number(editingEvent.age),
     activeUntilDate: null,
     income: Number(editingEvent.spouseIncome || 0),
@@ -60,7 +63,10 @@ export function createSpouseRecord(editingEvent, inputs) {
     growthRate: Number(editingEvent.incomeGrowthRate || 3),
     combinedSpendingAfterMarriage: combinedSpendingVal,
     housingCost: housingCostAmount,
-    lifestyleAdjustment: lifestyleAdjustmentAmount
+    lifestyleAdjustment: lifestyleAdjustmentAmount,
+    relationshipType: resolvedRelType,
+    livingTogether: editingEvent.livingTogether !== false,
+    combineFinances: editingEvent.combineFinances !== false
   };
 }
 
@@ -79,12 +85,23 @@ export function createMarriageEventObject(editingEvent, inputs) {
     ? Number(editingEvent.spouseDesiredRetirementAge) 
     : null;
 
+  const resolvedRelType = editingEvent.relationshipType || (editingEvent.type === 'marriage' ? 'married' : (editingEvent.type === 'domesticPartnership' ? 'domestic_partnership' : (editingEvent.type === 'relationshipBegins' ? 'partner' : 'married')));
+  const defaultType = resolvedRelType === 'married' ? 'marriage' : (resolvedRelType === 'domestic_partnership' ? 'domesticPartnership' : 'relationshipBegins');
+  const eventType = editingEvent.type || defaultType || 'marriage';
+  
+  const defaultEventName = eventType === 'marriage' ? 'Marriage' : (eventType === 'domesticPartnership' ? 'Domestic Partnership' : 'Relationship Begins');
+  const defaultSpouseName = eventType === 'marriage' ? 'Spouse' : 'Partner';
+
+  const isGenericPlaceholder = ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(editingEvent.id);
+  const eventId = editingEvent.id && !isGenericPlaceholder ? editingEvent.id : `${eventType}-${Date.now()}`;
+
   return {
-    id: editingEvent.id && editingEvent.id !== 'marriage' ? editingEvent.id : `marriage-${Date.now()}`,
-    type: 'marriage',
+    id: eventId,
+    type: eventType,
     enabled: true,
-    name: 'Marriage',
+    name: editingEvent.name || defaultEventName,
     age: Number(editingEvent.age),
+    spouseName: editingEvent.spouseName || defaultSpouseName,
     spouseIncome: Number(editingEvent.spouseIncome || 0),
     incomeGrowthRate: Number(editingEvent.incomeGrowthRate || 3),
     cash: Number(editingEvent.cash || 0),
@@ -118,6 +135,9 @@ export function createMarriageEventObject(editingEvent, inputs) {
     desiredRetirementAge: spouseDesiredRetirementAge,
     partnerRetiresWithUser: true,
     retirementSpendingNeed: spouseRetSpendingVal,
-    combinedSpendingAfterMarriage: combinedSpendingVal
+    combinedSpendingAfterMarriage: combinedSpendingVal,
+    relationshipType: resolvedRelType,
+    livingTogether: editingEvent.livingTogether !== false,
+    combineFinances: editingEvent.combineFinances !== false
   };
 }

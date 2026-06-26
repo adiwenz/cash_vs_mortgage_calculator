@@ -14,6 +14,8 @@ export {
   isRetirementEvent,
   isSocialSecurityEvent,
   isMarriageEvent,
+  isRelationshipStartEvent,
+  isLegalMarriageEvent,
   isDivorceEvent,
   isChildEvent,
   isHousingEvent

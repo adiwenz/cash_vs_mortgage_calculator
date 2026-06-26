@@ -54,8 +54,11 @@ export function buildEffectiveSimulationInputs(inputs) {
 
   // 3. Household & Marriage Status
   const household = profile.household || {};
-  if (household.status === 'married' || household.status === 'partnered') {
-    effective.filingStatus = 'married';
+  const isSpouseStatus = ['married', 'partnered', 'domestic_partnership', 'partner', 'engaged'].includes(household.status);
+  if (isSpouseStatus) {
+    if (household.status === 'married' || household.status === 'partnered') {
+      effective.filingStatus = 'married';
+    }
 
     // Add spouse member to householdMembers
     const hasSpouse = effective.householdMembers.some(m => m.id === 'spouse');
@@ -93,20 +96,31 @@ export function buildEffectiveSimulationInputs(inputs) {
       });
     }
 
-    // Add derived marriage event today so the simulation treats them as married
-    const hasMarriageEvent = effective.lifeEvents.some(e => e.type === 'marriage');
-    if (!hasMarriageEvent) {
+    // Add derived relationship event today if no relationship event exists
+    const hasRelationshipEvent = effective.lifeEvents.some(e => 
+      ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type)
+    );
+    if (!hasRelationshipEvent) {
+      const derivedType = (household.status === 'married' || household.status === 'partnered')
+        ? 'marriage'
+        : (household.status === 'domestic_partnership' ? 'domesticPartnership' : 'relationshipBegins');
+      
+      const derivedName = (household.status === 'married' || household.status === 'partnered')
+        ? 'Marriage'
+        : (household.status === 'domestic_partnership' ? 'Domestic Partnership' : 'Relationship Begins');
+
       effective.lifeEvents.push({
-        id: 'derived-marriage',
-        type: 'marriage',
+        id: `derived-${derivedType}`,
+        type: derivedType,
         enabled: true,
-        name: 'Marriage',
+        name: derivedName,
         age: currentAge,
         spouseIncome: Number(household.partnerIncome || 0),
         incomeGrowthRate: 3,
         spouseCurrentAge: Number(household.partnerAge !== undefined ? household.partnerAge : currentAge),
         spouseLifeExpectancy: Number(household.partnerLifeExpectancy !== undefined ? household.partnerLifeExpectancy : (effective.lifeExpectancy || 85)),
-        isDerived: true
+        isDerived: true,
+        relationshipType: household.status
       });
     }
   }

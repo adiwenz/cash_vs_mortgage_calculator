@@ -185,7 +185,7 @@ export default function BudgetModal({
   const activePhaseObj = normalizedPhases.find(p => p.id === activeBudgetPhase) || normalizedPhases[0];
   const isRetirementPhase = activePhaseObj?.type === 'retire';
 
-  const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
+  const marriageEvent = (inputs.lifeEvents || []).find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled) || (isBudgetOpenFromMarriageWizard ? editingEvent : null);
   const isMarriedMode = isBudgetOpenFromMarriageWizard ? true : (activePhaseObj ? !!activePhaseObj.isMarried : !!marriageEvent);
   const partnerMonthlyIncome = isMarriedMode ? roundCurrency(Number(marriageEvent?.spouseIncome || activePhaseObj?.spouseIncome || 0) / 12) : 0;
   const combinedIncome = isMarriedMode ? (budgetMonthlyIncome + partnerMonthlyIncome) : budgetMonthlyIncome;
@@ -523,6 +523,8 @@ export default function BudgetModal({
     if (le) {
       let icon = '❓';
       if (le.type === 'marriage') icon = '💍';
+      else if (le.type === 'domesticPartnership') icon = '🤝';
+      else if (le.type === 'relationshipBegins') icon = '❤️';
       else if (le.type === 'buyHouse') icon = '🏠';
       else if (le.type === 'haveChild') icon = '👶';
       else if (le.type === 'careerChange') icon = '💼';
@@ -591,6 +593,8 @@ export default function BudgetModal({
       const e = majorEvents[0];
       if (e.type === 'haveChild') eventName = 'Child';
       else if (e.type === 'marriage') eventName = 'Marriage';
+      else if (e.type === 'domesticPartnership') eventName = 'Domestic Partnership';
+      else if (e.type === 'relationshipBegins') eventName = 'Relationship';
       else if (e.type === 'buyHouse') eventName = 'Home Purchase';
       else if (e.type === 'windfall') eventName = 'Windfall';
       else if (e.type === 'careerChange' || e.type === 'promotion') eventName = 'Income Change';
@@ -727,12 +731,13 @@ export default function BudgetModal({
         return;
       }
 
-      // Marriage
-      if (exp.type === 'marriage' || textLower.includes("marriage") || textLower.includes("married")) {
+      // Marriage / Relationship
+      if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(exp.type) || textLower.includes("marriage") || textLower.includes("married") || textLower.includes("domestic partnership") || textLower.includes("relationship")) {
         if (textLower.includes("marriage ends") || textLower.includes("no longer married")) {
           phaseChangesList.push("Marriage ends");
         } else {
-          phaseChangesList.push("Marriage (Combined finances)");
+          const relationshipLabel = exp.type === 'marriage' ? 'Marriage' : (exp.type === 'domesticPartnership' ? 'Domestic Partnership' : 'Relationship');
+          phaseChangesList.push(`${relationshipLabel} (Combined finances)`);
         }
         return;
       }

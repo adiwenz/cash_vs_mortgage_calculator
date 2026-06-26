@@ -1,5 +1,5 @@
 import React from 'react';
-import MarriageWizard from '../MarriageWizard';
+import RelationshipWizard from '../RelationshipWizard';
 
 export default function MarriageFields({
   inputs,
@@ -17,7 +17,7 @@ export default function MarriageFields({
   setIsBudgetOpenFromMarriageWizard
 }) {
   return (
-    <MarriageWizard
+    <RelationshipWizard
       inputs={inputs}
       editingEvent={editingEvent}
       setEditingEvent={setEditingEvent}

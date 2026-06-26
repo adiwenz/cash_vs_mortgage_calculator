@@ -2,6 +2,7 @@ import React from 'react';
 import MobileChildPlanningModal from '../MobileChildPlanningModal';
 import MobileHousePlanningModal from '../MobileHousePlanningModal';
 import MobileMarriagePlanningModal from '../MobileMarriagePlanningModal';
+import MobileRelationshipPlanningModal from '../MobileRelationshipPlanningModal';
 import MobileIncomeChangeModal from '../MobileIncomeChangeModal';
 import MobileEventWizard from '../MobileEventWizard';
 import ChildImpactModal from '../ChildImpactModal';
@@ -115,8 +116,8 @@ export default function MobileModalLayer({
           uiState={uiState}
           onClose={() => setEditingEvent(null)}
         />
-      ) : editingEvent && (editingEvent.type === 'marriage' || editingEvent.type === 'get-married') ? (
-        <MobileMarriagePlanningModal
+      ) : editingEvent && (editingEvent.type === 'marriage' || editingEvent.type === 'domesticPartnership' || editingEvent.type === 'relationshipBegins' || editingEvent.type === 'get-married') ? (
+        <MobileRelationshipPlanningModal
           scenario={scenario}
           eventController={eventController}
           simulation={simulation}

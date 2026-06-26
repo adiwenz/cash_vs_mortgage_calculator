@@ -509,11 +509,39 @@ export function buildTimelineRows(inputs) {
       rows.push(createRow({ type: 'object', id: c.id, parent: 'children', label: c.name || 'Child', icon: '👶', objectType: c.type, objectId: c.id }));
     });
 
+    // 3.5 Education
+    const educations = objects.filter(o => o.type === 'education' || o.type === 'college');
+    rows.push(createRow({ type: 'category', id: 'education', parent: null, label: 'Education', icon: '🎓', count: educations.length }));
+    educations.forEach(e => {
+      rows.push(createRow({ type: 'object', id: e.id, parent: 'education', label: e.name, icon: '🎓', objectType: e.type, objectId: e.id }));
+    });
+
     // 4. Jobs & Income
     const jobs = objects.filter(o => o.type === 'job');
-    rows.push(createRow({ type: 'category', id: 'income', parent: null, label: 'Income', icon: '💼', count: jobs.length }));
+    const incomeEvents = (lifePlan.events || []).filter(e => 
+      ['socialSecurity', 'pension', 'rentalIncome', 'annuity', 'otherRetirementIncome'].includes(e.type) && e.enabled !== false
+    );
+    rows.push(createRow({ type: 'category', id: 'income', parent: null, label: 'Income', icon: '💼', count: jobs.length + incomeEvents.length }));
     jobs.forEach(j => {
       rows.push(createRow({ type: 'object', id: j.id, parent: 'income', label: j.name, icon: '💼', objectType: j.type, objectId: j.id }));
+    });
+    incomeEvents.forEach(ev => {
+      let name = ev.label;
+      if (!name) {
+        if (ev.type === 'socialSecurity') name = 'Social Security';
+        else if (ev.type === 'pension') name = 'Pension';
+        else if (ev.type === 'rentalIncome') name = 'Rental Income';
+        else name = 'Retirement Income';
+      }
+      rows.push(createRow({
+        type: 'object',
+        id: ev.id,
+        parent: 'income',
+        label: name,
+        icon: '💼',
+        objectType: 'income',
+        objectId: ev.id
+      }));
     });
 
     // 5. Debt
@@ -525,7 +553,7 @@ export function buildTimelineRows(inputs) {
 
     // 6. Accounts / Assets
     const accounts = objects.filter(o => o.type === 'account' || o.type === 'business');
-    rows.push(createRow({ type: 'category', id: 'assets', parent: null, label: 'Assets', icon: '🏦', count: accounts.length }));
+    rows.push(createRow({ type: 'category', id: 'assets', parent: null, label: 'Assets / Net Worth', icon: '📈', count: accounts.length }));
     accounts.forEach(a => {
       rows.push(createRow({ type: 'object', id: a.id, parent: 'assets', label: a.name, icon: '🏦', objectType: a.type, objectId: a.id }));
     });
@@ -563,7 +591,7 @@ export function buildTimelineRows(inputs) {
   }
   
   const enabledEvents = (actualInputs.lifeEvents || []).filter(e => e.enabled !== false);
-  const marriageEvents = enabledEvents.filter(e => e.type === 'marriage' || e.type === 'getMarried');
+  const marriageEvents = enabledEvents.filter(e => ['marriage', 'getMarried', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
   if (marriageEvents.length > 0) {
     hasPartner = true;
     if (marriageEvents[0].spouseName) {

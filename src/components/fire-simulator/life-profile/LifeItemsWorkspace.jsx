@@ -17,6 +17,8 @@ import {
   Target
 } from 'lucide-react';
 import { formatCurrency } from '../helpers';
+import { syncBudgetDetails } from '../../../fireCalculations.js';
+import { restoreSinglePersonBudgetAfterPartnerRemoval } from '../../../models/lifePlan/restoreSinglePersonBudget.js';
 
 const getAccountDisplayName = (name, type) => {
   if (type === 'cash') return '💵 Cash';
@@ -101,6 +103,17 @@ const CATEGORIES = [
   { key: 'other', label: 'Other', icon: '⚙', addTypes: ['goal'] }
 ];
 
+const CREATION_EVENT_TYPES = [
+  "marriage",
+  "relationshipBegins",
+  "domesticPartnership",
+  "haveChild",
+  "buyHome",
+  "startJob",
+  "addAccount",
+  "addDebt"
+];
+
 export default function LifeItemsWorkspace({
   isMobile,
   inputs,
@@ -116,6 +129,7 @@ export default function LifeItemsWorkspace({
   const [editingItem, setEditingItem] = useState(null); // { mode: 'add'|'edit', type, item }
   const [editingEvent, setEditingEvent] = useState(null); // { mode: 'add'|'edit', objectId, eventType, event }
   const [activeCategory, setActiveCategory] = useState('people');
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { itemId, sourceEventId, isPartner, itemName }
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [inlineEditingId, setInlineEditingId] = useState(null);
   const [inlineDrafts, setInlineDrafts] = useState({});
@@ -255,7 +269,7 @@ export default function LifeItemsWorkspace({
     setEditingItem({ mode: 'edit', type: item.type, item: itemCopy });
   };
 
-  const handleDelete = (id) => {
+  const performNormalDelete = (id) => {
     const nextObjects = objects.filter(o => o.id !== id);
     // If we delete a property, also delete any linked mortgage debt
     const mortgageId = `mortgage-${id}`;
@@ -271,6 +285,118 @@ export default function LifeItemsWorkspace({
     };
     setLocalLifePlan(updatedPlan);
     triggerSave({ lifePlan: updatedPlan });
+  };
+
+  const handleDelete = (id) => {
+    const item = objects.find(o => o.id === id);
+    const sourceEventId = item?.metadata?.createdFromEventId || item?.properties?.metadata?.createdFromEventId;
+    if (sourceEventId) {
+      const sourceEvent = (inputs.lifeEvents || []).find(e => e.id === sourceEventId);
+      if (sourceEvent && CREATION_EVENT_TYPES.includes(sourceEvent.type)) {
+        const isPartner = item.type === 'person' && (item.role === 'partner' || item.properties?.role === 'partner');
+        const protectedPreDeleteSavingsRate =
+          inputs.displayedSavingsRate && inputs.displayedSavingsRate > 0
+            ? inputs.displayedSavingsRate
+            : inputs.savingsRate && inputs.savingsRate > 0
+              ? inputs.savingsRate
+              : inputs.derivedSavingsRate && inputs.derivedSavingsRate > 0
+                ? inputs.derivedSavingsRate
+                : null;
+        setDeleteConfirmation({
+          itemId: id,
+          sourceEventId,
+          isPartner,
+          itemName: item.name,
+          protectedPreDeleteSavingsRate
+        });
+        return;
+      }
+    }
+    performNormalDelete(id);
+  };
+
+  const handleConfirmDeleteWithCascade = (itemId, sourceEventId, protectedPreDeleteSavingsRate = null) => {
+    const rateToUse = protectedPreDeleteSavingsRate !== undefined && protectedPreDeleteSavingsRate !== null
+      ? protectedPreDeleteSavingsRate
+      : (inputs.displayedSavingsRate && inputs.displayedSavingsRate > 0
+        ? inputs.displayedSavingsRate
+        : inputs.savingsRate && inputs.savingsRate > 0
+          ? inputs.savingsRate
+          : inputs.derivedSavingsRate && inputs.derivedSavingsRate > 0
+            ? inputs.derivedSavingsRate
+            : null);
+
+    const updatedEventsList = (inputs.lifeEvents || []).filter(e => e.id !== sourceEventId);
+
+    const isGeneratedByEvent = (obj) => {
+      const evId = obj.metadata?.createdFromEventId || obj.properties?.metadata?.createdFromEventId;
+      return evId === sourceEventId;
+    };
+
+    const deletedPartner = objects.find(o => (isGeneratedByEvent(o) || o.id === itemId) && o.type === 'person' && (o.role === 'partner' || o.properties?.role === 'partner'));
+    const deletedPartnerId = deletedPartner?.id;
+
+    const deletedRelationship = objects.find(o => (isGeneratedByEvent(o) || o.id === itemId) && o.type === 'relationship');
+    const deletedRelationshipId = deletedRelationship?.id;
+
+    const nextObjects = objects.filter(o => o.id !== itemId && !isGeneratedByEvent(o));
+    const mortgageId = `mortgage-${itemId}`;
+    const cleanObjects = nextObjects.filter(o => o.id !== mortgageId);
+
+    const clearRefs = (item) => {
+      if (item.personId === deletedPartnerId) item.personId = null;
+      if (item.partnerPersonId === deletedPartnerId) item.partnerPersonId = null;
+      if (item.relationshipId === deletedRelationshipId) item.relationshipId = null;
+      if (item.properties) {
+        if (item.properties.personId === deletedPartnerId) item.properties.personId = null;
+        if (item.properties.partnerPersonId === deletedPartnerId) item.properties.partnerPersonId = null;
+        if (item.properties.relationshipId === deletedRelationshipId) item.properties.relationshipId = null;
+      }
+    };
+
+    cleanObjects.forEach(clearRefs);
+    updatedEventsList.forEach(clearRefs);
+
+    const cleanEvents = (localLifePlan.events || []).filter(e => {
+      if (e.objectId === itemId || e.objectId === mortgageId) return false;
+      const obj = objects.find(o => o.id === e.objectId);
+      if (obj && isGeneratedByEvent(obj)) return false;
+      return true;
+    });
+    cleanEvents.forEach(clearRefs);
+
+    const updatedPlan = {
+      ...localLifePlan,
+      objects: cleanObjects,
+      events: cleanEvents
+    };
+
+    const updatedHouseholdMembers = (inputs.householdMembers || []).filter(m => m.id !== 'spouse');
+
+    const hasPartnerLeft = cleanObjects.some(o => 
+      o.type === 'person' && (o.id === 'spouse-partner' || o.role === 'partner' || o.properties?.role === 'partner')
+    ) || updatedHouseholdMembers.some(m => m.id === 'spouse');
+
+    let extraUpdates = {};
+
+    if (!hasPartnerLeft) {
+      extraUpdates = restoreSinglePersonBudgetAfterPartnerRemoval({
+        ...inputs,
+        lifePlan: updatedPlan,
+        householdMembers: updatedHouseholdMembers
+      }, {
+        protectedPreDeleteSavingsRate: rateToUse
+      });
+    }
+
+    setLocalLifePlan(updatedPlan);
+    triggerSave({
+      lifePlan: updatedPlan,
+      lifeEvents: updatedEventsList,
+      householdMembers: updatedHouseholdMembers,
+      ...extraUpdates
+    }, rateToUse);
+    setDeleteConfirmation(null);
   };
 
   const handleStartAddEvent = (itemId, eventType) => {
@@ -292,12 +418,24 @@ export default function LifeItemsWorkspace({
   };
 
   const handleDeleteEvent = (eventId) => {
+    const ev = (localLifePlan.events || []).find(e => e.id === eventId);
+    const isMarriageEvent = ev && (ev.type === 'marriage' || ev.type === 'relationshipBegins' || ev.type === 'domesticPartnership');
+    const protectedPreDeleteSavingsRate = isMarriageEvent
+      ? (inputs.displayedSavingsRate && inputs.displayedSavingsRate > 0
+        ? inputs.displayedSavingsRate
+        : inputs.savingsRate && inputs.savingsRate > 0
+          ? inputs.savingsRate
+          : inputs.derivedSavingsRate && inputs.derivedSavingsRate > 0
+            ? inputs.derivedSavingsRate
+            : null)
+      : null;
+
     const updatedPlan = {
       ...localLifePlan,
       events: (localLifePlan.events || []).filter(e => e.id !== eventId)
     };
     setLocalLifePlan(updatedPlan);
-    triggerSave({ lifePlan: updatedPlan });
+    triggerSave({ lifePlan: updatedPlan }, protectedPreDeleteSavingsRate);
   };
 
   const handleSaveEvent = (ev) => {
@@ -1707,6 +1845,48 @@ export default function LifeItemsWorkspace({
           {renderWorkspaceContent()}
         </div>
       </div>
+      {deleteConfirmation && (
+        <div className="modal-backdrop" onClick={() => setDeleteConfirmation(null)}>
+          <div 
+            className="event-form-overlay-card modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '480px', width: '90%', padding: '1.5rem', borderRadius: '12px' }}
+          >
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginTop: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              {deleteConfirmation.isPartner ? 'Delete partner?' : `Delete ${deleteConfirmation.itemName}?`}
+            </h3>
+            <p style={{ fontSize: '0.875rem', lineHeight: '1.45', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+              {deleteConfirmation.isPartner ? (
+                "This partner was created by your Marriage event. Deleting them will also delete the Marriage event, the internal relationship, and any partner income created from that event."
+              ) : (
+                `This item was created by your Marriage event. Deleting it will also delete the Marriage event, the partner, the internal relationship, and any partner income created from that event.`
+              )}
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => setDeleteConfirmation(null)}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn-primary" 
+                onClick={() => handleConfirmDeleteWithCascade(
+                  deleteConfirmation.itemId, 
+                  deleteConfirmation.sourceEventId, 
+                  deleteConfirmation.protectedPreDeleteSavingsRate
+                )}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: '#ef4444', borderColor: '#ef4444' }}
+              >
+                {deleteConfirmation.isPartner ? 'Delete partner and event' : 'Delete item and event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

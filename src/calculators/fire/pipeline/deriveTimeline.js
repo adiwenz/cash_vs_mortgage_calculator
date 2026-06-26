@@ -99,7 +99,7 @@ export function deriveTimelineStage(normalizedInputs) {
   }
 
   // Calculate spouseSocialSecurityDetails
-  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const marriageEvent = enabledEvents.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
   const spouseMember = (normalizedInputs.householdMembers || []).find(m => m.id === 'spouse');
   const hasMarriage = !!marriageEvent;
 

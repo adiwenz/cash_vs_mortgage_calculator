@@ -47,7 +47,7 @@ export function computeRetirementResult(profile, phases, events, plannedProjecti
     .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
   const homeEquityBaseline = (Number(assets.realEstate) || 0) + customHousesStartingValue;
 
-  const marriageEvent = events.find(e => e.type === 'marriage');
+  const marriageEvent = events.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
   const spouseMember = events.find(e => e.type === 'spouseMember');
   const hasMarriage = !!marriageEvent;
   const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''

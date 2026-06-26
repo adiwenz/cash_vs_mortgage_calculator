@@ -32,6 +32,27 @@ export function isMarriageEvent(event) {
 }
 
 /**
+ * Checks if the event is a relationship start event.
+ * @param {object} event 
+ * @returns {boolean}
+ */
+export function isRelationshipStartEvent(event) {
+  if (!event) return false;
+  const canonical = getCanonicalEventType(event.type);
+  return ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(canonical);
+}
+
+/**
+ * Checks if the event is a legal marriage event.
+ * @param {object} event 
+ * @returns {boolean}
+ */
+export function isLegalMarriageEvent(event) {
+  if (!event) return false;
+  return getCanonicalEventType(event.type) === 'marriage';
+}
+
+/**
  * Checks if the event is a divorce event.
  * @param {object} event 
  * @returns {boolean}

@@ -241,7 +241,16 @@ export function useEventEditingController({
   const handleDeleteRoadmapEvent = (evt) => {
     if (!evt || evt.isMilestone) return;
 
-    const result = eventSaveRouter.routeDelete(evt, inputs);
+    const protectedPreDeleteSavingsRate =
+      inputs.displayedSavingsRate && inputs.displayedSavingsRate > 0
+        ? inputs.displayedSavingsRate
+        : inputs.savingsRate && inputs.savingsRate > 0
+          ? inputs.savingsRate
+          : inputs.derivedSavingsRate && inputs.derivedSavingsRate > 0
+            ? inputs.derivedSavingsRate
+            : null;
+
+    const result = eventSaveRouter.routeDelete(evt, inputs, protectedPreDeleteSavingsRate);
     if (!result) return;
 
     setLastChartChangeType('event_remove');

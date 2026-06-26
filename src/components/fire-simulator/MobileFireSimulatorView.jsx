@@ -26,6 +26,7 @@ import MobileChildPlanningModal from './MobileChildPlanningModal';
 import { getEventShortLabel } from '../../features/fire/events';
 import MobileHousePlanningModal from './MobileHousePlanningModal';
 import MobileMarriagePlanningModal from './MobileMarriagePlanningModal';
+import MobileRelationshipPlanningModal from './MobileRelationshipPlanningModal';
 import MobileIncomeChangeModal from './MobileIncomeChangeModal';
 import EventModalForm from './EventModalForm/EventModalForm';
 import ChildImpactModal from './ChildImpactModal';
@@ -917,7 +918,7 @@ export default function MobileFireSimulatorView({
       if (!e.enabled) return;
       const eventAge = e.type === 'haveChild' ? Number(e.birthAge)
         : e.type === 'buyHouse' ? Number(e.purchaseAge)
-        : e.type === 'marriage' ? Number(e.marriageAge || e.age || e.startAge)
+        : ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) ? Number(e.marriageAge || e.age || e.startAge)
         : e.type === 'socialSecurity' ? Number(e.claimingAge)
         : e.type === 'retire' ? Number(e.age)
         : Number(e.age || e.startAge || e.purchaseAge || e.birthAge || e.claimingAge || e.ageReceived);
@@ -2439,8 +2440,8 @@ export default function MobileFireSimulatorView({
           uiState={uiState}
           onClose={() => setEditingEvent(null)}
         />
-      ) : editingEvent && (editingEvent.type === 'marriage' || editingEvent.type === 'get-married') ? (
-        <MobileMarriagePlanningModal
+      ) : editingEvent && (editingEvent.type === 'marriage' || editingEvent.type === 'domesticPartnership' || editingEvent.type === 'relationshipBegins' || editingEvent.type === 'get-married') ? (
+        <MobileRelationshipPlanningModal
           scenario={scenario}
           eventController={eventController}
           simulation={simulation}

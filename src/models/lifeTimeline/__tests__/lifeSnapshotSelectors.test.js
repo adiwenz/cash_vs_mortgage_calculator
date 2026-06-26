@@ -775,6 +775,8 @@ describe('lifeSnapshotSelectors', () => {
     const inputs = {
       ...DEFAULT_FIRE_INPUTS,
       currentAge: 35,
+      simpleIncome: 50000,
+      simpleExpenses: 50000,
       inflationRate: 0,
       useLifeProfile: true,
       lifePlan: {
