@@ -19,3 +19,7 @@
 
 ## Efficient Process Waiting Default Instruction
 - **Prefer waiting on command completion over arbitrary timers. Do not use fixed sleep intervals as the default test/build waiting strategy; use completion signals or adaptive polling, and avoid duplicate long-running commands.**
+
+## Search Memory & Result Reuse Default Instruction
+- **Treat search results as cached knowledge for the duration of a task. Prefer reusing previously discovered files, symbols, and locations instead of issuing duplicate searches. Search to discover information, not to repeatedly rediscover it.**
+
