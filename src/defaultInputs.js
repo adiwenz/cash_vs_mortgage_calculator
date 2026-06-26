@@ -12,6 +12,7 @@ export const DEFAULT_FIRE_INPUTS = {
   includeTaxes: false,
   filingStatus: 'single',
   isAdvancedMode: false, // Simple Mode by default
+  housingStatus: 'rent',
   readinessCriteria: 'lastsLifeExp',
   enableHealthcareModel: true,
   preMedicarePremium: 10000,

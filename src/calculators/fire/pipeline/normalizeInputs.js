@@ -2,8 +2,52 @@ import { getActiveChildrenCountAtAge } from '../../../simulatorMathUtils.js';
 import { getPartitionedPhases } from '../phases.js';
 import { normalizeSocialSecurityEvent } from '../socialSecurity.js';
 import { normalizeHouseholdModel } from '../../../models/household/index.js';
+import { hasExplicitAllocationRules } from '../simulation/resolveSavingsRoutingSource.js';
 
-export function normalizeInputsStage(inputs) {
+function translateSavingsKeys(savingsObj) {
+  if (!savingsObj) return savingsObj;
+  const translated = { ...savingsObj };
+  if (translated.cash !== undefined) {
+    translated.checking = (translated.checking || 0) + translated.cash;
+    delete translated.cash;
+  }
+  if (translated.emergencyFund !== undefined) {
+    translated.emergency = (translated.emergency || 0) + translated.emergencyFund;
+    delete translated.emergencyFund;
+  }
+  return translated;
+}
+
+function translateBudgetSavingsKeys(budgetDetails) {
+  if (!budgetDetails) return budgetDetails;
+  const cloned = { ...budgetDetails };
+  if (cloned.savings) {
+    cloned.savings = translateSavingsKeys(cloned.savings);
+  }
+  if (cloned.partnerSavings) {
+    cloned.partnerSavings = translateSavingsKeys(cloned.partnerSavings);
+  }
+  if (Array.isArray(cloned.phases)) {
+    cloned.phases = cloned.phases.map(phase => {
+      const clonedPhase = { ...phase };
+      if (clonedPhase.savings) {
+        clonedPhase.savings = translateSavingsKeys(clonedPhase.savings);
+      }
+      if (clonedPhase.partnerSavings) {
+        clonedPhase.partnerSavings = translateSavingsKeys(clonedPhase.partnerSavings);
+      }
+      return clonedPhase;
+    });
+  }
+  return cloned;
+}
+
+export function normalizeInputsStage(rawInputs) {
+  const translatedBudgetDetails = translateBudgetSavingsKeys(rawInputs.budgetDetails);
+  const inputs = {
+    ...rawInputs,
+    budgetDetails: translatedBudgetDetails
+  };
   const currentAge = Math.max(0, Number(inputs.currentAge) || 30);
   const lifeExpectancy = Math.max(currentAge + 1, Number(inputs.lifeExpectancy) || 85);
   const lifeEvents = inputs.lifeEvents ? inputs.lifeEvents.map(e => {
@@ -208,7 +252,7 @@ export function normalizeInputsStage(inputs) {
     }
   }
 
-  const isAdvanced = inputs.isAdvancedMode === true || inputs.useLifeProfile === true || (inputs.allocationRules && inputs.allocationRules.length > 1);
+  const isAdvanced = inputs.isAdvancedMode === true || inputs.useLifeProfile === true || hasExplicitAllocationRules(inputs);
   if (!isAdvanced) {
     const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
     incomeList = incomeList.map(inc => {

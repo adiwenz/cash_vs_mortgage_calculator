@@ -12,7 +12,7 @@ describe('lifeSnapshotSelectors', () => {
     expect(snapshot.age).toBe(40);
     expect(snapshot.currentAge).toBe(35); // Safe default fallback
     expect(snapshot.relationshipStatus).toBe('single');
-    expect(snapshot.housingStatus).toBe('rent');
+    expect(snapshot.housingStatus).toBeNull();
     expect(snapshot.people.self).toBeDefined();
     expect(snapshot.people.self.currentAge).toBe(40);
     expect(snapshot.people.partner).toBeNull();

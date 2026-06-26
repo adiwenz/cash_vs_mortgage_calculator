@@ -101,9 +101,16 @@ export function getLifeSnapshotFromLifePlan(lifePlan, age, originalInputs, optio
     savings
   };
 
-  // 5. Formulate Legacy-Compatible fields derived from the object graph
   const relationshipStatus = relationship;
-  const housingStatus = properties.length > 0 ? 'own' : 'rent';
+  let housingStatus = null;
+  if (properties.length > 0) {
+    housingStatus = 'own';
+  } else if (originalInputs?.lifeProfile?.home?.status) {
+    housingStatus = originalInputs.lifeProfile.home.status;
+  } else if (originalInputs?.housingStatus) {
+    housingStatus = originalInputs.housingStatus;
+  }
+
   
   const legacyChildren = children.map((ch, idx) => {
     const childAge = targetAge - ch.startAge;

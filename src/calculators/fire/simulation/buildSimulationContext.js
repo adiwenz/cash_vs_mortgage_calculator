@@ -1,5 +1,6 @@
 import { derivePhasesFromEvents } from '../phases.js';
 import { initializeActiveLoans } from '../debts.js';
+import { resolveSavingsRoutingSource } from './resolveSavingsRoutingSource.js';
 
 export function buildSimulationContext(profile, phases, events, targetRetirementAge, customLifeExpectancy = null) {
   const useLifeProfile = !!profile.useLifeProfile;
@@ -56,6 +57,16 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
   const simPhases = (targetRetirementAge === profile.targetRetirementAge && simLifeExpectancy === profile.lifeExpectancy)
     ? phases
     : derivePhasesFromEvents({ ...profile, targetRetirementAge, lifeExpectancy: simLifeExpectancy }, events, profile.budgetDetails?.phases || []);
+
+  const routingSource = resolveSavingsRoutingSource(profile);
+  let effectivePhases = simPhases;
+  if (routingSource !== 'budget_savings') {
+    effectivePhases = simPhases.map(p => ({
+      ...p,
+      savings: {},
+      partnerSavings: {}
+    }));
+  }
 
   let checkingBalance = (assets.checking !== undefined && !isNaN(Number(assets.checking))) ? Number(assets.checking) : (Number(assets.cash) || 0);
   let hysaBalance = (assets.hysa !== undefined && !isNaN(Number(assets.hysa))) ? Number(assets.hysa) : 0;
@@ -243,7 +254,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     maxLifeExpectancy,
     simLifeExpectancy,
     simYearsToCompute,
-    simPhases,
+    simPhases: effectivePhases,
     checkingBalance,
     hysaBalance,
     balances,
