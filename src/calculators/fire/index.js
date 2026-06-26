@@ -92,15 +92,18 @@ export {
   buildBaselineCurrentInputs
 };
 
+import { canonicalizeSimulationInputs } from './pipeline/canonicalizeSimulationInputs.js';
+
 // getSavingsPriority is now defined and exported from fireCalculations.js for legacy compatibility
 
 export function runFireSimulation(inputs) {
   const effectiveInputs = buildEffectiveSimulationInputs(inputs);
   const normalizedInputs = normalizeInputsStage(effectiveInputs);
-  const timelineDetails = deriveTimelineStage(normalizedInputs);
-  const { profile, events } = applyEventsStage(normalizedInputs, timelineDetails);
-  const phases = deriveBudgetPhasesStage(profile, events, normalizedInputs.budgetDetails?.phases);
-  const plannedProjection = projectYearlyBalancesStage(profile, phases, events, normalizedInputs.targetRetirementAge);
+  const canonicalInputs = canonicalizeSimulationInputs(normalizedInputs);
+  const timelineDetails = deriveTimelineStage(canonicalInputs);
+  const { profile, events } = applyEventsStage(canonicalInputs, timelineDetails);
+  const phases = deriveBudgetPhasesStage(profile, events, canonicalInputs.budgetDetails?.phases);
+  const plannedProjection = projectYearlyBalancesStage(profile, phases, events, canonicalInputs.targetRetirementAge);
   const readinessResult = computeReadinessStage(profile, phases, events, plannedProjection);
   return formatSimulationResultStage(readinessResult, profile, phases, plannedProjection, normalizedInputs);
 }

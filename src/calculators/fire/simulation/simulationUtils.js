@@ -52,6 +52,7 @@ export function isGeneratedMainIncome(id) {
          id.startsWith('simple-inc-prechild') ||
          id.startsWith('simple-inc-worksave') ||
          id.startsWith('simple-inc-childcare') ||
-         id === 'simple-inc' ||
-         id === 'inc-1';
+         id.startsWith('simple-inc') ||
+         id.startsWith('inc-1') ||
+         id.startsWith('job-1');
 }

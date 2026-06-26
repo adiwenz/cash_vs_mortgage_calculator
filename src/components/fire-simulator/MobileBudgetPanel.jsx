@@ -365,6 +365,8 @@ export default function MobileBudgetPanel({
       const latestEvent = incomeEvents[0];
       let eventName = latestEvent.name || latestEvent.type;
       if (latestEvent.type === 'marriage') eventName = 'Marriage';
+      else if (latestEvent.type === 'domesticPartnership') eventName = 'Domestic Partnership';
+      else if (latestEvent.type === 'relationshipBegins') eventName = 'Relationship';
       else if (latestEvent.type === 'careerChange' || latestEvent.type === 'promotion') eventName = 'Income Change';
       else if (latestEvent.type === 'socialSecurity') eventName = 'Social Security';
       else if (latestEvent.type === 'retire') eventName = 'Retirement';

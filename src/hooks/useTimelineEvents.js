@@ -18,8 +18,9 @@ function isGeneratedMainIncome(id) {
          id.startsWith('simple-inc-prechild') ||
          id.startsWith('simple-inc-worksave') ||
          id.startsWith('simple-inc-childcare') ||
-         id === 'simple-inc' ||
-         id === 'inc-1';
+         id.startsWith('simple-inc') ||
+         id.startsWith('inc-1') ||
+         id.startsWith('job-1');
 }
 
 export function useTimelineEvents(inputs, displayedResults) {
@@ -325,17 +326,26 @@ export function useTimelineEvents(inputs, displayedResults) {
               type: 'assetTransfer',
               description: `Moved ${formatCurrency(ev.amount)} from ${getAssetLabel(ev.fromAsset)} to ${getAssetLabel(ev.toAsset)}.`
             });
-          } else if (ev.type === 'marriage') {
+          } else if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(ev.type)) {
             const spouseAssets = (Number(ev.cash) || 0) + (Number(ev.investments) || 0) + (Number(ev.retirement) || 0);
             const spouseDebts = (Number(ev.debtStudent) || 0) + (Number(ev.debtCredit) || 0) + (Number(ev.debtOther) || 0);
+            const isMarried = ev.type === 'marriage';
+            const isDP = ev.type === 'domesticPartnership';
+            const relTitle = isMarried ? `💍 Get Married` : isDP ? `🤝 Domestic Partnership` : `❤️ Relationship Begins`;
+            const relLabel = isMarried ? `Get Married` : isDP ? `Domestic Partnership` : `Relationship Begins`;
+            const relIcon = isMarried ? '💍' : isDP ? '🤝' : '❤️';
+            const spouseLabel = isMarried ? 'spouse' : 'partner';
+            const eventVerb = isMarried ? 'Married' : isDP ? 'Entered domestic partnership with' : 'Started relationship with';
+            const eventCostLabel = isMarried ? 'Wedding cost' : 'Celebration cost';
+
             events.push({
               originalId: ev.id,
               age,
-              title: `💍 Get Married`,
-              label: `Get Married`,
-              icon: '💍',
-              type: 'marriage',
-              description: `Married a spouse with ${formatCurrency(ev.spouseIncome)}/yr income, ${formatCurrency(spouseAssets)} starting assets, and ${formatCurrency(spouseDebts)} starting debts. ${ev.includeWeddingCost ? 'Wedding cost: ' + formatCurrency(ev.weddingCost) + ' at Age ' + ev.weddingAge + '.' : ''}`,
+              title: relTitle,
+              label: relLabel,
+              icon: relIcon,
+              type: ev.type,
+              description: `${eventVerb} a ${spouseLabel} with ${formatCurrency(ev.spouseIncome)}/yr income, ${formatCurrency(spouseAssets)} starting assets, and ${formatCurrency(spouseDebts)} starting debts. ${ev.includeWeddingCost ? eventCostLabel + ': ' + formatCurrency(ev.weddingCost) + ' at Age ' + ev.weddingAge + '.' : ''}`,
               spouseIncome: ev.spouseIncome,
               incomeGrowthRate: ev.incomeGrowthRate,
               cash: ev.cash,
@@ -540,12 +550,12 @@ export function useTimelineEvents(inputs, displayedResults) {
           if (otherIndex === index) return false;
           if (otherEvt.age !== evt.age) return false;
           
-          const isPrimary = ['haveChild', 'marriage', 'buyHouse', 'sellHouse', 'retire', 'college', 'sabbatical', 'windfall', 'assetTransfer'].includes(otherEvt.type);
+          const isPrimary = ['haveChild', 'marriage', 'domesticPartnership', 'relationshipBegins', 'buyHouse', 'sellHouse', 'retire', 'college', 'sabbatical', 'windfall', 'assetTransfer'].includes(otherEvt.type);
           if (!isPrimary) return false;
           
           if (otherEvt.icon === evt.icon) return true;
           if (evt.icon === '👶' && otherEvt.type === 'haveChild') return true;
-          if (evt.icon === '💍' && otherEvt.type === 'marriage') return true;
+          if ((evt.icon === '💍' || evt.icon === '🤝' || evt.icon === '❤️') && ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(otherEvt.type)) return true;
           if (evt.icon === '🏠' && (otherEvt.type === 'buyHouse' || otherEvt.type === 'sellHouse')) return true;
           if ((evt.icon === '🏖️' || evt.icon === '🏖') && otherEvt.type === 'retire') return true;
           

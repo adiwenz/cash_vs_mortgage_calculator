@@ -4,6 +4,8 @@ import { normalizeSocialSecurityEvent } from '../socialSecurity.js';
 import { normalizeHouseholdModel } from '../../../models/household/index.js';
 import { hasExplicitAllocationRules } from '../simulation/resolveSavingsRoutingSource.js';
 
+import { isRelationshipStartEvent } from '../../../features/fire/events/eventTypeGuards.js';
+
 function translateSavingsKeys(savingsObj) {
   if (!savingsObj) return savingsObj;
   const translated = { ...savingsObj };
@@ -70,7 +72,7 @@ export function normalizeInputsStage(rawInputs) {
   }
 
   // Derive spouse death/life ages to calculate maxLifeExpectancy for childcare phase spending
-  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const marriageEvent = enabledEvents.find(isRelationshipStartEvent);
   const spouseMember = (inputs.householdMembers || []).find(m => m.id === 'spouse');
   const hasMarriage = !!marriageEvent;
 
@@ -144,6 +146,11 @@ export function normalizeInputsStage(rawInputs) {
         const finalChildcareBudgets = inputs.budgetDetails?.childcareBudgets || {};
         
         incomeSegments.forEach(seg => {
+          const isMarriedAtSeg = marriageEvent && seg.startAge >= Number(marriageEvent.age);
+          const segIncomeAnnual = isMarriedAtSeg
+            ? (Number(inputs.simpleIncome || 50000) + Number(marriageEvent.spouseIncome || 0))
+            : wsIncomeAnnual;
+
           if (seg.type === 'childcare') {
             const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
             let childcareIncome = inputs.budgetDetails?.childcareIncome;
@@ -153,7 +160,9 @@ export function normalizeInputsStage(rawInputs) {
               const minC = Math.min(...Object.keys(finalChildcareBudgets).map(Number));
               childcareIncome = finalChildcareBudgets[minC].income;
             }
-            const ccIncomeAnnual = (Number(childcareIncome) || (wsIncomeAnnual / 12)) * 12;
+            const ccIncomeAnnual = (childcareIncome !== undefined && childcareIncome !== null)
+              ? Number(childcareIncome) * 12
+              : (Number(segIncomeAnnual) || wsIncomeAnnual);
 
             const existingChildcareInc = incomeList.find(inc => 
               inc.id === 'simple-inc-childcare' || inc.id.startsWith('simple-inc-childcare-')
@@ -189,7 +198,7 @@ export function normalizeInputsStage(rawInputs) {
             cleanIncomeList.push({
               id: expectedId,
               name: 'Salary / Main Income (Standard Work Phase)',
-              amount: wsIncomeAnnual,
+              amount: segIncomeAnnual,
               frequency: 'yearly',
               startAge: seg.startAge,
               endAge: seg.endAge,
@@ -210,6 +219,11 @@ export function normalizeInputsStage(rawInputs) {
         const wsExpensesAnnual = (Number(inputs.budgetDetails?.expenses ? Object.values(inputs.budgetDetails.expenses).reduce((sum, val) => sum + val, 0) : 0) || (Number(inputs.simpleExpenses) / 12) || 3542) * 12;
 
         spendingSegments.forEach(seg => {
+          const isMarriedAtSeg = marriageEvent && seg.startAge >= Number(marriageEvent.age);
+          const segExpensesAnnual = isMarriedAtSeg && marriageEvent.combinedSpendingAfterMarriage
+            ? Number(marriageEvent.combinedSpendingAfterMarriage)
+            : wsExpensesAnnual;
+
           if (seg.type === 'childcare') {
             const C = getActiveChildrenCountAtAge(seg.startAge, enabledEvents);
             let childcareExpensesVal = inputs.budgetDetails?.childcareExpenses;
@@ -221,7 +235,7 @@ export function normalizeInputsStage(rawInputs) {
             }
             const ccExpensesAnnual = childcareExpensesVal
               ? Object.values(childcareExpensesVal).reduce((sum, val) => sum + val, 0) * 12
-              : wsExpensesAnnual;
+              : segExpensesAnnual;
 
             cleanSpendingPhases.push({
               id: `simple-spend-childcare-${seg.startAge}-${seg.endAge}`,
@@ -239,11 +253,11 @@ export function normalizeInputsStage(rawInputs) {
             cleanSpendingPhases.push({
               id: expectedId,
               name: 'Lifestyle Spending (Standard Work Phase)',
-              amount: wsExpensesAnnual,
+              amount: segExpensesAnnual,
               frequency: 'yearly',
               startAge: seg.startAge,
               endAge: seg.endAge,
-              annualSpending: wsExpensesAnnual
+              annualSpending: segExpensesAnnual
             });
           }
         });
@@ -256,6 +270,9 @@ export function normalizeInputsStage(rawInputs) {
   if (!isAdvanced) {
     const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
     incomeList = incomeList.map(inc => {
+      if (inc.id && inc.id.includes('-segment-')) {
+        return inc;
+      }
       if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
         if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
           const isGapPhase = inc.id.startsWith('simple-inc-worksave') && 
@@ -279,6 +296,9 @@ export function normalizeInputsStage(rawInputs) {
   }
   if (!isAdvanced) {
     spendingPhases = spendingPhases.map(p => {
+      if (p.id && p.id.includes('-segment-')) {
+        return p;
+      }
       if (p.id === 'spend-1' || p.id.startsWith('simple-spend-worksave') || p.id.startsWith('simple-spend-prechild') || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
         if (!p.id.includes('childcare') && !p.name.toLowerCase().includes('childcare')) {
           const amt = Number(inputs.simpleExpenses) || p.amount;

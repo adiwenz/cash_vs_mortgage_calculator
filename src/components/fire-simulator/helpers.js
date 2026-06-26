@@ -705,7 +705,7 @@ export function getBudgetForAge(inputs, age) {
                 || normalizedPhases[normalizedPhases.length - 1]
                 || normalizedPhases[0];
 
-  const marriageEvent = (inputs.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+  const marriageEvent = (inputs.lifeEvents || []).find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled);
   const spouseMember = (inputs.lifeEvents || []).find(e => e.type === 'spouseMember');
   const isMarriedMode = !!(phase.isMarried || marriageEvent || spouseMember || inputs.filingStatus === 'married' || inputs.filingStatus === 'jointly');
   const budgetMonthlyIncome = phase.income || 0;
@@ -857,7 +857,7 @@ export function getCategoryBreakdown(budget, category, inputs, isMarriedModeOver
   const expenses = phase.expenses || {};
   const savings = phase.savings || {};
   const partnerSavings = phase.partnerSavings || {};
-  const marriageEvent = (inputs?.lifeEvents || []).find(e => e.type === 'marriage' && e.enabled);
+  const marriageEvent = (inputs?.lifeEvents || []).find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled);
   const spouseMember = (inputs?.lifeEvents || []).find(e => e.type === 'spouseMember');
   const isMarriedMode = isMarriedModeOverride !== undefined 
     ? isMarriedModeOverride 

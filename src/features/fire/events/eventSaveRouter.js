@@ -15,7 +15,7 @@ function getHandlerForType(type, inputs, eventId) {
   if (type === 'haveChild') {
     return childEventHandler;
   }
-  if (type === 'marriage') {
+  if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(type)) {
     return marriageEventHandler;
   }
   if (['borrowing', 'payoffPlan'].includes(type)) {
@@ -53,10 +53,10 @@ export const eventSaveRouter = {
     return handler.save(cleanEvent, inputs, scenarios, currentScenarioId, options);
   },
 
-  routeDelete(matchEvent, inputs) {
+  routeDelete(matchEvent, inputs, protectedPreDeleteSavingsRate = null) {
     if (!matchEvent) return null;
     const resolvedEvent = findMatchingEvent(inputs, matchEvent) || matchEvent;
     const handler = getHandlerForType(resolvedEvent.type, inputs, resolvedEvent.id);
-    return handler.delete(resolvedEvent, inputs);
+    return handler.delete(resolvedEvent, inputs, protectedPreDeleteSavingsRate);
   }
 };

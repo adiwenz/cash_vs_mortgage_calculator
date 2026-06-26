@@ -78,9 +78,10 @@ describe('Mobile Life Profile Modal Redesign', () => {
 
     // Assert updateInput was called with new lifePlan containing currentAge: 42
     expect(updateInputMock).toHaveBeenCalledWith(
-      'lifePlan',
       expect.objectContaining({
-        currentAge: 42
+        lifePlan: expect.objectContaining({
+          currentAge: 42
+        })
       })
     );
   });

@@ -32,19 +32,21 @@ export function useScenarioState() {
   const updateInput = (key, value, currentScenarioId) => {
     setScenarios(prev => prev.map(scen => {
       if (scen.id === currentScenarioId) {
-        let updatedInputs = {
-          ...scen.inputs,
-          [key]: value
-        };
+        const isBatch = typeof key === 'object' && key !== null;
+        let updatedInputs = isBatch ? { ...scen.inputs, ...key } : { ...scen.inputs, [key]: value };
 
-        if (key === 'simpleIncome' || key === 'simpleExpenses') {
-          if (key === 'simpleIncome') {
+        const hasSimpleIncome = isBatch ? ('simpleIncome' in key) : (key === 'simpleIncome');
+        const hasSimpleExpenses = isBatch ? ('simpleExpenses' in key) : (key === 'simpleExpenses');
+        const hasBudgetDetails = isBatch ? ('budgetDetails' in key) : false;
+
+        if ((hasSimpleIncome || hasSimpleExpenses) && !hasBudgetDetails) {
+          if (hasSimpleIncome) {
             const prevIncome = Number(scen.inputs.simpleIncome) || 0;
             const prevExpenses = Number(scen.inputs.simpleExpenses) || 0;
             const prevRate = prevIncome > 0 ? ((prevIncome - prevExpenses) / prevIncome) * 100 : 0;
             const displayedSavingsRate = Math.min(100, Math.max(0, prevRate));
             
-            const monthlyIncome = roundCurrency(value / 12);
+            const monthlyIncome = roundCurrency(updatedInputs.simpleIncome / 12);
             const targetMonthlySavings = roundCurrency(monthlyIncome * (displayedSavingsRate / 100));
             
             const existingExpenses = scen.inputs.budgetDetails?.expenses || {};

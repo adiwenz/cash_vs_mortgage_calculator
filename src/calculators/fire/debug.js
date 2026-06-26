@@ -279,7 +279,7 @@ export function buildSimulationDebugSnapshot(inputs, normalizedInputs, events, r
 
   const boundaries = Array.from(new Set(simPhases.flatMap(p => [p.startAge, p.endAge]))).sort((a, b) => a - b);
 
-  const marriageEvent = rawInputs.lifeEvents?.find(e => e.type === 'marriage' && e.enabled);
+  const marriageEvent = rawInputs.lifeEvents?.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled);
   const weddingAge = marriageEvent 
     ? (marriageEvent.weddingAge !== undefined ? Number(marriageEvent.weddingAge) : (marriageEvent.age !== undefined ? Number(marriageEvent.age) : globalAssumptions.currentAge))
     : null;

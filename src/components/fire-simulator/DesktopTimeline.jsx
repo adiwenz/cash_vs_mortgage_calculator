@@ -95,7 +95,7 @@ export default function DesktopTimeline({
 
   const getEventCategory = (evt) => {
     const type = evt.type;
-    if (type === 'marriage') return 'marriage';
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(type)) return 'marriage';
     if (type === 'haveChild' || type === 'childSupportEnds') return 'children';
     if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'housing';
     if (type === 'career' || type === 'sabbatical' || type === 'promotion') return 'career';
@@ -228,14 +228,33 @@ export default function DesktopTimeline({
   // Marriage commitment span
   const lifeProfile = inputs.lifeProfile || {};
   const household = lifeProfile.household || {};
-  const startsMarried = household.status === 'married' || household.status === 'partnered';
-  const marriageEvent = inputs.lifeEvents?.find(e => e.type === 'marriage' && e.enabled);
+  const startsMarried = ['married', 'partnered', 'domestic_partnership', 'partner', 'engaged'].includes(household.status);
+  const marriageEvent = inputs.lifeEvents?.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type) && e.enabled);
   if (marriageEvent || startsMarried) {
     const marriageAge = startsMarried ? inputs.currentAge : Number(marriageEvent.age || marriageEvent.marriageAge || 35);
+    let label = 'Married Life';
+    let emoji = '💍';
+    if (marriageEvent) {
+      if (marriageEvent.type === 'domesticPartnership') {
+        label = 'Domestic Partnership';
+        emoji = '🤝';
+      } else if (marriageEvent.type === 'relationshipBegins') {
+        label = 'Relationship';
+        emoji = '❤️';
+      }
+    } else if (startsMarried) {
+      if (household.status === 'domestic_partnership') {
+        label = 'Domestic Partnership';
+        emoji = '🤝';
+      } else if (['partner', 'engaged', 'partnered'].includes(household.status)) {
+        label = 'Relationship';
+        emoji = '❤️';
+      }
+    }
     activeCommitments.push({
       id: 'commitment-marriage',
-      label: 'Married Life',
-      emoji: '💍',
+      label,
+      emoji,
       startAge: marriageAge,
       endAge: inputs.lifeExpectancy,
       className: 'commitment-span marriage'
@@ -776,7 +795,7 @@ function TimelineEventDialog({ age, events, target, onClose, handleEditRoadmapEv
 
   const getEventCategoryClass = (evt) => {
     const type = evt.type;
-    if (type === 'marriage') return 'marriage';
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(type)) return 'marriage';
     if (type === 'haveChild' || type === 'childSupportEnds') return 'children';
     if (type === 'buyHouse' || type === 'sellHouse' || type === 'mortgageOff') return 'housing';
     if (type === 'career' || type === 'sabbatical' || type === 'promotion') return 'career';
@@ -985,10 +1004,11 @@ function TimelineTooltipPortal({ hoveredEvent, inputs }) {
                   );
                 }
               }
-              if (evt.type === 'marriage') {
+              if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(evt.type)) {
+                const partnerLabel = evt.type === 'marriage' ? 'Spouse' : 'Partner';
                 return (
                   <div style={{ marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem', color: 'var(--accent-rose)' }}>
-                    Spouse Income: {formatCompactCurrency(evt.spouseIncome)}/yr
+                    {partnerLabel} Income: {formatCompactCurrency(evt.spouseIncome || evt.partnerIncome || 0)}/yr
                   </div>
                 );
               }

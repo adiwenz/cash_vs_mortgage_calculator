@@ -118,7 +118,7 @@ export default function EventModalForm({
 
   const type = editingEvent.type;
 
-  if (type === 'marriage') {
+  if (type === 'marriage' || type === 'domesticPartnership' || type === 'relationshipBegins') {
     return (
       <MarriageFields
         inputs={inputs}

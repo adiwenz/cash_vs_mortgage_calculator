@@ -38,12 +38,12 @@ export function getPartitionedPhases(startAge, endAge, enabledEvents) {
 
 export function getActiveEventsForInterval(startAge, endAge, enabledEvents, profile) {
   const active = [];
-  const marriageEvent = enabledEvents.find(ev => ev.type === 'marriage');
+  const marriageEvent = enabledEvents.find(ev => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(ev.type));
   const spouseMember = enabledEvents.find(ev => ev.type === 'spouseMember');
 
   enabledEvents.forEach(e => {
     let isActive = false;
-    if (e.type === 'marriage') {
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type)) {
       isActive = startAge >= Number(e.age);
     } else if (e.type === 'spouseMember') {
       if (marriageEvent && startAge >= Number(marriageEvent.age)) {
@@ -176,7 +176,12 @@ function getRepresentativeIcon(type, activeEventsList, enabledEvents) {
     if (bType === 'mortgage') return '🏡';
     return '💸';
   }
-  if (type === 'marriage') return '💍';
+  if (type === 'marriage') {
+    const relEv = enabledEvents.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
+    if (relEv?.type === 'domesticPartnership') return '🤝';
+    if (relEv?.type === 'relationshipBegins') return '❤️';
+    return '💍';
+  }
   return '💼';
 }
 
@@ -186,8 +191,9 @@ function isGeneratedMainIncome(id) {
          id.startsWith('simple-inc-prechild') ||
          id.startsWith('simple-inc-worksave') ||
          id.startsWith('simple-inc-childcare') ||
-         id === 'simple-inc' ||
-         id === 'inc-1';
+         id.startsWith('simple-inc') ||
+         id.startsWith('inc-1') ||
+         id.startsWith('job-1');
 }
 
 function isCustomSpendingPhase(id) {
@@ -204,7 +210,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
   const lifeExpectancy = profile.lifeExpectancy;
   const targetRetirementAge = profile.targetRetirementAge;
   const enabledEvents = events.filter(e => e.enabled !== false);
-  const marriageEvent = enabledEvents.find(e => e.type === 'marriage');
+  const marriageEvent = enabledEvents.find(e => ['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type));
   const spouseMember = enabledEvents.find(e => e.type === 'spouseMember');
 
   const boundaries = new Set();
@@ -244,7 +250,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       ages.push(birthAge + maxAge);
     }
 
-    if (e.type === 'marriage') {
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(e.type)) {
       const spouseCurrentAge = spouseMember && spouseMember.currentAge !== undefined && spouseMember.currentAge !== null && spouseMember.currentAge !== ''
         ? Number(spouseMember.currentAge)
         : (Number(e.spouseCurrentAge) || currentAge);
@@ -615,7 +621,9 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     let spouseRetirement = 0;
     let partnerSSMonthlyIncome = 0;
 
-    if (isMarried) {
+    const isCombined = marriageEvent ? (marriageEvent.combineFinances !== false) : true;
+
+    if (isMarried && isCombined) {
       const spouseClaimAge = spouseMember ? Number(spouseMember.spouseSocialSecurityAge !== undefined ? spouseMember.spouseSocialSecurityAge : 67) : 67;
       if (start >= spouseClaimAge && spouseMember) {
         if (spouseMember.spouseEstimatedSocialSecurityBenefit !== undefined && Number(spouseMember.spouseEstimatedSocialSecurityBenefit) > 0) {
@@ -994,7 +1002,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
     });
     if (sabbatical) effectsApplied.push(`Sabbatical income reduction: ${sabbatical.incomeReduction}%`);
     if (baristaFire) effectsApplied.push(`Barista FIRE part-time income: ${baristaFire.partTimeIncome}/yr`);
-    if (isMarried) {
+    if (isMarried && isCombined) {
       effectsApplied.push("Marriage/household changes (spouse income & savings)");
     }
     const mortgagePIAdded = resolvedExpenses['🏠 Mortgage'] !== undefined && resolvedExpenses['🏠 Mortgage'] > 0;
@@ -1034,7 +1042,9 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       else if (autoLoan) name = 'Auto Loan Years';
       else name = 'Debt Payoff Years';
     } else if (marriageEvent && Number(marriageEvent.age) === start) {
-      name = 'Married Life';
+      if (marriageEvent.type === 'marriage') name = 'Married Life';
+      else if (marriageEvent.type === 'domesticPartnership') name = 'Domestic Partnership';
+      else name = 'Relationship Life';
     } else if (hasHadDebts && activeDebts.length === 0) {
       name = 'Debt-Free Years';
     } else {

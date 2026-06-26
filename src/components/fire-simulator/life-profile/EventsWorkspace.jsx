@@ -8,8 +8,9 @@ function isGeneratedMainIncome(id) {
          id.startsWith('simple-inc-prechild') ||
          id.startsWith('simple-inc-worksave') ||
          id.startsWith('simple-inc-childcare') ||
-         id === 'simple-inc' ||
-         id === 'inc-1';
+         id.startsWith('simple-inc') ||
+         id.startsWith('inc-1') ||
+         id.startsWith('job-1');
 }
 
 const getWorkspaceEventAge = (ev) => {
@@ -99,6 +100,8 @@ export default function EventsWorkspace({
 
   const getEventIcon = (type) => {
     if (type === 'marriage') return '💍';
+    if (type === 'domesticPartnership') return '🤝';
+    if (type === 'relationshipBegins') return '❤️';
     if (type === 'haveChild' || type === 'child') return '👶';
     if (['buyHouse', 'sellHouse'].includes(type)) return '🏠';
     if (type === 'college') return '🎓';
@@ -118,7 +121,7 @@ export default function EventsWorkspace({
   };
 
   const getEventCategoryBg = (type) => {
-    if (type === 'marriage') return '#f3e8ff'; // purple
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(type)) return '#f3e8ff'; // purple
     if (['buyHouse', 'sellHouse', 'lifestyle', 'spending', 'move'].includes(type)) return '#dcfce7'; // green
     if (['haveChild', 'child'].includes(type)) return '#ffedd5'; // orange
     if (type === 'college') return '#dbeafe'; // blue
@@ -129,7 +132,7 @@ export default function EventsWorkspace({
   };
 
   const getEventCategoryLabel = (type) => {
-    if (type === 'marriage') return 'Relationship';
+    if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(type)) return 'Relationship';
     if (['buyHouse', 'sellHouse'].includes(type)) return 'Housing';
     if (['haveChild', 'child'].includes(type)) return 'Children';
     if (type === 'college') return 'Education';

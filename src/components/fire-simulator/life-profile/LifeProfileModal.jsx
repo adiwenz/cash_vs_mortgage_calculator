@@ -153,7 +153,7 @@ export default function LifeProfileModal({
             {activeTab === 'timeline' ? (
               <TimelineSnapshotTab
                 isMobile={true}
-                inputs={inputs}
+                inputs={draftInputs}
                 projection={projection}
                 snapshot={snapshot}
                 selectedAge={selectedAge}
@@ -166,7 +166,7 @@ export default function LifeProfileModal({
             ) : activeTab === 'lifeItems' ? (
               <LifeItemsWorkspace
                 isMobile={true}
-                inputs={inputs}
+                inputs={draftInputs}
                 localLifePlan={localLifePlan}
                 setLocalLifePlan={setLocalLifePlan}
                 currentAge={localAge}
@@ -180,7 +180,7 @@ export default function LifeProfileModal({
             ) : activeTab === 'events' ? (
               <EventsWorkspace
                 isMobile={true}
-                inputs={inputs}
+                inputs={draftInputs}
                 projection={projection}
                 snapshot={snapshot}
                 selectedAge={selectedAge}
@@ -289,7 +289,7 @@ export default function LifeProfileModal({
           {activeTab === 'timeline' ? (
             <TimelineSnapshotTab
               isMobile={false}
-              inputs={inputs}
+              inputs={draftInputs}
               projection={projection}
               snapshot={snapshot}
               selectedAge={selectedAge}
@@ -307,7 +307,7 @@ export default function LifeProfileModal({
                   {activeTab === 'lifeItems' && (
                     <LifeItemsWorkspace
                       isMobile={false}
-                      inputs={inputs}
+                      inputs={draftInputs}
                       localLifePlan={localLifePlan}
                       setLocalLifePlan={setLocalLifePlan}
                       currentAge={localAge}
@@ -323,7 +323,7 @@ export default function LifeProfileModal({
                   {activeTab === 'events' && (
                     <EventsWorkspace
                       isMobile={false}
-                      inputs={inputs}
+                      inputs={draftInputs}
                       projection={projection}
                       snapshot={snapshot}
                       selectedAge={selectedAge}

@@ -70,7 +70,9 @@ export default function useLifeProfileDraft({
   const [localLifeExpectancy, setLocalLifeExpectancy] = useState(inputs.lifeExpectancy || 85);
   const [localSimpleIncome, setLocalSimpleIncome] = useState(inputs.simpleIncome || 50000);
   const [localTargetRetirementAge, setLocalTargetRetirementAge] = useState(inputs.targetRetirementAge || 65);
-  const [localLifePlan, setLocalLifePlan] = useState(null);
+  const [localLifePlan, setLocalLifePlan] = useState(() => {
+    return inputs.lifePlan ? JSON.parse(JSON.stringify(inputs.lifePlan)) : initializeLifePlanIfMissing(inputs);
+  });
   const [editingItemId, setEditingItemId] = useState(null);
   
   // Find social security event claiming age
@@ -183,20 +185,35 @@ export default function useLifeProfileDraft({
   }, [localLifePlan]);
 
   // Save profile updates to scenario state
-  const saveToParent = (updatesObj) => {
+  const saveToParent = (updatesObj, protectedPreDeleteSavingsRate = null) => {
     setLastChartChangeType('profile_value_change');
     
-    const updates = getSaveUpdates(updatesObj, inputs);
+    const updates = getSaveUpdates(updatesObj, inputs, protectedPreDeleteSavingsRate);
 
-    Object.entries(updates).forEach(([key, val]) => {
-      updateInput(key, val);
+    const sumBudgetSavings = (bd) => {
+      if (!bd || !bd.savings) return 0;
+      return Object.values(bd.savings).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    };
+
+    console.log("PARTNER_DELETE_FINAL_UPDATES", {
+      simpleIncome: updates.simpleIncome,
+      simpleExpenses: updates.simpleExpenses,
+      savingsRate: updates.savingsRate,
+      displayedSavingsRate: updates.displayedSavingsRate,
+      spendingPhaseAnnual: updates.spendingPhases?.[0]?.annualSpending,
+      budgetSavingsTotal: sumBudgetSavings(updates.budgetDetails),
     });
+
+    updateInput(updates);
   };
 
-  const triggerSave = (overrides = {}) => {
+  const triggerSave = (overrides = {}, protectedPreDeleteSavingsRate = null) => {
     const lifePlan = overrides.lifePlan !== undefined ? overrides.lifePlan : localLifePlan;
     if (lifePlan) {
-      saveToParent({ lifePlan });
+      saveToParent({ 
+        ...overrides,
+        lifePlan
+      }, protectedPreDeleteSavingsRate);
     } else {
       const profile = overrides.profile !== undefined ? overrides.profile : localProfile;
       const age = overrides.age !== undefined ? overrides.age : localAge;
@@ -208,7 +225,7 @@ export default function useLifeProfileDraft({
       const bhAge = overrides.bhAge !== undefined ? overrides.bhAge : localBuyHouseAge;
       const bhPrice = overrides.bhPrice !== undefined ? overrides.bhPrice : localBuyHousePrice;
       
-      saveToParent({ profile, age, lifeExp, salary, retireAge, ssAge, bhEnabled, bhAge, bhPrice });
+      saveToParent({ profile, age, lifeExp, salary, retireAge, ssAge, bhEnabled, bhAge, bhPrice }, protectedPreDeleteSavingsRate);
     }
   };
 

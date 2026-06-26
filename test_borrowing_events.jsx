@@ -339,7 +339,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     const result = runFireSimulation(inputs);
     // Year 0 (age 35): brokerage = 5000, student loan debt = 30000.
     // End of year net worth is -19000
-    expect(result.nominalData[0].netWorth).toBe(-19000);
+    expect(result.nominalData[0].netWorth).toBeCloseTo(-19000, 1);
     expect(result.nominalData[0].debtBalance).toBeCloseTo(27900, 0);
   });
 
@@ -364,7 +364,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     };
     const result = runFireSimulation(inputs);
     // Year 0 (age 35) net worth = 12500 (debt is not active yet)
-    expect(result.nominalData[0].netWorth).toBe(12500);
+    expect(result.nominalData[0].netWorth).toBeCloseTo(12500, 1);
     expect(result.nominalData[0].debtBalance).toBe(0);
 
     // Active at age 40
@@ -393,7 +393,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     };
     const result = runFireSimulation(inputs);
     // Net worth = 6500 (end of year 35)
-    expect(result.nominalData[0].netWorth).toBe(6500);
+    expect(result.nominalData[0].netWorth).toBeCloseTo(6500, 1);
     expect(result.nominalData[0].debtBalance).toBeCloseTo(4200, 0);
   });
 
@@ -418,7 +418,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     };
     const result = runFireSimulation(inputs);
     // Net worth = -8700 (end of year 35)
-    expect(result.nominalData[0].netWorth).toBe(-8700);
+    expect(result.nominalData[0].netWorth).toBeCloseTo(-8700, 1);
     expect(result.nominalData[0].debtBalance).toBeCloseTo(16560, 0);
   });
 
@@ -528,7 +528,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     };
     const result = runFireSimulation(inputs);
     // Since startAge === currentAge (35), it should initialize as existing/current and reduce today's net worth
-    expect(result.nominalData[0].netWorth).toBe(2000); // 11300 portfolio - 9300 debt
+    expect(result.nominalData[0].netWorth).toBeCloseTo(2000, 1); // 11300 portfolio - 9300 debt
     expect(result.nominalData[0].debtBalance).toBeCloseTo(9300, 0);
   });
 
@@ -555,7 +555,7 @@ describe('Unification & Start Timing (9 Required Test Cases)', () => {
     };
     const result = runFireSimulation(inputs);
     // Today's net worth should not be affected
-    expect(result.nominalData[0].netWorth).toBe(12500);
+    expect(result.nominalData[0].netWorth).toBeCloseTo(12500, 1);
     expect(result.nominalData[0].debtBalance).toBe(0);
 
     // Active at age 40

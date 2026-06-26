@@ -106,12 +106,13 @@ export default function DesktopBudgetPanel({
   const getAppliedChangesExplanations = () => {
     const explanations = [];
     appliedEvents.forEach(evt => {
-      if (evt.type === 'marriage') {
+      if (['marriage', 'domesticPartnership', 'relationshipBegins'].includes(evt.type)) {
         const spouseIncome = Number(evt.spouseIncome) || 0;
+        const relLabel = evt.type === 'marriage' ? 'Marriage' : (evt.type === 'domesticPartnership' ? 'Domestic Partnership' : 'Relationship');
         if (spouseIncome > 0) {
-          explanations.push(`+$${(spouseIncome).toLocaleString()}/yr income from Marriage`);
+          explanations.push(`+$${(spouseIncome).toLocaleString()}/yr income from ${relLabel}`);
         } else {
-          explanations.push(`Combined finances from Marriage`);
+          explanations.push(`Combined finances from ${relLabel}`);
         }
       } else if (evt.type === 'haveChild') {
         explanations.push(`+$1,250/mo childcare from Child`);

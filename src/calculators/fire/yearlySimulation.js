@@ -34,6 +34,8 @@ import {
   buildSimulationContext
 } from './simulation/index.js';
 
+import { isLegalMarriageEvent } from '../../features/fire/events/eventTypeGuards.js';
+
 export function projectSalaryWithGrowth(baseSalary, growthRate, years) {
   return baseSalary * Math.pow(1 + growthRate, years);
 }
@@ -296,7 +298,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
 
     let currentFilingStatus = filingStatus;
     if (hasMarriage && age >= marriageAge && age <= userAgeWhenSpouseDies) {
-      currentFilingStatus = (marriageEvent && marriageEvent.filingStatus) || 'jointly';
+      if (marriageEvent && isLegalMarriageEvent(marriageEvent)) {
+        currentFilingStatus = marriageEvent.filingStatus || 'jointly';
+      } else {
+        currentFilingStatus = (marriageEvent && marriageEvent.filingStatus) || filingStatus;
+      }
     }
     if (currentFilingStatus === 'jointly' || currentFilingStatus === 'marriedJointly') {
       currentFilingStatus = 'married';
@@ -680,7 +686,11 @@ export function projectYearlyBalances(profile, phases, events, targetRetirementA
       budgetScalingMode = activePhaseForAge.budgetScalingMode || 'lifestyle';
       phaseIncomeAtCreation = activePhaseForAge.incomeAtCreation !== undefined ? activePhaseForAge.incomeAtCreation : (activePhaseForAge.income * 12);
       if (budgetScalingMode === 'lifestyle') {
-        incomeMultiplier = phaseIncomeAtCreation > 0 ? (annualIncome / phaseIncomeAtCreation) : 1.0;
+        if (phaseIncomeAtCreation > 0 && Math.abs(annualIncome - phaseIncomeAtCreation) < 1.0) {
+          incomeMultiplier = 1.0;
+        } else {
+          incomeMultiplier = phaseIncomeAtCreation > 0 ? (annualIncome / phaseIncomeAtCreation) : 1.0;
+        }
         scalingMultiplier = incomeMultiplier;
         savingsMultiplier = incomeMultiplier;
       } else { // 'fixed'
