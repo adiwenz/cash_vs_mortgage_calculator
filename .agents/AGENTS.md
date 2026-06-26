@@ -17,3 +17,5 @@
 ## No Legacy Modes Default Instruction
 - **Prefer replacement over compatibility. This project has no production users, so do not introduce feature flags, legacy code paths, migration layers, or compatibility wrappers unless explicitly requested. Maintain a single canonical implementation and remove obsolete code whenever practical.**
 
+## Efficient Process Waiting Default Instruction
+- **Prefer waiting on command completion over arbitrary timers. Do not use fixed sleep intervals as the default test/build waiting strategy; use completion signals or adaptive polling, and avoid duplicate long-running commands.**
