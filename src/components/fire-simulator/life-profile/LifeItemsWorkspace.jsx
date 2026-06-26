@@ -111,11 +111,16 @@ export default function LifeItemsWorkspace({
   triggerSave,
   editingItemId,
   setEditingItemId,
-  initialTab
+  initialTab,
+  handleCreateEvent
 }) {
   const [editingItem, setEditingItem] = useState(null); // { mode: 'add'|'edit', type, item }
   const [editingEvent, setEditingEvent] = useState(null); // { mode: 'add'|'edit', objectId, eventType, event }
+  const [activeScopeId, setActiveScopeId] = useState('self');
   const [activeCategory, setActiveCategory] = useState('people');
+  const [youExpanded, setYouExpanded] = useState(true);
+  const [partnerExpanded, setPartnerExpanded] = useState(true);
+  const [jointExpanded, setJointExpanded] = useState(false);
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [inlineEditingId, setInlineEditingId] = useState(null);
   const [inlineDrafts, setInlineDrafts] = useState({});
@@ -148,7 +153,22 @@ export default function LifeItemsWorkspace({
   
   const objects = localLifePlan?.objects || [];
 
-  // Group objects based on category key
+  const getObjectScope = (item) => {
+    if (!item) return 'self';
+    const owner = item.properties?.owner;
+    if (owner === 'partner' || owner === 'spouse-partner') return 'spouse-partner';
+    if (owner === 'joint' || owner === 'household' || owner === 'shared') return 'household';
+    if (owner === 'self') return 'self';
+
+    if (item.type === 'person') {
+      return item.properties?.role === 'partner' || item.id === 'spouse-partner' ? 'spouse-partner' : 'self';
+    }
+    if (item.type === 'child') {
+      return 'household';
+    }
+    return 'self';
+  };
+
   const getCategoryObjects = (categoryKey, objectsList) => {
     switch (categoryKey) {
       case 'people':
@@ -170,6 +190,39 @@ export default function LifeItemsWorkspace({
     }
   };
 
+  const getCategoryObjectsFiltered = (categoryKey) => {
+    const catObjects = getCategoryObjects(categoryKey, objects);
+    if (categoryKey === 'people') {
+      return catObjects;
+    }
+    return catObjects.filter(o => getObjectScope(o) === activeScopeId);
+  };
+
+  const getScopeCategoryCount = (scopeId, categoryKey) => {
+    const catObjects = getCategoryObjects(categoryKey, objects);
+    return catObjects.filter(o => getObjectScope(o) === scopeId).length;
+  };
+
+  const SIDEBAR_CATEGORIES = [
+    { key: 'jobs', label: 'Jobs & Income', icon: '💼' },
+    { key: 'accounts', label: 'Accounts & Assets', icon: '💳' },
+    { key: 'property', label: 'Homes & Property', icon: '🏡' },
+    { key: 'debts', label: 'Debts', icon: '💰' },
+    { key: 'insurance', label: 'Insurance', icon: '🛡️' },
+    { key: 'other', label: 'Other', icon: '⚙️' }
+  ];
+
+  const getScopeTotalCount = (scopeId) => {
+    let sum = 0;
+    SIDEBAR_CATEGORIES.forEach(cat => {
+      sum += getScopeCategoryCount(scopeId, cat.key);
+    });
+    return sum;
+  };
+
+  const partnerObj = objects.find(o => o.type === 'person' && (o.id === 'spouse-partner' || o.role === 'partner' || o.properties?.role === 'partner'));
+  const partnerName = partnerObj?.name || 'Sarah';
+
   useEffect(() => {
     if (editingItemId && setEditingItemId) {
       const item = objects.find(o => o.id === editingItemId);
@@ -181,7 +234,10 @@ export default function LifeItemsWorkspace({
         }
         setEditingItem({ mode: 'edit', type: item.type, item: itemCopy });
         
-        // Auto-switch to the correct category in the sidebar
+        // Auto-switch both scope and category
+        const itemScope = getObjectScope(item);
+        setActiveScopeId(itemScope);
+
         if (['person', 'child'].includes(item.type)) {
           setActiveCategory('people');
         } else if (item.type === 'job') {
@@ -234,7 +290,6 @@ export default function LifeItemsWorkspace({
   };
 
   const handleStartAdd = (type) => {
-    setShowTypeSelect(false);
     const settings = localLifePlan?.settings || localLifePlan?.assumptions || {};
     const newItem = {
       id: `${type}-${Date.now()}`,
@@ -242,7 +297,10 @@ export default function LifeItemsWorkspace({
       name: getPlaceholderName(type),
       startAge: currentAge,
       endAge: type === 'job' ? 65 : type === 'goal' ? lifeExpectancy : null,
-      properties: getInitialProperties(type, currentAge, settings)
+      properties: {
+        ...getInitialProperties(type, currentAge, settings),
+        owner: activeScopeId === 'self' ? 'self' : activeScopeId === 'spouse-partner' ? 'partner' : 'joint'
+      }
     };
     setEditingItem({ mode: 'add', type, item: newItem });
   };
@@ -256,12 +314,25 @@ export default function LifeItemsWorkspace({
   };
 
   const handleDelete = (id) => {
+    if (id === 'spouse-partner') {
+      const nextObjects = objects.filter(o => o.id !== id);
+      const updatedPlan = {
+        ...localLifePlan,
+        objects: nextObjects,
+        events: (localLifePlan.events || []).filter(e => e.type !== 'marriage'),
+        household: {
+          ...localLifePlan.household,
+          status: 'single'
+        }
+      };
+      setLocalLifePlan(updatedPlan);
+      triggerSave({ lifePlan: updatedPlan });
+      return;
+    }
+
     const nextObjects = objects.filter(o => o.id !== id);
-    // If we delete a property, also delete any linked mortgage debt
     const mortgageId = `mortgage-${id}`;
     const cleanObjects = nextObjects.filter(o => o.id !== mortgageId);
-
-    // Cascade deletion to attached events
     const cleanEvents = (localLifePlan.events || []).filter(e => e.objectId !== id && e.objectId !== mortgageId);
 
     const updatedPlan = {
@@ -657,10 +728,10 @@ export default function LifeItemsWorkspace({
             <button 
               type="button" 
               className="btn-primary" 
-              onClick={() => handleStartAdd('person')}
+              onClick={() => handleCreateEvent('marriage')}
               style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <Plus size={14} /> Add Person
+              <Plus size={14} /> Add Partner
             </button>
             <button 
               type="button" 
@@ -774,7 +845,7 @@ export default function LifeItemsWorkspace({
           </div>
           {renderEditorForm(editingItem.item, (updated) => {
             setEditingItem({ ...editingItem, item: updated });
-          }, () => handleSaveItem(editingItem.item))}
+          }, () => handleSaveItem(editingItem.item), objects)}
         </div>
       );
     }
@@ -1007,7 +1078,7 @@ export default function LifeItemsWorkspace({
     }
 
     return CATEGORIES.map(cat => {
-      const catObjects = getCategoryObjects(cat.key, objects);
+      const catObjects = getCategoryObjectsFiltered(cat.key);
       const isVisible = activeCategory === cat.key;
       return (
         <div key={cat.key} style={{ display: isVisible ? 'flex' : 'none', flexDirection: 'column', gap: '1rem' }}>
@@ -1026,7 +1097,44 @@ export default function LifeItemsWorkspace({
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: cat.key === 'accounts' ? '0.4rem' : '0.75rem' }}>
-            {cat.key === 'accounts' ? (
+            {cat.key === 'people' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* You Card */}
+                {objects.find(o => o.type === 'person' && (o.properties?.role === 'self' || o.id === 'self-person')) ? (
+                  renderCard(objects.find(o => o.type === 'person' && (o.properties?.role === 'self' || o.id === 'self-person')), 'people')
+                ) : null}
+
+                {/* Partner Card */}
+                {partnerObj ? (
+                  renderCard(partnerObj, 'people')
+                ) : (
+                  <div className="life-object-card life-profile-list-item" style={{ border: '1px dashed var(--border-color)', textAlign: 'center', padding: '1.5rem', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Partner (Not added yet)</div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: 0 }}>Add a partner to model income, taxes, social security, and shared life events.</p>
+                    <button type="button" className="btn-secondary" onClick={() => handleCreateEvent('marriage')} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', margin: '0 auto' }}>
+                      <Plus size={14} /> Add Partner
+                    </button>
+                  </div>
+                )}
+
+                {/* Joint / Household Card */}
+                <div className="life-object-card life-profile-list-item" style={{ cursor: 'pointer', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '1rem' }} onClick={() => { setActiveScopeId('household'); setActiveCategory('people'); }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Joint / Household</div>
+                    <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Shared accounts, property, insurance, and household-level items.</p>
+                </div>
+
+                {/* Children Section */}
+                {objects.filter(o => o.type === 'child').length > 0 && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Children & Dependents</h5>
+                    {objects.filter(o => o.type === 'child').map(c => renderCard(c, 'people'))}
+                  </div>
+                )}
+              </div>
+            ) : cat.key === 'accounts' ? (
               <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                 <div style={{ minWidth: '700px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   {renderAccountTableHeader()}
@@ -1036,7 +1144,7 @@ export default function LifeItemsWorkspace({
             ) : (
               catObjects.map(item => renderCard(item, cat.key))
             )}
-            {catObjects.length === 0 && (
+            {catObjects.length === 0 && cat.key !== 'people' && (
               <div style={{
                 textAlign: 'center',
                 padding: '2.5rem 1rem',
@@ -1120,7 +1228,8 @@ export default function LifeItemsWorkspace({
         accountType: 'custom',
         currentBalance: 0,
         allocation: '100/0',
-        taxTreatment: 'Taxable'
+        taxTreatment: 'Taxable',
+        owner: activeScopeId === 'self' ? 'self' : activeScopeId === 'spouse-partner' ? 'partner' : 'joint'
       }
     };
 
@@ -1652,54 +1761,360 @@ export default function LifeItemsWorkspace({
     <div className="life-profile-tab-content-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800' }}>Life Items</h4>
-          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Configure all the durable aspects of your life clock in one place.</p>
+          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800' }}>
+            {activeScopeId === 'self' 
+              ? 'Configure Profile (Scoped to You)' 
+              : activeScopeId === 'spouse-partner' 
+                ? `Configure Profile (Scoped to ${partnerName})` 
+                : 'Configure Household'}
+          </h4>
+          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            {activeScopeId === 'household' 
+              ? 'Configure shared assets, property, and household-level items.' 
+              : 'Configure all the durable aspects of life, all in one place.'}
+          </p>
         </div>
       </div>
 
       {/* Mobile Segments vs. Desktop Sidebar */}
       {isMobile ? (
-        <div className="life-items-mobile-nav">
-          {CATEGORIES.map(cat => {
-            const count = getCategoryObjects(cat.key, objects).length;
-            const isActive = activeCategory === cat.key;
-            return (
-              <button
-                key={cat.key}
-                type="button"
-                className={`life-items-mobile-nav-btn ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat.key)}
-              >
-                {cat.icon} {cat.label} ({count})
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          {/* Scope Selector */}
+          <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+            <button
+              type="button"
+              onClick={() => { setActiveScopeId('self'); setActiveCategory('people'); }}
+              style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '6px', cursor: 'pointer', background: activeScopeId === 'self' ? '#ffffff' : 'transparent', fontWeight: activeScopeId === 'self' ? 'bold' : 'normal', boxShadow: activeScopeId === 'self' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            >
+              👩 You
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (partnerObj) {
+                  setActiveScopeId('spouse-partner');
+                  setActiveCategory('people');
+                } else {
+                  handleCreateEvent('marriage');
+                }
+              }}
+              style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '6px', cursor: 'pointer', background: activeScopeId === 'spouse-partner' ? '#ffffff' : 'transparent', fontWeight: activeScopeId === 'spouse-partner' ? 'bold' : 'normal', boxShadow: activeScopeId === 'spouse-partner' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            >
+              👤 Partner {partnerObj ? `(${partnerName})` : '(Add)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveScopeId('household'); setActiveCategory('people'); }}
+              style={{ flex: 1, padding: '6px', fontSize: '0.78rem', border: 'none', borderRadius: '6px', cursor: 'pointer', background: activeScopeId === 'household' ? '#ffffff' : 'transparent', fontWeight: activeScopeId === 'household' ? 'bold' : 'normal', boxShadow: activeScopeId === 'household' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            >
+              👨‍👩‍👧‍👦 Joint
+            </button>
+          </div>
+
+          {/* Categories Nav */}
+          <div className="life-items-mobile-nav" style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '4px' }}>
+            <button
+              type="button"
+              className={`life-items-mobile-nav-btn ${activeCategory === 'people' ? 'active' : ''}`}
+              onClick={() => setActiveCategory('people')}
+              style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '20px', whiteSpace: 'nowrap' }}
+            >
+              👥 People
+            </button>
+            {SIDEBAR_CATEGORIES.map(cat => {
+              const count = getScopeCategoryCount(activeScopeId, cat.key);
+              const isActive = activeCategory === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  className={`life-items-mobile-nav-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveCategory(cat.key)}
+                  style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '20px', whiteSpace: 'nowrap' }}
+                >
+                  {cat.icon} {cat.label} ({count})
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
       <div className="life-items-container">
         {!isMobile && (
           <div className="life-items-sidebar">
-            {CATEGORIES.map(cat => {
-              const count = getCategoryObjects(cat.key, objects).length;
-              const isActive = activeCategory === cat.key;
-              return (
-                <button
-                  key={cat.key}
-                  type="button"
-                  className={`life-items-sidebar-btn ${isActive ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(cat.key)}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.05rem' }}>{cat.icon}</span>
-                    <span>{cat.label}</span>
+            {/* You (Self) Collapsible Header */}
+            <div 
+              onClick={() => {
+                setYouExpanded(!youExpanded);
+                setActiveScopeId('self');
+                setActiveCategory('people');
+              }}
+              className={`life-items-sidebar-header ${activeScopeId === 'self' && activeCategory === 'people' ? 'active' : ''}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.6rem 0.75rem',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                backgroundColor: activeScopeId === 'self' && activeCategory === 'people' ? '#dcfce7' : 'transparent',
+                color: activeScopeId === 'self' && activeCategory === 'people' ? '#16a34a' : 'var(--text-primary)',
+                marginBottom: '4px',
+                marginTop: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>👩</span>
+                <span>You (Self)</span>
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {youExpanded ? '▼' : '▶'}
+              </span>
+            </div>
+            {youExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem' }}>
+                {SIDEBAR_CATEGORIES.map(cat => {
+                  const isActive = activeScopeId === 'self' && activeCategory === cat.key;
+                  const count = getScopeCategoryCount('self', cat.key);
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      className={`life-items-sidebar-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveScopeId('self');
+                        setActiveCategory(cat.key);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.6rem',
+                        border: 'none',
+                        background: isActive ? '#f0fdf4' : 'transparent',
+                        color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        textAlign: 'left',
+                        fontWeight: isActive ? '700' : '500'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </div>
+                      <span className="life-items-sidebar-count" style={{
+                        fontSize: '0.7rem',
+                        background: isActive ? '#dcfce7' : '#f1f5f9',
+                        color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                        padding: '2px 6px',
+                        borderRadius: '10px'
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Partner Collapsible Header */}
+            <div 
+              onClick={() => {
+                setPartnerExpanded(!partnerExpanded);
+                setActiveScopeId('spouse-partner');
+                setActiveCategory('people');
+              }}
+              className={`life-items-sidebar-header ${activeScopeId === 'spouse-partner' && activeCategory === 'people' ? 'active' : ''}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.6rem 0.75rem',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                backgroundColor: activeScopeId === 'spouse-partner' && activeCategory === 'people' ? '#dcfce7' : 'transparent',
+                color: activeScopeId === 'spouse-partner' && activeCategory === 'people' ? '#16a34a' : 'var(--text-primary)',
+                marginBottom: '4px',
+                marginTop: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>👤</span>
+                <span>Partner {partnerObj ? `(${partnerName})` : ''}</span>
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {partnerExpanded ? '▼' : '▶'}
+              </span>
+            </div>
+            {partnerExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem' }}>
+                {partnerObj ? (
+                  SIDEBAR_CATEGORIES.map(cat => {
+                    const isActive = activeScopeId === 'spouse-partner' && activeCategory === cat.key;
+                    const count = getScopeCategoryCount('spouse-partner', cat.key);
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        className={`life-items-sidebar-btn ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveScopeId('spouse-partner');
+                          setActiveCategory(cat.key);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.45rem 0.6rem',
+                          border: 'none',
+                          background: isActive ? '#f0fdf4' : 'transparent',
+                          color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          textAlign: 'left',
+                          fontWeight: isActive ? '700' : '500'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </div>
+                        <span className="life-items-sidebar-count" style={{
+                          fontSize: '0.7rem',
+                          background: isActive ? '#dcfce7' : '#f1f5f9',
+                          color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                          padding: '2px 6px',
+                          borderRadius: '10px'
+                        }}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    <span>No partner added yet</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateEvent('marriage')}
+                      style={{
+                        alignSelf: 'flex-start',
+                        color: '#16a34a',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}
+                    >
+                      <Plus size={12} /> Add Partner
+                    </button>
                   </div>
-                  <span className="life-items-sidebar-count">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+                )}
+              </div>
+            )}
+
+            {/* Joint / Household Collapsible Header */}
+            <div 
+              onClick={() => {
+                setJointExpanded(!jointExpanded);
+                setActiveScopeId('household');
+                setActiveCategory('people');
+              }}
+              className={`life-items-sidebar-header ${activeScopeId === 'household' && activeCategory === 'people' ? 'active' : ''}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.6rem 0.75rem',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                backgroundColor: activeScopeId === 'household' && activeCategory === 'people' ? '#dcfce7' : 'transparent',
+                color: activeScopeId === 'household' && activeCategory === 'people' ? '#16a34a' : 'var(--text-primary)',
+                marginBottom: '4px',
+                marginTop: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>👨‍👩‍👧‍👦</span>
+                <span>Joint / Household</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="life-items-sidebar-count" style={{
+                  fontSize: '0.7rem',
+                  background: '#f1f5f9',
+                  color: 'var(--text-secondary)',
+                  padding: '2px 6px',
+                  borderRadius: '10px'
+                }}>
+                  {getScopeTotalCount('household')}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {jointExpanded ? '▼' : '▶'}
+                </span>
+              </div>
+            </div>
+            {jointExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '0.75rem' }}>
+                {SIDEBAR_CATEGORIES.map(cat => {
+                  const isActive = activeScopeId === 'household' && activeCategory === cat.key;
+                  const count = getScopeCategoryCount('household', cat.key);
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      className={`life-items-sidebar-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveScopeId('household');
+                        setActiveCategory(cat.key);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.6rem',
+                        border: 'none',
+                        background: isActive ? '#f0fdf4' : 'transparent',
+                        color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        textAlign: 'left',
+                        fontWeight: isActive ? '700' : '500'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </div>
+                      <span className="life-items-sidebar-count" style={{
+                        fontSize: '0.7rem',
+                        background: isActive ? '#dcfce7' : '#f1f5f9',
+                        color: isActive ? '#16a34a' : 'var(--text-secondary)',
+                        padding: '2px 6px',
+                        borderRadius: '10px'
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1712,7 +2127,7 @@ export default function LifeItemsWorkspace({
 }
 
 // Editor rendering helper
-function renderEditorForm(item, onChange, onSave) {
+function renderEditorForm(item, onChange, onSave, objects) {
   const p = item.properties || {};
 
   const updateProp = (key, val) => {
@@ -1743,6 +2158,24 @@ function renderEditorForm(item, onChange, onSave) {
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(); }} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* Owner selection when partner exists (and item is not person/child) */}
+      {objects.some(o => o.id === 'spouse-partner') && item.type !== 'person' && item.type !== 'child' && (
+        <div className="life-profile-form-group" style={{ marginBottom: '0.75rem' }}>
+          <label htmlFor="owner-scope-select" className="life-profile-label-small">Owner / Scope</label>
+          <select 
+            id="owner-scope-select"
+            className="life-profile-select-field" 
+            value={p.owner || 'self'} 
+            onChange={(e) => updateProp('owner', e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <option value="self">Self (Primary)</option>
+            <option value="partner">Partner / Spouse</option>
+            <option value="joint">Joint</option>
+          </select>
+        </div>
+      )}
+
       <div className="life-profile-form-group">
         <label className="life-profile-label-small">Item Name</label>
         <input 

@@ -175,6 +175,7 @@ export default function LifeProfileModal({
                 editingItemId={editingItemId}
                 setEditingItemId={setEditingItemId}
                 initialTab={initialTab}
+                handleCreateEvent={handleCreateEvent}
               />
             ) : activeTab === 'events' ? (
               <EventsWorkspace
@@ -315,6 +316,7 @@ export default function LifeProfileModal({
                       editingItemId={editingItemId}
                       setEditingItemId={setEditingItemId}
                       initialTab={initialTab}
+                      handleCreateEvent={handleCreateEvent}
                     />
                   )}
 
