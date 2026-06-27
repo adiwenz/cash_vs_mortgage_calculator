@@ -110,7 +110,7 @@ Recommendations (e.g., delaying retirement, scaling savings, or rebalancing home
 To prevent architectural and functional regressions:
 1. **Directory Boundaries**: Run `node test_architecture_boundaries.js` to ensure React imports do not pollute calculations or domain modules.
 2. **Simulation Golden Suite**: All pipeline adjustments must pass [test_simulation_pipeline_golden.js](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/test_simulation_pipeline_golden.js) validating outcome shape and immutability.
-3. **Changed and Full Runs**: Execute `npm run test:changed` during development and the full `npm run test` before committing/merging.
+3. **Related and Full Runs**: Execute `npm run test:related -- <modified-source-files>` during development and the full `npm run test` before committing/merging.
 
 ---
 

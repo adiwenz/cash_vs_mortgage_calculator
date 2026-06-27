@@ -22,10 +22,13 @@ This skill ensures that whenever you implement a new feature, add a new calculat
    - Ensure it is matched by the Vitest configuration (`test_*.js`).
 
 4. **Verify Locally**:
-   - Run a one-time execution of Vitest targeting only the changed files:
+   - Run Vitest targeting only the related tests for the modified source files:
      ```bash
-     npm run test:changed
+     npm run test:related -- <modified-source-files>
      ```
-   - If git changes are not staged/committed, run a targeted run using `npx vitest run test_<feature_name>.js` or `npx vitest related <changed files>`.
-   - For Playwright E2E tests, only run changed tests relative to the main branch when code is changed: `npm run test:e2e:changed`. Do NOT run the whole Playwright test suite (`npm run test:e2e`) during development.
+     Or, if the modified file is a test file, run it directly:
+     ```bash
+     npm run test -- <test-file>
+     ```
    - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e`) manually during development, as the `git-commit-and-merge` skill will automatically run them before merging to `main`.
+   - For Playwright E2E tests, only run changed tests relative to the main branch when code is changed: `npm run test:e2e:changed`. Do NOT run the whole Playwright test suite (`npm run test:e2e`) during development.

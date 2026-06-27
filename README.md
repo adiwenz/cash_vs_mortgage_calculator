@@ -70,9 +70,9 @@ The project uses **Vitest** as the primary test runner for unit and component te
 To maintain a fast and high-confidence test suite, follow this development workflow:
 
 #### 1. During Development
-Run only tests affected by changes relative to the `main` branch:
+Run tests related to modified source files:
 ```bash
-npm run test:changed
+npm run test:related -- <modified-source-files>
 ```
 
 #### 2. Before Commit
@@ -92,7 +92,7 @@ npm run verify:full
 ### Command Reference
 
 #### Unit & Component Tests (Vitest)
-*   **Run Changed Tests**: `npm run test:changed` (runs `vitest run --changed=main`)
+*   **Run Related Tests**: `npm run test:related -- <files>` (runs `vitest related <files> --run`)
 *   **Run All Tests**: `npm run test` or `npm run test:unit` (runs `vitest run`)
 *   **Watch Mode**: `npm run test:watch` (runs `vitest`)
 

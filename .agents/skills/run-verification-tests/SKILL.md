@@ -9,18 +9,27 @@ This skill ensures that whenever you modify, create, or delete any source code, 
 ## Instructions
 
 1. **Active Development Unit Validation**:
-   - After each code edit, run a one-time execution of Vitest targeting only the changed files:
+   - If the modified file is a test file, run it directly:
      ```bash
-     npm run test:changed
+     npm run test -- <test-file>
+     ```
+   - If the modified files are source files, run Vitest targeting only the related tests:
+     ```bash
+     npm run test:related -- <modified-source-files>
      ```
      Inspect the output to ensure the affected tests pass. Do not run Vitest in watch mode.
+     *Note: Ignore non-testable files like markdown, docs, snapshots, lockfiles, CSS, and generated output.*
 
-2. **One-Time Related Unit Validation**:
-   - If git changes are not staged/committed, run Vitest targeting only the modified files:
-     ```bash
-     npx vitest related <changed files>
-     ```
-     Avoid running the full suite `npm run test:unit` during development iterations.
+2. **Fallback Workflow for Unit Tests**:
+   - If `npm run test:related` finds no related tests, follow this strict fallback order:
+     1. Run the nearest targeted test file by path/name if one exists.
+     2. Run the relevant package/module test suite if a nearby test file cannot be identified.
+     3. If no targeted test is discoverable, explicitly report:
+        - which modified files had no related tests,
+        - why no targeted fallback was available,
+        - what broader verification command will cover the change.
+        Only then proceed.
+     - **Never** treat "no related tests found" as a green/successful test result.
 
 3. **E2E Changed Validation (Playwright)**:
    - For Playwright end-to-end tests, only run changed tests relative to the main branch when code is changed:
@@ -34,4 +43,4 @@ This skill ensures that whenever you modify, create, or delete any source code, 
    - Avoid running the full suite manually during development iterations unless:
      - Explicitly requested by the user.
      - Preparing a final release/build verification.
-     - The changed-test command indicates broader validation is required.
+     - A broader validation command is required due to no targeted tests being found.
