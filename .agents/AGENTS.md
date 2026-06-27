@@ -23,3 +23,6 @@
 ## Search Memory & Result Reuse Default Instruction
 - **Treat search results as cached knowledge for the duration of a task. Prefer reusing previously discovered files, symbols, and locations instead of issuing duplicate searches. Search to discover information, not to repeatedly rediscover it.**
 
+## Efficient Code Navigation Default Instruction
+- **Navigate by meaning, not by line number. Search first, read complete logical units, and avoid repeated small adjacent file reads.**
+- **Efficient Code Navigation**: For all coding tasks in this repository, you MUST read and strictly follow the [Efficient Code Navigation](file:///Users/adriannawenz/code/cash_vs_mortgage_calculator/.agents/skills/efficient-code-navigation/SKILL.md) skill.
