@@ -12,15 +12,33 @@ const formatCurrency = (val) => {
   }).format(val);
 };
 
-function isGeneratedMainIncome(id) {
-  if (!id || typeof id !== 'string') return false;
-  return id.startsWith('child-income-boost') ||
+function isMainIncome(inc) {
+  if (!inc) return false;
+  const name = inc.name || '';
+  const id = inc.id || '';
+  return id === 'inc-1' ||
+         id === 'simple-inc' ||
+         id.startsWith('job-1') ||
+         id.startsWith('child-income-boost') ||
          id.startsWith('simple-inc-prechild') ||
          id.startsWith('simple-inc-worksave') ||
          id.startsWith('simple-inc-childcare') ||
-         id.startsWith('simple-inc') ||
-         id.startsWith('inc-1') ||
-         id.startsWith('job-1');
+         name === 'Salary / Main Income' ||
+         name === 'Main Salary' ||
+         name.startsWith('Salary / Main Income (');
+}
+
+function isMainSpending(p) {
+  if (!p) return false;
+  const name = p.name || '';
+  const id = p.id || '';
+  return id === 'spend-1' ||
+         id === 'simple-spend' ||
+         id.startsWith('simple-spend-prechild') ||
+         id.startsWith('simple-spend-worksave') ||
+         id.startsWith('simple-spend-childcare') ||
+         name === 'Base Lifestyle Spending' ||
+         name.startsWith('Lifestyle Spending (');
 }
 
 export function useTimelineEvents(inputs, displayedResults) {
@@ -37,13 +55,10 @@ export function useTimelineEvents(inputs, displayedResults) {
       if (inc.isDerived) {
         return;
       }
-      if (inc.id && typeof inc.id === 'string' && inc.id.startsWith('simple-inc')) {
+      if (isMainIncome(inc)) {
         return;
       }
-      const isCustomCareer = !isGeneratedMainIncome(inc.id);
-      const isAgeMatch = isCustomCareer
-        ? (inc.startAge >= inp.currentAge && inc.startAge <= inp.lifeExpectancy)
-        : (inc.startAge > inp.currentAge && inc.startAge <= inp.lifeExpectancy);
+      const isAgeMatch = inc.startAge >= inp.currentAge && inc.startAge <= inp.lifeExpectancy;
 
       if (isAgeMatch) {
         const isIncrease = inc.incomeChangeType === 'increaseByAmount';
@@ -69,10 +84,12 @@ export function useTimelineEvents(inputs, displayedResults) {
       if (phase.isDerived) {
         return;
       }
-      if (phase.id && typeof phase.id === 'string' && phase.id.startsWith('simple-spend')) {
+      if (isMainSpending(phase)) {
         return;
       }
-      if (phase.startAge > inp.currentAge && phase.startAge <= inp.lifeExpectancy) {
+      const isAgeMatch = phase.startAge >= inp.currentAge && phase.startAge <= inp.lifeExpectancy;
+
+      if (isAgeMatch) {
         let emoji = '🏡';
         if (phase.name.toLowerCase().includes('dominican') || phase.name.toLowerCase().includes('dr')) {
           emoji = '🇩🇴';
