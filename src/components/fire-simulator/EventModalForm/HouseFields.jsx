@@ -85,7 +85,8 @@ export default function HouseFields({
                 setEditingEvent({
                   ...editingEvent,
                   homePrice: newPrice,
-                  downPayment: Math.round(newPrice * currentPct)
+                  downPayment: Math.round(newPrice * currentPct),
+                  recommendationApplied: false
                 });
               }}
             />
@@ -100,7 +101,8 @@ export default function HouseFields({
                 const pct = parseFloat(e.target.value) || 0;
                 setEditingEvent({
                   ...editingEvent,
-                  downPayment: Math.round((editingEvent.homePrice || 0) * (pct / 100))
+                  downPayment: Math.round((editingEvent.homePrice || 0) * (pct / 100)),
+                  recommendationApplied: false
                 });
               }}
             />

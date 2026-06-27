@@ -69,6 +69,18 @@ export default function EventModalForm({
     if (editingEvent && editingEvent.type === 'buyHouse' && editingEvent.recommendationApplied) {
       const purchaseAge = editingEvent.purchaseAge !== undefined ? editingEvent.purchaseAge : (editingEvent.age || 35);
       const simulationResults = activeResults || baselineResults;
+
+      // Skip resetting if the activeResults are stale relative to editingEvent values
+      const isResultsStale = activeResults && activeResults.nominalData && (() => {
+        const logAtAge = activeResults.nominalData.find(l => l.age === purchaseAge);
+        if (!logAtAge) return true;
+        if (!logAtAge.homeAccountingDebug) return false; // support mock results in unit tests
+        const priceDiff = Math.abs(logAtAge.homeAccountingDebug.purchasePrice - (editingEvent.homePrice || 0));
+        const dpDiff = Math.abs(logAtAge.homeAccountingDebug.downPaymentUsed - (editingEvent.downPayment || 0));
+        return priceDiff > 1.0 || dpDiff > 1.0;
+      })();
+      if (isResultsStale) return;
+
       const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
       const totalCashRequired = calculateTotalCashRequired(editingEvent);
       const cashShortfall = calculateCashShortfall(totalCashRequired, liquidAssets);

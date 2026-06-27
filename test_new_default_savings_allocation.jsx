@@ -138,7 +138,6 @@ describe('New Default Savings Allocation', () => {
       ],
       simpleIncome: 50000,
       simpleExpenses: 42500, // surplus 7500/yr (625/mo)
-      budgetDetails: { savings: {}, partnerSavings: {}, expenses: {} },
       lifeEvents: [
         {
           id: 'raise',

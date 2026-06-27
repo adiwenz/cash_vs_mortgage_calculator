@@ -37,7 +37,8 @@ export function calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulati
       if (logBefore) {
         const cash = Number(logBefore.cashBalance) || 0;
         const brokerage = Number(logBefore.brokerageBalance) || 0;
-        return cash + brokerage;
+        const emergencyFund = Number(logBefore.emergencyFundBalance) || 0;
+        return cash + brokerage + emergencyFund;
       }
     }
   }
@@ -46,7 +47,17 @@ export function calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulati
   const assets = inputs?.assets || {};
   const cash = Number(assets.cash) || 0;
   const brokerage = Number(assets.brokerage) || 0;
-  return cash + brokerage;
+  const emergencyFund = Number(assets.emergencyFund) || 0;
+
+  const conditionItems = (inputs?.lifeEvents || []).filter(e => e.type === 'conditionItem');
+  const customCheckingSavings = conditionItems
+    .filter(c => c.type === 'checkingSavings')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+  const customBrokerage = conditionItems
+    .filter(c => c.type === 'brokerage')
+    .reduce((sum, c) => sum + (Number(c.value) || 0), 0);
+
+  return cash + brokerage + emergencyFund + customCheckingSavings + customBrokerage;
 }
 
 export function getAvailableLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults) {

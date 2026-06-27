@@ -18,6 +18,7 @@ export function LiquidAssetsWarning({
   const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchaseAge, simulationResults);
   const totalCashRequired = calculateTotalCashRequired(editingEvent);
 
+  if (editingEvent.recommendationApplied) return null;
   if (totalCashRequired <= liquidAssets) return null;
   const shortfall = calculateCashShortfall(totalCashRequired, liquidAssets);
 

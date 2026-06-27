@@ -858,7 +858,7 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       baseSavings = { ...savedPhase.savings };
       if (savedPhase.partnerSavings) basePartnerSavings = { ...savedPhase.partnerSavings };
       savingsAllocMode = savedPhase.savingsAllocMode || savingsAllocMode;
-      if (savedPhase.income !== undefined) {
+      if (savedPhase.income !== undefined && profile.hasCustomizedSavingsAllocation) {
         resolvedIncome = Number(savedPhase.income);
         if (start < targetRetirementAge) {
           const threshold = standardIncome;

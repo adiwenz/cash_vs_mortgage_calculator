@@ -716,7 +716,39 @@ export function solveBisectionHomeValue(level, inputs, buyHouseEv, baselineReady
   const movingCosts = Number(buyHouseEv.movingCost) || Number(buyHouseEv.movingCosts) || 0;
   const fixedUpfrontCosts = points + renovationCosts + movingCosts;
 
-  const liquidAssets = calculateLiquidAssetsAtPurchaseAge(inputs, purchase_age, baselineResults);
+  const liquidNWBefore = getAvailableLiquidAssetsBeforePurchase(baselineResults, purchase_age, inputs);
+
+  const emergencyFundBefore = baselineResults && baselineResults.nominalData 
+    ? (baselineResults.nominalData.find(l => l.age === purchase_age - 1)?.emergencyFundBalance || 0)
+    : (Number(inputs.assets?.emergencyFund) || 0);
+
+  const emergencyFundMinimumComfortable = emergencyFundBefore;
+  const emergencyFundMinimumBalanced = Math.min(5000, emergencyFundBefore);
+
+  const currentAgeVal = Math.max(0, Number(inputs.currentAge) || 30);
+  const yearsDiff = Math.max(0, purchase_age - currentAgeVal);
+
+  const normPhases = getNormalizedPhases(inputs);
+  const activePhase = normPhases.find(p => purchase_age >= p.startAge && purchase_age < p.endAge) || normPhases[0];
+
+  const brokerageSavings = Number(activePhase?.savings?.brokerage) || 0;
+  const checkingSavings = Number(activePhase?.savings?.checking) || 0;
+  const hysaSavings = Number(activePhase?.savings?.hysa) || 0;
+  const emergencySavings = Number(activePhase?.savings?.emergency) || 0;
+  const otherSavings = Number(activePhase?.savings?.other) || 0;
+  const monthlyNonRetirementSavings = brokerageSavings + checkingSavings + hysaSavings + emergencySavings + otherSavings;
+
+  const redirectedSavingsBalanced = 0;
+  const redirectedSavingsStretch = 0;
+
+  let liquidAssets = liquidNWBefore;
+  if (level === 'conservative') {
+    liquidAssets = Math.max(0, liquidNWBefore - emergencyFundMinimumComfortable);
+  } else if (level === 'balanced') {
+    liquidAssets = Math.max(0, liquidNWBefore - emergencyFundMinimumBalanced + redirectedSavingsBalanced);
+  } else if (level === 'stretch' || level === 'aggressive') {
+    liquidAssets = Math.max(0, liquidNWBefore + redirectedSavingsStretch);
+  }
 
   const cashAffordablePrice = calculateCashAffordableHomePrice({
     liquidAssets,
@@ -821,7 +853,6 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
 
   const currentSurplusRaw = getPhaseSurplus(activePhase, recInputs);
   const houseDeficit = Math.max(0, -currentSurplusRaw);
-  if (houseDeficit <= 0) return null;
 
   const baselineInputs = JSON.parse(JSON.stringify(recInputs));
   baselineInputs.lifeEvents = (baselineInputs.lifeEvents || []).map(ev => {
@@ -832,6 +863,12 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
   });
   const baselinePhases = getNormalizedPhases(baselineInputs);
   const baselineResults = runFireSimulation(baselineInputs);
+
+  const liquidNWBefore = getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, recInputs);
+  let totalCashNeeded = getRequiredDownPaymentAndCosts(p, resolvedBuyHouseEv);
+  const hasCashShortfall = totalCashNeeded > liquidNWBefore;
+
+  if (houseDeficit <= 0 && !hasCashShortfall) return null;
 
   const resolvedBaselineAge = (baselineReadyAge !== null && baselineReadyAge !== undefined)
     ? baselineReadyAge
@@ -876,8 +913,6 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
   const balancedMaxPayment = Math.max(0, currentRent + currentSurplus + balancedAdjustmentCapacity - emergencySurplusFloor);
   const aggressiveMaxPayment = Math.max(0, currentRent + currentSurplus + aggressiveAdjustmentCapacity - emergencySurplusFloor);
 
-  const liquidNWBefore = getAvailableLiquidAssetsBeforePurchase(baselineResults, purchaseAge, recInputs);
-
   const emergencyFundBefore = baselineResults && baselineResults.nominalData 
     ? (baselineResults.nominalData.find(l => l.age === purchaseAge - 1)?.emergencyFundBalance || 0)
     : (Number(recInputs.assets?.emergencyFund) || 0);
@@ -895,14 +930,8 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
   const otherSavings = Number(basePhase.savings?.other) || 0;
   const monthlyNonRetirementSavings = brokerageSavings + checkingSavings + hysaSavings + emergencySavings + otherSavings;
 
-  const trad401kSavings = Number(basePhase.savings?.trad401k) || 0;
-  const tradIraSavings = Number(basePhase.savings?.tradIra) || 0;
-  const rothIraSavings = Number(basePhase.savings?.rothIra) || 0;
-  const hsaSavings = Number(basePhase.savings?.hsa) || 0;
-  const monthlyRetirementSavings = trad401kSavings + tradIraSavings + rothIraSavings + hsaSavings;
-
-  const redirectedSavingsBalanced = yearsDiff * 12 * monthlyNonRetirementSavings;
-  const redirectedSavingsStretch = yearsDiff * 12 * (monthlyNonRetirementSavings + 0.5 * monthlyRetirementSavings);
+  const redirectedSavingsBalanced = 0;
+  const redirectedSavingsStretch = 0;
 
   const availableHomeFundsComfortable = liquidNWBefore - emergencyFundMinimumComfortable;
   const availableHomeFundsBalanced = liquidNWBefore - emergencyFundMinimumBalanced + redirectedSavingsBalanced;
@@ -975,7 +1004,7 @@ export function getRebalanceStrategies(inputs, activeBuyHouseEv, baselineReadyAg
 
   const maxHomePriceBalanced = Math.max(0, availableHomeFundsBalanced - movingCosts) / (targetDownPaymentPercent + closingCostsRate / 100);
 
-  const totalCashNeeded = getRequiredDownPaymentAndCosts(p, resolvedBuyHouseEv);
+  totalCashNeeded = getRequiredDownPaymentAndCosts(p, resolvedBuyHouseEv);
 
   const getDownPaymentForPrice = (pr) => {
     const originalPrice = Number(resolvedBuyHouseEv.homePrice !== undefined ? resolvedBuyHouseEv.homePrice : (resolvedBuyHouseEv.purchasePrice !== undefined ? resolvedBuyHouseEv.purchasePrice : 0)) || 0;
