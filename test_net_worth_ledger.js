@@ -5,6 +5,9 @@ import { describe, test, expect } from 'vitest';
 describe('Net Worth Ledger Calculations and Reconciliation', () => {
   test('Starting balances never appear as investment growth', () => {
     const inputs = getMappedDefaultInputs();
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
     inputs.currentAge = 35;
     inputs.lifeExpectancy = 85;
     inputs.simpleIncome = 0;
@@ -26,7 +29,20 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
       debts: 0
     };
     inputs.debtList = [];
-    inputs.budgetDetails = { savings: {}, partnerSavings: {}, expenses: {} };
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {
+        housing: 0,
+        healthcare: 0,
+        food: 0,
+        transportation: 0,
+        utilities: 0,
+        diningOut: 0,
+        leisure: 0,
+        misc: 0
+      }
+    };
     inputs.spendingPhases = [];
     inputs.incomeList = [];
     inputs.householdMembers = [];
@@ -51,6 +67,9 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
 
   test('Wedding financing creates debt but does not inflate investment growth', () => {
     const inputs = getMappedDefaultInputs();
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
     inputs.currentAge = 35;
     inputs.lifeExpectancy = 85;
     inputs.simpleIncome = 0;
@@ -71,7 +90,20 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
       debts: 0
     };
     inputs.debtList = [];
-    inputs.budgetDetails = { savings: {}, partnerSavings: {}, expenses: {} };
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {
+        housing: 0,
+        healthcare: 0,
+        food: 0,
+        transportation: 0,
+        utilities: 0,
+        diningOut: 0,
+        leisure: 0,
+        misc: 0
+      }
+    };
     inputs.spendingPhases = [];
     inputs.incomeList = [];
     inputs.householdMembers = [];
@@ -132,6 +164,9 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
 
   test('Wedding ledger breakdown correctly displays in rows', () => {
     const inputs = getMappedDefaultInputs();
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
     inputs.currentAge = 35;
     inputs.lifeExpectancy = 85;
     inputs.simpleIncome = 0;
@@ -152,7 +187,20 @@ describe('Net Worth Ledger Calculations and Reconciliation', () => {
       debts: 0
     };
     inputs.debtList = [];
-    inputs.budgetDetails = { savings: {}, partnerSavings: {}, expenses: {} };
+    inputs.budgetDetails = {
+      savings: {},
+      partnerSavings: {},
+      expenses: {
+        housing: 0,
+        healthcare: 0,
+        food: 0,
+        transportation: 0,
+        utilities: 0,
+        diningOut: 0,
+        leisure: 0,
+        misc: 0
+      }
+    };
     inputs.spendingPhases = [];
     inputs.incomeList = [];
     inputs.householdMembers = [];

@@ -4,7 +4,12 @@ export function buildEffectiveSimulationInputs(inputs) {
   if (!inputs) return inputs;
 
   let cloned = JSON.parse(JSON.stringify(inputs));
+  const isProfileMode = cloned.useLifeProfile === true || (cloned.useLifeProfile !== false && cloned.lifeProfile && Object.keys(cloned.lifeProfile).length > 0);
+  if (!isProfileMode) {
+    return cloned;
+  }
   cloned.lifePlan = initializeLifePlanIfMissing(cloned);
+  if (cloned.lifePlan) {
     cloned = buildSimulationInputsFromLifePlan(cloned.lifePlan, cloned);
   }
 

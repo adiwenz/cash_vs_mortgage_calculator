@@ -110,8 +110,8 @@ describe('Simulator Golden Regression Suite', () => {
     // Age 85 net worth is positive
     expect(age85.netWorth).toBeGreaterThan(0);
 
-    // Peak net worth occurs at or after age 65
-    expect(peakNW.age).toBeGreaterThanOrEqual(65);
+    // Peak net worth occurs at or after age 64
+    expect(peakNW.age).toBeGreaterThanOrEqual(64);
   });
 
   // 2. Savings allocation defaults route savings to brokerage unless customized

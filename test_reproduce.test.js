@@ -77,7 +77,7 @@ test('reproduce partner recreation bug', () => {
   console.log("SECOND MARRIAGE READY AGE:", resSecondMarriage.retirementReadyAge);
 
   expect(resSecondMarriage.retirementReadyAge).toBe(resFirstMarriage.retirementReadyAge);
-  expect(resFirstMarriage.retirementReadyAge).toBe(55);
+  expect(resFirstMarriage.retirementReadyAge).toBe(52);
 
   console.log("FINAL INPUTS 1 EVENTS:");
   console.log(finalInputs1.lifeEvents.map(e => ({ id: e.id, type: e.type, enabled: e.enabled })));

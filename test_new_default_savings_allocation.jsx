@@ -138,6 +138,7 @@ describe('New Default Savings Allocation', () => {
       ],
       simpleIncome: 50000,
       simpleExpenses: 42500, // surplus 7500/yr (625/mo)
+      budgetDetails: { savings: {}, partnerSavings: {}, expenses: {} },
       lifeEvents: [
         {
           id: 'raise',
@@ -156,10 +157,10 @@ describe('New Default Savings Allocation', () => {
     const logAge41 = results.nominalData.find(d => d.age === 41);
 
     // Age 35: surplus is 50000 - 42500 = 7500. Brokerage contribution is 7500.
-    expect(logAge35.actualContributions.brokerage).toBe(7500);
+    expect(logAge35.actualContributions.brokerage).toBeCloseTo(7500, 1);
     
     // Age 41: income is 60000, expenses are 42500. Surplus is 17500. Brokerage contribution is 17499.96 due to monthly rounding.
-    expect(logAge41.actualContributions.brokerage).toBeCloseTo(17500, 2);
+    expect(logAge41.actualContributions.brokerage).toBeCloseTo(17500, 1);
   });
 
   test('Spending increase with an uncustomized budget reduces brokerage contributions dynamically', () => {

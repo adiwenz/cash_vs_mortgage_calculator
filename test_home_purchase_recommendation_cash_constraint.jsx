@@ -23,6 +23,9 @@ describe('Home Purchase Recommendation Cash Constraint Tests', () => {
 
   const setupTestScenario = ({ income, wants, savings, rent, homePrice, downPayment, liquidAssets, purchaseAge = 36 }) => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
     inputs.currentAge = 35;
     inputs.targetRetirementAge = 65;
     inputs.lifeExpectancy = 85;

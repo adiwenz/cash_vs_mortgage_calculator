@@ -46,6 +46,9 @@ describe('House Price Solver Audits and Scenario Verification', () => {
         }
       ]
     };
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
 
     const results = runFireSimulation(inputs);
     const phases = getNormalizedPhases(inputs);
@@ -103,6 +106,9 @@ describe('House Price Solver Audits and Scenario Verification', () => {
         }
       ]
     };
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
 
     const results = runFireSimulation(inputs);
     const log40 = results.nominalData.find(d => d.age === 40);

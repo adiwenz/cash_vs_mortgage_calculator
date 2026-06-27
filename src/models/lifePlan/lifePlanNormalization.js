@@ -1628,7 +1628,22 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}, pr
       const eAge = sortedBudgetAges[i+1];
 
       // Compute effective contributions at sAge
-      const contributions = {};
+      const contributions = {
+        trad401k: 0,
+        rothIra: 0,
+        tradIra: 0,
+        hsa: 0,
+        brokerage: 0,
+        cash: 0,
+        emergencyFund: 0,
+        debt: 0,
+        other: 0
+      };
+      if (budgetDetails?.savings) {
+        Object.keys(budgetDetails.savings).forEach(k => {
+          contributions[k] = Number(budgetDetails.savings[k] || 0);
+        });
+      }
       accounts.forEach(acc => {
         const p = acc.properties || {};
         const type = p.accountType || 'brokerage';
@@ -1708,16 +1723,31 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}, pr
           other: 0
         };
       } else {
+        let hasCustomMatchingPhase = false;
         if (originalInputs.hasCustomizedBudget && originalInputs.budgetDetails?.phases) {
           const matchingPhase = originalInputs.budgetDetails.phases.find(p => sAge >= p.startAge && sAge < p.endAge);
-          if (matchingPhase && matchingPhase.expenses) {
-            phaseExpenses = { ...matchingPhase.expenses };
-          }
-          if (matchingPhase && matchingPhase.savings) {
-            phaseSavings = { ...matchingPhase.savings };
+          if (matchingPhase) {
+            hasCustomMatchingPhase = true;
+            if (matchingPhase.expenses) phaseExpenses = { ...matchingPhase.expenses };
+            if (matchingPhase.savings) phaseSavings = { ...matchingPhase.savings };
+            if (matchingPhase.partnerSavings) phasePartnerSavings = { ...matchingPhase.partnerSavings };
+            expensesAnnual = Object.values(phaseExpenses).reduce((sum, v) => sum + (Number(v) || 0), 0) * 12;
           }
         }
-        if (originalInputs.hasCustomizedBudget === false || (originalInputs.hasCustomizedBudget === undefined && originalInputs.simpleIncome !== undefined)) {
+
+        if (!hasCustomMatchingPhase) {
+          if (sAge >= targetRetirementAge) {
+            const retireEv = events.find(e => e.type === 'retire' && e.enabled !== false);
+            const pct = (retireEv?.spendingPercent !== undefined ? Number(retireEv.spendingPercent) : 70) / 100;
+            
+            phaseExpenses = {};
+            Object.keys(budgetDetails.expenses).forEach(k => {
+              phaseExpenses[k] = Math.round(((Number(budgetDetails.expenses[k]) || 0) * pct) * 100) / 100;
+            });
+            phaseSavings = { trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0 };
+            phasePartnerSavings = { trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0 };
+            expensesAnnual = Object.values(phaseExpenses).reduce((sum, v) => sum + v, 0) * 12;
+          } else if (originalInputs.hasCustomizedBudget === false || (originalInputs.hasCustomizedBudget === undefined && originalInputs.simpleIncome !== undefined)) {
           const activeIncomes = incomeList.filter(inc => inc.startAge <= sAge && inc.endAge > sAge);
           const phaseIncome = activeIncomes.reduce((sum, inc) => sum + Number(inc.amount || 0), 0) || (originalInputs.simpleIncome !== undefined && originalInputs.simpleIncome !== null ? Number(originalInputs.simpleIncome) : 50000);
           const savingsRate = repairedSavingsRate;
@@ -1760,6 +1790,7 @@ export function deriveLegacyInputsFromLifePlan(lifePlan, originalInputs = {}, pr
           }
         }
       }
+    }
 
       budgetDetails.phases.push({
         id: phaseId,

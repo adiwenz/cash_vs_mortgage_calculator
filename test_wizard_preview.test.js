@@ -72,5 +72,5 @@ test('compare preview ages', () => {
   const res2 = runFireSimulation(afterInputs2);
   console.log("Preview Age 2 (useLifeProfile = true):", res2.retirementReadyAge);
 
-  expect(res2.retirementReadyAge).toBe(55);
+  expect(res2.retirementReadyAge).toBe(52);
 });

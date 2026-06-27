@@ -63,7 +63,7 @@ export function normalizeInputsStage(rawInputs) {
   const retireEvent = enabledEvents.find(e => e.type === 'retire');
   const targetRetirementAge = retireEvent 
     ? Math.max(currentAge, Number(retireEvent.age) || 65) 
-    : lifeExpectancy;
+    : (inputs.targetRetirementAge !== undefined && inputs.targetRetirementAge !== null ? Math.max(currentAge, Number(inputs.targetRetirementAge)) : lifeExpectancy);
     
   const includeTaxes = !!inputs.includeTaxes;
   let filingStatus = inputs.filingStatus || 'single';
@@ -90,12 +90,28 @@ export function normalizeInputsStage(rawInputs) {
   const hasActiveChild = enabledEvents.some(e => e.type === 'haveChild');
   let incomeList = inputs.incomeList ? inputs.incomeList.map(inc => {
     const cloned = { ...inc };
+    if (cloned.id === 'inc-1') {
+      cloned.startAge = currentAge;
+      if (inputs.simpleIncome !== undefined && inputs.simpleIncome !== null) {
+        cloned.amount = Number(inputs.simpleIncome);
+      }
+    }
     if (cloned.growthRate !== undefined) {
       cloned.growthRate = Math.min(0.25, Math.max(0, Number(cloned.growthRate) || 0));
     }
     return cloned;
   }) : [];
-  let spendingPhases = inputs.spendingPhases ? inputs.spendingPhases.map(p => ({ ...p })) : [];
+  let spendingPhases = inputs.spendingPhases ? inputs.spendingPhases.map(p => {
+    const cloned = { ...p };
+    if (cloned.id === 'spend-1') {
+      cloned.startAge = currentAge;
+      if (inputs.simpleExpenses !== undefined && inputs.simpleExpenses !== null) {
+        cloned.amount = Number(inputs.simpleExpenses);
+        cloned.annualSpending = Number(inputs.simpleExpenses);
+      }
+    }
+    return cloned;
+  }) : [];
 
   if (hasActiveChild) {
     const incomeSegments = getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents);
@@ -286,6 +302,13 @@ export function normalizeInputsStage(rawInputs) {
     enabled: true
   };
 
+  const simpleIncome = Number(inputs.simpleIncome) || 0;
+  const simpleExpenses = Number(inputs.simpleExpenses) || 0;
+  let savingsRate = inputs.savingsRate !== undefined && inputs.savingsRate !== null 
+    ? Number(inputs.savingsRate) 
+    : (simpleIncome > 0 ? ((simpleIncome - simpleExpenses) / simpleIncome) * 100 : 15);
+  savingsRate = Math.min(100, Math.max(0, savingsRate));
+
   const normalized = {
     ...inputs,
     currentAge,
@@ -297,7 +320,8 @@ export function normalizeInputsStage(rawInputs) {
     incomeList,
     spendingPhases,
     lifeEvents,
-    socialSecurity
+    socialSecurity,
+    savingsRate
   };
 
   normalized.householdModel = normalizeHouseholdModel(normalized);

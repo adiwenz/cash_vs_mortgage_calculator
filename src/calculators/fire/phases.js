@@ -539,7 +539,12 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       }
     });
 
-    const activeSpendingItem = enabledEvents.find(e => e.type === 'spendingItem' && start >= Number(e.startAge) && start < Number(e.endAge));
+    const activeSpendingItems = enabledEvents.filter(e => e.type === 'spendingItem' && start >= Number(e.startAge) && start < Number(e.endAge));
+    let activeSpendingItem = null;
+    if (activeSpendingItems.length > 0) {
+      const customItem = activeSpendingItems.find(e => isCustomSpendingPhase(e.id));
+      activeSpendingItem = customItem || activeSpendingItems[0];
+    }
     if (activeSpendingItem && isCustomSpendingPhase(activeSpendingItem.id)) {
       let targetMonthly = activeSpendingItem.frequency === 'monthly'
         ? (Number(activeSpendingItem.amount) || 0)
@@ -759,6 +764,35 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       basePartnerSavings = { trad401k: 0, rothIra: 0, tradIra: 0, hsa: 0, brokerage: 0, checking: 0, hysa: 0, emergency: 0, debt: 0, other: 0 };
     }
 
+    if (start < targetRetirementAge && profile.hasCustomizedBudget === false && !profile.hasCustomizedSavingsAllocation) {
+      const expensesSum = Object.values(baseExpenses).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const phaseSavingsAmt = Math.max(0, resolvedIncome - expensesSum);
+      baseSavings = {
+        trad401k: 0,
+        rothIra: 0,
+        tradIra: 0,
+        hsa: 0,
+        brokerage: phaseSavingsAmt,
+        checking: 0,
+        hysa: 0,
+        emergency: 0,
+        debt: 0,
+        other: 0
+      };
+      basePartnerSavings = {
+        trad401k: 0,
+        rothIra: 0,
+        tradIra: 0,
+        hsa: 0,
+        brokerage: 0,
+        checking: 0,
+        hysa: 0,
+        emergency: 0,
+        debt: 0,
+        other: 0
+      };
+    }
+
     const activeEventsList = getActiveEventsForInterval(start, end, enabledEvents, profile);
     const activeEventsKey = activeEventsList.slice().sort().join(',');
 
@@ -810,6 +844,13 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
       if (savedOfSameType[myIndexInType]) {
         savedPhase = savedOfSameType[myIndexInType];
       }
+    }
+    if (!savedPhase) {
+      savedPhase = budgetOverrides.find(p => {
+        const isCurrentRetire = start >= targetRetirementAge;
+        const isOverrideRetire = Number(p.startAge) >= profile.targetRetirementAge;
+        return isCurrentRetire === isOverrideRetire && start >= Number(p.startAge) && start < Number(p.endAge);
+      });
     }
 
     if (savedPhase) {
@@ -872,8 +913,29 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
           
           const keepRent = !!asset.keepRent;
           
-          const propTaxRate = (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100;
-          const insRate = (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : (asset.insurance !== undefined ? Number(asset.insurance) : 0.35)) / 100;
+          let propTaxRate = 1.1 / 100;
+          if (asset.propertyTaxRate !== undefined) {
+            propTaxRate = Number(asset.propertyTaxRate) / 100;
+          } else if (asset.propertyTaxes !== undefined && p > 0) {
+            propTaxRate = Number(asset.propertyTaxes) / p;
+          } else if (asset.propertyTax !== undefined) {
+            propTaxRate = Number(asset.propertyTax) / 100;
+          }
+
+          let insRate = 0.35 / 100;
+          if (asset.insuranceRate !== undefined) {
+            insRate = Number(asset.insuranceRate) / 100;
+          } else if (asset.insurance !== undefined) {
+            const val = Number(asset.insurance);
+            if (val > 10 && p > 0) {
+              insRate = val / p;
+            } else {
+              insRate = val / 100;
+            }
+          } else if (asset.insuranceCost !== undefined) {
+            insRate = Number(asset.insuranceCost) / 100;
+          }
+
           const maintRate = (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100;
           
           const monthlyPropTax = (p * propTaxRate) / 12;

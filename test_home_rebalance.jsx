@@ -26,6 +26,9 @@ describe('Home Purchase Rebalance calculations & strategies tests', () => {
 
   const setupBaseInputs = () => {
     const inputs = JSON.parse(JSON.stringify(DEFAULT_FIRE_INPUTS));
+    delete inputs.lifePlan;
+    delete inputs.lifeProfile;
+    inputs.useLifeProfile = false;
     inputs.hasCustomizedSavingsAllocation = true;
     inputs.currentAge = 35;
     inputs.targetRetirementAge = 65;
