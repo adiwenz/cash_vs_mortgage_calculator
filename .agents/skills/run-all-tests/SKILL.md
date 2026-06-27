@@ -4,7 +4,10 @@ description: Run the complete test suite (all unit, component, and E2E tests) to
 ---
 # Run All Tests
 
-This skill outlines how to run the full test suite in the repository to thoroughly verify all changes. It should be used before merging to main, before final releases, or upon user request.
+This skill outlines how to run the full test suite in the repository to thoroughly verify all changes. 
+
+> [!IMPORTANT]
+> This skill is **not** part of normal iterative development. It should never be automatically triggered simply because source code changed.
 
 ## Instructions
 
@@ -22,6 +25,7 @@ This skill outlines how to run the full test suite in the repository to thorough
      ```
 
 3. **When to Execute**:
-   - When preparing a final release or build verification.
-   - When explicitly requested by the user.
-   - *Note: The `git-commit-and-merge` skill automatically runs the full test suite before committing/merging, so manual execution of this skill is not required immediately before merging.*
+   - Only when preparing a final release or build verification.
+   - Only when explicitly requested by the user.
+   - When preparing to merge.
+   - By the `git-commit-and-merge` skill.
