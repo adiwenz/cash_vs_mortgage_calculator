@@ -191,10 +191,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     }
   }
 
-  const isAdvanced = !!profile.isAdvancedMode;
-  if (!isAdvanced && includeTaxes) {
-    initialSpending = Math.max(0, initialSpending - (profile.year0Taxes || 0));
-  }
+
 
   let spouseIncome = isCombined ? (spouseMember ? (Number(spouseMember.income) || 0) : (marriageEvent ? (Number(marriageEvent.spouseIncome) || 0) : 0)) : 0;
   let spouseGrowth = isCombined ? (spouseMember 
@@ -236,7 +233,7 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
 
   const enabledEvents = updatedEvents.filter(e => e.enabled !== false);
 
-  return {
+  const res = {
     currentAge,
     lifeExpectancy,
     expectedReturn,
@@ -302,4 +299,6 @@ export function buildSimulationContext(profile, phases, events, targetRetirement
     useLifeProfile,
     accountReturnOverrides
   };
+
+  return res;
 }

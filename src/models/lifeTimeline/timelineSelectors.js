@@ -40,7 +40,7 @@ export function getEventAge(ev, fallbackAge = 35) {
 export function getTimelineItems(inputs) {
   if (!inputs) return [];
 
-  if (inputs.lifePlan) {
+  if (inputs.lifePlan && (inputs.useLifeProfile || !inputs.lifePlan._isFallback)) {
     const lifePlan = inputs.lifePlan;
     const currentAge = Number(lifePlan.currentAge) || 35;
     const lifeExpectancy = Number(lifePlan.lifeExpectancy) || 85;
