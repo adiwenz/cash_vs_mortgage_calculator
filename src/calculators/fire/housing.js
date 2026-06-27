@@ -8,7 +8,12 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
       if (!asset) return;
 
       const p = Number(asset.homePrice !== undefined ? asset.homePrice : (asset.purchasePrice !== undefined ? asset.purchasePrice : 0)) || 0;
-      const dp = Number(asset.downPayment) || 0;
+      let dp = Number(asset.downPayment) || 0;
+      if (dp === 0 && asset.downPaymentPercent !== undefined && asset.downPaymentPercent !== null) {
+        const pct = Number(asset.downPaymentPercent);
+        const factor = pct > 1 ? pct / 100 : pct;
+        dp = p * factor;
+      }
       const isCash = dp >= p || asset.purchaseType === 'cash';
 
       const closingCostsRate = asset.closingCosts !== undefined ? Number(asset.closingCosts) : 3;
@@ -47,9 +52,9 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
           mortgageBalance: 0,
           annualPI: 0,
           loanTerm: 0,
-          propertyTaxRate: (asset.propertyTax !== undefined ? Number(asset.propertyTax) : (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : 1.1)) / 100,
-          insuranceRate: (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35)) / 100,
-          maintenanceRate: (asset.maintenance !== undefined ? Number(asset.maintenance) : (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : 1.0)) / 100,
+          propertyTaxRate: (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100,
+          insuranceRate: (asset.insuranceRate !== undefined ? Number(asset.insuranceRate) : (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35))) / 100,
+          maintenanceRate: (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100,
           appreciationRate: (asset.appreciationRate !== undefined ? Number(asset.appreciationRate) : 3.0) / 100,
           hoa: asset.hoa !== undefined ? Number(asset.hoa) : (asset.hoaCost !== undefined ? Number(asset.hoaCost) : 0),
           utilitiesIncrease: asset.utilitiesIncrease !== undefined ? Number(asset.utilitiesIncrease) : 0,
@@ -83,9 +88,9 @@ export function handleHousePurchase(age, enabledEvents, profile, purchasedProper
           annualPI,
           currentValue: p,
           mortgageBalance: loanAmount,
-          propertyTaxRate: (asset.propertyTax !== undefined ? Number(asset.propertyTax) : (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : 1.1)) / 100,
-          insuranceRate: (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35)) / 100,
-          maintenanceRate: (asset.maintenance !== undefined ? Number(asset.maintenance) : (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : 1.0)) / 100,
+          propertyTaxRate: (asset.propertyTaxRate !== undefined ? Number(asset.propertyTaxRate) : (asset.propertyTax !== undefined ? Number(asset.propertyTax) : 1.1)) / 100,
+          insuranceRate: (asset.insuranceRate !== undefined ? Number(asset.insuranceRate) : (asset.insurance !== undefined ? Number(asset.insurance) : (asset.insuranceCost !== undefined ? Number(asset.insuranceCost) : 0.35))) / 100,
+          maintenanceRate: (asset.maintenanceRate !== undefined ? Number(asset.maintenanceRate) : (asset.maintenance !== undefined ? Number(asset.maintenance) : 1.0)) / 100,
           pmiRate: asset.pmi !== undefined ? Number(asset.pmi) : 0.5,
           appreciationRate: (asset.appreciationRate !== undefined ? Number(asset.appreciationRate) : 3.0) / 100,
           hoa: asset.hoa !== undefined ? Number(asset.hoa) : (asset.hoaCost !== undefined ? Number(asset.hoaCost) : 0),

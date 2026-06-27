@@ -266,57 +266,13 @@ export function normalizeInputsStage(rawInputs) {
     }
   }
 
-  const isAdvanced = inputs.isAdvancedMode === true || inputs.useLifeProfile === true || hasExplicitAllocationRules(inputs);
-  if (!isAdvanced) {
-    const incomeSegments = hasActiveChild ? getPartitionedPhases(currentAge, targetRetirementAge, enabledEvents) : [];
-    incomeList = incomeList.map(inc => {
-      if (inc.id && inc.id.includes('-segment-')) {
-        return inc;
-      }
-      if (inc.id === 'inc-1' || inc.id.startsWith('simple-inc-worksave') || inc.id.startsWith('simple-inc-prechild') || inc.name.toLowerCase().includes('salary') || inc.name.toLowerCase().includes('main')) {
-        if (!inc.id.includes('childcare') && !inc.name.toLowerCase().includes('childcare')) {
-          const isGapPhase = inc.id.startsWith('simple-inc-worksave') && 
-            incomeSegments.some(seg => seg.type === 'standard' && seg.endAge < targetRetirementAge && inc.id === `simple-inc-worksave-${seg.startAge}-${seg.endAge}`);
-          const end = (inc.id.startsWith('simple-inc-prechild') || isGapPhase) ? inc.endAge : targetRetirementAge;
-          return { ...inc, amount: Number(inputs.simpleIncome) || inc.amount, endAge: end };
-        }
-      }
-      return inc;
-    });
-  }
   if (!hasActiveChild) {
     incomeList = incomeList
-      .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'))
-      .map(inc => {
-        if (!isAdvanced && (inc.id.startsWith('simple-inc-worksave') || inc.id === 'inc-1')) {
-          return { ...inc, startAge: currentAge };
-        }
-        return inc;
-      });
-  }
-  if (!isAdvanced) {
-    spendingPhases = spendingPhases.map(p => {
-      if (p.id && p.id.includes('-segment-')) {
-        return p;
-      }
-      if (p.id === 'spend-1' || p.id.startsWith('simple-spend-worksave') || p.id.startsWith('simple-spend-prechild') || p.name.toLowerCase().includes('spending') || p.name.toLowerCase().includes('lifestyle')) {
-        if (!p.id.includes('childcare') && !p.name.toLowerCase().includes('childcare')) {
-          const amt = Number(inputs.simpleExpenses) || p.amount;
-          return { ...p, amount: amt, annualSpending: amt };
-        }
-      }
-      return p;
-    });
+      .filter(inc => !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-prechild'));
   }
   if (!hasActiveChild) {
     spendingPhases = spendingPhases
-      .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'))
-      .map(p => {
-        if (!isAdvanced && (p.id.startsWith('simple-spend-worksave') || p.id === 'spend-1')) {
-          return { ...p, startAge: currentAge };
-        }
-        return p;
-      });
+      .filter(p => !p.id.startsWith('simple-spend-childcare') && !p.id.startsWith('simple-spend-prechild'));
   }
 
   const socialSecurity = inputs.socialSecurity ? {
