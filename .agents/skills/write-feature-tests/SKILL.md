@@ -30,5 +30,5 @@ This skill ensures that whenever you implement a new feature, add a new calculat
      ```bash
      npm run test -- <test-file>
      ```
-   - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e`) manually during development, as the `git-commit-and-merge` skill will automatically run them before merging to `main`.
+   - Avoid executing full suites (`npm run test:unit`, `npm run test:e2e`) manually during development.
    - For Playwright E2E tests, only run changed tests relative to the main branch when code is changed: `npm run test:e2e:changed`. Do NOT run the whole Playwright test suite (`npm run test:e2e`) during development.

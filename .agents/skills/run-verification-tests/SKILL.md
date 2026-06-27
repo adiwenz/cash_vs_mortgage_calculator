@@ -76,7 +76,7 @@ Unless:
 - The user explicitly requests it.
 - Preparing a release.
 - Preparing to merge.
-- The `git-commit-and-merge` skill invokes it.
+
 
 ### 6. Definition of Done
 A coding task is complete only after the appropriate targeted verification has passed. However, verification should happen **once per coherent implementation batch**, not after every file edit.

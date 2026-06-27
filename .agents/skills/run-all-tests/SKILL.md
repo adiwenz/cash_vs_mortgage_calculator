@@ -28,4 +28,3 @@ This skill outlines how to run the full test suite in the repository to thorough
    - Only when preparing a final release or build verification.
    - Only when explicitly requested by the user.
    - When preparing to merge.
-   - By the `git-commit-and-merge` skill.
