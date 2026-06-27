@@ -4,21 +4,19 @@ export function buildEffectiveSimulationInputs(inputs) {
   if (!inputs) return inputs;
 
   let cloned = JSON.parse(JSON.stringify(inputs));
-  if (cloned.useLifeProfile) {
-    cloned.lifePlan = initializeLifePlanIfMissing(cloned);
-    if (cloned.lifePlan) {
-      const derived = deriveLegacyInputsFromLifePlan(cloned.lifePlan, cloned);
-      cloned = {
-        ...cloned,
-        ...derived
-      };
-    }
+  cloned.lifePlan = initializeLifePlanIfMissing(cloned);
+  if (cloned.lifePlan) {
+    const derived = deriveLegacyInputsFromLifePlan(cloned.lifePlan, cloned);
+    cloned = {
+      ...cloned,
+      ...derived
+    };
   }
 
   // 1. Deep clone the inputs
   const effective = cloned;
 
-  if (!effective.useLifeProfile || !effective.lifeProfile) {
+  if (!effective.lifeProfile) {
     return effective;
   }
 
@@ -47,6 +45,9 @@ export function buildEffectiveSimulationInputs(inputs) {
     debts: Number(effective.assets.debts || 0),
     other: Number(ass.crypto || 0) + Number(ass.businessEquity || 0)
   };
+  if (ass.brokerage === undefined) {
+    delete effective.assets.brokerage;
+  }
 
   // Sum up invested assets for simpleInvestments
   const totalAssets = Object.values(effective.assets).reduce((sum, val) => sum + (Number(val) || 0), 0);
@@ -255,23 +256,12 @@ export function buildBaselineCurrentInputs(inputs) {
 
   // 5. Now, strip out all timeline event assumptions.
   // We keep only the derived events/debts/incomes/members which represent the manual baseline situation.
-  if (inputs.useLifeProfile) {
-    return {
-      ...effective,
-      lifeEvents: (effective.lifeEvents || []).filter(e => e.isDerived),
-      debtList: (effective.debtList || []).filter(d => d.isDerived),
-      incomeList: (effective.incomeList || []).filter(i => i.isDerived),
-      householdMembers: (effective.householdMembers || []).filter(m => m.id === 'spouse' || m.isDerived)
-    };
-  } else {
-    // If useLifeProfile is false, the baseline situation is the simple inputs (no timeline events at all).
-    return {
-      ...effective,
-      lifeEvents: [],
-      debtList: [],
-      incomeList: [],
-      householdMembers: []
-    };
-  }
+  return {
+    ...effective,
+    lifeEvents: (effective.lifeEvents || []).filter(e => e.isDerived),
+    debtList: (effective.debtList || []).filter(d => d.isDerived),
+    incomeList: (effective.incomeList || []).filter(i => i.isDerived),
+    householdMembers: (effective.householdMembers || []).filter(m => m.id === 'spouse' || m.isDerived)
+  };
 }
 

@@ -32,7 +32,7 @@ export function getTimelineProjection(inputs, options = {}) {
   }
 
   // 2. Normalize and retrieve raw timeline items
-  const items = getTimelineItems(effective);
+  const items = getTimelineItems({ ...effective, lifePlan: undefined });
 
   // 3. Resolve minAge and maxAge
   const lifeExpectancy = Math.max(currentAge + 1, Number(effective.lifeExpectancy) || 85);

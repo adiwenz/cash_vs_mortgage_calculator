@@ -64,7 +64,7 @@ export function getProfileFromInputs(inputs) {
     allocationRules: inputs.allocationRules || [],
     debtList: inputs.debtList || [],
     houseAssets: inputs.houseAssets || [],
-    isAdvancedMode: inputs.isAdvancedMode === true || (inputs.allocationRules && inputs.allocationRules.length > 1),
+    isAdvancedMode: true,
     useLifeProfile: inputs.useLifeProfile,
     accountReturnOverrides,
     lifeEvents: (inputs.lifeEvents || []).map(e => {

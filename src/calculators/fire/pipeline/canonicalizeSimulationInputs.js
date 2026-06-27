@@ -80,8 +80,8 @@ function reconcileBudgetDetails(inputs) {
     inputs.hasCustomizedSavingsAllocation = true;
   }
 
-  const hasCustomSavings = !!inputs.hasCustomizedSavingsAllocation || !!inputs.useLifeProfile;
-  const hasCustomBudget = !!inputs.hasCustomizedBudget || !!inputs.hasCustomizedExpenses || !!inputs.hasCustomizedSavingsAllocation || !!inputs.useLifeProfile;
+  const hasCustomSavings = !!inputs.hasCustomizedSavingsAllocation;
+  const hasCustomBudget = !!inputs.hasCustomizedBudget || !!inputs.hasCustomizedExpenses || !!inputs.hasCustomizedSavingsAllocation;
 
   let annualIncome = Number(inputs.simpleIncome || (inputs.budgetDetails?.income ? inputs.budgetDetails.income * 12 : 0)) || 0;
   if (annualIncome === 0 && Array.isArray(inputs.incomeList)) {
@@ -323,135 +323,27 @@ function mergeContiguousSpendingPhases(spendingPhases, inputs) {
   return mergedList;
 }
 
-function buildCanonicalIncomeList(inputs) {
-  const currentAge = Number(inputs.currentAge) || 35;
-  const targetRetirementAge = Number(inputs.targetRetirementAge) || 65;
-
-  const enabledEvents = (inputs.lifeEvents || []).filter(e => e.enabled !== false);
-  const careerChanges = enabledEvents.filter(e => e.type === 'incomeItem' && !isGeneratedMainIncome(e.id));
-
-  if (careerChanges.length === 0) {
-    return;
-  }
-
-  const boundaries = new Set();
-  boundaries.add(currentAge);
-  boundaries.add(targetRetirementAge);
-  careerChanges.forEach(cc => {
-    const start = Number(cc.startAge);
-    const end = Number(cc.endAge);
-    if (start >= currentAge && start < targetRetirementAge) boundaries.add(start);
-    if (end >= currentAge && end < targetRetirementAge) boundaries.add(end);
-  });
-
-  const sorted = Array.from(boundaries).sort((a, b) => a - b);
-  const segments = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const start = sorted[i];
-    const end = sorted[i + 1];
-
-    const activeCCs = careerChanges.filter(cc => start >= Number(cc.startAge) && start < Number(cc.endAge));
-    const latestReset = [...activeCCs].reverse().find(cc => cc.incomeChangeType !== 'increaseByAmount');
-
-    const mainInc = inputs.incomeList?.find(isMainIncome);
-    const defaultGrowthRate = mainInc && mainInc.growthRate !== undefined
-      ? Number(mainInc.growthRate)
-      : (inputs.salaryGrowthRate !== undefined ? Number(inputs.salaryGrowthRate) / 100 : 0.03);
-
-    let amount = 0;
-    let growthRate = defaultGrowthRate;
-    let isTaxable = true;
-
-    if (latestReset) {
-      amount = Number(latestReset.amount) || 0;
-      growthRate = latestReset.growthRate !== undefined ? Number(latestReset.growthRate) : defaultGrowthRate;
-      isTaxable = latestReset.isTaxable !== false;
-
-      activeCCs.forEach(cc => {
-        if (cc.incomeChangeType === 'increaseByAmount' && Number(cc.startAge) > Number(latestReset.startAge)) {
-          amount += Number(cc.salaryIncrease !== undefined ? cc.salaryIncrease : cc.amount) || 0;
-        }
-      });
-    } else {
-      amount = Number(inputs.simpleIncome) || 0;
-      activeCCs.forEach(cc => {
-        if (cc.incomeChangeType === 'increaseByAmount') {
-          amount += Number(cc.salaryIncrease !== undefined ? cc.salaryIncrease : cc.amount) || 0;
-        }
-        growthRate = cc.growthRate !== undefined ? Number(cc.growthRate) : defaultGrowthRate;
-        isTaxable = cc.isTaxable !== false;
-      });
-    }
-
-    segments.push({
-      id: `inc-segment-${start}-${end}`,
-      name: 'Salary / Main Income',
-      amount,
-      frequency: 'yearly',
-      startAge: start,
-      endAge: end,
-      growthRate,
-      isTaxable
-    });
-  }
-
-  inputs.incomeList = segments;
-  inputs.lifeEvents = inputs.lifeEvents.filter(e => !(e.type === 'incomeItem' && !isGeneratedMainIncome(e.id)));
-}
-
 export function canonicalizeSimulationInputs(inputs) {
   if (!inputs) return inputs;
   const canonical = JSON.parse(JSON.stringify(inputs));
   
-  if (!canonical.useLifeProfile) {
-    buildCanonicalIncomeList(canonical);
-  }
-
   // Reconcile budget details first to establish canonical simpleIncome/simpleExpenses
   reconcileBudgetDetails(canonical);
 
-  if (!canonical.useLifeProfile) {
-    // Update main incomes in place
-    let hasMainInc = false;
-    if (canonical.incomeList) {
-      canonical.incomeList.forEach(inc => {
-        if (isMainIncome(inc) || (inc.id && inc.id.startsWith('inc-segment-'))) {
-          hasMainInc = true;
-        }
-        if (isMainIncome(inc) && !inc.id.startsWith('simple-inc-prechild') && !inc.id.startsWith('simple-inc-childcare') && !inc.id.startsWith('simple-inc-worksave') && !inc.id.startsWith('inc-segment-')) {
-          inc.amount = Number(canonical.simpleIncome);
-        }
-      });
-    }
-    if (!hasMainInc) {
-      canonical.incomeList = canonical.incomeList || [];
-      canonical.incomeList.push({
-        id: 'inc-1',
-        name: 'Salary / Main Income',
-        amount: Number(canonical.simpleIncome),
-        frequency: 'yearly',
-        startAge: Number(canonical.currentAge) || 35,
-        endAge: Number(canonical.targetRetirementAge) || 65,
-        growthRate: 0.03,
-        isTaxable: true
-      });
-    }
-  } else {
-    // Seed incomeList if empty
-    let list = canonical.incomeList || [];
-    if (list.length === 0 && Number(canonical.simpleIncome) > 0) {
-      list.push({
-        id: 'inc-1',
-        name: 'Salary / Main Income',
-        amount: Number(canonical.simpleIncome),
-        frequency: 'yearly',
-        startAge: Number(canonical.currentAge) || 35,
-        endAge: Number(canonical.targetRetirementAge) || 65,
-        growthRate: 0.03,
-        isTaxable: true
-      });
-      canonical.incomeList = list;
-    }
+  // Seed incomeList if empty
+  let list = canonical.incomeList || [];
+  if (list.length === 0 && Number(canonical.simpleIncome) > 0) {
+    list.push({
+      id: 'inc-1',
+      name: 'Salary / Main Income',
+      amount: Number(canonical.simpleIncome),
+      frequency: 'yearly',
+      startAge: Number(canonical.currentAge) || 35,
+      endAge: Number(canonical.targetRetirementAge) || 65,
+      growthRate: 0.03,
+      isTaxable: true
+    });
+    canonical.incomeList = list;
   }
 
   // Unconditionally update main spending in place to keep it in sync with reconciled simpleExpenses

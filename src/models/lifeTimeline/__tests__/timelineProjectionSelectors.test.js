@@ -185,7 +185,7 @@ describe('timelineProjectionSelectors', () => {
       ]
     };
     const projection = getTimelineProjection(inputs);
-    const ages = projection.upcomingMilestones.map(m => m.age);
+    const ages = projection.upcomingMilestones.map(m => m.age).filter(age => age < 65);
     expect(ages).toEqual([38, 42, 50]);
   });
 

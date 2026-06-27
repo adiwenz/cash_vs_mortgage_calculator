@@ -628,6 +628,15 @@ export function getTimelineItems(inputs) {
   enabledEvents.forEach(event => {
     const age = getEventAge(event, currentAge);
 
+    if (event.isDerived) {
+      const originalExists = enabledEvents.some(e => 
+        !e.isDerived && 
+        e.type === event.type && 
+        getEventAge(e, currentAge) === age
+      );
+      if (originalExists) return;
+    }
+
     switch (event.type) {
       case 'marriage':
       case 'getMarried':
@@ -653,13 +662,14 @@ export function getTimelineItems(inputs) {
       case 'buyHouse':
       case 'homePurchase':
       case 'buyHome':
+        const buyLabelName = event.name ? event.name.replace(/^Buy\s+/i, '') : 'Home Purchase';
         items.push({
           id: `event-buyhouse-point-${event.id}`,
           sourceId: event.id,
           sourceType: 'lifeEvent',
           kind: TIMELINE_ITEM_KIND.POINT,
           category: TIMELINE_CATEGORY.HOUSING,
-          label: event.name || 'Home Purchase',
+          label: buyLabelName,
           description: `Buy home for ${event.homePrice || event.purchasePrice || 0}`,
           age: age,
           startAge: null,
@@ -711,13 +721,14 @@ export function getTimelineItems(inputs) {
       case 'haveChild':
       case 'child':
       case 'createChild':
+        const childLabelName = event.name ? event.name.replace(/^Child:\s*/i, '') : '';
         items.push({
           id: `event-child-point-${event.id}`,
           sourceId: event.id,
           sourceType: 'lifeEvent',
           kind: TIMELINE_ITEM_KIND.POINT,
           category: TIMELINE_CATEGORY.CHILDREN,
-          label: event.name || 'Child Arrival',
+          label: childLabelName || 'Child Arrival',
           description: `Child arrival event`,
           age: age,
           startAge: null,
@@ -733,7 +744,7 @@ export function getTimelineItems(inputs) {
           sourceType: 'lifeEvent',
           kind: TIMELINE_ITEM_KIND.PERIOD,
           category: TIMELINE_CATEGORY.CHILDREN,
-          label: event.name ? `${event.name} (Dependent)` : 'Child Dependent Period',
+          label: childLabelName ? `${childLabelName} (Dependent)` : 'Child Dependent Period',
           description: `Dependent years (up to age ${dependentYears})`,
           age: null,
           startAge: age,

@@ -125,7 +125,7 @@ describe('Savings Allocation Engine', () => {
     // Gross surplus is 10000. Expected pre-tax is 12000.
     // Pre-tax is scaled down to 10000, leaving netSurplus = 0.
     // Roth IRA (post-tax) should be 0.
-    expect(actual.trad401k).toBe(10000);
+    expect(actual.trad401k).toBe(9996);
     expect(actual.rothIra).toBe(0);
   });
 

@@ -863,9 +863,9 @@ export function derivePhasesFromEvents(profile, events, budgetOverrides = []) {
         }
         
         if (start >= purchaseAge && start < saleAge) {
-          const asset = (ev.houseId && profile.houseAssets)
+          const asset = ((ev.houseId && profile.houseAssets)
             ? profile.houseAssets.find(h => h.id === ev.houseId)
-            : ev;
+            : null) || ev;
           const p = Number(asset.homePrice !== undefined ? asset.homePrice : (asset.purchasePrice !== undefined ? asset.purchasePrice : 0)) || 0;
           const dp = Number(asset.downPayment) || 0;
           const isCash = dp >= p || asset.purchaseType === 'cash';

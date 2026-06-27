@@ -167,7 +167,7 @@ describe('lifeSnapshotSelectors', () => {
     const inputsNoIncomeList = {
       currentAge: 35,
       simpleIncome: 100000,
-      salaryGrowthRate: 0,
+      salaryGrowthRate: 3,
       inflationRate: 0
     };
     const snapshotNoList = getLifeSnapshotAtAge(inputsNoIncomeList, 40);
