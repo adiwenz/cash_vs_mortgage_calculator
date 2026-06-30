@@ -5,7 +5,7 @@ This document outlines the interaction cycle between `@Developer` and `@QA` in t
 ## Workflow Sequence
 
 1. **Propose/Implement**: `@Developer` proposes or implements a change in the application source code.
-2. **QA Trigger**: `@QA` automatically triggers the `/qa-check` command (defined in the `qa_engine` skill).
+2. **QA Trigger**: `@QA` automatically triggers the `/qa-check` command (defined in the `qa-check` skill).
 3. **Execution & Report**:
    - If all tests pass, `@QA` writes `.agents/artifacts/qa_pass_report.md` indicating a clean status.
    - If tests fail, `@QA` writes `.agents/artifacts/bug_trace.md` capturing the error logs, stack trace, and failing test context, and returns this context to `@Developer`.

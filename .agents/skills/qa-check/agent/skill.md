@@ -1,5 +1,5 @@
 ---
-name: qa_engine
+name: qa-check
 description: Skill for running the QA check on code changes using vitest related.
 ---
 
